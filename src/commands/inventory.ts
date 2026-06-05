@@ -55,7 +55,7 @@ async function renderTab(
       .addOptions([
         new StringSelectMenuOptionBuilder().setLabel('📦 Vật phẩm').setDescription('Đồ consumable và materials').setValue('items').setDefault(currentTab === 'items'),
         new StringSelectMenuOptionBuilder().setLabel('🔮 Skill Pool').setDescription('Kỹ năng đã học').setValue('skills').setDefault(currentTab === 'skills'),
-        new StringSelectMenuOptionBuilder().setLabel('📌 Loadout').setDescription('Trang bị 4 slots chiến đấu').setValue('loadout').setDefault(currentTab === 'loadout'),
+        new StringSelectMenuOptionBuilder().setLabel('📌 Loadout').setDescription('Trang bị skill slots chiến đấu').setValue('loadout').setDefault(currentTab === 'loadout'),
         new StringSelectMenuOptionBuilder().setLabel('📚 Skill Books').setDescription('Học kỹ năng mới').setValue('books').setDefault(currentTab === 'books'),
         new StringSelectMenuOptionBuilder().setLabel('⚔️ Trang Bị').setDescription('Weapon · Armor · 2x Accessory').setValue('equip').setDefault(currentTab === 'equip'),
         new StringSelectMenuOptionBuilder().setLabel('🏅 Danh Hiệu').setDescription('Title đã mở khoá').setValue('titles').setDefault(currentTab === 'titles'),
@@ -282,7 +282,8 @@ function buildSkillsTab(
 function buildLoadoutTab(
   player: any, pool: any[], loadout: any[], userId: string
 ): [EmbedBuilder, ActionRowBuilder<any>[]] {
-  const slotLines = [1,2,3,4].map(slot => {
+  const maxSlots = 4 + Math.min(2, player.extra_skill_slots ?? 0);
+  const slotLines = Array.from({ length: maxSlots }, (_, i) => i + 1).map(slot => {
     const entry = loadout.find(l => l.slot === slot);
     if (!entry) return `\`Slot ${slot}\` — *Trống*`;
     const sk = getSkill(entry.skill_id);
@@ -295,7 +296,7 @@ function buildLoadoutTab(
     .setColor(COLORS.magic)
     .setTitle('📌 Loadout')
     .setDescription(
-      '*Tối đa 4 slots. Loadout mất khi chết — pool giữ lại.*\n\n' +
+      `*Tối đa ${maxSlots} slots. Loadout mất khi chết — pool giữ lại.*\n\n` +
       slotLines.join('\n')
     );
 
@@ -308,7 +309,7 @@ function buildLoadoutTab(
     return sk && !equippedIds.has(p.skill_id);
   });
 
-  if (equipable.length && loadout.length < 4) {
+  if (equipable.length && loadout.length < maxSlots) {
     const opts = equipable.map(p => {
       const sk = getSkill(p.skill_id)!;
       return new StringSelectMenuOptionBuilder()
@@ -446,7 +447,9 @@ async function pickSlotForSkill(
   userId: string, guildId: string, skillId: string, loadout: any[]
 ): Promise<void> {
   const sk    = getSkill(skillId)!;
-  const freeSlots = [1,2,3,4].filter(s => !loadout.find(l => l.slot === s));
+  const player = getPlayer(userId, guildId)!;
+  const maxSlots = 4 + Math.min(2, player.extra_skill_slots ?? 0);
+  const freeSlots = Array.from({ length: maxSlots }, (_, i) => i + 1).filter(s => !loadout.find(l => l.slot === s));
 
   if (!freeSlots.length) {
     await renderTab(interaction, userId, guildId, 'loadout');

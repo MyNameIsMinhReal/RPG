@@ -60,7 +60,42 @@ const ACHIEVEMENTS: AchievementDef[] = [
     description: 'Trade 20 lần',
     badge: '🤝',
     rewardGold: 200
-  }
+  },
+  {
+    id: 'no_turning_back',
+    name: 'Không Còn Đường Lui',
+    description: 'Giết shopkeeper lần đầu',
+    badge: '🗡️',
+    rewardGold: 150
+  },
+  {
+    id: 'merchant_nightmare',
+    name: 'Ác Mộng Của Thương Nhân',
+    description: 'Cướp 3 shopkeeper',
+    badge: '🏦',
+    rewardGold: 300
+  },
+  {
+    id: 'friend_of_villagers',
+    name: 'Người Hùng Của Dân Làng',
+    description: 'Đạt Reputation +100',
+    badge: '🌿',
+    rewardGold: 300
+  },
+  {
+    id: 'walking_disaster',
+    name: 'Tai Họa Biết Đi',
+    description: 'Đạt Reputation -100',
+    badge: '🌑',
+    rewardGold: 100
+  },
+  {
+    id: 'familiar_with_death',
+    name: 'Kẻ Quen Mặt Với Tử Thần',
+    description: 'Chết 10 lần',
+    badge: '💀',
+    rewardGold: 100
+  },
 ];
 
 function ensureAchievementTables(): void {
@@ -135,6 +170,7 @@ export function awardAchievements(userId: string, guildId: string): string[] {
   const unlockedMessages: string[] = [];
   const bossKills = getEventTypeCount(userId, guildId, 'boss_kill');
   const tradeCount = getEventTypeCount(userId, guildId, 'trade');
+  const shopkeeperKills = getEventTypeCount(userId, guildId, 'shopkeeper_robbery');
   const skillCount = getSkillBookCount(userId, guildId);
 
   const checks: Array<[string, boolean]> = [
@@ -143,7 +179,12 @@ export function awardAchievements(userId: string, guildId: string): string[] {
     ['unlucky_soul', player.deaths >= 5],
     ['book_collector', skillCount >= 10],
     ['boss_hunter', bossKills >= 10],
-    ['trader', tradeCount >= 20]
+    ['trader', tradeCount >= 20],
+    ['no_turning_back', shopkeeperKills >= 1],
+    ['merchant_nightmare', shopkeeperKills >= 3],
+    ['friend_of_villagers', (player.reputation ?? 0) >= 100],
+    ['walking_disaster', (player.reputation ?? 0) <= -100],
+    ['familiar_with_death', player.deaths >= 10]
   ];
 
   for (const [id, condition] of checks) {

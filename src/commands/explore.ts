@@ -7,7 +7,9 @@ import {
 import {
   getPlayer, getLoadout, applyPassiveStats, incrementKills,
   grantGold, spendGold, killPlayer, grantExp, grantSoulShards,
-  addItem, getInventory, getItemQty, removeItem, updatePlayerHpMp, setZone, adjustReputation
+  addItem, getInventory, getItemQty, removeItem, updatePlayerHpMp, setZone, adjustReputation,
+  adjustWanted, getWantedLevel, getWantedTitle, adjustFaction,
+  addPermanentStat, addKeepItemCharge, addExtraSkillSlot, improveDeathPenaltyReduction, addRebirthBlessing, addMerchantMercy
 } from '../systems/player';
 import { getCombatByUser, saveCombat, deleteCombat } from '../systems/combat';
 import { startCombatFlow, startCombatFlowWithEnemy } from '../systems/combatFlow';
@@ -15,7 +17,8 @@ import { canExplore, exploreCooldownRemaining, setExploreCooldown } from '../sys
 import { processVictoryRewards, processDeathPenalty } from '../systems/rewards';
 import {
   logEvent, onBossKilled, isBossSlain, getDropBonus, getEnemyAtkBonus,
-  getShopMarkup, increaseShopMarkup, getShopkeeperThreatMultiplier, recordShopkeeperRobbery
+  getShopMarkup, getEffectiveShopMarkup, increaseShopMarkup, getShopkeeperThreatMultiplier, getShopkeeperRobberyCount, recordShopkeeperRobbery,
+  increaseMerchantFear, adjustWorldDanger
 } from '../systems/world';
 import { awardAchievements } from '../systems/achievements';
 import { createLegacy, pickLegacySkill, getLegaciesInZone, claimLegacy, getLegacy } from '../systems/legacy';
@@ -32,6 +35,7 @@ import { wearEquipment } from '../systems/equipment';
 import { getSkill } from '../data/skills';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
+import { pickExploreEvent, runExploreEvent } from './exploreEvents';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -422,69 +426,43 @@ async function handleSearch(
   const hasCombat = enemies.length > 0;
   const hasLegacy = legacies.length > 0;
 
-  // Weighted table (100 total)
-  // 25% combat | 10% ambush | 10% legacy | 8% merchant | 8% spring
-  // 8% trap | 8% altar | 7% mysterious | 7% villager | 5% caravan | 4% loot | 0% nothing
-  type EventType = 'combat'|'ambush'|'legacy'|'merchant'|'spring'|'trap'|'altar'|'mysterious'|'villager'|'caravan'|'loot'|'soul_shop'|'abandoned_camp'|'lost_pouch'|'rune_stone'|'treasure_chest'|'wandering_healer'|'spirit_trial'|'nothing';
-
-  const table: Array<[EventType, number]> = [
-    ['combat',     hasCombat ? 24 : 0],
-    ['ambush',     hasCombat ? 9 : 0],
-    ['legacy',     hasLegacy ? 9 : 0],
-    ['merchant',   8],
-    ['spring',     7],
-    ['trap',       7],
-    ['altar',      7],
-    ['mysterious', 6],
-    ['villager',   6],
-    ['caravan',    5],
-    ['loot',       4],
-    ['abandoned_camp', 5],
-    ['lost_pouch',     4],
-    ['rune_stone',     4],
-    ['treasure_chest', 4],
-    ['wandering_healer', 4],
-    ['spirit_trial',   hasCombat ? 3 : 0],
-    ['soul_shop',  player.soul_shards >= 1 ? 5 : 2], // rare unless has shards
-  ];
-
-  // Weighted random pick
-  const total = table.reduce((s, [, w]) => s + w, 0);
-  let roll    = randInt(1, total || 1);
-  let event: EventType = 'nothing';
-  for (const [name, weight] of table) {
-    if (weight <= 0) continue;
-    roll -= weight;
-    if (roll <= 0) { event = name; break; }
-  }
+  const event = pickExploreEvent({ player, guildId, hasCombat, hasLegacy });
 
   setExploreCooldown(userId, guildId);
 
-  switch (event) {
-    case 'combat':     return startCombatFlow(interaction, userId, guildId, pick(enemies).id, handleVictory, handleDeath);
-    case 'ambush':     return showAmbush(interaction, userId, guildId, pick(enemies).id);
-    case 'legacy':     return showLegacyFind(interaction, userId, guildId, legacies);
-    case 'merchant':   return showMerchant(interaction, userId, guildId);
-    case 'spring':     return showHealingSpring(interaction, userId, guildId);
-    case 'trap':       return showTrap(interaction, userId, guildId);
-    case 'altar':      return showAncientAltar(interaction, userId, guildId);
-    case 'mysterious': return showMysteriousFigure(interaction, userId, guildId);
-    case 'villager':   return showVillagerRescue(interaction, userId, guildId, enemies);
-    case 'caravan':    return showCaravanRobbery(interaction, userId, guildId, enemies);
-    case 'loot':       return showLootFind(interaction, userId, guildId);
-    case 'abandoned_camp': return showAbandonedCamp(interaction, userId, guildId);
-    case 'lost_pouch':     return showLostPouch(interaction, userId, guildId);
-    case 'rune_stone':     return showRuneStone(interaction, userId, guildId);
-    case 'treasure_chest': return showTreasureChest(interaction, userId, guildId);
-    case 'wandering_healer': return showWanderingHealer(interaction, userId, guildId);
-    case 'spirit_trial':   return showSpiritTrial(interaction, userId, guildId, enemies);
-    case 'soul_shop':  return showSoulShop(interaction, userId, guildId);
-    default:
-      await interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(zone.color).setDescription(`*${pick(zone.ambiance)}*\n\nKhông có gì bất thường...`)],
-        components: []
-      });
-  }
+  return runExploreEvent({
+    event,
+    interaction,
+    userId,
+    guildId,
+    player,
+    enemies,
+    legacies,
+    callbacks: {
+      startCombat: (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath),
+      showAmbush: () => showAmbush(interaction, userId, guildId, pick(enemies).id),
+      showLegacyFind: () => showLegacyFind(interaction, userId, guildId, legacies),
+      showMerchant: () => showMerchant(interaction, userId, guildId),
+      showHealingSpring: () => showHealingSpring(interaction, userId, guildId),
+      showTrap: () => showTrap(interaction, userId, guildId),
+      showAncientAltar: () => showAncientAltar(interaction, userId, guildId),
+      showMysteriousFigure: () => showMysteriousFigure(interaction, userId, guildId),
+      showVillagerRescue: () => showVillagerRescue(interaction, userId, guildId, enemies),
+      showCaravanRobbery: () => showCaravanRobbery(interaction, userId, guildId, enemies),
+      showLootFind: () => showLootFind(interaction, userId, guildId),
+      showSoulShop: () => showSoulShop(interaction, userId, guildId),
+      showAbandonedCamp: () => showAbandonedCamp(interaction, userId, guildId),
+      showLostPouch: () => showLostPouch(interaction, userId, guildId),
+      showRuneStone: () => showRuneStone(interaction, userId, guildId),
+      showTreasureChest: () => showTreasureChest(interaction, userId, guildId),
+      showWanderingHealer: () => showWanderingHealer(interaction, userId, guildId),
+      showSpiritTrial: () => showSpiritTrial(interaction, userId, guildId, enemies),
+      buildContinueExploreRow,
+      attachContinueExploreHandler,
+      handleVictory,
+      handleDeath
+    }
+  });
 }
 
 // ── Boss ───────────────────────────────────────────────────────────────────────
@@ -588,9 +566,21 @@ async function showLegacyFind(
 async function showLootFind(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
-  const lootTable = ['health_potion', 'mana_potion', 'herb', 'antidote'];
-  const itemId    = pick(lootTable);
-  const item      = getItem(itemId)!;
+  const player    = getPlayer(userId, guildId)!;
+  const zoneMats: Record<string, string[]> = {
+    village: ['healing_herb', 'wood', 'slime_core'],
+    forest:  ['wood', 'leather', 'wolf_fang', 'healing_herb', 'slime_core'],
+    shrine:  ['bone_shard', 'ancient_bone', 'mana_crystal', 'ectoplasm'],
+    mines:   ['iron_ore', 'stone', 'troll_hide', 'burning_core', 'dark_wing'],
+    wastes:  ['void_essence', 'shadow_essence', 'abyss_core', 'demon_seal'],
+  };
+  const lootPool  = [
+    'health_potion', 'mana_potion', 'antidote',
+    ...(zoneMats[player.zone_id] ?? ['healing_herb', 'wood']),
+    ...(zoneMats[player.zone_id] ?? ['healing_herb', 'wood']),
+  ];
+  const itemId    = pick(lootPool);
+  const item      = getItem(itemId) ?? { icon: '⚙️', name: itemId, description: '' } as any;
   addItem(userId, guildId, itemId, 1);
 
   const lootReply = await interaction.editReply({
@@ -951,7 +941,7 @@ async function showMerchant(
 
   const { getShopDiscount } = await import('../systems/world');
   const discount = getShopDiscount(guildId);
-  const markup = getShopMarkup(guildId);
+  const markup = getEffectiveShopMarkup(guildId);
 
   const stock = buildRandomMerchantStock(zone.id);
   await renderMerchantBuy(interaction, userId, guildId, zone.id, discount, markup, player.gold, stock);
@@ -1004,7 +994,7 @@ async function renderMerchantBuy(
 
   const allBuyOptions = [
     ...shopItems.filter(i => i.buyPrice).map(i => {
-      const price = Math.floor(i.buyPrice! * (1 - discount / 100));
+      const price = merchantPrice(i.buyPrice!, discount, markup);
       return new StringSelectMenuOptionBuilder()
         .setLabel(`${i.name} — ${price} 🪙`)
         .setDescription(i.description.replace(/\*\*/g, '').slice(0, 50))
@@ -1259,18 +1249,19 @@ function formatMerchantStock(stock: MerchantStock): string {
   return lines.length ? lines.join('\n') : '*Không còn hàng để cướp.*';
 }
 
-function buildShopkeeperEnemy(player: any, zoneId: string, stock: MerchantStock, multiplier: number) {
+function buildShopkeeperEnemy(player: any, zoneId: string, stock: MerchantStock, multiplier: number, wantedLevel = 0, merchantFear = 0) {
   const zoneIdx = Math.max(0, ZONE_ORDER.indexOf(zoneId));
   const stockCount = stock.itemIds.length + stock.equipmentIds.length;
-  const hp = Math.floor((Math.max(120, player.max_hp * 1.25) + zoneIdx * 45 + stockCount * 10) * multiplier);
-  const atk = Math.floor((Math.max(12, player.atk + 7) + zoneIdx * 4 + stockCount) * multiplier);
-  const def = Math.floor((Math.max(5, player.def + 3) + zoneIdx * 2 + Math.floor(stockCount / 2)) * multiplier);
+  const pressure = 1 + wantedLevel * 0.12 + merchantFear / 250;
+  const hp = Math.floor((Math.max(120, player.max_hp * 1.25) + zoneIdx * 45 + stockCount * 10) * multiplier * pressure);
+  const atk = Math.floor((Math.max(12, player.atk + 7) + zoneIdx * 4 + stockCount) * multiplier * pressure);
+  const def = Math.floor((Math.max(5, player.def + 3) + zoneIdx * 2 + Math.floor(stockCount / 2)) * multiplier * pressure);
 
   return {
     id: `shopkeeper_${player.user_id}_${Date.now()}`,
-    name: multiplier > 1 ? 'Veteran Shopkeeper' : 'Shopkeeper',
-    icon: multiplier > 1 ? '🛡️' : '🧔',
-    level: Math.max(1, player.level + zoneIdx + (multiplier > 1 ? 3 : 1)),
+    name: wantedLevel >= 4 ? 'Merchant Guardian' : multiplier > 1 ? 'Veteran Shopkeeper' : 'Shopkeeper',
+    icon: wantedLevel >= 4 ? '🛡️' : multiplier > 1 ? '🛡️' : '🧔',
+    level: Math.max(1, player.level + zoneIdx + wantedLevel + (multiplier > 1 ? 3 : 1)),
     hp, atk, def,
     boss: false,
     lore: 'Một lái buôn không hề yếu như vẻ ngoài.',
@@ -1284,6 +1275,12 @@ async function renderShopkeeperRobPrompt(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string, zoneId: string, stock: MerchantStock
 ): Promise<void> {
   const multiplier = getShopkeeperThreatMultiplier(guildId, userId);
+  const wanted = getWantedLevel(userId, guildId);
+  const wantedText = getWantedTitle(wanted);
+  const robberyCount = getShopkeeperRobberyCount(guildId, userId);
+  const memoryLine = robberyCount > 0
+    ? `\n\n🧠 *"Lại là ngươi...? Ta đã chuẩn bị rồi."*`
+    : '';
   const embed = new EmbedBuilder()
     .setColor(COLORS.danger)
     .setTitle('🗡️ Cướp Shopkeeper?')
@@ -1295,6 +1292,7 @@ async function renderShopkeeperRobPrompt(
       `• Giá shop toàn thế giới tăng thêm **10%**.\n` +
       `• Sau khi từng giết shopkeeper, lần cướp sau shopkeeper sẽ có **x2 stats**.\n` +
       `• Khi còn **50% HP**, shopkeeper sẽ dùng sạch hàng đang bán để hồi máu/tăng stats.\n\n` +
+      `📜 Wanted hiện tại: **${wanted}/5 — ${wantedText}**` + memoryLine + `\n` +
       (multiplier > 1 ? `🛡️ **Shopkeeper lần này đã cảnh giác: x2 stats.**` : `Bạn chưa từng giết shopkeeper, hắn vẫn chưa gọi vệ sĩ.`)
     );
 
@@ -1321,7 +1319,8 @@ async function startShopkeeperCombat(
 ): Promise<void> {
   const player = getPlayer(userId, guildId)!;
   const multiplier = getShopkeeperThreatMultiplier(guildId, userId);
-  const enemy = buildShopkeeperEnemy(player, zoneId, stock, multiplier);
+  const enemy = buildShopkeeperEnemy(player, zoneId, stock, multiplier, getWantedLevel(userId, guildId), (await import('../systems/world')).getMerchantFear(guildId));
+  (enemy as any).onMercy = handleShopkeeperMercyChoice;
 
   await startCombatFlowWithEnemy(
     interaction, userId, guildId, enemy,
@@ -1329,6 +1328,70 @@ async function startShopkeeperCombat(
     handleShopkeeperVictory,
     handleDeath
   );
+}
+
+
+async function handleShopkeeperMercyChoice(
+  interaction: ChatInputCommandInteraction, btnInt: ButtonInteraction,
+  userId: string, guildId: string, player: any, enemy: any, state: any, cid: string
+): Promise<void> {
+  updatePlayerHpMp(userId, guildId, state.player_hp, state.player_mp);
+  const stock: MerchantStock = enemy.shopStock ?? { itemIds: [], equipmentIds: [] };
+  const drops = [...(stock.itemIds ?? []), ...(stock.equipmentIds ?? [])];
+
+  if (cid === `shopmercy_spare_${userId}`) {
+    const rep = adjustReputation(userId, guildId, 12);
+    const wanted = adjustWanted(userId, guildId, -1);
+    const merchantFaction = adjustFaction(userId, guildId, 'merchants', 10);
+    logEvent(guildId, userId, player.name, 'shopkeeper_mercy', `${player.name} đã tha mạng shopkeeper.`, player.zone_id);
+    const embed = new EmbedBuilder().setColor(COLORS.success)
+      .setTitle('🙏 Tha Mạng Shopkeeper')
+      .setDescription(
+        `Bạn hạ vũ khí xuống. Shopkeeper ôm lấy vết thương rồi biến mất vào màn sương.
+
+` +
+        `🤝 Reputation: **${rep}** (+12)
+` +
+        `📜 Wanted: **${wanted}/5** (-1)
+` +
+        `🏛️ Hội Thương Nhân: **${merchantFaction}** (+10)
+` +
+        `*Hắn sẽ nhớ lòng thương xót này.*`
+      );
+    await btnInt.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(btnInt.message, interaction, userId, guildId);
+    return;
+  }
+
+  if (cid === `shopmercy_take_${userId}`) {
+    const takeCount = Math.min(drops.length, randInt(1, 2));
+    const taken = drops.slice(0, takeCount);
+    for (const id of taken) addItem(userId, guildId, id, 1);
+    const rep = adjustReputation(userId, guildId, -12);
+    const wanted = adjustWanted(userId, guildId, 1);
+    const merchantFaction = adjustFaction(userId, guildId, 'merchants', -12);
+    logEvent(guildId, userId, player.name, 'shopkeeper_extortion', `${player.name} ép shopkeeper giao nộp hàng.`, player.zone_id);
+    const dropText = taken.length ? taken.map(id => {
+      const item = getItem(id); const eq = getEquipment(id);
+      return `${item?.icon ?? eq?.icon ?? '🎁'} **${item?.name ?? eq?.name ?? id}**`;
+    }).join('\n') : '*Shopkeeper không còn gì để giao nộp.*';
+    const embed = new EmbedBuilder().setColor(COLORS.warning)
+      .setTitle('💰 Ép Giao Nộp Hàng')
+      .setDescription(
+        `Bạn ép shopkeeper nộp hàng rồi để hắn sống.\n\n` +
+        `📦 **Nhận được:**\n${dropText}\n\n` +
+        `🤝 Reputation: **${rep}** (-12)\n` +
+        `📜 Wanted: **${wanted}/5** (+1)\n` +
+        `🏛️ Hội Thương Nhân: **${merchantFaction}** (-12)`
+      );
+    await btnInt.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(btnInt.message, interaction, userId, guildId);
+    return;
+  }
+
+  // Kết liễu khi shopkeeper đã van xin: nhận toàn bộ hàng còn lại nhưng phạt nặng hơn.
+  enemy.shopStock = stock;
+  await handleShopkeeperVictory(interaction, btnInt, userId, guildId, player, enemy, state);
 }
 
 async function handleShopkeeperVictory(
@@ -1344,9 +1407,14 @@ async function handleShopkeeperVictory(
   for (const id of drops) addItem(userId, guildId, id, 1);
 
   const rep = adjustReputation(userId, guildId, -30);
+  const wanted = adjustWanted(userId, guildId, 1);
+  const merchantFaction = adjustFaction(userId, guildId, 'merchants', -25);
+  adjustFaction(userId, guildId, 'shadow_court', 8);
   const markup = increaseShopMarkup(guildId, 10, 75);
+  const fear = increaseMerchantFear(guildId, 12);
+  const danger = adjustWorldDanger(guildId, 5);
   const robberyCount = recordShopkeeperRobbery(guildId, userId);
-  logEvent(guildId, userId, player.name, 'shopkeeper_robbery', `${player.name} đã giết một shopkeeper. Giá shop +${markup}%, reputation ${rep}.`, player.zone_id);
+  logEvent(guildId, userId, player.name, 'shopkeeper_robbery', `${player.name} đã giết một shopkeeper. Wanted ${wanted}/5, giá shop +${markup}%, reputation ${rep}.`, player.zone_id);
 
   const dropText = drops.length
     ? drops.map(id => {
@@ -1363,7 +1431,9 @@ async function handleShopkeeperVictory(
       `Bạn lục soát quầy hàng đổ nát.\n\n` +
       `📦 **Đồ cướp được:**\n${dropText}\n\n` +
       `🤝 Reputation: **${rep}** (**−30**)\n` +
-      `🛒 Giá shop toàn thế giới: **+${markup}%**\n` +
+      `📜 Wanted: **${wanted}/5 — ${getWantedTitle(wanted)}** (**+1**)\n` +
+      `🏛️ Hội Thương Nhân: **${merchantFaction}** (**−25**)\n` +
+      `🛒 Giá shop toàn thế giới: **+${markup}%** · 🏦 Fear **${fear}%** · ⚠️ Danger **${danger}%**\n` +
       `🛡️ Lần cướp shopkeeper sau: **x2 stats**${robberyCount > 1 ? ` *(đây là lần ${robberyCount})*` : ''}`
     );
 
@@ -1976,6 +2046,14 @@ const SOUL_SHOP_ITEMS: Array<{
   { id: 'eq_box',       name: 'Cursed Equipment Box',       icon: '🎁', cost: 8, desc: 'Trang bị Rare+ ngẫu nhiên', giveItem: 'cursed_equipment_box', qty: 1 },
   { id: 'soul_anchor',  name: 'Soul Anchor',                icon: '⚓', cost: 10, desc: 'Sống sót 1 lần khi chết', giveItem: 'soul_anchor', qty: 1 },
   { id: 'leg_pendant',  name: 'Legacy Pendant',             icon: '📿', cost: 12, desc: '+50% gold từ Legacy', giveItem: 'legacy_pendant', qty: 1 },
+  { id: 'stat_atk',     name: '+1 ATK vĩnh viễn',            icon: '⚔️', cost: 6, desc: 'Tăng ATK cơ bản, giữ qua chuyển sinh' },
+  { id: 'stat_def',     name: '+1 DEF vĩnh viễn',            icon: '🛡️', cost: 6, desc: 'Tăng DEF cơ bản, giữ qua chuyển sinh' },
+  { id: 'stat_hp',      name: '+10 HP vĩnh viễn',            icon: '❤️', cost: 7, desc: 'Tăng Max HP cơ bản, giữ qua chuyển sinh' },
+  { id: 'keep_item',    name: 'Giữ 1 item khi chết',         icon: '🔒', cost: 9, desc: 'Tích 1 charge bảo hiểm di vật' },
+  { id: 'skill_slot',   name: 'Mở thêm slot kỹ năng',        icon: '📌', cost: 18, desc: 'Mở tối đa +2 slot loadout' },
+  { id: 'death_reduce', name: 'Giảm penalty khi chết',       icon: '🕯️', cost: 10, desc: 'Giảm penalty tử vong thêm 10%, cap 50%' },
+  { id: 'next_bless',   name: 'Blessing cho kiếp sau',       icon: '🧬', cost: 7, desc: 'Lần /start sau chết mạnh hơn một chút' },
+  { id: 'mercy_mark',   name: 'Ấn chuộc lỗi thương nhân',    icon: '🧾', cost: 6, desc: 'Dùng trong event chuộc tội/giảm wanted' },
 ];
 
 const COMMON_BOOKS = ['book_fireball','book_ice_lance','book_shield_bash','book_shadow_step','book_mend_wounds','book_thunder_clap',
@@ -1998,7 +2076,7 @@ async function showSoulShop(
 
   const embed = new EmbedBuilder()
     .setColor(COLORS.purple)
-    .setTitle('💀 Soul Shop — Cửa Hàng Bóng Tối')
+    .setTitle('💀 Người Giữ Linh Hồn')
     .setDescription(`*${pick(flavors)}*\n\n${itemLines}\n\n💀 Soul Shards của bạn: **${player.soul_shards}**`);
 
   const options = SOUL_SHOP_ITEMS
@@ -2080,12 +2158,36 @@ async function showSoulShop(
         addItem(userId, guildId, chosen.id, 1);
         result = `${chosen.icon} **${chosen.name}** (${chosen.rarity})`;
       } else if (itemKey === 'mat_chest') {
-        const mats = ['herb','wolf_fang','ancient_bark','bone_shard','ectoplasm','troll_hide'];
+        const mats = ['herb','wolf_fang','ancient_bark','bone_shard','ectoplasm','troll_hide','ancient_wood','broken_rune','merchant_seal','soul_dust','rusty_gear','cursed_cloth'];
         const qty = randInt(2, 4);
         const picked: string[] = [];
         for (let i = 0; i < qty; i++) { const m = pick(mats); addItem(userId, guildId, m, 1); picked.push(m); }
         const distinct = [...new Set(picked)].map(m => getItem(m)?.name ?? m).join(', ');
         result = `📦 ${distinct}`;
+      } else if (itemKey === 'stat_atk') {
+        addPermanentStat(userId, guildId, 'atk', 1);
+        result = '⚔️ **ATK vĩnh viễn +1**';
+      } else if (itemKey === 'stat_def') {
+        addPermanentStat(userId, guildId, 'def', 1);
+        result = '🛡️ **DEF vĩnh viễn +1**';
+      } else if (itemKey === 'stat_hp') {
+        addPermanentStat(userId, guildId, 'max_hp', 10);
+        result = '❤️ **Max HP vĩnh viễn +10**';
+      } else if (itemKey === 'keep_item') {
+        const charges = addKeepItemCharge(userId, guildId, 1);
+        result = `🔒 **Keep Item Charge +1** *(đang có ${charges})*`;
+      } else if (itemKey === 'skill_slot') {
+        const slots = addExtraSkillSlot(userId, guildId, 1);
+        result = `📌 **Mở thêm slot kỹ năng** *(+${slots}/2)*`;
+      } else if (itemKey === 'death_reduce') {
+        const reduction = improveDeathPenaltyReduction(userId, guildId, 10);
+        result = `🕯️ **Death penalty reduction ${reduction}%**`;
+      } else if (itemKey === 'next_bless') {
+        const blessings = addRebirthBlessing(userId, guildId, 1);
+        result = `🧬 **Blessing cho kiếp sau +1** *(đang có ${blessings})*`;
+      } else if (itemKey === 'mercy_mark') {
+        const marks = addMerchantMercy(userId, guildId, 1);
+        result = `🧾 **Ấn chuộc lỗi thương nhân +1** *(đang có ${marks})*`;
       } else if (shopItem.giveItem) {
         addItem(userId, guildId, shopItem.giveItem, shopItem.qty ?? 1);
         const it = getItem(shopItem.giveItem);
@@ -2096,7 +2198,7 @@ async function showSoulShop(
       const resReply = await interaction.editReply({
         embeds: [
           new EmbedBuilder().setColor(COLORS.purple)
-            .setTitle('💀 Soul Shop — Mua Thành Công')
+            .setTitle('💀 Người Giữ Linh Hồn — Khế Ước Hoàn Tất')
             .setDescription(`−**${shopItem.cost} 💀** Soul Shard\nNhận được: ${result}\n\n💀 Còn lại: **${afterP.soul_shards}** Soul Shards`)
         ],
         components: buildContinueExploreRow(userId)

@@ -24,14 +24,21 @@ export function createPlayer(userId: string, guildId: string, name: string): Pla
 }
 
 export function resetPlayer(userId: string, guildId: string): void {
-  // Keep soul_shards and deaths count; reset everything else
+  // Keep soul_shards, deaths, learned skills and permanent soul upgrades.
+  const current = getPlayer(userId, guildId) as any;
+  const pAtk = current?.permanent_atk_bonus ?? 0;
+  const pDef = current?.permanent_def_bonus ?? 0;
+  const pHp  = current?.permanent_max_hp_bonus ?? 0;
+  const pMp  = current?.permanent_max_mp_bonus ?? 0;
+  const blessing = current?.rebirth_blessing ? 1 : 0;
   db.prepare(`
     UPDATE players SET
       alive = 1, level = 1, exp = 0, exp_next = 100,
-      hp = 100, max_hp = 100, mp = 50, max_mp = 50,
-      atk = 10, def = 5, gold = 50, zone_id = 'village', kills = 0
+      hp = ?, max_hp = ?, mp = ?, max_mp = ?,
+      atk = ?, def = ?, gold = ?, zone_id = 'village', kills = 0,
+      rebirth_blessing = MAX(0, COALESCE(rebirth_blessing,0) - ?)
     WHERE user_id = ? AND guild_id = ?
-  `).run(userId, guildId);
+  `).run(100 + pHp + blessing * 20, 100 + pHp + blessing * 20, 50 + pMp + blessing * 10, 50 + pMp + blessing * 10, 10 + pAtk + blessing * 2, 5 + pDef + blessing, 50 + blessing * 50, blessing, userId, guildId);
   // Clear loadout (pool is kept)
   db.prepare('DELETE FROM skill_loadout WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
   // Clear inventory
@@ -237,4 +244,123 @@ export function killPlayer(userId: string, guildId: string): void {
     UPDATE players SET alive=0, hp=0, mp=0, deaths=deaths+1
     WHERE user_id=? AND guild_id=?
   `).run(userId, guildId);
+}
+
+// ── Wanted / Factions / Soul perks / Pets ────────────────────────────────
+export type FactionId = 'merchants' | 'hunters' | 'old_church' | 'shadow_court' | 'villagers';
+
+export function getWantedLevel(userId: string, guildId: string): number {
+  const row = db.prepare('SELECT COALESCE(wanted_level,0) AS wanted_level FROM players WHERE user_id=? AND guild_id=?')
+    .get(userId, guildId) as unknown as { wanted_level: number } | undefined;
+  return Math.max(0, Math.min(5, row?.wanted_level ?? 0));
+}
+
+export function adjustWanted(userId: string, guildId: string, amount: number): number {
+  db.prepare(`
+    UPDATE players
+    SET wanted_level = MAX(0, MIN(5, COALESCE(wanted_level,0) + ?))
+    WHERE user_id=? AND guild_id=?
+  `).run(amount, userId, guildId);
+  return getWantedLevel(userId, guildId);
+}
+
+export function getWantedTitle(level: number): string {
+  if (level <= 0) return 'Bình thường';
+  if (level === 1) return 'Bị nghi ngờ';
+  if (level === 2) return 'Bị truy nã nhẹ';
+  if (level === 3) return 'Bị thương hội săn';
+  if (level === 4) return 'Bị cấm giao dịch';
+  return 'Sát nhân khét tiếng';
+}
+
+export function adjustFaction(userId: string, guildId: string, factionId: FactionId, amount: number): number {
+  db.prepare(`
+    INSERT INTO player_factions (user_id, guild_id, faction_id, reputation, updated_at)
+    VALUES (?, ?, ?, ?, unixepoch())
+    ON CONFLICT(user_id, guild_id, faction_id)
+    DO UPDATE SET reputation = MAX(-100, MIN(100, reputation + excluded.reputation)), updated_at = unixepoch()
+  `).run(userId, guildId, factionId, amount);
+
+  const row = db.prepare('SELECT reputation FROM player_factions WHERE user_id=? AND guild_id=? AND faction_id=?')
+    .get(userId, guildId, factionId) as unknown as { reputation: number } | undefined;
+  return row?.reputation ?? 0;
+}
+
+export function getFactionReputation(userId: string, guildId: string, factionId: FactionId): number {
+  const row = db.prepare('SELECT reputation FROM player_factions WHERE user_id=? AND guild_id=? AND faction_id=?')
+    .get(userId, guildId, factionId) as unknown as { reputation: number } | undefined;
+  return row?.reputation ?? 0;
+}
+
+export function getFactionSummary(userId: string, guildId: string): Record<FactionId, number> {
+  return {
+    merchants: getFactionReputation(userId, guildId, 'merchants'),
+    hunters: getFactionReputation(userId, guildId, 'hunters'),
+    old_church: getFactionReputation(userId, guildId, 'old_church'),
+    shadow_court: getFactionReputation(userId, guildId, 'shadow_court'),
+    villagers: getFactionReputation(userId, guildId, 'villagers'),
+  };
+}
+
+export function addPermanentStat(userId: string, guildId: string, stat: 'atk' | 'def' | 'max_hp' | 'max_mp', amount: number): void {
+  const safeAmount = Math.max(1, Math.floor(amount));
+  const bonusColumn: Record<typeof stat, string> = {
+    atk: 'permanent_atk_bonus',
+    def: 'permanent_def_bonus',
+    max_hp: 'permanent_max_hp_bonus',
+    max_mp: 'permanent_max_mp_bonus'
+  };
+  db.prepare(`UPDATE players SET ${stat} = ${stat} + ?, ${bonusColumn[stat]} = COALESCE(${bonusColumn[stat]},0) + ?, bonus_stat_points = COALESCE(bonus_stat_points,0) + ? WHERE user_id=? AND guild_id=?`)
+    .run(safeAmount, safeAmount, safeAmount, userId, guildId);
+  if (stat === 'max_hp') db.prepare('UPDATE players SET hp = hp + ? WHERE user_id=? AND guild_id=?').run(safeAmount, userId, guildId);
+  if (stat === 'max_mp') db.prepare('UPDATE players SET mp = mp + ? WHERE user_id=? AND guild_id=?').run(safeAmount, userId, guildId);
+}
+
+export function addKeepItemCharge(userId: string, guildId: string, amount = 1): number {
+  db.prepare('UPDATE players SET keep_item_charges = COALESCE(keep_item_charges,0) + ? WHERE user_id=? AND guild_id=?')
+    .run(amount, userId, guildId);
+  return (getPlayer(userId, guildId)?.keep_item_charges ?? 0);
+}
+
+export function addExtraSkillSlot(userId: string, guildId: string, amount = 1, cap = 2): number {
+  db.prepare('UPDATE players SET extra_skill_slots = MIN(?, COALESCE(extra_skill_slots,0) + ?) WHERE user_id=? AND guild_id=?')
+    .run(cap, amount, userId, guildId);
+  return (getPlayer(userId, guildId)?.extra_skill_slots ?? 0);
+}
+
+export function improveDeathPenaltyReduction(userId: string, guildId: string, amount = 10, cap = 50): number {
+  db.prepare('UPDATE players SET death_penalty_reduction = MIN(?, COALESCE(death_penalty_reduction,0) + ?) WHERE user_id=? AND guild_id=?')
+    .run(cap, amount, userId, guildId);
+  return (getPlayer(userId, guildId)?.death_penalty_reduction ?? 0);
+}
+
+export function addRebirthBlessing(userId: string, guildId: string, amount = 1): number {
+  db.prepare('UPDATE players SET rebirth_blessing = COALESCE(rebirth_blessing,0) + ? WHERE user_id=? AND guild_id=?')
+    .run(amount, userId, guildId);
+  return (getPlayer(userId, guildId)?.rebirth_blessing ?? 0);
+}
+
+export function addMerchantMercy(userId: string, guildId: string, amount = 1): number {
+  db.prepare('UPDATE players SET merchant_mercy = COALESCE(merchant_mercy,0) + ? WHERE user_id=? AND guild_id=?')
+    .run(amount, userId, guildId);
+  return (getPlayer(userId, guildId)?.merchant_mercy ?? 0);
+}
+
+export function addPet(userId: string, guildId: string, petId: string): boolean {
+  const before = db.prepare('SELECT 1 FROM player_pets WHERE user_id=? AND guild_id=? AND pet_id=?')
+    .get(userId, guildId, petId);
+  db.prepare('INSERT OR IGNORE INTO player_pets (user_id, guild_id, pet_id) VALUES (?, ?, ?)')
+    .run(userId, guildId, petId);
+  return !before;
+}
+
+export function hasPet(userId: string, guildId: string, petId: string): boolean {
+  const row = db.prepare('SELECT 1 FROM player_pets WHERE user_id=? AND guild_id=? AND pet_id=?')
+    .get(userId, guildId, petId);
+  return !!row;
+}
+
+export function getPets(userId: string, guildId: string): Array<{ pet_id: string; level: number; acquired_at: number }> {
+  return db.prepare('SELECT pet_id, level, acquired_at FROM player_pets WHERE user_id=? AND guild_id=? ORDER BY acquired_at DESC')
+    .all(userId, guildId) as unknown as Array<{ pet_id: string; level: number; acquired_at: number }>;
 }

@@ -170,3 +170,55 @@ db.exec(`
     PRIMARY KEY (user_id, guild_id, date)
   );
 `);
+
+// ── Crafting tables ───────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS unlocked_recipes (
+    user_id     TEXT NOT NULL,
+    guild_id    TEXT NOT NULL,
+    recipe_id   TEXT NOT NULL,
+    unlocked_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id, recipe_id)
+  );
+`);
+
+try { db.exec(`ALTER TABLE players ADD COLUMN crafting_exp   INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN crafting_level INTEGER DEFAULT 1`); } catch {}
+
+// ── Stamina columns for active_combats ───────────────────────────────────
+try { db.exec(`ALTER TABLE active_combats ADD COLUMN player_stamina     INTEGER DEFAULT 100`); } catch {}
+try { db.exec(`ALTER TABLE active_combats ADD COLUMN player_max_stamina INTEGER DEFAULT 100`); } catch {}
+
+// ── Wanted / factions / soul perks / pets ────────────────────────────────
+try { db.exec(`ALTER TABLE players ADD COLUMN wanted_level INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN bonus_stat_points INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN keep_item_charges INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN extra_skill_slots INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN death_penalty_reduction INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN rebirth_blessing INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN merchant_mercy INTEGER DEFAULT 0`); } catch {}
+
+// World values are stored as flags, but these tables keep player-specific relationships.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS player_factions (
+    user_id       TEXT NOT NULL,
+    guild_id      TEXT NOT NULL,
+    faction_id    TEXT NOT NULL,
+    reputation    INTEGER DEFAULT 0,
+    updated_at    INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id, faction_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS player_pets (
+    user_id       TEXT NOT NULL,
+    guild_id      TEXT NOT NULL,
+    pet_id        TEXT NOT NULL,
+    level         INTEGER DEFAULT 1,
+    acquired_at   INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id, pet_id)
+  );
+`);
+try { db.exec(`ALTER TABLE players ADD COLUMN permanent_atk_bonus INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN permanent_def_bonus INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN permanent_max_hp_bonus INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN permanent_max_mp_bonus INTEGER DEFAULT 0`); } catch {}

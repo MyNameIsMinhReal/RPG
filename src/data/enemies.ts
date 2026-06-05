@@ -27,7 +27,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   forest_sprite: {
     id: 'forest_sprite', name: 'Forest Sprite', icon: '🧚', level: 1,
     hp: 40, atk: 8, def: 3, expReward: 20, goldMin: 5, goldMax: 15,
-    drops: [{ itemId: 'herb', chance: 40 }, { itemId: 'book_fireball', chance: 5 }],
+    drops: [{ itemId: 'healing_herb', chance: 45 }, { itemId: 'slime_core', chance: 30 }, { itemId: 'wood', chance: 40 }, { itemId: 'book_fireball', chance: 5 }],
     specialAttacks: ['petal_storm'],
     zones: ['forest'],
     lore: 'Một tinh linh rừng nhỏ bị nhiễm độc bởi bóng tối.'
@@ -35,7 +35,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   cursed_wolf: {
     id: 'cursed_wolf', name: 'Cursed Wolf', icon: '🐺', level: 2,
     hp: 65, atk: 14, def: 5, expReward: 40, goldMin: 10, goldMax: 25,
-    drops: [{ itemId: 'wolf_fang', chance: 50 }, { itemId: 'book_berserker', chance: 8 }],
+    drops: [{ itemId: 'wolf_fang', chance: 55 }, { itemId: 'leather', chance: 45 }, { itemId: 'book_berserker', chance: 8 }],
     specialAttacks: ['double_bite', 'howl'],
     zones: ['forest'],
     lore: 'Bị lời nguyền biến thành quái vật, đôi mắt đỏ rực bùng cháy.'
@@ -43,7 +43,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   vine_golem: {
     id: 'vine_golem', name: 'Vine Golem', icon: '🌿', level: 3,
     hp: 90, atk: 16, def: 12, expReward: 65, goldMin: 20, goldMax: 40,
-    drops: [{ itemId: 'ancient_bark', chance: 45 }, { itemId: 'book_iron_skin', chance: 10 }],
+    drops: [{ itemId: 'ancient_bark', chance: 45 }, { itemId: 'wood', chance: 50 }, { itemId: 'stone', chance: 30 }, { itemId: 'book_iron_skin', chance: 10 }],
     specialAttacks: ['entangle'],
     zones: ['forest'],
     lore: 'Cây cổ thụ ngàn năm bị hồn ma chiếm đóng, rễ cây trở thành nanh vuốt.'
@@ -54,7 +54,9 @@ export const ENEMIES: Record<string, EnemyDef> = {
     drops: [
       { itemId: 'book_tough_body', chance: 40 },
       { itemId: 'book_mend_wounds', chance: 30 },
-      { itemId: 'elixir', chance: 20 }
+      { itemId: 'elixir', chance: 20 },
+      { itemId: 'ancient_relic', chance: 15 },
+      { itemId: 'wood', chance: 80 }
     ],
     specialAttacks: ['root_slam', 'nature_regeneration'],
     zones: ['forest'], boss: true,
@@ -66,7 +68,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   skeleton_archer: {
     id: 'skeleton_archer', name: 'Skeleton Archer', icon: '💀', level: 3,
     hp: 70, atk: 18, def: 6, expReward: 60, goldMin: 15, goldMax: 35,
-    drops: [{ itemId: 'bone_shard', chance: 55 }, { itemId: 'book_shadow_step', chance: 8 }],
+    drops: [{ itemId: 'bone_shard', chance: 55 }, { itemId: 'ancient_bone', chance: 20 }, { itemId: 'silver_ore', chance: 15 }, { itemId: 'book_shadow_step', chance: 8 }],
     specialAttacks: ['piercing_arrow'],
     zones: ['shrine'],
     lore: 'Linh hồn lính canh cổ đền bị giam cầm, vẫn bảo vệ nơi thiêng liêng.'
@@ -74,7 +76,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   phantom: {
     id: 'phantom', name: 'Phantom', icon: '👻', level: 4,
     hp: 80, atk: 20, def: 8, expReward: 85, goldMin: 25, goldMax: 50,
-    drops: [{ itemId: 'ectoplasm', chance: 60 }, { itemId: 'book_counter', chance: 10 }],
+    drops: [{ itemId: 'ectoplasm', chance: 60 }, { itemId: 'mana_crystal', chance: 25 }, { itemId: 'frost_shard', chance: 15 }, { itemId: 'book_counter', chance: 10 }],
     specialAttacks: ['drain_mp', 'phase_through'],
     zones: ['shrine'],
     lore: 'Bóng ma không đầu lang thang, tìm kiếm linh hồn để hoàn chỉnh bản thân.'
@@ -97,7 +99,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   cave_troll: {
     id: 'cave_troll', name: 'Cave Troll', icon: '👹', level: 5,
     hp: 130, atk: 26, def: 10, expReward: 120, goldMin: 30, goldMax: 60,
-    drops: [{ itemId: 'troll_hide', chance: 50 }, { itemId: 'book_shield_bash', chance: 12 }],
+    drops: [{ itemId: 'troll_hide', chance: 55 }, { itemId: 'iron_ore', chance: 40 }, { itemId: 'burning_core', chance: 15 }, { itemId: 'book_shield_bash', chance: 12 }],
     specialAttacks: ['ground_slam', 'rock_throw'],
     zones: ['mines'],
     lore: 'Hung thần hang động, mỗi bước chân làm rung chuyển hầm mỏ.'
@@ -105,7 +107,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   shadow_bat: {
     id: 'shadow_bat', name: 'Shadow Bat', icon: '🦇', level: 6,
     hp: 100, atk: 30, def: 7, expReward: 140, goldMin: 35, goldMax: 70,
-    drops: [{ itemId: 'dark_wing', chance: 55 }, { itemId: 'book_vampiric', chance: 12 }],
+    drops: [{ itemId: 'dark_wing', chance: 55 }, { itemId: 'shadow_essence', chance: 30 }, { itemId: 'black_iron', chance: 10 }, { itemId: 'book_vampiric', chance: 12 }],
     specialAttacks: ['blood_drain', 'screech'],
     zones: ['mines'],
     lore: 'Sống trong bóng tối tuyệt đối, hút máu để duy trì sự bất tử.'
@@ -116,7 +118,10 @@ export const ENEMIES: Record<string, EnemyDef> = {
     drops: [
       { itemId: 'book_ice_lance', chance: 30 },
       { itemId: 'book_mana_flow', chance: 25 },
-      { itemId: 'colossus_core', chance: 20 }
+      { itemId: 'colossus_core', chance: 25 },
+      { itemId: 'dragon_scale', chance: 15 },
+      { itemId: 'burning_core', chance: 30 },
+      { itemId: 'iron_ore', chance: 60 }
     ],
     specialAttacks: ['cave_in', 'seismic_slam', 'magma_core'],
     zones: ['mines'], boss: true,
@@ -128,7 +133,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   void_wraith: {
     id: 'void_wraith', name: 'Void Wraith', icon: '🌀', level: 8,
     hp: 160, atk: 35, def: 12, expReward: 200, goldMin: 50, goldMax: 100,
-    drops: [{ itemId: 'void_essence', chance: 50 }, { itemId: 'book_mark_zone', chance: 15 }],
+    drops: [{ itemId: 'void_essence', chance: 50 }, { itemId: 'broken_soul', chance: 15 }, { itemId: 'abyss_core', chance: 10 }, { itemId: 'book_mark_zone', chance: 15 }],
     specialAttacks: ['void_drain', 'reality_tear'],
     zones: ['wastes'],
     lore: 'Được sinh ra từ sự hư không, thứ còn lại sau khi linh hồn hoàn toàn tan biến.'
@@ -136,7 +141,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   echo_demon: {
     id: 'echo_demon', name: 'Echo Demon', icon: '👁️', level: 11,
     hp: 220, atk: 42, def: 18, expReward: 320, goldMin: 70, goldMax: 130,
-    drops: [{ itemId: 'demon_seal', chance: 45 }, { itemId: 'book_soul_offering', chance: 15 }],
+    drops: [{ itemId: 'demon_seal', chance: 45 }, { itemId: 'demon_horn', chance: 20 }, { itemId: 'cursed_blood', chance: 12 }, { itemId: 'book_soul_offering', chance: 15 }],
     specialAttacks: ['skill_echo', 'mind_crush'],
     zones: ['wastes'],
     lore: 'Phản chiếu nỗi sợ hãi của người đối diện, bắt chước từng động tác một cách hoàn hảo.'
@@ -147,7 +152,12 @@ export const ENEMIES: Record<string, EnemyDef> = {
     drops: [
       { itemId: 'forgotten_crown', chance: 100 },
       { itemId: 'book_last_stand', chance: 50 },
-      { itemId: 'book_counter', chance: 50 }
+      { itemId: 'book_counter', chance: 50 },
+      { itemId: 'fallen_star_fragment', chance: 30 },
+      { itemId: 'broken_soul', chance: 25 },
+      { itemId: 'void_fragment', chance: 20 },
+      { itemId: 'lost_memory', chance: 15 },
+      { itemId: 'abyss_core', chance: 20 }
     ],
     specialAttacks: ['erase', 'butterfly_curse', 'forgotten_rage'],
     zones: ['wastes'], boss: true,

@@ -2,6 +2,7 @@ import { grantGold, incrementKills, grantExp, grantSoulShards, addItem, killPlay
 import { createLegacy, pickLegacySkill } from './legacy';
 import { logEvent, onBossKilled, getDropBonus } from './world';
 import { getItem } from '../data/items';
+import { unlockRecipesBySource } from './crafting';
 import { EQUIPMENT, getEquipment } from '../data/equipment';
 import { addItem as addItemFn } from './player';
 import { randInt } from '../utils/format';
@@ -59,6 +60,7 @@ export function processVictoryRewards(
   if (enemy.boss && enemy.deathWorldFlag) {
     bonusLine = '\n\n' + onBossKilled(guildId, enemy.id, player.name, player.zone_id);
     logEvent(guildId, userId, player.name, 'boss_kill', `tiêu diệt Boss **${enemy.icon} ${enemy.name}**!`, player.zone_id);
+    unlockRecipesBySource(userId, guildId, enemy.id);
   } else {
     logEvent(guildId, userId, player.name, 'kill', `tiêu diệt **${enemy.icon} ${enemy.name}**.`, player.zone_id);
   }

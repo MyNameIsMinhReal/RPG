@@ -34,14 +34,16 @@ export function saveCombat(state: CombatState): void {
     (message_id, channel_id, user_id, guild_id, enemy_id, enemy_name,
      enemy_hp, enemy_max_hp, enemy_atk, enemy_def,
      player_hp, player_max_hp, player_mp, player_max_mp,
-     turn, is_defending, active_effects, combat_log)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     turn, is_defending, active_effects, combat_log,
+     player_stamina, player_max_stamina)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     state.message_id, state.channel_id, state.user_id, state.guild_id,
     state.enemy_id, state.enemy_name,
     state.enemy_hp, state.enemy_max_hp, state.enemy_atk, state.enemy_def,
     state.player_hp, state.player_max_hp, state.player_mp, state.player_max_mp,
-    state.turn, state.is_defending, state.active_effects, state.combat_log
+    state.turn, state.is_defending, state.active_effects, state.combat_log,
+    state.player_stamina ?? 100, state.player_max_stamina ?? 100
   );
 }
 
@@ -59,7 +61,8 @@ export function startCombat(
     player_hp: boosted.hp, player_max_hp: boosted.max_hp,
     player_mp: boosted.mp, player_max_mp: boosted.max_mp,
     turn: 1, is_defending: 0,
-    active_effects: '[]', combat_log: '[]'
+    active_effects: '[]', combat_log: '[]',
+    player_stamina: 100, player_max_stamina: 100
   };
   saveCombat(state);
   return state;
@@ -150,6 +153,16 @@ export function processAttack(state: CombatState, playerAtk: number): ActionResu
   const logs: string[] = JSON.parse(state.combat_log || '[]');
   const passives = getPassives(state.user_id, state.guild_id);
   let { player_hp, player_mp, enemy_hp } = state;
+  let player_stamina = state.player_stamina ?? 100;
+  const player_max_stamina = state.player_max_stamina ?? 100;
+
+  // Stamina cost for attacking
+  const staminaCost = 15;
+  player_stamina = Math.max(0, player_stamina - staminaCost);
+
+  // MP regen on normal attack
+  const mpRegen = 4;
+  player_mp = Math.min(state.player_max_mp, player_mp + mpRegen);
 
   // Defend bonus
   const defendBonus = state.is_defending === 1 ? Math.floor(state.enemy_atk * 0.4) : 0;
@@ -237,6 +250,16 @@ export function processSkill(
   let { player_hp, player_mp, enemy_hp } = state;
 
   // Soul Shard cost check
+  // Stamina cost for skill use
+  {
+    const staminaCost = 10;
+    const curStamina = state.player_stamina ?? 100;
+    const maxStamina = state.player_max_stamina ?? 100;
+    // We'll carry stamina through in the return states
+    // Stored as temporary marker - makeResult handles natural regen
+    (state as any).__skillStamina = Math.max(0, curStamina - staminaCost);
+  }
+
   if ((skill as any).soulCost) {
     const { grantSoulShards, getPlayer: gp } = require('./player');
     const fresh = gp(state.user_id, state.guild_id);
@@ -328,8 +351,13 @@ export function processDefend(state: CombatState, playerAtk: number, _h: number,
   const effects  = parseEffects(state.active_effects);
   const passives = getPassives(state.user_id, state.guild_id);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
-  logs.push(`🛡️ Bạn chọn **Phòng thủ** — giảm 40% sát thương lượt này.`);
-  return enemyTurn(state, { ...state, is_defending: 1 }, state.player_hp, state.player_mp, effects, logs, Math.floor(state.enemy_atk * 0.4), passives);
+  // Defend restores stamina
+  const staminaGain = 25;
+  const maxStamina  = state.player_max_stamina ?? 100;
+  const newStamina  = Math.min(maxStamina, (state.player_stamina ?? 100) + staminaGain);
+  logs.push(`🛡️ Bạn **Phòng thủ** — giảm 40% sát thương và hồi **${staminaGain} ⚡ Stamina**.`);
+  const defendedState = { ...state, is_defending: 1, player_stamina: newStamina };
+  return enemyTurn(state, defendedState, state.player_hp, state.player_mp, effects, logs, Math.floor(state.enemy_atk * 0.4), passives);
 }
 
 // ── processFlee ───────────────────────────────────────────────────────────
@@ -482,6 +510,46 @@ function enemyTurn(
   return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
 }
 
+// ── processItemUse ────────────────────────────────────────────────────────
+export function processItemUse(state: CombatState, itemId: string): ActionResult {
+  const { getItemQty, removeItem, updatePlayerHpMp } = require('./player');
+  const { getItem } = require('../data/items');
+  const effects = parseEffects(state.active_effects);
+  const passives = getPassives(state.user_id, state.guild_id);
+  const logs: string[] = JSON.parse(state.combat_log || '[]');
+  let { player_hp, player_mp } = state;
+
+  const qty = getItemQty(state.user_id, state.guild_id, itemId);
+  const item = getItem(itemId);
+
+  if (!item || qty <= 0 || item.type !== 'consumable' || !item.effect) {
+    logs.push(`❌ Không thể dùng item này!`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-4)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
+
+  removeItem(state.user_id, state.guild_id, itemId, 1);
+
+  if (item.effect.hp) {
+    const gain = Math.min(item.effect.hp, state.player_max_hp - player_hp);
+    player_hp = Math.min(state.player_max_hp, player_hp + item.effect.hp);
+    logs.push(`🎒 Dùng **${item.icon} ${item.name}** — hồi **${gain} HP**! (${player_hp}/${state.player_max_hp})`);
+  }
+  if (item.effect.mp) {
+    const gain = Math.min(item.effect.mp, state.player_max_mp - player_mp);
+    player_mp = Math.min(state.player_max_mp, player_mp + item.effect.mp);
+    logs.push(`🎒 Dùng **${item.icon} ${item.name}** — hồi **${gain} MP**!`);
+  }
+  if (item.effect.removeEffect) {
+    const before = effects.length;
+    const filtered = effects.filter((e: any) => e.name !== item.effect!.removeEffect);
+    if (filtered.length < before) logs.push(`🎒 **${item.name}** — giải trừ **${item.effect.removeEffect}**!`);
+    effects.splice(0, effects.length, ...filtered);
+  }
+
+  // Item use triggers enemy turn (costs your action)
+  return enemyTurn(state, { ...state }, player_hp, player_mp, effects, logs, 0, passives);
+}
+
 // ── Special attack dispatch ───────────────────────────────────────────────
 function applySpecialAttack(
   special: string, baseAtk: number, enemy: EnemyDef,
@@ -606,15 +674,22 @@ function makeResult(
   _orig: CombatState, current: CombatState,
   playerHp: number, playerMp: number,
   effects: Effect[], logs: string[],
-  playerDied: boolean, enemyDied: boolean, fled: boolean
+  playerDied: boolean, enemyDied: boolean, fled: boolean,
+  playerStamina?: number
 ): ActionResult {
+  const maxStamina = current.player_max_stamina ?? 100;
+  // Natural stamina regen each turn end
+  const rawStamina = playerStamina ?? (current.player_stamina ?? 100);
+  const regenStamina = Math.min(maxStamina, rawStamina + 6);
   return {
     newState: {
       ...current,
       player_hp: playerHp, player_mp: playerMp,
       turn: current.turn + 1, is_defending: 0,
       active_effects: JSON.stringify(effects),
-      combat_log: JSON.stringify(logs.slice(-6))
+      combat_log: JSON.stringify(logs.slice(-4)),
+      player_stamina: regenStamina,
+      player_max_stamina: maxStamina
     },
     logLines: logs, playerDied, enemyDied, fled
   };

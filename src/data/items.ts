@@ -43,6 +43,30 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Giải trừ hiệu ứng **burn**.',
     effect: { removeEffect: 'burn' }, sellPrice: 10, buyPrice: 20
   },
+  fate_coin: {
+    id: 'fate_coin', name: 'Fate Coin', icon: '🪙',
+    type: 'key_item', stackable: true,
+    description: 'Đồng xu kỳ lạ có một mặt sáng và một mặt tối. Dùng cho các event định mệnh sau này.',
+    sellPrice: 25
+  },
+  blood_vial: {
+    id: 'blood_vial', name: 'Blood Vial', icon: '🩸',
+    type: 'consumable', stackable: true,
+    description: 'Hồi **35 HP**. Một món hàng cấm của chợ đen.',
+    effect: { hp: 35 }, sellPrice: 35, buyPrice: 90
+  },
+  assassins_smoke: {
+    id: 'assassins_smoke', name: "Assassin's Smoke", icon: '💨',
+    type: 'consumable', stackable: true,
+    description: 'Khói ám sát dùng trong các cuộc cướp shopkeeper. Có thể mở rộng thành debuff trước combat.',
+    sellPrice: 60, buyPrice: 180
+  },
+  black_market_token: {
+    id: 'black_market_token', name: 'Black Market Token', icon: '🌑',
+    type: 'key_item', stackable: true,
+    description: 'Dấu hiệu của chợ đen. Người có danh tiếng thấp sẽ được nhận ra.',
+    sellPrice: 75
+  },
 
   // ── MATERIALS ───────────────────────────────────────────────────
   herb: {
@@ -50,6 +74,54 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'material', stackable: true,
     description: 'Thảo dược rừng, dùng để chế tạo.',
     sellPrice: 5
+  },
+  ancient_wood: {
+    id: 'ancient_wood', name: 'Ancient Wood', icon: '🪵',
+    type: 'material', stackable: true,
+    description: 'Gỗ cổ thụ thấm mana, dùng để craft trang bị rừng.',
+    sellPrice: 18
+  },
+  broken_rune: {
+    id: 'broken_rune', name: 'Broken Rune', icon: '🔹',
+    type: 'material', stackable: true,
+    description: 'Mảnh rune vỡ lấy từ đền thờ và vết nứt linh hồn.',
+    sellPrice: 35
+  },
+  merchant_seal: {
+    id: 'merchant_seal', name: 'Merchant Seal', icon: '🏷️',
+    type: 'material', stackable: true,
+    description: 'Dấu niêm phong của Hội Thương Nhân, dùng để craft token giao dịch.',
+    sellPrice: 45
+  },
+  soul_dust: {
+    id: 'soul_dust', name: 'Soul Dust', icon: '💨',
+    type: 'material', stackable: true,
+    description: 'Bụi linh hồn còn sót lại sau chuyển sinh.',
+    sellPrice: 55
+  },
+  rusty_gear: {
+    id: 'rusty_gear', name: 'Rusty Gear', icon: '⚙️',
+    type: 'material', stackable: true,
+    description: 'Bánh răng cũ từ bẫy, xe hàng và thợ săn tiền thưởng.',
+    sellPrice: 22
+  },
+  cursed_cloth: {
+    id: 'cursed_cloth', name: 'Cursed Cloth', icon: '🧣',
+    type: 'material', stackable: true,
+    description: 'Mảnh vải nguyền rủa thường xuất hiện ở chợ đen.',
+    sellPrice: 40
+  },
+  discount_token: {
+    id: 'discount_token', name: 'Discount Token', icon: '🎟️',
+    type: 'consumable', stackable: true,
+    description: 'Token thương nhân. Có thể mở rộng để giảm giá shop trong lần mua sau.',
+    sellPrice: 80
+  },
+  rune_charm: {
+    id: 'rune_charm', name: 'Rune Charm', icon: '🧿',
+    type: 'consumable', stackable: true,
+    description: 'Bùa rune dùng một lần, có thể mở rộng để chặn debuff trong combat.',
+    sellPrice: 75
   },
   wolf_fang: {
     id: 'wolf_fang', name: 'Wolf Fang', icon: '🦷',

@@ -180,6 +180,15 @@ export function getWorldSummary(guildId: string): WorldSummary {
   if (getFlag(guildId, 'shop_markup'))
     activeDebuffs.push(`🛒 Giá shop +${getShopMarkup(guildId)}% vì thương nhân bị cướp`);
 
+  const fear = getMerchantFear(guildId);
+  if (fear > 0) activeDebuffs.push(`🏦 Thương nhân sợ hãi: ${fear}%`);
+
+  const danger = getWorldDanger(guildId);
+  if (danger > 0) activeDebuffs.push(`⚠️ Mức nguy hiểm thế giới: ${danger}%`);
+
+  const corruption = getWorldCorruption(guildId);
+  if (corruption > 0) activeDebuffs.push(`🌑 Corruption: ${corruption}% — quái mạnh hơn nhưng drop tối hơn`);
+
   if (getFlag(guildId, 'forest_drop_bonus'))
     activeBonuses.push('🌲 Drop rate +20% tại Rừng Bóng Tối');
 
@@ -197,4 +206,44 @@ export function getWorldSummary(guildId: string): WorldSummary {
     .map(f => `• ${f.flag_value}`);
 
   return { flags, events, bossesSlain, activeDebuffs, activeBonuses, activeEvents };
+}
+
+// ── Extended world pressure: danger, corruption, merchant fear ───────────
+export function getWorldNumber(guildId: string, key: string): number {
+  const raw = getFlag(guildId, key);
+  return raw ? Number(raw) || 0 : 0;
+}
+
+export function adjustWorldNumber(guildId: string, key: string, amount: number, min = 0, max = 100): number {
+  const next = Math.max(min, Math.min(max, getWorldNumber(guildId, key) + amount));
+  setFlag(guildId, key, String(next));
+  return next;
+}
+
+export function getMerchantFear(guildId: string): number {
+  return getWorldNumber(guildId, 'merchant_fear');
+}
+
+export function increaseMerchantFear(guildId: string, amount: number): number {
+  const next = adjustWorldNumber(guildId, 'merchant_fear', amount, 0, 100);
+  setWorldEvent(guildId, 'merchant_fear_level', `🏦 Thương nhân sợ hãi: **${next}%**. Giá shop và vệ sĩ sẽ tăng theo mức này.`, 86400);
+  return next;
+}
+
+export function getWorldCorruption(guildId: string): number {
+  return getWorldNumber(guildId, 'world_corruption');
+}
+
+export function getWorldDanger(guildId: string): number {
+  return getWorldNumber(guildId, 'world_danger_level');
+}
+
+export function adjustWorldDanger(guildId: string, amount: number): number {
+  const next = adjustWorldNumber(guildId, 'world_danger_level', amount, 0, 100);
+  setWorldEvent(guildId, 'danger_level', `⚠️ Mức nguy hiểm thế giới: **${next}%**. Thợ săn tiền thưởng và ambush xuất hiện nhiều hơn.`, 86400);
+  return next;
+}
+
+export function getEffectiveShopMarkup(guildId: string): number {
+  return Math.min(150, getShopMarkup(guildId) + Math.floor(getMerchantFear(guildId) / 5) + Math.floor(getWorldDanger(guildId) / 10));
 }

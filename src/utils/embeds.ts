@@ -34,6 +34,15 @@ export interface PlayerRow {
   zone_id: string; deaths: number; kills: number; created_at: number;
   last_explore?: number;
   reputation?: number;
+  wanted_level?: number;
+  bonus_stat_points?: number;
+  keep_item_charges?: number;
+  extra_skill_slots?: number;
+  death_penalty_reduction?: number;
+  rebirth_blessing?: number;
+  merchant_mercy?: number;
+  permanent_atk_bonus?: number; permanent_def_bonus?: number;
+  permanent_max_hp_bonus?: number; permanent_max_mp_bonus?: number;
 }
 
 // ── Simple embeds ───────────────────────────────────────────────────────────
@@ -54,7 +63,8 @@ export function buildProfileEmbed(
   const titleLine    = selectedTitle ? `${selectedTitle.icon} *${selectedTitle.name}*` : '';
   const unlockedCount = getUnlockedTitles(player.user_id, player.guild_id).length;
 
-  const skillSlots = [1, 2, 3, 4].map(slot => {
+  const maxSkillSlots = 4 + Math.min(2, player.extra_skill_slots ?? 0);
+  const skillSlots = Array.from({ length: maxSkillSlots }, (_, i) => i + 1).map(slot => {
     const entry = loadout.find(l => l.slot === slot);
     if (!entry) return `\`${slot}\` —`;
     const sk = getSkill(entry.skill_id);
@@ -87,6 +97,8 @@ export function buildProfileEmbed(
       { name: '🪙 Gold',  value: `**${player.gold.toLocaleString()}**`, inline: true },
       { name: '💀 Soul Shards', value: `**${player.soul_shards}**`, inline: true },
       { name: '🤝 Reputation', value: `**${player.reputation ?? 0}**`, inline: true },
+      { name: '📜 Wanted', value: `**${player.wanted_level ?? 0}/5**`, inline: true },
+      { name: '✨ Soul Perks', value: `Stats +${player.bonus_stat_points ?? 0} · Slots +${player.extra_skill_slots ?? 0}`, inline: true },
       { name: '☠️ Deaths / 🗡️ Kills', value: `**${player.deaths}** / **${player.kills}**`, inline: true },
       {
         name: '🏆 Thành tựu',
@@ -112,6 +124,7 @@ export interface CombatState {
   player_mp: number; player_max_mp: number;
   turn: number; is_defending: number;
   active_effects: string; combat_log: string;
+  player_stamina: number; player_max_stamina: number;
 }
 
 export function buildCombatEmbed(
@@ -149,6 +162,7 @@ export function buildCombatEmbed(
         value: [
           `❤️ \`${bar(state.player_hp, state.player_max_hp, 12)}\` **${state.player_hp}**/${state.player_max_hp}`,
           `💧 \`${bar(state.player_mp, state.player_max_mp, 12)}\` **${state.player_mp}**/${state.player_max_mp}`,
+          `⚡ \`${bar(state.player_stamina ?? 100, state.player_max_stamina ?? 100, 12)}\` **${state.player_stamina ?? 100}**/${state.player_max_stamina ?? 100}${(state.player_stamina ?? 100) <= 10 ? ' *(kiệt sức!)*' : ''}`,
         ].join('\n'),
         inline: true
       },
@@ -171,13 +185,18 @@ export function buildCombatEmbed(
 }
 
 // ── Combat action buttons ─────────────────────────────────────────────────
-export function buildCombatButtons(userId: string, hasSkills: boolean): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+export function buildCombatButtons(
+  userId: string, hasSkills: boolean,
+  stamina: number = 100, hasItems: boolean = false
+): ActionRowBuilder<ButtonBuilder>[] {
+  const exhausted = stamina <= 10;
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`rpg_attack_${userId}`)
-      .setLabel('Tấn công')
+      .setLabel(exhausted ? 'Kiệt sức!' : 'Tấn công')
       .setEmoji('⚔️')
-      .setStyle(ButtonStyle.Danger),
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(exhausted),
     new ButtonBuilder()
       .setCustomId(`rpg_skill_${userId}`)
       .setLabel('Kỹ năng')
@@ -186,15 +205,22 @@ export function buildCombatButtons(userId: string, hasSkills: boolean): ActionRo
       .setDisabled(!hasSkills),
     new ButtonBuilder()
       .setCustomId(`rpg_defend_${userId}`)
-      .setLabel('Phòng thủ')
+      .setLabel(`Phòng thủ${exhausted ? ' ✅' : ''}`)
       .setEmoji('🛡️')
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(exhausted ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`rpg_item_${userId}`)
+      .setLabel('Dùng đồ')
+      .setEmoji('🎒')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(!hasItems),
     new ButtonBuilder()
       .setCustomId(`rpg_flee_${userId}`)
-      .setLabel('Bỏ chạy (60%)')
+      .setLabel('Chạy (60%)')
       .setEmoji('🏃')
       .setStyle(ButtonStyle.Secondary)
   );
+  return [row1];
 }
 
 // ── Skill select menu ─────────────────────────────────────────────────────
