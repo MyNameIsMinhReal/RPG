@@ -96,8 +96,8 @@ export async function startCombatFlow(
       if (!loadout.length) return;
       await compInt.editReply({ components: [buildSkillSelectMenu(userId, loadout, current.player_mp)] });
       return;
-    } else if (cid.startsWith(`rpg_useskill_${userId}_`)) {
-      const skillId = cid.replace(`rpg_useskill_${userId}_`, '');
+    } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
+      const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
       result = processSkill(current, skillId, freshPassive.atk, 0, 0);
     } else return;
 
@@ -201,8 +201,9 @@ export async function startCombatFlowWithEnemy(
       if (!loadout.length) return;
       await compInt.editReply({ components: [buildSkillSelectMenu(userId, loadout, current.player_mp)] });
       return;
-    } else if (cid.startsWith(`rpg_useskill_${userId}_`)) {
-      result = processSkill(current, cid.replace(`rpg_useskill_${userId}_`, ''), freshPassive.atk, 0, 0);
+    } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
+      const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
+      result = processSkill(current, skillId, freshPassive.atk, 0, 0);
     } else return;
 
     if (!result) return;

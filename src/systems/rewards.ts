@@ -2,7 +2,10 @@ import { grantGold, incrementKills, grantExp, grantSoulShards, addItem, killPlay
 import { createLegacy, pickLegacySkill } from './legacy';
 import { logEvent, onBossKilled, getDropBonus } from './world';
 import { getItem } from '../data/items';
+import { EQUIPMENT, getEquipment } from '../data/equipment';
+import { addItem as addItemFn } from './player';
 import { randInt } from '../utils/format';
+import { incrementDaily } from '../commands/daily';
 import type { PlayerRow } from '../utils/embeds';
 import type { EnemyDef } from '../data/enemies';
 
@@ -28,6 +31,7 @@ export function processVictoryRewards(
 
   grantGold(userId, guildId, gold);
   incrementKills(userId, guildId);
+  incrementDaily(userId, guildId, 'kill_count');
   const lvRes = grantExp(userId, guildId, exp);
 
   for (const drop of enemy.drops) {
@@ -35,6 +39,19 @@ export function processVictoryRewards(
       addItem(userId, guildId, drop.itemId, 1);
       const it = getItem(drop.itemId);
       if (it) drops.push(`${it.icon} ${it.name}`);
+    }
+  }
+
+  // Equipment drops — rare, tied to specific enemies
+  const eqDrops = Object.values(EQUIPMENT).filter(e =>
+    e.dropFrom?.includes(enemy.id) && e.dropChance
+  );
+  for (const eq of eqDrops) {
+    const roll = Math.random() * 100;
+    const adjustedChance = (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * dropBonus / 100);
+    if (roll <= adjustedChance) {
+      addItem(userId, guildId, eq.id, 1);
+      drops.push(`${eq.icon} **${eq.name}** *(${['common','rare','epic','legendary'][['common','rare','epic','legendary'].indexOf(eq.rarity)]})*`);
     }
   }
 

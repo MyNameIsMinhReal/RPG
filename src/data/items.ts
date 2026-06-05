@@ -69,36 +69,6 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Mảnh xương của chiến binh đã khuất.',
     sellPrice: 15
   },
-  stone: {
-    id: 'stone', name: 'Stone', icon: '🪨',
-    type: 'material', stackable: true,
-    description: 'Đá thô, có thể dùng làm nền tảng cho vật phẩm thiết yếu.',
-    sellPrice: 5
-  },
-  silver_ore: {
-    id: 'silver_ore', name: 'Silver Ore', icon: '🥈',
-    type: 'material', stackable: true,
-    description: 'Quặng bạc lấp lánh, thích hợp cho trang sức và phép thuật.',
-    sellPrice: 25
-  },
-  slime_core: {
-    id: 'slime_core', name: 'Slime Core', icon: '🟢',
-    type: 'material', stackable: true,
-    description: 'Lõi slime dẻo dai, dùng trong chế tạo và nuôi pet tạm thời.',
-    sellPrice: 35
-  },
-  mana_crystal: {
-    id: 'mana_crystal', name: 'Mana Crystal', icon: '🔷',
-    type: 'material', stackable: true,
-    description: 'Tinh thể mana thuần khiết, dùng để tiếp năng lượng phép thuật.',
-    sellPrice: 70
-  },
-  cursed_blood: {
-    id: 'cursed_blood', name: 'Cursed Blood', icon: '🩸',
-    type: 'material', stackable: true,
-    description: 'Máu bị nguyền, chứa sức mạnh đen tối và rủi ro.',
-    sellPrice: 45
-  },
   ectoplasm: {
     id: 'ectoplasm', name: 'Ectoplasm', icon: '🫧',
     type: 'material', stackable: true,
@@ -140,24 +110,6 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'key_item', stackable: false,
     description: 'Lõi năng lượng của Colossus, vẫn còn nóng đỏ.',
     sellPrice: 350
-  },
-  lost_memory: {
-    id: 'lost_memory', name: 'Lost Memory', icon: '💭',
-    type: 'key_item', stackable: false,
-    description: 'Ký ức bị mất, chứa nội dung của quá khứ lạ lùng.',
-    sellPrice: 120
-  },
-  title_trinket: {
-    id: 'title_trinket', name: 'Title Trinket', icon: '🎖️',
-    type: 'key_item', stackable: false,
-    description: 'Vật phẩm trang trí hiếm, dùng để mở khóa danh xưng đặc biệt.',
-    sellPrice: 150
-  },
-  title_token: {
-    id: 'title_token', name: 'Title Token', icon: '🏅',
-    type: 'key_item', stackable: false,
-    description: 'Token danh xưng, biểu tượng của danh tiếng trên hành trình.',
-    sellPrice: 100
   },
   forgotten_crown: {
     id: 'forgotten_crown', name: 'Forgotten Crown', icon: '👑',
@@ -227,12 +179,6 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Học kỹ năng **Vampiric Strike 🧛**.',
     teachesSkill: 'vampiric', sellPrice: 60, buyPrice: 150
   },
-  book_dark_ritual: {
-    id: 'book_dark_ritual', name: 'Tome: Dark Ritual', icon: '📕',
-    type: 'skill_book', stackable: false,
-    description: 'Học kỹ năng **Dark Ritual 🕯️** với sức mạnh nguyền rủa.',
-    teachesSkill: 'dark_ritual', sellPrice: 110, buyPrice: 260
-  },
   book_tough_body: {
     id: 'book_tough_body', name: 'Tome: Tough Body', icon: '📓',
     type: 'skill_book', stackable: false,
@@ -257,6 +203,66 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Học kỹ năng **Mark Zone 📍**.',
     teachesSkill: 'mark_zone', sellPrice: 90, buyPrice: 220
   },
+
+  // ── Soul Skill Books (rare, from Soul Shop) ──────────────────────────────
+  book_soul_strike: {
+    id: 'book_soul_strike', name: 'Tome: Soul Strike', icon: '📕',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Soul Strike 💀**.',
+    teachesSkill: 'soul_strike', sellPrice: 150
+  },
+  book_soul_guard: {
+    id: 'book_soul_guard', name: 'Tome: Soul Guard', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Soul Guard 🛡️**.',
+    teachesSkill: 'soul_guard', sellPrice: 150
+  },
+  book_soul_drain: {
+    id: 'book_soul_drain', name: 'Tome: Soul Drain', icon: '📗',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Soul Drain 🌀**.',
+    teachesSkill: 'soul_drain', sellPrice: 150
+  },
+
+  // ── Soul Items (special, from Soul Shop) ─────────────────────────────────
+  soul_anchor: {
+    id: 'soul_anchor', name: 'Soul Anchor', icon: '⚓',
+    type: 'consumable', stackable: false,
+    description: '**Passive:** Khi chết, hồi sinh với **1 HP** thay vì mất nhân vật (1 lần/mang theo).',
+    sellPrice: 300
+  },
+  purification_stone: {
+    id: 'purification_stone', name: 'Purification Stone', icon: '💎',
+    type: 'consumable', stackable: true,
+    description: 'Xóa toàn bộ **debuff** và **cursed effect** khỏi nhân vật.',
+    effect: { removeEffect: 'all' },
+    sellPrice: 80
+  },
+  material_chest: {
+    id: 'material_chest', name: 'Material Chest', icon: '📦',
+    type: 'consumable', stackable: true,
+    description: 'Mở để nhận **2–4 material ngẫu nhiên**.',
+    sellPrice: 30
+  },
+  cursed_equipment_box: {
+    id: 'cursed_equipment_box', name: 'Cursed Equipment Box', icon: '🎁',
+    type: 'consumable', stackable: false,
+    description: 'Mở ra **1 trang bị Cursed** ngẫu nhiên. Rarity từ Rare trở lên.',
+    sellPrice: 200
+  },
+  legacy_pendant: {
+    id: 'legacy_pendant', name: 'Legacy Pendant', icon: '📿',
+    type: 'consumable', stackable: false,
+    description: '**Passive:** Khi tìm thấy Legacy, nhận thêm **50% gold** và chance nhận skill cao hơn.',
+    sellPrice: 150
+  },
+  soulbound_scroll: {
+    id: 'soulbound_scroll', name: 'Soulbound Scroll', icon: '📜',
+    type: 'consumable', stackable: false,
+    description: 'Khóa **1 item** — item đó không mất khi chết.',
+    sellPrice: 250
+  },
+
   book_soul_offering: {
     id: 'book_soul_offering', name: 'Tome: Soul Offering', icon: '📕',
     type: 'skill_book', stackable: false,

@@ -1,6 +1,7 @@
 import db from '../database/index';
 import { expNext } from '../utils/format';
 import { SKILLS, getSkill } from '../data/skills';
+import { getEquipmentStats } from './equipment';
 import type { PlayerRow } from '../utils/embeds';
 
 export interface SkillPoolEntry { skill_id: string; learned_at: number; }
@@ -40,7 +41,7 @@ export function resetPlayer(userId: string, guildId: string): void {
 // ── Stat helpers ──────────────────────────────────────────────────────────
 export function applyPassiveStats(player: PlayerRow): PlayerRow {
   const loadout = getLoadout(player.user_id, player.guild_id);
-  let bonusDef = 0, bonusMaxHp = 0, bonusMaxMp = 0;
+  let bonusDef = 0, bonusAtk = 0, bonusMaxHp = 0, bonusMaxMp = 0;
 
   for (const entry of loadout) {
     const sk = getSkill(entry.skill_id);
@@ -50,11 +51,19 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
     bonusMaxMp += sk.passiveBonus.maxMp  ?? 0;
   }
 
+  // Full equipment stat bonuses (includes set bonuses, crit, dodge, etc.)
+  const eq = getEquipmentStats(player.user_id, player.guild_id);
+  bonusAtk   += eq.atk   ?? 0;
+  bonusDef   += eq.def   ?? 0;
+  bonusMaxHp += eq.maxHp ?? 0;
+  bonusMaxMp += eq.maxMp ?? 0;
+
   return {
     ...player,
-    def:    player.def    + bonusDef,
-    max_hp: player.max_hp + bonusMaxHp,
-    max_mp: player.max_mp + bonusMaxMp,
+    atk:    player.atk    + bonusAtk,
+    def:    Math.max(0, player.def + bonusDef),
+    max_hp: Math.max(10, player.max_hp + bonusMaxHp),
+    max_mp: Math.max(5,  player.max_mp + bonusMaxMp),
   };
 }
 

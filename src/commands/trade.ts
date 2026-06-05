@@ -77,9 +77,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   spendGold(userId, guildId, amount);
   grantGold(target.id, guildId, received);
 
-  const achievementMessages = awardAchievements(userId, guildId);
   logEvent(guildId, userId, sender.name, 'trade',
     `đã chuyển **${received}** Gold cho **${receiver.name}** (thuế ${tax} Gold).`);
+  const achievementMessages = awardAchievements(userId, guildId);
 
   const embed = new EmbedBuilder()
     .setColor(COLORS.gold)

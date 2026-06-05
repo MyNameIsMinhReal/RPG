@@ -126,3 +126,43 @@ if (!playerColumns.some((col: any) => col.name === 'last_explore')) {
 }
 
 export default db;
+
+// ── Equipment & Title tables (added) ─────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS equipment_worn (
+    user_id      TEXT NOT NULL,
+    guild_id     TEXT NOT NULL,
+    slot         TEXT NOT NULL,
+    equipment_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, guild_id, slot)
+  );
+
+  CREATE TABLE IF NOT EXISTS player_titles (
+    user_id    TEXT NOT NULL,
+    guild_id   TEXT NOT NULL,
+    title_id   TEXT NOT NULL,
+    unlocked_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id, title_id)
+  );
+`);
+
+// Add selected_title column if not exists (safe migration)
+try {
+  db.exec(`ALTER TABLE players ADD COLUMN selected_title TEXT DEFAULT NULL`);
+} catch { /* column already exists */ }
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_quests (
+    user_id       TEXT NOT NULL,
+    guild_id      TEXT NOT NULL,
+    date          TEXT NOT NULL,
+    explore_count INTEGER DEFAULT 0,
+    explore_goal  INTEGER DEFAULT 5,
+    kill_count    INTEGER DEFAULT 0,
+    kill_goal     INTEGER DEFAULT 3,
+    potion_used   INTEGER DEFAULT 0,
+    potion_goal   INTEGER DEFAULT 1,
+    claimed       INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, guild_id, date)
+  );
+`);

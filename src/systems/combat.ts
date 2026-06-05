@@ -2,14 +2,15 @@ import db from '../database/index';
 import { randInt, pick } from '../utils/format';
 import { getSkill } from '../data/skills';
 import { getEnemy, type EnemyDef } from '../data/enemies';
-import { getLoadout, applyPassiveStats } from './player';
+import { getLoadout, applyPassiveStats, getPlayer } from './player';
+import { getEquipmentStats } from './equipment';
 import type { CombatState } from '../utils/embeds';
 import type { PlayerRow } from '../utils/embeds';
 
 export interface Effect {
   name: string;
   duration: number;
-  value?: number; // e.g. burn damage, slow atk reduction
+  value?: number;
 }
 
 // ── Combat CRUD ───────────────────────────────────────────────────────────
@@ -64,6 +65,38 @@ export function startCombat(
   return state;
 }
 
+// ── Passive snapshot ──────────────────────────────────────────────────────
+interface Passives {
+  hasBerserker: boolean;
+  hasVampiric: boolean;
+  hasCounter: boolean;
+  hasLastStand: boolean;
+  hpRegenPerTurn: number;
+  mpRegenPerTurn: number;
+}
+
+function getPassives(userId: string, guildId: string): Passives {
+  const loadout = getLoadout(userId, guildId);
+  const p: Passives = {
+    hasBerserker: false, hasVampiric: false,
+    hasCounter: false, hasLastStand: false,
+    hpRegenPerTurn: 0, mpRegenPerTurn: 0
+  };
+  for (const entry of loadout) {
+    const sk = getSkill(entry.skill_id);
+    if (!sk) continue;
+    switch (sk.id) {
+      case 'berserker':  p.hasBerserker  = true; break;
+      case 'vampiric':   p.hasVampiric   = true; break;
+      case 'counter':    p.hasCounter    = true; break;
+      case 'last_stand': p.hasLastStand  = true; break;
+      case 'tough_body': p.hpRegenPerTurn += sk.passiveBonus?.hpRegen ?? 0; break;
+      case 'mana_flow':  p.mpRegenPerTurn += sk.passiveBonus?.mpRegen ?? 0; break;
+    }
+  }
+  return p;
+}
+
 // ── Effect helpers ────────────────────────────────────────────────────────
 export function parseEffects(raw: string): Effect[] {
   try { return JSON.parse(raw); } catch { return []; }
@@ -73,312 +106,516 @@ export function hasEffect(effects: Effect[], name: string): boolean {
   return effects.some(e => e.name === name && e.duration > 0);
 }
 
-export function tickEffects(effects: Effect[]): { effects: Effect[]; burnDmg: number; hpRegen: number; mpRegen: number } {
-  let burnDmg = 0, hpRegen = 0, mpRegen = 0;
+export function tickEffects(effects: Effect[]): { effects: Effect[]; burnDmg: number } {
+  let burnDmg = 0;
   const next = effects
     .map(e => {
-      if (e.name === 'burn')    burnDmg  += e.value ?? 5;
-      if (e.name === 'hp_regen') hpRegen += e.value ?? 3;
-      if (e.name === 'mp_regen') mpRegen += e.value ?? 2;
+      if (e.name === 'burn') burnDmg += e.value ?? 5;
       return { ...e, duration: e.duration - 1 };
     })
     .filter(e => e.duration > 0);
-  return { effects: next, burnDmg, hpRegen, mpRegen };
+  return { effects: next, burnDmg };
 }
 
 export function addEffect(effects: Effect[], name: string, duration: number, value?: number): Effect[] {
-  const existing = effects.findIndex(e => e.name === name);
-  if (existing >= 0) {
-    effects[existing].duration = Math.max(effects[existing].duration, duration);
+  const idx = effects.findIndex(e => e.name === name);
+  if (idx >= 0) {
+    effects[idx].duration = Math.max(effects[idx].duration, duration);
+    if (value !== undefined) effects[idx].value = value;
   } else {
     effects.push({ name, duration, value });
   }
   return effects;
 }
 
-// ── Damage calculation ─────────────────────────────────────────────────────
+// ── Damage calc ───────────────────────────────────────────────────────────
 function calcDamage(atk: number, def: number, variance = 0.15): number {
   const base = Math.max(1, atk - def);
   const v = base * variance;
   return Math.max(1, Math.round(base + randInt(-v, v)));
 }
 
-// ── Player action ─────────────────────────────────────────────────────────
+// ── Action result ─────────────────────────────────────────────────────────
 export interface ActionResult {
-  newState:    CombatState;
-  logLines:    string[];
-  playerDied:  boolean;
-  enemyDied:   boolean;
-  fled:        boolean;
+  newState:   CombatState;
+  logLines:   string[];
+  playerDied: boolean;
+  enemyDied:  boolean;
+  fled:       boolean;
 }
 
+// ── processAttack ─────────────────────────────────────────────────────────
 export function processAttack(state: CombatState, playerAtk: number): ActionResult {
-  const effects = parseEffects(state.active_effects);
+  const effects  = parseEffects(state.active_effects);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
+  const passives = getPassives(state.user_id, state.guild_id);
   let { player_hp, player_mp, enemy_hp } = state;
-  let playerDied = false, enemyDied = false, fled = false;
 
-  const isDefending = state.is_defending === 1;
-  let defendBonus = 0;
-  if (isDefending) {
-    defendBonus = Math.floor(state.enemy_atk * 0.4);
-    logs.push(`🛡️ Bạn đang phòng thủ (+${defendBonus} DEF tạm thời).`);
-  }
+  // Defend bonus
+  const defendBonus = state.is_defending === 1 ? Math.floor(state.enemy_atk * 0.4) : 0;
+  if (state.is_defending === 1) logs.push(`🛡️ Phòng thủ: +${defendBonus} DEF tạm thời.`);
 
-  // Berserker passive only applies if the player has the skill equipped
-  const loadout = getLoadout(state.user_id, state.guild_id);
-  const hasBerserker = loadout.some(l => l.skill_id === 'berserker');
+  // Berserker passive (also checks 'berserk' effect from Last Stand)
   let effectiveAtk = playerAtk;
-  if (hasBerserker && player_hp / state.player_max_hp < 0.3) {
+  if (passives.hasBerserker && player_hp / state.player_max_hp < 0.3) {
     effectiveAtk = Math.floor(effectiveAtk * 1.2);
-    logs.push('😤 **Berserker** kích hoạt! ATK tăng 20% vì HP thấp.');
+    logs.push('😤 **Berserker!** ATK +20% vì HP thấp.');
+  }
+  if (hasEffect(effects, 'berserk')) {
+    const bonus = effects.find(e => e.name === 'berserk')?.value ?? 50;
+    effectiveAtk = Math.floor(effectiveAtk * (1 + bonus / 100));
+    logs.push(`🔱 **Last Stand** còn hiệu lực — ATK +${bonus}%.`);
   }
 
-  // Dodge check
-  if (hasEffect(effects, 'dodge')) {
-    const idx = effects.findIndex(e => e.name === 'dodge');
-    effects.splice(idx, 1);
-    logs.push(`🌑 Shadow Step! Bạn né đòn tấn công của địch.`);
-  }
+  // Equipment stats
+  const eqStats = getEquipmentStats(state.user_id, state.guild_id);
+  const totalCrit    = (eqStats.critChance   ?? 0);
+  const totalLifesteal = (eqStats.lifesteal  ?? 0) + (passives.hasVampiric ? 15 : 0);
 
-  // Vampire lifesteal
-  const dmg = calcDamage(effectiveAtk, state.enemy_def);
+  // Crit check
+  const isCrit = totalCrit > 0 && randInt(1, 100) <= totalCrit;
+  let dmg = calcDamage(effectiveAtk, state.enemy_def);
+  if (isCrit) { dmg = Math.floor(dmg * 1.75); }
   enemy_hp = Math.max(0, enemy_hp - dmg);
-  logs.push(`⚔️ Bạn tấn công gây **${dmg}** sát thương. (${enemy_hp}/${state.enemy_max_hp} HP còn lại)`);
+
+  const critTag = isCrit ? ' ✨ **CRIT!**' : '';
+  logs.push(`⚔️ Bạn tấn công gây **${dmg}** sát thương.${critTag} (${enemy_hp}/${state.enemy_max_hp} HP còn lại)`);
+
+  // Lifesteal (vampiric passive + equipment)
+  if (totalLifesteal > 0 && dmg > 0) {
+    const stolen = Math.max(1, Math.floor(dmg * totalLifesteal / 100));
+    player_hp = Math.min(state.player_max_hp, player_hp + stolen);
+    logs.push(`🩸 Hút **${stolen} HP** (${totalLifesteal}% lifesteal).`);
+  }
+
+  // Equipment effects on hit
+  if (eqStats.effects.includes('burn_on_hit') && randInt(1, 100) <= 20) {
+    addEffect(effects, 'burn', 2, 5);
+    logs.push(`🔥 Flameblade — Đốt cháy 2 lượt!`);
+  }
+  if (eqStats.effects.includes('stun_on_hit') && randInt(1, 100) <= 15) {
+    addEffect(effects, 'stun', 1);
+    logs.push(`💫 Hammer — Choáng 1 lượt!`);
+  }
+  if (eqStats.effects.includes('extra_hit') && randInt(1, 100) <= 10) {
+    const bonusDmg = Math.max(1, Math.floor(effectiveAtk * 0.3));
+    enemy_hp = Math.max(0, enemy_hp - bonusDmg);
+    logs.push(`⚡ Đòn phụ! +**${bonusDmg}** sát thương.`);
+  }
+  if (eqStats.effects.includes('star_damage') && randInt(1, 100) <= 20) {
+    const starDmg = Math.max(1, Math.floor(effectiveAtk * 0.4));
+    enemy_hp = Math.max(0, enemy_hp - starDmg);
+    logs.push(`⭐ Star Damage! +**${starDmg}** sát thương!`);
+  }
+  // Dodge on crit
+  if (isCrit && eqStats.effects.includes('dodge_on_crit') && randInt(1, 100) <= 20) {
+    addEffect(effects, 'dodge', 1);
+    logs.push(`🌑 Crit → Dodge kích hoạt!`);
+  }
+
+  // Boss damage bonus from equipment
+  // (already applied via effectiveAtk multiplier in caller if boss)
 
   if (enemy_hp <= 0) {
-    enemyDied = true;
-    return {
-      newState: { ...state, enemy_hp, active_effects: JSON.stringify(effects), combat_log: JSON.stringify(logs.slice(-6)) },
-      logLines: logs, playerDied: false, enemyDied: true, fled: false
-    };
+    return makeResult(state, { ...state, enemy_hp }, player_hp, player_mp, effects, logs, false, true, false);
   }
 
-  // Enemy turn
-  const result = enemyTurn(state, { ...state, enemy_hp, active_effects: JSON.stringify(effects) }, player_hp, player_mp, effects, logs, defendBonus);
-  return result;
+  return enemyTurn(state, { ...state, enemy_hp }, player_hp, player_mp, effects, logs, defendBonus, passives);
 }
 
+// ── processSkill ──────────────────────────────────────────────────────────
 export function processSkill(
   state: CombatState, skillId: string, playerAtk: number,
-  hpRegenPerTurn: number, mpRegenPerTurn: number
+  _hpRegen: number, _mpRegen: number
 ): ActionResult {
   const skill = getSkill(skillId);
   if (!skill) return processAttack(state, playerAtk);
 
   const effects = parseEffects(state.active_effects);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
+  const passives = getPassives(state.user_id, state.guild_id);
   let { player_hp, player_mp, enemy_hp } = state;
 
+  // Soul Shard cost check
+  if ((skill as any).soulCost) {
+    const { grantSoulShards, getPlayer: gp } = require('./player');
+    const fresh = gp(state.user_id, state.guild_id);
+    const cost = (skill as any).soulCost as number;
+    if (!fresh || fresh.soul_shards < cost) {
+      logs.push(`❌ Không đủ 💀 Soul Shard để dùng **${skill.name}**! (cần ${cost}, có ${fresh?.soul_shards ?? 0})`);
+      return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+    }
+    grantSoulShards(state.user_id, state.guild_id, -cost);
+    logs.push(`💀 −**${cost} Soul Shard** → **${skill.name}**!`);
+  }
+
+  // MP check
   if (skill.mpCost && player_mp < skill.mpCost) {
-    logs.push(`❌ Không đủ MP để dùng **${skill.name}**!`);
-    return {
-      newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) },
-      logLines: logs, playerDied: false, enemyDied: false, fled: false
-    };
+    logs.push(`❌ Không đủ MP để dùng **${skill.name}**! (cần ${skill.mpCost}, có ${player_mp})`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
   }
 
   player_mp -= skill.mpCost ?? 0;
 
-  if (skill.damage) {
-    let dmg = skill.damage;
-    const finalDmg = Math.max(1, Math.round(dmg - state.enemy_def * 0.5)); // skills pierce some DEF
-    enemy_hp = Math.max(0, enemy_hp - finalDmg);
-    logs.push(`${skill.icon} **${skill.name}**! Gây **${finalDmg}** sát thương.`);
+  // ── World skills ────────────────────────────────────────────────────────
+  if (skill.type === 'world') {
+    const player = getPlayer(state.user_id, state.guild_id);
+    const zoneId = player?.zone_id ?? 'forest';
 
-    if (skill.effect && skill.effectDuration) {
-      addEffect(effects, skill.effect, skill.effectDuration, skill.effect === 'burn' ? 5 : undefined);
-      const effectNames: Record<string, string> = {
-        burn: '🔥 Đốt cháy', slow: '🧊 Làm chậm', stun: '💫 Choáng', dodge: '🌑 Dodge'
-      };
-      logs.push(`  └ ${effectNames[skill.effect] ?? skill.effect} x${skill.effectDuration} lượt.`);
+    if (skill.worldEffect === 'zone_marked') {
+      const { setFlag } = require('./world');
+      setFlag(state.guild_id, `zone_marked_${zoneId}`, '1', 86400);
+      logs.push(`📍 **Mark Zone!** Drop rate +15% tại zone trong 24h!`);
+    } else if (skill.worldEffect === 'soul_drop') {
+      const sacrifice = Math.floor(state.player_max_hp * 0.2);
+      player_hp = Math.max(1, player_hp - sacrifice);
+      const { grantSoulShards } = require('./player');
+      grantSoulShards(state.user_id, state.guild_id, 2);
+      logs.push(`💀 **Soul Offering!** Hy sinh **${sacrifice} HP** → +**2 Soul Shards**!`);
     }
+
+    // World skills skip enemy counter
+    return makeResult(state, { ...state }, player_hp, player_mp, effects, logs, false, false, false);
   }
 
+  // ── Damage skills ────────────────────────────────────────────────────────
+  if (skill.damage) {
+    // Soul Strike pierces more DEF (only 30% DEF reduction)
+    const defPierce = (skill as any).soulCost ? 0.3 : 0.5;
+    const finalDmg = Math.max(1, Math.round(skill.damage - state.enemy_def * defPierce));
+    enemy_hp = Math.max(0, enemy_hp - finalDmg);
+    logs.push(`${skill.icon} **${skill.name}**! Gây **${finalDmg}** sát thương.`);
+  }
+
+  // ── Heal skills ──────────────────────────────────────────────────────────
   if (skill.heal) {
     const healed = Math.min(skill.heal, state.player_max_hp - player_hp);
     player_hp = Math.min(state.player_max_hp, player_hp + skill.heal);
-    logs.push(`${skill.icon} **${skill.name}**! Hồi **${healed} HP**. (${player_hp}/${state.player_max_hp})`);
+    // Soul Drain also restores 15 MP
+    if (skill.id === 'soul_drain') {
+      player_mp = Math.min(state.player_max_mp, player_mp + 15);
+      logs.push(`${skill.icon} **${skill.name}**! Hồi **${healed} HP** + **15 MP**.`);
+    } else {
+      logs.push(`${skill.icon} **${skill.name}**! Hồi **${healed} HP**. (${player_hp}/${state.player_max_hp})`);
+    }
+  }
+
+  // ── Effects — applied REGARDLESS of damage (fixes Shadow Step!) ──────────
+  if (skill.effect && skill.effectDuration) {
+    const val = skill.effect === 'burn' ? 5 : undefined;
+    addEffect(effects, skill.effect, skill.effectDuration, val);
+    const effectLabels: Record<string, string> = {
+      burn: '🔥 Đốt cháy', slow: '🧊 Làm chậm', stun: '💫 Choáng',
+      dodge: '🌑 Shadow Step — sẽ né đòn tấn công tiếp theo'
+    };
+    if (!skill.damage && !skill.heal) {
+      // Pure-effect skills get their own log line
+      logs.push(`${skill.icon} **${skill.name}**! ${effectLabels[skill.effect] ?? skill.effect} ×${skill.effectDuration} lượt.`);
+    } else {
+      logs.push(`  └ ${effectLabels[skill.effect] ?? skill.effect} ×${skill.effectDuration} lượt.`);
+    }
   }
 
   if (enemy_hp <= 0) {
-    return {
-      newState: { ...state, player_hp, player_mp, enemy_hp, active_effects: JSON.stringify(effects), combat_log: JSON.stringify(logs.slice(-6)) },
-      logLines: logs, playerDied: false, enemyDied: true, fled: false
-    };
+    return makeResult(state, { ...state, enemy_hp }, player_hp, player_mp, effects, logs, false, true, false);
   }
 
-  // Enemy turn
-  const midState = { ...state, player_hp, player_mp, enemy_hp, active_effects: JSON.stringify(effects) };
-  return enemyTurn(state, midState, player_hp, player_mp, effects, logs, 0);
+  return enemyTurn(state, { ...state, enemy_hp }, player_hp, player_mp, effects, logs, 0, passives);
 }
 
-export function processDefend(state: CombatState, playerAtk: number, hpRegen: number, mpRegen: number): ActionResult {
-  const effects = parseEffects(state.active_effects);
+// ── processDefend ─────────────────────────────────────────────────────────
+export function processDefend(state: CombatState, playerAtk: number, _h: number, _m: number): ActionResult {
+  const effects  = parseEffects(state.active_effects);
+  const passives = getPassives(state.user_id, state.guild_id);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
-  logs.push(`🛡️ Bạn chọn **Phòng thủ** — giảm 40% sát thương nhận vào lượt này.`);
-  const defended = { ...state, is_defending: 1 };
-  return enemyTurn(state, defended, state.player_hp, state.player_mp, effects, logs, Math.floor(state.enemy_atk * 0.4));
+  logs.push(`🛡️ Bạn chọn **Phòng thủ** — giảm 40% sát thương lượt này.`);
+  return enemyTurn(state, { ...state, is_defending: 1 }, state.player_hp, state.player_mp, effects, logs, Math.floor(state.enemy_atk * 0.4), passives);
 }
 
+// ── processFlee ───────────────────────────────────────────────────────────
 export function processFlee(state: CombatState): ActionResult {
+  const passives = getPassives(state.user_id, state.guild_id);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
-  const chance = 60;
-  if (randInt(1, 100) <= chance) {
+  if (randInt(1, 100) <= 60) {
     logs.push(`🏃 Bạn **bỏ chạy** thành công!`);
     return { newState: state, logLines: logs, playerDied: false, enemyDied: false, fled: true };
   }
   logs.push(`🏃 Cố bỏ chạy nhưng thất bại!`);
   const effects = parseEffects(state.active_effects);
-  return enemyTurn(state, state, state.player_hp, state.player_mp, effects, logs, 0);
+  return enemyTurn(state, state, state.player_hp, state.player_mp, effects, logs, 0, passives);
 }
 
-// ── Enemy AI ──────────────────────────────────────────────────────────────
+// ── enemyTurn ─────────────────────────────────────────────────────────────
 function enemyTurn(
-  original: CombatState,
-  current: CombatState,
+  original: CombatState, current: CombatState,
   playerHp: number, playerMp: number,
   effects: Effect[], logs: string[],
-  defenseBonus: number
+  defenseBonus: number, passives: Passives
 ): ActionResult {
-  const enemy = getEnemy(current.enemy_id)!;
+  const enemy = getEnemy(current.enemy_id);
+  if (!enemy) return makeResult(original, current, playerHp, playerMp, effects, logs, false, false, false);
 
-  // Check stun
+  // ── Stun: enemy skips turn ─────────────────────────────────────────────
   if (hasEffect(effects, 'stun')) {
     logs.push(`💫 **${enemy.name}** bị choáng — bỏ qua lượt!`);
     const nextEffects = effects.map(e => e.name === 'stun' ? { ...e, duration: e.duration - 1 } : e).filter(e => e.duration > 0);
-    const ticked = tickEffects(nextEffects);
-    playerHp = Math.min(current.player_max_hp, playerHp - ticked.burnDmg + ticked.hpRegen);
-    playerMp = Math.min(current.player_max_mp, playerMp + ticked.mpRegen);
-
-    return makeResult(original, current, playerHp, playerMp, ticked.effects, logs, false, false, false);
+    const { effects: ticked, burnDmg } = tickEffects(nextEffects);
+    if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); logs.push(`🔥 Đốt cháy −**${burnDmg} HP**.`); }
+    playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
+    playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
+    if (passives.mpRegenPerTurn > 0) logs.push(`💫 Hồi **${passives.mpRegenPerTurn} MP** (Mana Flow).`);
+    return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
   }
 
-  // Check slow (-5 ATK)
-  const slowActive = hasEffect(effects, 'slow');
+  // ── Shield (Soul Guard): block one massive/lethal hit ──────────────────
+  if (hasEffect(effects, 'shield')) {
+    // Pre-calc if this would be a fatal/heavy hit
+    const preDmg = Math.max(1, enemy.atk - defenseBonus);
+    const wouldBeHeavy = preDmg >= playerHp || preDmg > current.player_max_hp * 0.5;
+    if (wouldBeHeavy) {
+      const idx = effects.findIndex(e => e.name === 'shield');
+      effects.splice(idx, 1);
+      logs.push(`🛡️💀 **Soul Guard** bloqueou o golpe! O ataque foi absorvido!`);
+      const { effects: ticked, burnDmg } = tickEffects(effects);
+      if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); }
+      playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
+      playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
+      return makeResult(original, current, playerHp, playerMp, ticked, logs, false, false, false);
+    }
+  }
+
+  // ── Passive dodge chance (from equipment) ────────────────────────────
+  const eqStatsET = getEquipmentStats(current.user_id, current.guild_id);
+  const passiveDodge = eqStatsET.dodgeChance ?? 0;
+  if (passiveDodge > 0 && !hasEffect(effects, 'dodge') && randInt(1, 100) <= passiveDodge) {
+    logs.push(`💨 **Dodge pasif (${passiveDodge}%)** — Tránh đòn!`);
+    const { effects: ticked, burnDmg } = tickEffects(effects);
+    if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); }
+    playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
+    playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
+    return makeResult(original, current, playerHp, playerMp, ticked, logs, false, false, false);
+  }
+
+  // ── Dodge: player avoids attack completely ─────────────────────────────
+  if (hasEffect(effects, 'dodge')) {
+    const idx = effects.findIndex(e => e.name === 'dodge');
+    effects.splice(idx, 1);
+    logs.push(`🌑 **Shadow Step!** Bạn né hoàn toàn đòn tấn công của **${enemy.name}**!`);
+    // Tick remaining effects
+    const { effects: ticked, burnDmg } = tickEffects(effects);
+    if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); logs.push(`🔥 Đốt cháy −**${burnDmg} HP**.`); }
+    playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
+    playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
+    return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
+  }
+
+  // ── Slow: reduce enemy ATK ─────────────────────────────────────────────
   let enemyAtk = current.enemy_atk;
-  if (slowActive) enemyAtk = Math.max(1, enemyAtk - 5);
+  if (hasEffect(effects, 'slow')) {
+    enemyAtk = Math.max(1, enemyAtk - 5);
+    logs.push(`🧊 Địch bị làm chậm (−5 ATK).`);
+  }
 
-  // AI: 30% chance to use special if available, more aggressive if low HP
-  const hpPct = current.enemy_hp / current.enemy_max_hp;
+  // ── Enemy attacks ──────────────────────────────────────────────────────
+  const hpPct      = current.enemy_hp / current.enemy_max_hp;
   const useSpecial = (hpPct < 0.3 && randInt(1, 100) <= 60) || randInt(1, 100) <= 30;
-  const special = useSpecial && enemy.specialAttacks.length > 0 ? pick(enemy.specialAttacks) : null;
-
-  let dmg = 0;
+  const special    = useSpecial && enemy.specialAttacks.length > 0 ? pick(enemy.specialAttacks) : null;
+  let dealDmg      = 0;
 
   if (special) {
-    const result = applySpecialAttack(special, enemyAtk, enemy.name, playerHp, playerMp, logs);
-    playerHp   = result.playerHp;
-    playerMp   = result.playerMp;
-    dmg        = result.dmg;
+    const res = applySpecialAttack(special, enemyAtk, enemy, playerHp, playerMp, logs);
+    playerHp = res.playerHp;
+    playerMp = res.playerMp;
+    dealDmg  = res.dmg;
   } else {
-    dmg = Math.max(1, calcDamage(enemyAtk, defenseBonus));
-    // Counter reaction
-    // (handled passively — counter skill fires on hit, 40% chance)
-    playerHp = Math.max(0, playerHp - dmg);
-    logs.push(`${enemy.icon} **${enemy.name}** tấn công gây **${dmg}** sát thương. (${playerHp}/${current.player_max_hp} HP còn lại)`);
+    dealDmg  = Math.max(1, calcDamage(enemyAtk, defenseBonus));
+    playerHp = Math.max(0, playerHp - dealDmg);
+    logs.push(`${enemy.icon} **${enemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP còn lại)`);
   }
 
-  // Tick end-of-turn effects
-  const ticked = tickEffects(effects);
-  if (ticked.burnDmg > 0) {
-    playerHp = Math.max(0, playerHp - ticked.burnDmg);
-    logs.push(`🔥 Đốt cháy gây **${ticked.burnDmg}** sát thương theo thời gian.`);
-  }
-  if (ticked.hpRegen > 0) {
-    playerHp = Math.min(current.player_max_hp, playerHp + ticked.hpRegen);
-    logs.push(`💚 Hồi phục **${ticked.hpRegen} HP** từ tái sinh.`);
-  }
-  if (ticked.mpRegen > 0) {
-    playerMp = Math.min(current.player_max_mp, playerMp + ticked.mpRegen);
+  // ── Counter reaction (on hit) ──────────────────────────────────────────
+  if (passives.hasCounter && dealDmg > 0 && randInt(1, 100) <= 40) {
+    const loadout    = getLoadout(current.user_id, current.guild_id);
+    const counterEntry = loadout.find(l => l.skill_id === 'counter');
+    if (counterEntry) {
+      const player    = getPlayer(current.user_id, current.guild_id);
+      const baseAtk   = player?.atk ?? 10;
+      const counterDmg = Math.max(1, Math.floor(baseAtk * 0.6));
+      const newEnemyHp = Math.max(0, current.enemy_hp - counterDmg);
+      // Note: enemy_hp in current is already pre-set, update via state mutation
+      logs.push(`🔄 **Counter!** Phản đòn gây **${counterDmg}** sát thương! (${newEnemyHp}/${current.enemy_max_hp})`);
+      // Reflect in return state
+      current = { ...current, enemy_hp: newEnemyHp };
+      if (newEnemyHp <= 0) {
+        const { effects: ticked, burnDmg } = tickEffects(effects);
+        return makeResult(original, current, playerHp, playerMp, ticked, logs, false, true, false);
+      }
+    }
   }
 
-  const playerDied = playerHp <= 0;
-  return makeResult(original, current, playerHp, playerMp, ticked.effects, logs, playerDied, false, false);
+  // ── Tick end-of-turn effects ───────────────────────────────────────────
+  const { effects: ticked, burnDmg } = tickEffects(effects);
+  if (burnDmg > 0) {
+    playerHp = Math.max(0, playerHp - burnDmg);
+    logs.push(`🔥 Đốt cháy gây **${burnDmg}** sát thương theo thời gian.`);
+  }
+
+  // ── Passive regen ──────────────────────────────────────────────────────
+  if (passives.hpRegenPerTurn > 0 && playerHp > 0) {
+    playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
+    logs.push(`💪 **Tough Body:** Hồi **${passives.hpRegenPerTurn} HP**.`);
+  }
+  if (passives.mpRegenPerTurn > 0) {
+    playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
+    logs.push(`💫 **Mana Flow:** Hồi **${passives.mpRegenPerTurn} MP**.`);
+  }
+
+  // ── Last Stand reaction (on drop below 10% HP) ─────────────────────────
+  const hpThreshold = current.player_max_hp * 0.1;
+  if (passives.hasLastStand && playerHp > 0 && playerHp <= hpThreshold
+    && !hasEffect(ticked, 'berserk') && !hasEffect(ticked, 'last_stand_used')) {
+    addEffect(ticked, 'berserk', 3, 50);
+    addEffect(ticked, 'last_stand_used', 999);
+    logs.push(`🔱 **Last Stand!** HP cực thấp — ATK +50% trong **3 lượt**!`);
+  }
+
+  return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
 }
 
+// ── Special attack dispatch ───────────────────────────────────────────────
 function applySpecialAttack(
-  special: string, baseAtk: number, enemyName: string,
+  special: string, baseAtk: number, enemy: EnemyDef,
   playerHp: number, playerMp: number, logs: string[]
 ): { playerHp: number; playerMp: number; dmg: number } {
   let dmg = 0;
+  const n = enemy.name, ic = enemy.icon;
   switch (special) {
     case 'double_bite':
       dmg = Math.max(1, calcDamage(baseAtk * 0.6, 0)) * 2;
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`🐺 **${enemyName}** cắn **hai lần**! Tổng **${dmg}** sát thương!`);
-      break;
-    case 'drain_mp':
-      const mpDrain = Math.min(playerMp, 15);
-      playerMp -= mpDrain;
-      logs.push(`👻 **${enemyName}** hút **${mpDrain} MP** của bạn!`);
-      break;
+      logs.push(`🐺 **${n}** cắn **hai lần**! Tổng **${dmg}** sát thương!`); break;
+    case 'drain_mp': {
+      const d = Math.min(playerMp, 15); playerMp -= d;
+      logs.push(`${ic} **${n}** hút **${d} MP**!`); break;
+    }
     case 'petal_storm':
       dmg = Math.max(1, calcDamage(baseAtk * 0.8, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`🧚 **${enemyName}** tung **Petal Storm**! ${dmg} sát thương!`);
-      break;
+      logs.push(`${ic} **${n}** tung **Petal Storm**! **${dmg}** sát thương!`); break;
     case 'root_slam':
       dmg = Math.max(1, calcDamage(baseAtk * 1.5, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`🌳 **${enemyName}** đập rễ cây cực mạnh! **${dmg}** sát thương!`);
-      break;
+      logs.push(`${ic} **${n}** đập rễ cây! **${dmg}** sát thương!`); break;
     case 'nature_regeneration':
-      logs.push(`🌳 **${enemyName}** hồi phục sinh lực từ đất!`);
-      // Handled in enemy HP update in combat
-      break;
+      logs.push(`${ic} **${n}** hồi phục sinh lực từ đất!`); break;
     case 'divine_judgment':
       dmg = Math.max(1, calcDamage(baseAtk * 1.4, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`⛩️ **${enemyName}** tung **Divine Judgment**! **${dmg}** sát thương!`);
-      break;
+      logs.push(`${ic} **${n}** tung **Divine Judgment**! **${dmg}** sát thương!`); break;
+    case 'shatter_guard':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** phá vỡ phòng thủ! **${dmg}** sát thương!`); break;
+    case 'enrage':
+      logs.push(`${ic} **${n}** nổi điên — ATK tăng mạnh!`); break;
     case 'cave_in':
       dmg = Math.max(1, calcDamage(baseAtk * 1.2, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`👹 **${enemyName}** gây sạt lở hang động! **${dmg}** sát thương!`);
-      break;
+      logs.push(`${ic} **${n}** gây sạt lở! **${dmg}** sát thương!`); break;
+    case 'rock_throw':
+      dmg = Math.max(1, calcDamage(baseAtk * 0.9, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** ném đá! **${dmg}** sát thương!`); break;
     case 'blood_drain':
       dmg = Math.max(1, calcDamage(baseAtk * 0.9, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`🦇 **${enemyName}** hút máu! **${dmg}** sát thương và hồi phục HP!`);
-      break;
-    case 'void_drain':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.7, 0));
-      const mpD = Math.min(playerMp, 20);
+      logs.push(`${ic} **${n}** hút máu! **${dmg}** sát thương!`); break;
+    case 'screech':
+      dmg = Math.max(1, calcDamage(baseAtk * 0.5, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      playerMp -= mpD;
-      logs.push(`🌀 **${enemyName}** dùng **Void Drain**! −${dmg} HP, −${mpD} MP!`);
-      break;
+      logs.push(`${ic} **${n}** hét vang! **${dmg}** sát thương + hoa mắt!`); break;
+    case 'howl':
+      logs.push(`${ic} **${n}** hú vang — đòn tiếp theo mạnh hơn!`); break;
+    case 'piercing_arrow':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.2, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** bắn **Mũi Tên Xuyên Giáp**! **${dmg}** sát thương!`); break;
+    case 'phase_through':
+      dmg = Math.max(1, calcDamage(baseAtk * 0.8, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** xuyên qua hàng phòng thủ! **${dmg}** sát thương!`); break;
+    case 'ground_slam':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.3, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** đập đất! **${dmg}** sát thương!`); break;
+    case 'seismic_slam':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.6, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** tung **Seismic Slam**! **${dmg}** sát thương khổng lồ!`); break;
+    case 'magma_core':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.4, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** bùng phát lõi magma! **${dmg}** sát thương lửa!`); break;
+    case 'void_drain': {
+      dmg = Math.max(1, calcDamage(baseAtk * 0.7, 0));
+      const mpD = Math.min(playerMp, 20); playerHp = Math.max(0, playerHp - dmg); playerMp -= mpD;
+      logs.push(`${ic} **${n}** dùng **Void Drain**! −${dmg} HP, −${mpD} MP!`); break;
+    }
+    case 'reality_tear':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** xé toạc thực tại! **${dmg}** sát thương!`); break;
+    case 'skill_echo':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.0, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** sao chép kỹ năng của bạn! **${dmg}** sát thương!`); break;
+    case 'mind_crush':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.2, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** đè nát tâm trí! **${dmg}** sát thương!`); break;
     case 'erase':
       dmg = Math.max(1, calcDamage(baseAtk * 2.0, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`❓ **${enemyName}** cố xóa sổ bạn khỏi sự tồn tại! **${dmg}** sát thương khổng lồ!`);
-      break;
+      logs.push(`${ic} **${n}** cố **XÓA SỔ** bạn! **${dmg}** sát thương khổng lồ!`); break;
     case 'butterfly_curse':
       dmg = Math.max(1, calcDamage(baseAtk * 0.8, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`🦋 **${enemyName}** tung **Butterfly Curse** — mỗi đòn đánh có hệ quả!`);
-      break;
+      logs.push(`${ic} **${n}** tung **Butterfly Curse!** **${dmg}** sát thương!`); break;
+    case 'forgotten_rage':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.8, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** bùng phát cơn thịnh nộ! **${dmg}** sát thương!`); break;
+    case 'backstab':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.3, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** đâm lén! **${dmg}** sát thương!`); break;
+    case 'shield_bash':
+      dmg = Math.max(1, calcDamage(baseAtk * 0.9, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** húc khiên! **${dmg}** sát thương!`); break;
     default:
       dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
       playerHp = Math.max(0, playerHp - dmg);
-      logs.push(`✨ **${enemyName}** dùng đòn đặc biệt! **${dmg}** sát thương!`);
+      logs.push(`${ic} **${n}** tung đòn đặc biệt! **${dmg}** sát thương!`);
   }
   return { playerHp, playerMp, dmg };
 }
 
+// ── makeResult ────────────────────────────────────────────────────────────
 function makeResult(
-  _original: CombatState, current: CombatState,
+  _orig: CombatState, current: CombatState,
   playerHp: number, playerMp: number,
   effects: Effect[], logs: string[],
   playerDied: boolean, enemyDied: boolean, fled: boolean
 ): ActionResult {
-  const newState: CombatState = {
-    ...current,
-    player_hp: playerHp, player_mp: playerMp,
-    turn: current.turn + 1, is_defending: 0,
-    active_effects: JSON.stringify(effects),
-    combat_log: JSON.stringify(logs.slice(-6))
+  return {
+    newState: {
+      ...current,
+      player_hp: playerHp, player_mp: playerMp,
+      turn: current.turn + 1, is_defending: 0,
+      active_effects: JSON.stringify(effects),
+      combat_log: JSON.stringify(logs.slice(-6))
+    },
+    logLines: logs, playerDied, enemyDied, fled
   };
-  return { newState, logLines: logs, playerDied, enemyDied, fled };
 }

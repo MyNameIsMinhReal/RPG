@@ -13,13 +13,16 @@ import { awardAchievements } from '../systems/achievements';
 import { COLORS } from '../utils/embeds';
 import { getItem } from '../data/items';
 import { getSkill, SKILLS, type SkillType } from '../data/skills';
+import { getEquipment, EQUIPMENT, RARITY_COLORS, RARITY_LABELS, SLOT_ICONS, getZoneEquipment } from '../data/equipment';
+import { getWornEquipment, wearEquipment, removeEquipment, getOwnedEquipment, formatWornGear } from '../systems/equipment';
+import { getUnlockedTitles, getSelectedTitle, selectTitle } from '../systems/titles';
 import { bar } from '../utils/format';
 
 export const data = new SlashCommandBuilder()
   .setName('inventory')
   .setDescription('Quản lý đồ vật, kỹ năng và loadout');
 
-type Tab = 'consumable' | 'skillbook' | 'equipment' | 'material' | 'special' | 'skills' | 'loadout';
+type Tab = 'items' | 'skills' | 'loadout' | 'books' | 'equip' | 'titles';
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply();
@@ -32,13 +35,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  await renderTab(interaction, userId, guildId, 'consumable');
+  await renderTab(interaction, userId, guildId, 'items');
 }
 
 // ── Render tab ────────────────────────────────────────────────────────────────
 async function renderTab(
   interaction: ChatInputCommandInteraction,
-  userId: string, guildId: string, currentTab: Tab, currentRarity = 'all'
+  userId: string, guildId: string, currentTab: Tab
 ): Promise<void> {
   const player    = getPlayer(userId, guildId)!;
   const inventory = getInventory(userId, guildId);
@@ -50,25 +53,12 @@ async function renderTab(
       .setCustomId(`inv_tab_${userId}`)
       .setPlaceholder('Chọn mục...')
       .addOptions([
-        new StringSelectMenuOptionBuilder().setLabel('🎒 Consumable').setDescription('Vật phẩm hồi phục và consumables').setValue('consumable').setDefault(currentTab === 'consumable'),
-        new StringSelectMenuOptionBuilder().setLabel('📜 Skill Book').setDescription('Sách học kỹ năng').setValue('skillbook').setDefault(currentTab === 'skillbook'),
-        new StringSelectMenuOptionBuilder().setLabel('⚔️ Equipment').setDescription('Trang bị và vật phẩm đặc biệt').setValue('equipment').setDefault(currentTab === 'equipment'),
-        new StringSelectMenuOptionBuilder().setLabel('🪨 Material').setDescription('Vật liệu chế tạo').setValue('material').setDefault(currentTab === 'material'),
-        new StringSelectMenuOptionBuilder().setLabel('✨ Special').setDescription('Đồ đặc biệt / key items').setValue('special').setDefault(currentTab === 'special'),
-      ])
-  );
-
-  // Rarity filter (applies to item-like tabs)
-  const raritySelect = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`inv_rarity_${userId}`)
-      .setPlaceholder('Lọc rarity...')
-      .addOptions([
-        new StringSelectMenuOptionBuilder().setLabel('All').setValue('all').setDefault(currentRarity === 'all'),
-        new StringSelectMenuOptionBuilder().setLabel('Common').setValue('Common').setDefault(currentRarity === 'Common'),
-        new StringSelectMenuOptionBuilder().setLabel('Rare').setValue('Rare').setDefault(currentRarity === 'Rare'),
-        new StringSelectMenuOptionBuilder().setLabel('Epic').setValue('Epic').setDefault(currentRarity === 'Epic'),
-        new StringSelectMenuOptionBuilder().setLabel('Legendary').setValue('Legendary').setDefault(currentRarity === 'Legendary'),
+        new StringSelectMenuOptionBuilder().setLabel('📦 Vật phẩm').setDescription('Đồ consumable và materials').setValue('items').setDefault(currentTab === 'items'),
+        new StringSelectMenuOptionBuilder().setLabel('🔮 Skill Pool').setDescription('Kỹ năng đã học').setValue('skills').setDefault(currentTab === 'skills'),
+        new StringSelectMenuOptionBuilder().setLabel('📌 Loadout').setDescription('Trang bị 4 slots chiến đấu').setValue('loadout').setDefault(currentTab === 'loadout'),
+        new StringSelectMenuOptionBuilder().setLabel('📚 Skill Books').setDescription('Học kỹ năng mới').setValue('books').setDefault(currentTab === 'books'),
+        new StringSelectMenuOptionBuilder().setLabel('⚔️ Trang Bị').setDescription('Weapon · Armor · 2x Accessory').setValue('equip').setDefault(currentTab === 'equip'),
+        new StringSelectMenuOptionBuilder().setLabel('🏅 Danh Hiệu').setDescription('Title đã mở khoá').setValue('titles').setDefault(currentTab === 'titles'),
       ])
   );
 
@@ -76,16 +66,15 @@ async function renderTab(
   let actionRows: ActionRowBuilder<any>[] = [];
 
   switch (currentTab) {
-    case 'consumable': [embed, actionRows] = buildItemsTab(player, inventory, userId, 'consumable', currentRarity); break;
-    case 'material':   [embed, actionRows] = buildItemsTab(player, inventory, userId, 'material', currentRarity); break;
-    case 'equipment':  [embed, actionRows] = buildItemsTab(player, inventory, userId, 'equipment', currentRarity); break;
-    case 'special':    [embed, actionRows] = buildItemsTab(player, inventory, userId, 'special', currentRarity); break;
-    case 'skillbook':  [embed, actionRows] = buildBooksTab(player, inventory, userId); break;
-    case 'skills':     [embed, actionRows] = buildSkillsTab(player, pool, loadout); break;
-    case 'loadout':    [embed, actionRows] = buildLoadoutTab(player, pool, loadout, userId); break;
+    case 'items':   [embed, actionRows] = buildItemsTab(player, inventory, userId);   break;
+    case 'skills':  [embed, actionRows] = buildSkillsTab(player, pool, loadout);       break;
+    case 'loadout': [embed, actionRows] = buildLoadoutTab(player, pool, loadout, userId); break;
+    case 'books':   [embed, actionRows] = buildBooksTab(player, inventory, userId);   break;
+    case 'equip':   [embed, actionRows] = buildEquipTab(player, userId, guildId);      break;
+    case 'titles':  [embed, actionRows] = buildTitlesTab(player, userId, guildId);     break;
   }
 
-  const allRows = [tabSelect, raritySelect, ...actionRows].slice(0, 5);
+  const allRows = [tabSelect, ...actionRows].slice(0, 5);
   const reply   = await interaction.editReply({ embeds: [embed!], components: allRows });
 
   // ── Collector ────────────────────────────────────────────────────
@@ -102,14 +91,7 @@ async function renderTab(
     // Tab switch
     if (cid === `inv_tab_${userId}`) {
       const tab = (compInt as StringSelectMenuInteraction).values[0] as Tab;
-      await renderTab(interaction, userId, guildId, tab, currentRarity);
-      return;
-    }
-
-    // Rarity switch
-    if (cid === `inv_rarity_${userId}`) {
-      const rarity = (compInt as StringSelectMenuInteraction).values[0];
-      await renderTab(interaction, userId, guildId, currentTab, rarity);
+      await renderTab(interaction, userId, guildId, tab);
       return;
     }
 
@@ -147,6 +129,35 @@ async function renderTab(
       return;
     }
 
+    // ── Equip tab actions ─────────────────────────────────────────
+    if (cid === `inv_wear_${userId}`) {
+      const sel    = compInt as StringSelectMenuInteraction;
+      const equipId = sel.values[0].replace('wear_', '');
+      const def    = getEquipment(equipId);
+      if (def) {
+        wearEquipment(userId, guildId, equipId);
+        await renderTab(interaction, userId, guildId, 'equip');
+      }
+      return;
+    }
+
+    if (cid.startsWith(`inv_unequip_gear_${userId}_`)) {
+      const slot = cid.replace(`inv_unequip_gear_${userId}_`, '') as import('../data/equipment').EquipSlot;
+      removeEquipment(userId, guildId, slot);
+      await renderTab(interaction, userId, guildId, 'equip');
+      return;
+    }
+
+    // ── Titles tab actions ─────────────────────────────────────────
+    if (cid === `inv_title_${userId}`) {
+      const sel     = compInt as StringSelectMenuInteraction;
+      const titleId = sel.values[0];
+      if (titleId === 'none') selectTitle(userId, guildId, null);
+      else selectTitle(userId, guildId, titleId);
+      await renderTab(interaction, userId, guildId, 'titles');
+      return;
+    }
+
     // ── Books tab actions ──────────────────────────────────────────
     if (cid === `inv_learn_${userId}`) {
       const sel    = compInt as StringSelectMenuInteraction;
@@ -163,49 +174,53 @@ async function renderTab(
 
 // ── Tab: Items ────────────────────────────────────────────────────────────────
 function buildItemsTab(
-  player: any, inventory: any[], userId: string, category: 'consumable' | 'material' | 'equipment' | 'special', rarity = 'all'
+  player: any, inventory: any[], userId: string
 ): [EmbedBuilder, ActionRowBuilder<any>[]] {
-  // filter by category
-  const byCategory = inventory.filter(e => {
-    const it = getItem(e.item_id);
-    if (!it) return false;
-    if (category === 'consumable') return it.type === 'consumable';
-    if (category === 'material') return it.type === 'material';
-    if (category === 'special') return it.type === 'key_item';
-    // equipment currently not modeled; fallback to key_item
-    if (category === 'equipment') return it.type === 'key_item';
-    return false;
-  }).filter(e => {
-    const it = getItem(e.item_id)!;
-    const r = (it as any).rarity ?? 'Common';
-    return rarity === 'all' ? true : r === rarity;
-  });
+  const consumables = inventory.filter(e => getItem(e.item_id)?.type === 'consumable');
+  const materials   = inventory.filter(e => getItem(e.item_id)?.type === 'material');
+  const keyItems    = inventory.filter(e => getItem(e.item_id)?.type === 'key_item');
 
   const embed = new EmbedBuilder()
     .setColor(COLORS.info)
-    .setTitle(category === 'consumable' ? '🎒 Consumables' : category === 'material' ? '🪨 Materials' : category === 'equipment' ? '⚔️ Equipment' : '✨ Special')
+    .setTitle('📦 Vật Phẩm')
     .setDescription(`🪙 Gold: **${player.gold}**  ·  💀 Soul Shards: **${player.soul_shards}**`);
 
-  if (byCategory.length) {
-    // group display
+  if (consumables.length) {
     embed.addFields({
-      name: 'Items',
-      value: byCategory.map(e => {
+      name: '🧪 Consumables',
+      value: consumables.map(e => {
         const it = getItem(e.item_id)!;
-        const rarityTag = (it as any).rarity ? ` • ${ (it as any).rarity }` : '';
-        return `${it.icon} **${it.name}** ×${e.quantity}${rarityTag} — ${it.description.replace(/\*\*/g,'').slice(0,60)}`;
+        return `${it.icon} **${it.name}** ×${e.quantity}  — *${it.description.replace(/\*\*/g,'').slice(0,40)}*`;
       }).join('\n'),
       inline: false
     });
-  } else {
-    embed.setDescription(`🪙 Gold: **${player.gold}**\n\n*Không có vật phẩm trong mục này.*`);
+  }
+  if (materials.length) {
+    embed.addFields({
+      name: '⚗️ Materials',
+      value: materials.map(e => {
+        const it = getItem(e.item_id)!;
+        return `${it.icon} **${it.name}** ×${e.quantity}`;
+      }).join('  ·  '),
+      inline: false
+    });
+  }
+  if (keyItems.length) {
+    embed.addFields({
+      name: '🔑 Key Items',
+      value: keyItems.map(e => { const it = getItem(e.item_id)!; return `${it.icon} **${it.name}**`; }).join('  ·  '),
+      inline: false
+    });
+  }
+  if (!consumables.length && !materials.length && !keyItems.length) {
+    embed.setDescription(`🪙 Gold: **${player.gold}**\n\n*Túi đồ trống. Khám phá để tìm đồ hoặc gặp lái buôn!*`);
   }
 
   const rows: ActionRowBuilder<any>[] = [];
 
-  // Use item select for consumables only
-  if (category === 'consumable' && byCategory.length) {
-    const options = byCategory.map(e => {
+  // Use item select
+  if (consumables.length) {
+    const options = consumables.map(e => {
       const it = getItem(e.item_id)!;
       return new StringSelectMenuOptionBuilder()
         .setLabel(`${it.name} ×${e.quantity}`)
@@ -379,10 +394,10 @@ async function handleUseItem(
 ): Promise<void> {
   const player = getPlayer(userId, guildId)!;
   const item   = getItem(itemId);
-  if (!item?.effect) { await renderTab(interaction, userId, guildId, 'consumable'); return; }
+  if (!item?.effect) { await renderTab(interaction, userId, guildId, 'items'); return; }
 
   const qty = getItemQty(userId, guildId, itemId);
-  if (qty <= 0) { await renderTab(interaction, userId, guildId, 'consumable'); return; }
+  if (qty <= 0) { await renderTab(interaction, userId, guildId, 'items'); return; }
 
   let newHp = player.hp, newMp = player.mp;
   const lines: string[] = [];
@@ -403,7 +418,7 @@ async function handleUseItem(
 
   const inv     = getInventory(userId, guildId);
   const fresh   = getPlayer(userId, guildId)!;
-  const [embed, actionRows] = buildItemsTab(fresh, inv, userId, 'consumable', 'all');
+  const [embed, actionRows] = buildItemsTab(fresh, inv, userId);
 
   embed.spliceFields(0, embed.data.fields?.length ?? 0);
   embed.setDescription(
@@ -413,16 +428,16 @@ async function handleUseItem(
 
   const tabSelect = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder().setCustomId(`inv_tab_${userId}`).setPlaceholder('Chọn mục...').addOptions([
-      new StringSelectMenuOptionBuilder().setLabel('🎒 Consumable').setValue('consumable').setDefault(true),
-      new StringSelectMenuOptionBuilder().setLabel('📜 Skill Book').setValue('skillbook'),
-      new StringSelectMenuOptionBuilder().setLabel('📌 Loadout').setValue('loadout'),
+      new StringSelectMenuOptionBuilder().setLabel('📦 Vật phẩm').setValue('items').setDefault(true),
       new StringSelectMenuOptionBuilder().setLabel('🔮 Skill Pool').setValue('skills'),
+      new StringSelectMenuOptionBuilder().setLabel('📌 Loadout').setValue('loadout'),
+      new StringSelectMenuOptionBuilder().setLabel('📚 Skill Books').setValue('books'),
     ])
   );
 
   await interaction.editReply({ embeds: [embed], components: [tabSelect, ...actionRows].slice(0,5) });
   // Re-attach collector via renderTab
-  setTimeout(() => renderTab(interaction, userId, guildId, 'consumable'), 200);
+  setTimeout(() => renderTab(interaction, userId, guildId, 'items'), 200);
 }
 
 // ── Action: Pick slot for equip ────────────────────────────────────────────────
@@ -480,16 +495,16 @@ async function handleLearnSkill(
   userId: string, guildId: string, bookId: string
 ): Promise<void> {
   const item = getItem(bookId);
-  if (!item?.teachesSkill) { await renderTab(interaction, userId, guildId, 'skillbook'); return; }
+  if (!item?.teachesSkill) { await renderTab(interaction, userId, guildId, 'books'); return; }
 
   const qty = getItemQty(userId, guildId, bookId);
-  if (qty <= 0) { await renderTab(interaction, userId, guildId, 'skillbook'); return; }
+  if (qty <= 0) { await renderTab(interaction, userId, guildId, 'books'); return; }
 
   const skill = getSkill(item.teachesSkill)!;
 
   if (hasSkillInPool(userId, guildId, skill.id)) {
     // Already known — just show updated tab
-    await renderTab(interaction, userId, guildId, 'skillbook');
+    await renderTab(interaction, userId, guildId, 'books');
     return;
   }
 
@@ -514,5 +529,135 @@ async function handleLearnSkill(
   await interaction.editReply({ embeds: [embed], components: [] });
 
   // Auto switch to books tab after 3s
-  setTimeout(() => renderTab(interaction, userId, guildId, 'skillbook'), 2500);
+  setTimeout(() => renderTab(interaction, userId, guildId, 'books'), 2500);
+}
+
+// ── Tab: Equipment ────────────────────────────────────────────────────────
+function buildEquipTab(
+  player: any, userId: string, guildId: string
+): [EmbedBuilder, ActionRowBuilder<any>[]] {
+  const worn  = getWornEquipment(userId, guildId);
+  const owned = getOwnedEquipment(userId, guildId);
+  const { getEquipmentStats: ges, getEquipmentStats } = require('../systems/equipment');
+  const fullStats = getEquipmentStats(userId, guildId);
+
+  const embed = new EmbedBuilder()
+    .setColor(0xE67E22)
+    .setTitle('⚔️ Trang Bị  (4 Slots)')
+    .setDescription('*Weapon · Armor · Accessory 1 · Accessory 2*')
+    .addFields({
+      name: '🎽 Đang mặc',
+      value: formatWornGear(userId, guildId) || '*Chưa trang bị gì*',
+      inline: false
+    });
+
+  // Full stat summary
+  const statLines = [
+    fullStats.atk         ? `⚔️ +${fullStats.atk} ATK`            : '',
+    fullStats.def         ? `🛡️ +${fullStats.def} DEF`            : '',
+    fullStats.maxHp       ? `❤️ +${fullStats.maxHp} HP`           : '',
+    fullStats.maxMp       ? `💧 +${fullStats.maxMp} MP`           : '',
+    fullStats.critChance  ? `🎯 +${fullStats.critChance}% Crit`   : '',
+    fullStats.dodgeChance ? `💨 +${fullStats.dodgeChance}% Dodge` : '',
+    fullStats.lifesteal   ? `🩸 +${fullStats.lifesteal}% Lifesteal` : '',
+    fullStats.expBonus    ? `⭐ +${fullStats.expBonus}% EXP`      : '',
+    fullStats.goldBonus   ? `🪙 +${fullStats.goldBonus}% Gold`    : '',
+  ].filter(Boolean);
+
+  if (statLines.length) {
+    embed.addFields({ name: '📊 Tổng bonus', value: statLines.join('  ·  '), inline: false });
+  }
+
+  // Active effects
+  if (fullStats.effects?.length) {
+    embed.addFields({ name: '✨ Effects đang hoạt động', value: fullStats.effects.join(', '), inline: false });
+  }
+
+  const rows: ActionRowBuilder<any>[] = [];
+
+  // Equipment to wear (owned and not currently worn)
+  const wornIds = new Set(worn.map(w => w.equipment_id));
+  const equipable = owned.filter(e => !wornIds.has(e.id));
+
+  if (equipable.length) {
+    const opts = equipable.map(e => {
+      const statsStr = Object.entries(e.stats).map(([k, v]) => `+${v} ${k}`).join(', ');
+      return new StringSelectMenuOptionBuilder()
+        .setLabel(`${e.name} (${RARITY_LABELS[e.rarity]})`)
+        .setDescription(`${SLOT_ICONS[e.slot]} ${e.slot} · ${statsStr}`)
+        .setValue(`wear_${e.id}`)
+        .setEmoji(e.icon);
+    });
+    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`inv_wear_${userId}`)
+        .setPlaceholder('⚔️ Trang bị gear...')
+        .addOptions(opts)
+    ));
+  }
+
+  // Unequip buttons per occupied slot
+  if (worn.length) {
+    const btns = worn.map(w => {
+      const def = EQUIPMENT[w.equipment_id];
+      return new ButtonBuilder()
+        .setCustomId(`inv_unequip_gear_${userId}_${w.slot}`)
+        .setLabel(`Gỡ ${w.slot}`)
+        .setEmoji(def?.icon ?? '❌')
+        .setStyle(ButtonStyle.Secondary);
+    });
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...btns));
+  }
+
+  if (!owned.length) {
+    embed.addFields({ name: '📦 Kho Gear', value: '*Chưa có gear nào. Tìm thấy khi chiến đấu hoặc mua ở shop!*', inline: false });
+  }
+
+  return [embed, rows];
+}
+
+// ── Tab: Titles ───────────────────────────────────────────────────────────
+function buildTitlesTab(
+  player: any, userId: string, guildId: string
+): [EmbedBuilder, ActionRowBuilder<any>[]] {
+  const unlocked = getUnlockedTitles(userId, guildId);
+  const current  = getSelectedTitle(userId, guildId);
+
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.gold)
+    .setTitle('🏅 Danh Hiệu')
+    .setDescription(
+      `Danh hiệu hiện tại: ${current ? `**${current.icon} ${current.name}**` : '*Không có*'}\n\n` +
+      `Đã mở khoá **${unlocked.length}** danh hiệu.`
+    );
+
+  if (unlocked.length) {
+    embed.addFields({
+      name: '✅ Đã mở khoá',
+      value: unlocked.map(t => `${t.icon} **${t.name}** — *${t.description}*`).join('\n'),
+      inline: false
+    });
+  } else {
+    embed.addFields({ name: '🔒 Chưa có', value: '*Hoàn thành Achievement để mở khoá danh hiệu!*', inline: false });
+  }
+
+  const rows: ActionRowBuilder<any>[] = [];
+  if (unlocked.length) {
+    const opts = [
+      new StringSelectMenuOptionBuilder().setLabel('Không đeo danh hiệu').setValue('none').setDefault(!current),
+      ...unlocked.map(t =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(t.name).setDescription(t.description).setValue(t.id)
+          .setEmoji(t.icon).setDefault(current?.id === t.id)
+      )
+    ];
+    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`inv_title_${userId}`)
+        .setPlaceholder('🏅 Chọn danh hiệu hiển thị...')
+        .addOptions(opts)
+    ));
+  }
+
+  return [embed, rows];
 }

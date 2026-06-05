@@ -13,7 +13,7 @@ import { getCombatByUser, saveCombat, deleteCombat } from '../systems/combat';
 import { startCombatFlow, startCombatFlowWithEnemy } from '../systems/combatFlow';
 import { canExplore, exploreCooldownRemaining, setExploreCooldown } from '../systems/economy';
 import { processVictoryRewards, processDeathPenalty } from '../systems/rewards';
-import { logEvent, onBossKilled, isBossSlain, getDropBonus, getEnemyAtkBonus, setFlag, setWorldEvent } from '../systems/world';
+import { logEvent, onBossKilled, isBossSlain, getDropBonus, getEnemyAtkBonus } from '../systems/world';
 import { awardAchievements } from '../systems/achievements';
 import { createLegacy, pickLegacySkill, getLegaciesInZone, claimLegacy, getLegacy } from '../systems/legacy';
 import {
@@ -23,11 +23,12 @@ import {
 import { getZone, ZONES, ZONE_ORDER } from '../data/zones';
 import { ENEMIES, getEnemiesForZone, getBossForZone, getEnemy } from '../data/enemies';
 import { getItem, ITEMS } from '../data/items';
+import { getZoneEquipment } from '../data/equipment';
+import { incrementDaily } from './daily';
+import { wearEquipment } from '../systems/equipment';
 import { getSkill } from '../data/skills';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
-import { execute as execInventory } from './inventory';
-import { execute as execProfile } from './profile';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -85,15 +86,11 @@ function buildContinueExploreRow(userId: string) {
   return [new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`continue_explore_${userId}`)
-      .setLabel('🔎 Explore tiếp')
+      .setLabel('🔎 Khám phá tiếp')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
-      .setCustomId(`open_inventory_${userId}`)
-      .setLabel('🎒 Inventory')
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId(`open_profile_${userId}`)
-      .setLabel('👤 Profile')
+      .setCustomId(`continue_menu_${userId}`)
+      .setLabel('📍 Menu chính')
       .setStyle(ButtonStyle.Secondary)
   )];
 }
@@ -110,31 +107,10 @@ async function attachContinueExploreHandler(
   });
 
   collector.on('collect', async (i) => {
-    const cid = i.customId;
-    // Continue explore
-    if (cid === `continue_explore_${userId}`) {
-      await i.deferUpdate();
-      collector.stop('continue');
-      await showExploreMenu(interaction, userId, guildId);
-      return;
-    }
-
-    // Open inventory (use the inventory command executor)
-    if (cid === `open_inventory_${userId}`) {
-      await i.deferUpdate();
-      collector.stop('inventory');
-      // inventory.execute expects a ChatInputCommandInteraction; ButtonInteraction is compatible at runtime
-      await execInventory(i as any).catch(() => {});
-      return;
-    }
-
-    // Open profile
-    if (cid === `open_profile_${userId}`) {
-      await i.deferUpdate();
-      collector.stop('profile');
-      await execProfile(i as any).catch(() => {});
-      return;
-    }
+    if (i.customId !== `continue_explore_${userId}` && i.customId !== `continue_menu_${userId}`) return;
+    await i.deferUpdate();
+    collector.stop('continue');
+    await showExploreMenu(interaction, userId, guildId);
   });
 
   collector.on('end', (_c, reason) => {
@@ -337,13 +313,15 @@ async function handleRest(
       ),
     'rest'
   );
-  await interaction.editReply({ embeds: [restEmbed], files: restFiles, components: [] });
+  const restReply = await interaction.editReply({ embeds: [restEmbed], files: restFiles, components: buildContinueExploreRow(userId) });
+  attachContinueExploreHandler(restReply, interaction, userId, guildId);
 }
 
 // ── Search: random event ───────────────────────────────────────────────────────
 async function handleSearch(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
+  incrementDaily(userId, guildId, 'explore_count');
   const player   = getPlayer(userId, guildId)!;
   const zone     = getZone(player.zone_id)!;
   const enemies  = getEnemiesForZone(player.zone_id);
@@ -355,56 +333,36 @@ async function handleSearch(
   // Weighted table (100 total)
   // 25% combat | 10% ambush | 10% legacy | 8% merchant | 8% spring
   // 8% trap | 8% altar | 7% mysterious | 7% villager | 5% caravan | 4% loot | 0% nothing
-  type EventType = 'combat'|'ambush'|'legacy'|'merchant'|'spring'|'trap'|'altar'|'mysterious'|'villager'|'caravan'|'loot'|'nothing';
+  type EventType = 'combat'|'ambush'|'legacy'|'merchant'|'spring'|'trap'|'altar'|'mysterious'|'villager'|'caravan'|'loot'|'soul_shop'|'nothing';
 
   const table: Array<[EventType, number]> = [
-    ['combat',     hasCombat ? 25 : 0],
-    ['ambush',     hasCombat ? 10 : 0],
-    ['legacy',     hasLegacy ? 10 : 0],
+    ['combat',     hasCombat ? 24 : 0],
+    ['ambush',     hasCombat ? 9 : 0],
+    ['legacy',     hasLegacy ? 9 : 0],
     ['merchant',   8],
-    ['spring',     8],
-    ['trap',       8],
-    ['altar',      8],
-    ['mysterious', 7],
-    ['villager',   7],
+    ['spring',     7],
+    ['trap',       7],
+    ['altar',      7],
+    ['mysterious', 6],
+    ['villager',   6],
     ['caravan',    5],
     ['loot',       4],
+    ['soul_shop',  player.soul_shards >= 1 ? 6 : 2], // rare unless has shards
   ];
 
-  // Extra custom events (lower weight)
-  type NewEventType = 'wounded_traveler'|'cursed_chest'|'lake'|'wounded_monster'|'elite'|'rival'|'village_attack'|'blood_altar'|'spirit'|'wheel'|'library'|'dream'|'slime'|'stumble'|'bard';
-  const extra: Array<[NewEventType, number]> = [
-    ['wounded_traveler', 4],
-    ['cursed_chest', 4],
-    ['lake', 4],
-    ['wounded_monster', 3],
-    ['elite', 3],
-    ['rival', 3],
-    ['village_attack', 3],
-    ['blood_altar', 2],
-    ['spirit', 3],
-    ['wheel', 2],
-    ['library', 2],
-    ['dream', 2],
-    ['slime', 2],
-    ['stumble', 2],
-    ['bard', 2]
-  ];
-
-  // Weighted random pick (include extra events)
-  const combined = ([...table] as Array<any>).concat(extra as any);
-  const total = combined.reduce((s, [, w]) => s + w, 0);
+  // Weighted random pick
+  const total = table.reduce((s, [, w]) => s + w, 0);
   let roll    = randInt(1, total || 1);
-  let eventName: string = 'nothing';
-  for (const [name, weight] of combined) {
+  let event: EventType = 'nothing';
+  for (const [name, weight] of table) {
     if (weight <= 0) continue;
     roll -= weight;
-    if (roll <= 0) { eventName = name; break; }
+    if (roll <= 0) { event = name; break; }
   }
 
   setExploreCooldown(userId, guildId);
 
-  switch (eventName) {
+  switch (event) {
     case 'combat':     return startCombatFlow(interaction, userId, guildId, pick(enemies).id, handleVictory, handleDeath);
     case 'ambush':     return showAmbush(interaction, userId, guildId, pick(enemies).id);
     case 'legacy':     return showLegacyFind(interaction, userId, guildId, legacies);
@@ -416,22 +374,7 @@ async function handleSearch(
     case 'villager':   return showVillagerRescue(interaction, userId, guildId, enemies);
     case 'caravan':    return showCaravanRobbery(interaction, userId, guildId, enemies);
     case 'loot':       return showLootFind(interaction, userId, guildId);
-    // Extra events
-    case 'wounded_traveler': return showWoundedTraveler(interaction, userId, guildId);
-    case 'cursed_chest':     return showCursedChest(interaction, userId, guildId);
-    case 'lake':             return showReflectiveLake(interaction, userId, guildId);
-    case 'wounded_monster':  return showWoundedMonster(interaction, userId, guildId);
-    case 'elite':            return showEliteEncounter(interaction, userId, guildId);
-    case 'rival':            return showRivalAdventurer(interaction, userId, guildId);
-    case 'village_attack':   return showVillageUnderAttack(interaction, userId, guildId);
-    case 'blood_altar':      return showBloodAltar(interaction, userId, guildId);
-    case 'spirit':           return showPlayerSpirit(interaction, userId, guildId);
-    case 'wheel':            return showWheelOfFate(interaction, userId, guildId);
-    case 'library':          return showAncientLibrary(interaction, userId, guildId);
-    case 'dream':            return showDreamEvent(interaction, userId, guildId);
-    case 'slime':            return showSlimeFollower(interaction, userId, guildId);
-    case 'stumble':          return showStumbleRock(interaction, userId, guildId);
-    case 'bard':             return showBardSinger(interaction, userId, guildId);
+    case 'soul_shop':  return showSoulShop(interaction, userId, guildId);
     default:
       await interaction.editReply({
         embeds: [new EmbedBuilder().setColor(zone.color).setDescription(`*${pick(zone.ambiance)}*\n\nKhông có gì bất thường...`)],
@@ -520,7 +463,7 @@ async function showLegacyFind(
   claimLegacy(legacy.id, userId);
   logEvent(guildId, userId, player.name, 'legacy', `đã nhận Di Sản của **${legacy.player_name}**.`, player.zone_id);
 
-  await interaction.editReply({
+  const legResReply = await interaction.editReply({
     embeds: [
       new EmbedBuilder().setColor(COLORS.purple)
         .setTitle('✨ Đã Nhận Di Sản')
@@ -529,8 +472,9 @@ async function showLegacyFind(
           (results.join('\n') || '*Không có gì...*')
         )
     ],
-    components: []
+    components: buildContinueExploreRow(userId)
   });
+  attachContinueExploreHandler(legResReply, interaction, userId, guildId);
 }
 
 // ── Loot find ─────────────────────────────────────────────────────────────────
@@ -542,14 +486,15 @@ async function showLootFind(
   const item      = getItem(itemId)!;
   addItem(userId, guildId, itemId, 1);
 
-  await interaction.editReply({
+  const lootReply = await interaction.editReply({
     embeds: [
       new EmbedBuilder().setColor(COLORS.gold)
         .setTitle('📦 Tìm thấy vật phẩm!')
         .setDescription(`Bạn nhặt được **${item.icon} ${item.name}** ẩn trong bụi rậm!`)
     ],
-    components: []
+    components: buildContinueExploreRow(userId)
   });
+  attachContinueExploreHandler(lootReply, interaction, userId, guildId);
 }
 
 // ── Merchant encounter ────────────────────────────────────────────────────────
@@ -577,11 +522,22 @@ async function renderMerchantBuy(
     .map(id => getItem(id))
     .filter(Boolean) as NonNullable<ReturnType<typeof getItem>>[];
 
-  const itemLines = shopItems.map(item => {
-    if (!item.buyPrice) return '';
-    const price = Math.floor(item.buyPrice * (1 - discount / 100));
-    return `${item.icon} **${item.name}** — **${price}** 🪙  \`${item.id}\``;
-  }).filter(Boolean).join('\n');
+  // Equipment for sale in this zone
+  const eqItems = getZoneEquipment(zoneId);
+
+  const itemLines = [
+    ...shopItems.map(item => {
+      if (!item.buyPrice) return '';
+      const price = Math.floor(item.buyPrice * (1 - discount / 100));
+      return `${item.icon} **${item.name}** — **${price}** 🪙`;
+    }),
+    eqItems.length ? '\n⚔️ **Trang bị:**' : '',
+    ...eqItems.map(eq => {
+      const price = Math.floor(eq.buyPrice! * (1 - discount / 100));
+      const statsStr = Object.entries(eq.stats).map(([k,v]) => `+${v} ${k}`).join(', ');
+      return `${eq.icon} **${eq.name}** (${statsStr}) — **${price}** 🪙`;
+    })
+  ].filter(Boolean).join('\n');
 
   const discountNote = discount > 0 ? `\n> 🛒 Giảm giá **${discount}%** đang có!\n` : '';
 
@@ -593,16 +549,27 @@ async function renderMerchantBuy(
       discountNote + '\n' + itemLines + `\n\n🪙 Gold của bạn: **${playerGold}**`
     );
 
-  const buyOptions = shopItems
-    .filter(i => i.buyPrice)
-    .map(i => {
+  const allBuyOptions = [
+    ...shopItems.filter(i => i.buyPrice).map(i => {
       const price = Math.floor(i.buyPrice! * (1 - discount / 100));
       return new StringSelectMenuOptionBuilder()
         .setLabel(`${i.name} — ${price} 🪙`)
         .setDescription(i.description.replace(/\*\*/g, '').slice(0, 50))
         .setValue(`buy_${i.id}`)
         .setEmoji(i.icon);
-    });
+    }),
+    ...eqItems.map(eq => {
+      const price = Math.floor(eq.buyPrice! * (1 - discount / 100));
+      const statsStr = Object.entries(eq.stats).map(([k,v]) => `+${v} ${k}`).join(', ');
+      return new StringSelectMenuOptionBuilder()
+        .setLabel(`${eq.name} — ${price} 🪙`)
+        .setDescription(`⚔️ ${eq.slot} · ${statsStr}`.slice(0, 50))
+        .setValue(`buyeq_${eq.id}`)
+        .setEmoji(eq.icon);
+    })
+  ].slice(0, 25); // Discord limit
+
+  const buyOptions = allBuyOptions;
 
   const rows: ActionRowBuilder<any>[] = [];
 
@@ -642,18 +609,30 @@ async function renderMerchantBuy(
 
     } else if (cid === `merch_buy_${userId}`) {
       const sel = compInt as StringSelectMenuInteraction;
-      const itemId = sel.values[0].replace('buy_', '');
-      const item   = getItem(itemId);
-      const fresh  = getPlayer(userId, guildId)!;
+      const rawVal  = sel.values[0];
+      const isBuyEq = rawVal.startsWith('buyeq_');
+      const itemId  = rawVal.replace('buyeq_', '').replace('buy_', '');
+      const fresh   = getPlayer(userId, guildId)!;
 
-      if (!item?.buyPrice) return;
-      const price = Math.floor(item.buyPrice * (1 - discount / 100));
+      let price = 0;
+      let displayName = '';
+
+      if (isBuyEq) {
+        const { getEquipment: getEq } = await import('../data/equipment');
+        const eq = getEq(itemId);
+        if (!eq?.buyPrice) return;
+        price = Math.floor(eq.buyPrice * (1 - discount / 100));
+        displayName = `${eq.icon} ${eq.name}`;
+      } else {
+        const item = getItem(itemId);
+        if (!item?.buyPrice) return;
+        price = Math.floor(item.buyPrice * (1 - discount / 100));
+        displayName = `${item.icon} ${item.name}`;
+      }
 
       if (fresh.gold < price) {
         await interaction.editReply({
-          embeds: [
-            embed.setFooter({ text: `❌ Không đủ Gold! Cần ${price} 🪙, bạn có ${fresh.gold} 🪙` })
-          ]
+          embeds: [embed.setFooter({ text: `❌ Không đủ Gold! Cần ${price} 🪙, bạn có ${fresh.gold} 🪙` })]
         });
         return;
       }
@@ -667,7 +646,7 @@ async function renderMerchantBuy(
           new EmbedBuilder().setColor(COLORS.gold)
             .setTitle('🛒 Lái Buôn Lữ Hành!')
             .setDescription(
-              `✅ Đã mua **${item.icon} ${item.name}** — −${price} 🪙\n` +
+              `✅ Đã mua **${displayName}** — −${price} 🪙\n` +
               discountNote + '\n' + itemLines + `\n\n🪙 Gold còn lại: **${updatedPlayer.gold}**`
             )
         ]
@@ -881,7 +860,8 @@ async function showHealingSpring(
       ),
     'spring'
   );
-  await interaction.editReply({ embeds: [springEmbed], files: springFiles, components: [] });
+  const reply = await interaction.editReply({ embeds: [springEmbed], files: springFiles, components: buildContinueExploreRow(userId) });
+  attachContinueExploreHandler(reply, interaction, userId, guildId);
 }
 
 // ── Event: Trap ────────────────────────────────────────────────────────────────
@@ -965,7 +945,8 @@ async function triggerTrap(
     new EmbedBuilder().setColor(COLORS.danger).setTitle('💣 Dính Bẫy!').setDescription(prefix + resultDesc),
     'trap'
   );
-  await interaction.editReply({ embeds: [trapResEmbed], files: trapResFiles, components: [] });
+  const trapResReply = await interaction.editReply({ embeds: [trapResEmbed], files: trapResFiles, components: buildContinueExploreRow(userId) });
+  attachContinueExploreHandler(trapResReply, interaction, userId, guildId);
 }
 
 // ── Event: Ancient Altar ────────────────────────────────────────────────────
@@ -1063,10 +1044,11 @@ async function showAncientAltar(
     }
   }
 
-  await interaction.editReply({
+  const altarResReply = await interaction.editReply({
     embeds: [new EmbedBuilder().setColor(0xF39C12).setTitle(title).setDescription(resultDesc)],
-    components: []
+    components: buildContinueExploreRow(userId)
   });
+  attachContinueExploreHandler(altarResReply, interaction, userId, guildId);
 }
 
 // ── Event: Mysterious Figure ──────────────────────────────────────────────────
@@ -1152,10 +1134,11 @@ async function showMysteriousFigure(
     }
   }
 
-  await interaction.editReply({
+  const mystResReply = await interaction.editReply({
     embeds: [new EmbedBuilder().setColor(0x2C3E50).setTitle(title).setDescription(desc)],
-    components: []
+    components: buildContinueExploreRow(userId)
   });
+  attachContinueExploreHandler(mystResReply, interaction, userId, guildId);
 }
 
 // ── Event: Ambush ─────────────────────────────────────────────────────────────
@@ -1342,7 +1325,7 @@ async function showCaravanRobbery(
     addItem(userId, guildId, watchLoot, 1);
     grantGold(userId, guildId, watchGold);
     const it = getItem(watchLoot)!;
-    await interaction.editReply({
+    const watchReply = await interaction.editReply({
       embeds: [
         new EmbedBuilder().setColor(COLORS.info)
           .setTitle('👁️ Quan Sát Từ Xa')
@@ -1351,8 +1334,9 @@ async function showCaravanRobbery(
             `${it.icon} **${it.name}** × 1  ·  🪙 +**${watchGold} Gold**`
           )
       ],
-      components: []
+      components: buildContinueExploreRow(userId)
     });
+    attachContinueExploreHandler(watchReply, interaction, userId, guildId);
     return;
   }
 
@@ -1380,474 +1364,146 @@ function simpleEmbed(color: number, desc: string) {
   return new EmbedBuilder().setColor(color).setDescription(desc);
 }
 
-// ── New Events: Wounded Traveler, Cursed Chest, Reflective Lake, etc. ─────────
-async function showWoundedTraveler(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
+// ── Event: Soul Shop ──────────────────────────────────────────────────────
+const SOUL_SHOP_ITEMS: Array<{
+  id: string; name: string; icon: string; cost: number; desc: string;
+  giveItem?: string; qty?: number;
+}> = [
+  { id: 'mat_chest',    name: 'Material Chest ngẫu nhiên', icon: '📦', cost: 1, desc: '2–4 material ngẫu nhiên', giveItem: 'material_chest', qty: 1 },
+  { id: 'rand_book',    name: 'Skill Book ngẫu nhiên',      icon: '📚', cost: 3, desc: 'Skill book random (thường)', giveItem: '', qty: 1 },
+  { id: 'soul_book',    name: 'Soul Skill Book',            icon: '💀', cost: 5, desc: 'Một trong 3 Soul Skill Book', giveItem: '', qty: 1 },
+  { id: 'puri_stone',   name: 'Purification Stone',         icon: '💎', cost: 5, desc: 'Xóa toàn bộ debuff', giveItem: 'purification_stone', qty: 1 },
+  { id: 'eq_box',       name: 'Cursed Equipment Box',       icon: '🎁', cost: 8, desc: 'Trang bị Rare+ ngẫu nhiên', giveItem: 'cursed_equipment_box', qty: 1 },
+  { id: 'soul_anchor',  name: 'Soul Anchor',                icon: '⚓', cost: 10, desc: 'Sống sót 1 lần khi chết', giveItem: 'soul_anchor', qty: 1 },
+  { id: 'leg_pendant',  name: 'Legacy Pendant',             icon: '📿', cost: 12, desc: '+50% gold từ Legacy', giveItem: 'legacy_pendant', qty: 1 },
+];
+
+const COMMON_BOOKS = ['book_fireball','book_ice_lance','book_shield_bash','book_shadow_step','book_mend_wounds','book_thunder_clap',
+                      'book_iron_skin','book_berserker','book_mana_flow','book_vampiric','book_tough_body'];
+const SOUL_BOOKS   = ['book_soul_strike','book_soul_guard','book_soul_drain'];
+
+async function showSoulShop(
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+): Promise<void> {
   const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(COLORS.info).setTitle('🩺 Người Lữ Hành Bị Thương')
-    .setDescription(`*Bạn gặp một người bị thương bên đường...*
+  const flavors = [
+    '☁️ Một bóng hình mờ ảo xuất hiện, không nói một lời...',
+    '💀 "Linh hồn có giá của nó... Muốn mua gì không?"',
+    '🌑 Cửa hàng bóng tối, chỉ mở khi thế giới đang ngủ.',
+  ];
 
-> ⚕️ Cứu người đó — tốn potion hoặc gold, nhận lòng biết ơn
+  const itemLines = SOUL_SHOP_ITEMS.map(i =>
+    `${i.icon} **${i.name}** — **${i.cost} 💀** Soul Shard\n> *${i.desc}*`
+  ).join('\n');
 
-> 💼 Lục đồ rồi bỏ đi — lấy vàng/vật phẩm
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.purple)
+    .setTitle('💀 Soul Shop — Cửa Hàng Bóng Tối')
+    .setDescription(`*${pick(flavors)}*\n\n${itemLines}\n\n💀 Soul Shards của bạn: **${player.soul_shards}**`);
 
-> ❓ Hỏi thông tin — có thể biết vị trí dungeon/shop/boss`);
+  const options = SOUL_SHOP_ITEMS
+    .filter(i => player.soul_shards >= i.cost)
+    .map(i =>
+      new StringSelectMenuOptionBuilder()
+        .setLabel(`${i.name} — ${i.cost} 💀`)
+        .setDescription(i.desc)
+        .setValue(i.id)
+        .setEmoji(i.icon)
+    );
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`trav_save_${userId}`).setLabel('Cứu người đó').setStyle(ButtonStyle.Primary).setEmoji('🤝'),
-    new ButtonBuilder().setCustomId(`trav_rob_${userId}`).setLabel('Lục đồ rồi bỏ đi').setStyle(ButtonStyle.Danger).setEmoji('💰'),
-    new ButtonBuilder().setCustomId(`trav_ask_${userId}`).setLabel('Hỏi thông tin').setStyle(ButtonStyle.Secondary).setEmoji('❓')
-  );
+  const rows: ActionRowBuilder<any>[] = [];
 
-  const { embed: eImg, files } = withImage(embed, 'villager');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-
-  if (!btn || btn.customId === `trav_ask_${userId}`) {
-    // Ask: reveal hint
-    const hints = ['Một hầm ngầm cũ ở phía đông.', 'Nghe nói ở chợ có mặt hàng hiếm hôm nay.', 'Có một con boss nhỏ trú tại hang động.'];
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, `❓ Người lữ hành thì thầm: "${pick(hints)}"`)], components: [] });
-    return;
+  if (options.length) {
+    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`soul_buy_${userId}`)
+        .setPlaceholder('Mua với Soul Shard...')
+        .addOptions(options)
+    ));
   }
 
-  if (btn.customId === `trav_rob_${userId}`) {
-    // Loot: take some gold or item
-    const gold = randInt(10, 60);
-    grantGold(userId, guildId, gold);
-    logEvent(guildId, userId, player.name, 'wounded_loot', `lục đồ người lữ hành và lấy ${gold} Gold.`, player.zone_id);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `💰 Bạn lục lọi và lấy **${gold} Gold**.`)], components: [] });
-    return;
-  }
+  rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`soul_leave_${userId}`).setLabel('Rời đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
+  ));
 
-  // Save
-  // Try to consume a health_potion, otherwise spend gold
-  const hasPotion = getItemQty(userId, guildId, 'health_potion') > 0;
-  if (hasPotion) {
-    removeItem(userId, guildId, 'health_potion', 1);
-    grantSoulShards(userId, guildId, 1);
-    logEvent(guildId, userId, player.name, 'wounded_save', 'cứu người lữ hành bằng potion.', player.zone_id);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🩹 Bạn cứu người đó bằng 1 Potion — họ gửi lời biết ơn (+1 Soul Shard).')], components: [] });
-  } else if (player.gold >= 20) {
-    spendGold(userId, guildId, 20);
-    grantSoulShards(userId, guildId, 1);
-    logEvent(guildId, userId, player.name, 'wounded_save', 'cứu người lữ hành bằng vàng.', player.zone_id);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🩹 Bạn trả 20 Gold để băng bó cho họ — họ gửi lời biết ơn (+1 Soul Shard).')], components: [] });
-  } else {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '⚠️ Bạn không có potion hoặc vàng để giúp. Người lữ hành rên rỉ rồi rời đi.')], components: [] });
-  }
-}
+  const reply = await interaction.editReply({ embeds: [embed], components: rows });
 
-async function showCursedChest(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(COLORS.purple).setTitle('📦 Rương Cổ Bị Nguyền')
-    .setDescription(`*Một cái rương cổ nằm giữa rễ cây...*
+  const collector = reply.createMessageComponentCollector({
+    filter: i => i.user.id === userId, time: 60_000
+  });
 
-> 🔓 Mở rương — có thể nhận item hiếm hoặc dính curse
+  collector.on('collect', async (compInt) => {
+    await compInt.deferUpdate();
+    const cid = (compInt as any).customId as string;
+    collector.stop();
 
-> 🕵️ Kiểm tra bẫy — giảm nguy cơ bị bẫy
-
-> 🔨 Phá rương — ít reward hơn nhưng an toàn hơn
-
-> 🚶 Bỏ qua`);
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`chest_open_${userId}`).setLabel('Mở rương').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`chest_check_${userId}`).setLabel('Kiểm tra bẫy').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`chest_smash_${userId}`).setLabel('Phá rương').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`chest_skip_${userId}`).setLabel('Bỏ qua').setStyle(ButtonStyle.Secondary)
-  );
-
-  const { embed: eImg, files } = withImage(embed, 'loot');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-
-  if (!btn || btn.customId === `chest_skip_${userId}`) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn rời rương cổ lại cho rừng...')], components: [] });
-    return;
-  }
-
-  const trapChecked = btn.customId === `chest_check_${userId}`;
-
-  if (btn.customId === `chest_smash_${userId}`) {
-    // Smash: smaller reward
-    const gold = randInt(10, 30);
-    grantGold(userId, guildId, gold);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🔨 Bạn phá rương và thu được **${gold} Gold**, nhưng có vẻ rương đã vỡ mất một số đồ.`)], components: [] });
-    return;
-  }
-
-  // Open or checked
-  const curseRoll = randInt(1, 100);
-  const effectiveRoll = trapChecked ? Math.max(1, curseRoll - 25) : curseRoll; // reduced chance if checked
-
-  if (effectiveRoll <= 65) {
-    // Good reward
-    const possible = ['health_potion','mana_potion','antidote','elixir','book_fireball'];
-    const item = pick(possible);
-    addItem(userId, guildId, item, 1);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.gold, `🎁 Bạn mở rương và nhận **${getItem(item)?.icon} ${getItem(item)?.name}**!`)], components: [] });
-    logEvent(guildId, userId, player.name, 'cursed_chest_open', `mở rương và nhận ${item}.`, player.zone_id);
-    return;
-  }
-
-  // Curse inflicted
-  const curseTypes = ['maxhp_down','stronger_enemies','no_potion_next_combat'];
-  const curse = pick(curseTypes);
-  // store as flag per player (simple): value = curse|3
-  setFlag(guildId, `curse_${userId}`, `${curse}|3`, 86400);
-  await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `💀 Lời nguyền! Bạn bị **${curse}** trong vài lần khám phá tiếp theo...`)], components: [] });
-  logEvent(guildId, userId, player.name, 'cursed_chest_curse', `bị lời nguyền ${curse} từ rương.`, player.zone_id);
-}
-
-async function showReflectiveLake(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(0x1ABC9C).setTitle('🔮 Hồ Phản Chiếu')
-    .setDescription('*Mặt hồ phản chiếu một tương lai mơ hồ...*\n\n' +
-      `> 👀 Nhìn vào hồ — biết trước event tiếp theo\n> 💰 Ném gold xuống hồ — nhận buff may mắn\n> 🥤 Uống nước — hồi HP/MP hoặc ảo giác\n> 🚶 Rời đi`);
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`lake_look_${userId}`).setLabel('Nhìn vào hồ').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`lake_toss_${userId}`).setLabel('Ném gold xuống hồ').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`lake_drink_${userId}`).setLabel('Uống nước').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`lake_skip_${userId}`).setLabel('Rời đi').setStyle(ButtonStyle.Secondary)
-  );
-
-  const { embed: eImg, files } = withImage(embed, 'spring');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-
-  if (!btn || btn.customId === `lake_skip_${userId}`) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn rời hồ tĩnh lặng...')], components: [] });
-    return;
-  }
-
-  if (btn.customId === `lake_look_${userId}`) {
-    // Show a peek: random event name
-    const previews = ['Một cuộc phục kích!', 'Có một thương nhân lạ.', 'Một kho báu ẩn...'];
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.purple, `🔮 Bạn thấy: "${pick(previews)}"`)], components: [] });
-    return;
-  }
-
-  if (btn.customId === `lake_toss_${userId}`) {
-    const cost = Math.min(20, player.gold);
-    if (cost <= 0) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, 'Bạn không có vàng để ném...')], components: [] }); return; }
-    spendGold(userId, guildId, cost);
-    setFlag(guildId, `luck_${userId}`, '1', 3600);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `🍀 Bạn ném **${cost} Gold** xuống hồ — cảm thấy may mắn trong 1 giờ.`)], components: [] });
-    return;
-  }
-
-  // drink
-  const roll = randInt(1, 100);
-  if (roll <= 60) {
-    const hpGain = Math.min(player.max_hp - player.hp, Math.floor(player.max_hp * 0.25));
-    const mpGain = Math.min(player.max_mp - player.mp, Math.floor(player.max_mp * 0.25));
-    updatePlayerHpMp(userId, guildId, player.hp + hpGain, player.mp + mpGain);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💧 Bạn uống và hồi **${hpGain} HP** và **${mpGain} MP**.`)], components: [] });
-  } else {
-    // hallucination: small MP loss
-    const newMp = Math.max(0, player.mp - Math.floor(player.max_mp * 0.2));
-    updatePlayerHpMp(userId, guildId, player.hp, newMp);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🌫️ Ảo giác! Bạn cảm thấy choáng và mất MP ít nhiều...')], components: [] });
-  }
-}
-
-async function showWoundedMonster(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const enemy = { id: 'wounded_beast', name: 'Quái Vật Thương Tích', icon: '🦴', level: Math.max(1, player.level - 1), hp: 10 + player.level * 5, atk: 5 + player.level, def: 2, expReward: 20 + player.level * 3, goldMin: 5, goldMax: 25, drops: [], specialAttacks: [], zones: [], boss: false, deathWorldFlag: undefined, lore: 'Một con quái bị thương đang rên rỉ.' } as any;
-
-  const embed = new EmbedBuilder().setColor(COLORS.warning).setTitle('🦴 Quái Vật Bị Thương')
-    .setDescription(`*Một con quái vật đang kiệt sức trước mặt bạn...*\n\n> ⚔️ Kết liễu — nhận EXP/Gold dễ dàng\n> 🙏 Tha mạng — tăng lòng tốt (flavor)\n> 🐾 Bắt làm thú theo dấu — có cơ hội nhận pet tạm thời`);
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`wmon_kill_${userId}`).setLabel('Kết liễu').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`wmon_spare_${userId}`).setLabel('Tha mạng').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`wmon_tame_${userId}`).setLabel('Bắt làm thú').setStyle(ButtonStyle.Primary)
-  );
-
-  const { embed: eImg, files } = withImage(embed, 'combat');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-
-  if (!btn) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, 'Bạn rời đi, con quái lết vào rừng...')], components: [] }); return; }
-  if (btn.customId === `wmon_kill_${userId}`) {
-    await startCombatFlowWithEnemy(interaction, userId, guildId, enemy, { bonusGold: randInt(15, 35), bonusDesc: '🎁 Bạn nhận thưởng vì hạ gục quái vật bị thương.' }, handleVictory, handleDeath);
-  } else if (btn.customId === `wmon_spare_${userId}`) {
-    grantSoulShards(userId, guildId, 1);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🙏 Bạn tha mạng — nhận sự biết ơn (flavor).')], components: [] });
-  } else {
-    // tame attempt
-    const success = randInt(1, 100) <= 35;
-    if (success) {
-      addItem(userId, guildId, 'slime_core', 1);
-      await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🐾 Bạn thuần hóa được quái và nhận một pet token (slime_core).')], components: [] });
-    } else {
-      await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Thuần hóa thất bại — quái bỏ chạy.')], components: [] });
+    if (cid === `soul_leave_${userId}`) {
+      const leaveReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '💀 *"Đến lần sau..."* Bóng hình tan biến.')], components: buildContinueExploreRow(userId) });
+      attachContinueExploreHandler(leaveReply, interaction, userId, guildId);
+      return;
     }
-  }
-}
 
-async function showEliteEncounter(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const enemies = getEnemiesForZone(player.zone_id);
-  if (!enemies.length) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, 'Không có quái phù hợp ở đây.')], components: [] }); return; }
-  const base = pick(enemies);
-  const modifier = pick(['Burning','Armored','Bloodthirsty','Cursed','Swift']);
-  const elite = { ...base, id: base.id + '_elite', name: `${modifier} ${base.name}`, combatBonus: { bonusGold: randInt(20, 80), bonusDesc: '💠 Elite bonus' } } as any;
-  await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.danger).setTitle(`👑 Elite: ${elite.name}`).setDescription(`Một quái cấp cao xuất hiện — ${modifier}.`)], components: [] });
-  await new Promise(r => setTimeout(r, 800));
-  await startCombatFlow(interaction, userId, guildId, elite.id, handleVictory, handleDeath);
-}
+    if (cid === `soul_buy_${userId}`) {
+      const sel     = compInt as StringSelectMenuInteraction;
+      const itemKey = sel.values[0];
+      const shopItem = SOUL_SHOP_ITEMS.find(i => i.id === itemKey);
+      if (!shopItem) return;
 
-async function showRivalAdventurer(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(0x9B59B6).setTitle('⚔️ Rival Adventurer')
-    .setDescription('*Bạn gặp một mạo hiểm giả khác trên đường.*\n\n> 🥊 Đấu tay đôi — combat PvE với NPC\n> 🤝 Hợp tác — tăng reward explore tiếp theo\n> 🔁 Trao đổi item — đổi đồ\n> 🗡️ Cướp đồ — nhận item nhưng giảm danh tiếng');
+      const freshP = getPlayer(userId, guildId)!;
+      if (freshP.soul_shards < shopItem.cost) {
+        await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ Không đủ Soul Shard (cần ${shopItem.cost}, có ${freshP.soul_shards})`)], components: [] });
+        return;
+      }
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`rival_duel_${userId}`).setLabel('Đấu tay đôi').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`rival_coop_${userId}`).setLabel('Hợp tác').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`rival_trade_${userId}`).setLabel('Trao đổi').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`rival_rob_${userId}`).setLabel('Cướp đồ').setStyle(ButtonStyle.Danger)
-  );
+      // Deduct soul shards
+      const { grantSoulShards: gss } = await import('../systems/player');
+      gss(userId, guildId, -shopItem.cost);
 
-  const { embed: eImg, files } = withImage(embed, 'combat');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
+      let result = '';
+      if (itemKey === 'rand_book') {
+        const book = pick(COMMON_BOOKS);
+        addItem(userId, guildId, book, 1);
+        const it = getItem(book)!;
+        result = `${it.icon} **${it.name}**`;
+      } else if (itemKey === 'soul_book') {
+        const book = pick(SOUL_BOOKS);
+        addItem(userId, guildId, book, 1);
+        const it = getItem(book)!;
+        result = `${it?.icon ?? '💀'} **${it?.name ?? book}** (Soul Skill!)`;
+      } else if (itemKey === 'eq_box') {
+        // Give a random rare+ equipment
+        const { EQUIPMENT: EQ } = await import('../data/equipment');
+        const rareEq = Object.values(EQ).filter(e => e.rarity === 'rare' || e.rarity === 'epic');
+        const chosen = pick(rareEq);
+        addItem(userId, guildId, chosen.id, 1);
+        result = `${chosen.icon} **${chosen.name}** (${chosen.rarity})`;
+      } else if (itemKey === 'mat_chest') {
+        const mats = ['herb','wolf_fang','ancient_bark','bone_shard','ectoplasm','troll_hide'];
+        const qty = randInt(2, 4);
+        const picked: string[] = [];
+        for (let i = 0; i < qty; i++) { const m = pick(mats); addItem(userId, guildId, m, 1); picked.push(m); }
+        const distinct = [...new Set(picked)].map(m => getItem(m)?.name ?? m).join(', ');
+        result = `📦 ${distinct}`;
+      } else if (shopItem.giveItem) {
+        addItem(userId, guildId, shopItem.giveItem, shopItem.qty ?? 1);
+        const it = getItem(shopItem.giveItem);
+        result = `${it?.icon ?? '✨'} **${it?.name ?? shopItem.giveItem}**`;
+      }
 
-  if (!btn) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, 'Người lữ hành kia đi mất...')], components: [] }); return; }
-  if (btn.customId === `rival_duel_${userId}`) {
-    const npc = { id: 'rival_npc', name: 'Rival Adventurer', icon: '🗡️', level: player.level, hp: Math.floor(60 + player.level * 10), atk: Math.floor(10 + player.level * 2), def: Math.floor(5 + player.level), expReward: 50, goldMin: 20, goldMax: 60, drops: [], specialAttacks: [], zones: [], boss: false, deathWorldFlag: undefined } as any;
-    await startCombatFlowWithEnemy(interaction, userId, guildId, npc, { bonusGold: randInt(20,60), bonusDesc: '🥊 Rival thua, bạn thu được một khoản thưởng nhỏ.' }, handleVictory, handleDeath);
-  } else if (btn.customId === `rival_coop_${userId}`) {
-    // set a small bonus flag for next explore
-    setFlag(guildId, `coop_bonus_${userId}`, '1', 3600);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🤝 Bạn hợp tác với rival — khám phá tiếp theo có bonus!')], components: [] });
-  } else if (btn.customId === `rival_trade_${userId}`) {
-    // give a small item
-    addItem(userId, guildId, 'health_potion', 1);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🔁 Bạn trao đổi và nhận 1 Health Potion.')], components: [] });
-  } else {
-    const gold = randInt(20, 80);
-    grantGold(userId, guildId, gold);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `🗡️ Bạn cướp đồ và nhận **${gold} Gold**, nhưng lòng tin của bạn giảm (flavor).`)], components: [] });
-  }
-}
-
-async function showVillageUnderAttack(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(COLORS.danger).setTitle('🏘️ Ngôi Làng Bị Tấn Công')
-    .setDescription('*Bạn đến và thấy dân làng đang bị tấn công!*\n\n> 🛡️ Bảo vệ dân làng — khó, reward lớn\n> 🚑 Cứu merchant trước — unlock discount\n> 🧰 Lợi dụng hỗn loạn để loot — nhiều gold nhưng xấu danh tiếng\n> 🚶 Bỏ đi');
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`village_defend_${userId}`).setLabel('Bảo vệ dân làng').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`village_save_${userId}`).setLabel('Cứu merchant trước').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`village_loot_${userId}`).setLabel('Loot').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`village_ignore_${userId}`).setLabel('Bỏ đi').setStyle(ButtonStyle.Secondary)
-  );
-
-  const { embed: eImg, files } = withImage(embed, 'villager');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-
-  if (!btn || btn.customId === `village_ignore_${userId}`) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn bỏ đi... Làng bị tổn thất.')], components: [] });
-    // simple world flag for village harmed
-    setWorldEvent(guildId, 'village_harmed', `${player.name} đã rời làng khi nó bị tấn công.`, 86400);
-    return;
-  }
-
-  if (btn.customId === `village_loot_${userId}`) {
-    const gold = randInt(80, 200);
-    grantGold(userId, guildId, gold);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `💰 Bạn lợi dụng hỗn loạn và lấy **${gold} Gold**.`)], components: [] });
-    setWorldEvent(guildId, 'village_looted', `${player.name} đã loot một làng.`, 86400);
-    return;
-  }
-
-  if (btn.customId === `village_save_${userId}`) {
-    // unlock discount
-    setFlag(guildId, 'shop_discount', '10', 86400);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🛒 Bạn cứu merchant — shop giảm giá 10% trong 24h!')], components: [] });
-    return;
-  }
-
-  // defend
-  const boss = { id: 'village_assailant', name: 'Chỉ Huy Bầy Quái', icon: '👹', level: player.level + 1, hp: Math.floor(80 + player.level * 12), atk: 12 + player.level, def: 5 + player.level, expReward: 80, goldMin: 40, goldMax: 120, drops: [], specialAttacks: [], zones: [], boss: false, deathWorldFlag: undefined } as any;
-  await startCombatFlowWithEnemy(interaction, userId, guildId, boss, { bonusGold: randInt(100, 220), bonusDesc: '🏅 Dân làng cảm ơn bạn với phần thưởng!' }, handleVictory, handleDeath);
-}
-
-async function showBloodAltar(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(0x8E44AD).setTitle('🩸 Tế Đàn Máu')
-    .setDescription('*Một tế đàn cổ yêu cầu vật hiến tế.*\n\n> 🩸 Hiến máu — damage buff nhưng mất max HP tạm thời\n> 💰 Hiến gold — luck buff\n> 📚 Hiến item — skill book/cursed item\n> 🔥 Phá tế đàn — spawn boss hoặc xóa curse toàn server');
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`altar_blood_${userId}`).setLabel('Hiến máu').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`altar_gold2_${userId}`).setLabel('Hiến gold').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`altar_item_${userId}`).setLabel('Hiến item').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`altar_smash_${userId}`).setLabel('Phá tế đàn').setStyle(ButtonStyle.Danger)
-  );
-
-  const { embed: eImg, files } = withImage(embed, 'altar');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-
-  if (!btn) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, 'Bạn rời tế đàn...')], components: [] }); return; }
-  if (btn.customId === `altar_blood_${userId}`) {
-    const sacrifice = Math.floor(player.max_hp * 0.15);
-    const newHp = Math.max(1, player.hp - sacrifice);
-    updatePlayerHpMp(userId, guildId, newHp, player.mp);
-    grantSoulShards(userId, guildId, 3);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `🩸 Bạn hiến máu −${sacrifice} HP, nhận buff và +3 Soul Shards.`)], components: [] });
-  } else if (btn.customId === `altar_gold2_${userId}`) {
-    if (player.gold < 50) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, 'Không đủ gold để hiến.')], components: [] }); return; }
-    spendGold(userId, guildId, 50);
-    setFlag(guildId, `luck_${userId}`, '1', 3600);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '💰 Bạn hiến gold — nhận buff may mắn.')], components: [] });
-  } else if (btn.customId === `altar_item_${userId}`) {
-    // give a skill book or cursed item
-    const sk = pick(['book_fireball','book_iron_skin','book_shadow_step']);
-    addItem(userId, guildId, sk, 1);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.gold, `📚 Bạn hiến vật phẩm — nhận **${getItem(sk)?.name}** (có thể là nguyền).`)], components: [] });
-  } else {
-    // smash: spawn boss or clear curses
-    const roll = randInt(1, 100);
-    if (roll <= 50) {
-      const boss = { id: 'altar_keeper', name: 'Guardian of the Altar', icon: '👺', level: player.level + 2, hp: Math.floor(120 + player.level * 18), atk: 18 + player.level * 2, def: 8 + player.level, expReward: 150, goldMin: 120, goldMax: 300, drops: [], specialAttacks: [], zones: [], boss: false, deathWorldFlag: undefined } as any;
-      await startCombatFlowWithEnemy(interaction, userId, guildId, boss, { bonusGold: randInt(150,300), bonusDesc: '🧨 Bạn xâm phạm tế đàn và phải chiến đấu với kẻ bảo vệ!'}, handleVictory, handleDeath);
-    } else {
-      // clear global curses
-      setWorldEvent(guildId, 'altar_cleansed', `${player.name} phá tế đàn và xóa một số lời nguyền.`, 86400);
-      await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '✨ Bạn phá tế đàn — một lời nguyền được xóa (flavor).')], components: [] });
+      const afterP = getPlayer(userId, guildId)!;
+      const resReply = await interaction.editReply({
+        embeds: [
+          new EmbedBuilder().setColor(COLORS.purple)
+            .setTitle('💀 Soul Shop — Mua Thành Công')
+            .setDescription(`−**${shopItem.cost} 💀** Soul Shard\nNhận được: ${result}\n\n💀 Còn lại: **${afterP.soul_shards}** Soul Shards`)
+        ],
+        components: buildContinueExploreRow(userId)
+      });
+      attachContinueExploreHandler(resReply, interaction, userId, guildId);
     }
-  }
-}
+  });
 
-async function showPlayerSpirit(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(COLORS.purple).setTitle('👻 Linh Hồn Người Chơi Đã Chết')
-    .setDescription(`*Linh hồn lững lờ hiện ra trước bạn...*
-
-> 🗣️ Lắng nghe lời cảnh báo — biết trước event
-> ⚱️ Nhận di vật — item nhưng có curse
-> ⚔️ Chiến đấu với linh hồn — boss mini
-> 🕯️ Cầu siêu — tăng reputation (flavor)`);
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`sp_listen_${userId}`).setLabel('Lắng nghe').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`sp_take_${userId}`).setLabel('Nhận di vật').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`sp_fight_${userId}`).setLabel('Chiến đấu').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`sp_pray_${userId}`).setLabel('Cầu siêu').setStyle(ButtonStyle.Success)
-  );
-
-  const { embed: eImg, files } = withImage(embed, 'legacy');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-
-  if (!btn) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, 'Linh hồn lẩn vào màn sương...')], components: [] }); return; }
-  if (btn.customId === `sp_listen_${userId}`) {
-    const hints = ['Sẽ có boss ở hang phía bắc.','Chợ sắp có giảm giá.','Một rương nguyền gần đây.'];
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, `🔮 Linh hồn nói: "${pick(hints)}"`)], components: [] });
-  } else if (btn.customId === `sp_take_${userId}`) {
-    const it = pick(['ancient_relic','cursed_blood','book_shadow_step']);
-    addItem(userId, guildId, it, 1);
-    if (it === 'cursed_blood') setFlag(guildId, `curse_${userId}`, `weaker_potions|2`, 86400);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.gold, `⚱️ Bạn nhận **${getItem(it)?.name}** — may mắn/đáng sợ.`)], components: [] });
-  } else if (btn.customId === `sp_fight_${userId}`) {
-    const boss = { id: 'spirit_boss', name: 'Vengeful Spirit', icon: '👹', level: player.level + 2, hp: Math.floor(100 + player.level * 15), atk: 16 + player.level, def: 6 + player.level, expReward: 120, goldMin: 80, goldMax: 200, drops: [], specialAttacks: [], zones: [], boss: false, deathWorldFlag: undefined } as any;
-    await startCombatFlowWithEnemy(interaction, userId, guildId, boss, { bonusGold: randInt(80,200), bonusDesc: '👻 Tinh linh kêu gọi phần thưởng nếu bạn thắng.' }, handleVictory, handleDeath);
-  } else {
-    grantSoulShards(userId, guildId, 2);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🕯️ Bạn cầu siêu — linh hồn an nghỉ, bạn được ban phước nhẹ.')], components: [] });
-  }
-}
-
-async function showWheelOfFate(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const cost = 50;
-  if (player.gold < cost) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `Cần ${cost} 🪙 để quay.`)], components: [] }); return; }
-  spendGold(userId, guildId, cost);
-  const roll = randInt(1, 100);
-  if (roll <= 25) { grantGold(userId, guildId, 200); await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🎉 Thắng! +200 Gold')], components: [] }); }
-  else if (roll <= 45) { addItem(userId, guildId, 'elixir', 1); await interaction.editReply({ embeds: [simpleEmbed(COLORS.gold, '🎁 Nhận 1 Elixir')], components: [] }); }
-  else if (roll <= 60) { setFlag(guildId, `luck_${userId}`, '1', 3600); await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🍀 Nhận buff may mắn 1 giờ')], components: [] }); }
-  else if (roll <= 75) { // boss
-    const boss = { id: 'wheel_wrath', name: 'Wrath of Fate', icon: '⚡', level: player.level + 2, hp: Math.floor(110 + player.level * 16), atk: 18 + player.level, def: 8 + player.level, expReward: 140, goldMin: 80, goldMax: 220, drops: [], specialAttacks: [], zones: [], boss: false, deathWorldFlag: undefined } as any;
-    await startCombatFlowWithEnemy(interaction, userId, guildId, boss, { bonusGold: randInt(80,220), bonusDesc: '⚡ Sứ mệnh Nghĩa Bài bắt bạn chiến đấu cùng số phận.' }, handleVictory, handleDeath);
-  } else if (roll <= 90) { setFlag(guildId, `curse_${userId}`, `random_misfortune|2`, 86400); await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '💀 Bị curse!')], components: [] }); }
-  else { addItem(userId, guildId, 'book_fireball', 1); await interaction.editReply({ embeds: [simpleEmbed(COLORS.gold, '📚 Nhận skill book hiếm!')], components: [] }); }
-}
-
-async function showAncientLibrary(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(0xF1C40F).setTitle('📚 Thư Viện Cổ')
-    .setDescription('*Bạn bước vào thư viện cổ...*\n\n> 📖 Đọc sách chiến đấu — nhận warrior skill book\n> 🔮 Đọc sách ma thuật — nhận mage skill book\n> ☠️ Đọc sách cấm — nhận skill mạnh nhưng bị curse\n> 🔥 Đốt thư viện — nhận gold/material nhưng giảm reputation');
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`lib_fight_${userId}`).setLabel('Chiến đấu').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`lib_magic_${userId}`).setLabel('Ma thuật').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`lib_banned_${userId}`).setLabel('Sách cấm').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`lib_burn_${userId}`).setLabel('Đốt thư viện').setStyle(ButtonStyle.Danger)
-  );
-
-  const { embed: eImg, files } = withImage(embed, 'loot');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-  if (!btn) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, 'Bạn rời thư viện...')], components: [] }); return; }
-  if (btn.customId === `lib_fight_${userId}`) { addItem(userId, guildId, 'book_iron_skin', 1); await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '📖 Nhận Warrior skill book')], components: [] }); }
-  else if (btn.customId === `lib_magic_${userId}`) { addItem(userId, guildId, 'book_fireball', 1); await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🔮 Nhận Mage skill book')], components: [] }); }
-  else if (btn.customId === `lib_banned_${userId}`) { addItem(userId, guildId, 'book_shadow_step', 1); setFlag(guildId, `curse_${userId}`, `forbidden_tome|3`, 86400); await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '⚠️ Nhận skill mạnh nhưng bị curse')], components: [] }); }
-  else { const gold = randInt(30,120); grantGold(userId, guildId, gold); await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🔥 Bạn đốt thư viện và thu được ${gold} Gold — danh tiếng giảm (flavor).`)], components: [] }); }
-}
-
-async function showDreamEvent(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const roll = randInt(1,100);
-  if (roll <= 25) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '🌀 Nightmare! Bạn gặp nightmare enemy trong mơ và mất MP.')], components: [] }); const newMp = Math.max(0, player.mp - 10); updatePlayerHpMp(userId, guildId, player.hp, newMp); }
-  else if (roll <= 60) { setFlag(guildId, `luck_${userId}`, '1', 3600); await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '💫 Bạn mơ thấy điều tốt — nhận temporary buff.')], components: [] }); }
-  else { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '💤 Một giấc mơ yên bình — bạn cảm thấy nhẹ nhàng.')], components: [] }); }
-}
-
-async function showSlimeFollower(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  addItem(userId, guildId, 'slime_core', 1);
-  await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🐾 Một con slime bám theo bạn — nhận 1 Slime Core (pet token).')], components: [] });
-}
-
-async function showStumbleRock(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const roll = randInt(1,4);
-  if (roll === 1) { updatePlayerHpMp(userId, guildId, Math.max(1, player.hp - 1), player.mp); await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🤕 Bạn vấp đá — mất 1 HP.')], components: [] }); }
-  else if (roll === 2) { grantGold(userId, guildId, 5); await interaction.editReply({ embeds: [simpleEmbed(COLORS.gold, '🪙 Bạn nhặt được 5 Gold.')], components: [] }); }
-  else if (roll === 3) { addItem(userId, guildId, 'herb', 1); await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🌿 Bạn tìm thấy 1 Herb — con đường bí ẩn được hé lộ.')], components: [] }); }
-  else { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '😌 Không có gì xảy ra.')], components: [] }); }
-}
-
-async function showBardSinger(interaction: ChatInputCommandInteraction, userId: string, guildId: string) {
-  const player = getPlayer(userId, guildId)!;
-  const embed = new EmbedBuilder().setColor(COLORS.info).setTitle('🎶 Người Hát Rong')
-    .setDescription('*Một bard hát trong quán rượu...*\n\n> 🎧 Nghe hát — hồi MP\n> 💸 Tip gold — tăng reputation (flavor)\n> 🎤 Yêu cầu bài hát về mình — unlock title');
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`bard_listen_${userId}`).setLabel('Nghe hát').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`bard_tip_${userId}`).setLabel('Tip gold').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`bard_req_${userId}`).setLabel('Yêu cầu bài hát').setStyle(ButtonStyle.Success)
-  );
-
-  const { embed: eImg, files } = withImage(embed, 'villager');
-  const reply = await interaction.editReply({ embeds: [eImg], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25000 }).catch(() => null);
-  await (btn?.deferUpdate() ?? Promise.resolve());
-  if (!btn) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, 'Bard rời đi...')], components: [] }); return; }
-  if (btn.customId === `bard_listen_${userId}`) { const mpGain = Math.min(player.max_mp - player.mp, 5); updatePlayerHpMp(userId, guildId, player.hp, player.mp + mpGain); await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💧 Nghe hát — hồi ${mpGain} MP.`)], components: [] }); }
-  else if (btn.customId === `bard_tip_${userId}`) { if (player.gold < 5) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, 'Không đủ gold để tip.')], components: [] }); } else { spendGold(userId, guildId, 5); grantSoulShards(userId, guildId, 1); await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '💸 Bạn tip 5 Gold — bard cảm kích (flavor).')], components: [] }); } }
-  else { addItem(userId, guildId, 'title_token', 1); await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '🎤 Bard hát bài ca về bạn — unlock title token.')], components: [] }); }
+  collector.on('end', (_c, reason) => {
+    if (reason === 'time') interaction.editReply({ components: [] }).catch(() => {});
+  });
 }

@@ -18,6 +18,7 @@ export interface SkillDef {
   type: SkillType;
   description: string;
   mpCost?: number;
+  soulCost?: number;    // Soul Shards consumed on use
   damage?: number;
   heal?: number;
   effect?: EffectType;
@@ -117,6 +118,27 @@ export const SKILLS: Record<string, SkillDef> = {
     description: 'Đánh dấu zone hiện tại, tăng **drop rate** cho tất cả player trong **24h**.',
     learnFrom: 'book_mark_zone'
   },
+
+  // ── Soul Skills (cost Soul Shards) ────────────────────────────────────
+  soul_strike: {
+    id: 'soul_strike', name: 'Soul Strike', icon: '💀', type: 'active',
+    soulCost: 1, damage: 65,
+    description: 'Dùng **1 💀 Soul Shard**. Gây **65** sát thương linh hồn, xuyên 70% DEF.',
+    learnFrom: 'book_soul_strike'
+  },
+  soul_guard: {
+    id: 'soul_guard', name: 'Soul Guard', icon: '🛡️💀', type: 'active',
+    soulCost: 1, effect: 'shield' as any, effectDuration: 1,
+    description: 'Dùng **1 💀 Soul Shard**. Chặn **1 đòn chí mạng hoặc sát thương > 50% HP** tiếp theo.',
+    learnFrom: 'book_soul_guard'
+  },
+  soul_drain: {
+    id: 'soul_drain', name: 'Soul Drain', icon: '🌀', type: 'active',
+    soulCost: 1, damage: 25, heal: 20,
+    description: 'Dùng **1 💀 Soul Shard**. Hút **25 HP + 15 MP** từ kẻ thù.',
+    learnFrom: 'book_soul_drain'
+  },
+
   soul_offering: {
     id: 'soul_offering', name: 'Soul Offering', icon: '💀', type: 'world',
     worldEffect: 'soul_drop',

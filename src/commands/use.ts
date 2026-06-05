@@ -3,6 +3,7 @@ import {
   EmbedBuilder
 } from 'discord.js';
 import { getPlayer, getItemQty, removeItem, updatePlayerHpMp } from '../systems/player';
+import { incrementDaily } from './daily';
 import { COLORS } from '../utils/embeds';
 import { getItem } from '../data/items';
 import { bar } from '../utils/format';
@@ -76,6 +77,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   removeItem(userId, guildId, itemId, 1);
   updatePlayerHpMp(userId, guildId, newHp, newMp);
+  incrementDaily(userId, guildId, 'potion_used');
 
   await interaction.editReply({
     embeds: [

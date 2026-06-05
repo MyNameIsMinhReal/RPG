@@ -7,6 +7,8 @@ import { data as exploreData,   execute as execExplore   } from './commands/expl
 import { data as inventoryData, execute as execInventory } from './commands/inventory';
 import { data as useData,       execute as execUse       } from './commands/use';
 import { data as tradeData,     execute as execTrade     } from './commands/trade';
+import { data as dailyData,     execute as execDaily     } from './commands/daily';
+import { data as rerollData,    execute as execReroll    } from './commands/reroll';
 import { data as achievementsData, execute as execAchievements } from './commands/achievements';
 import { data as worldData, execute as execWorld } from './commands/world';
 
@@ -20,6 +22,8 @@ commands.set('explore',   execExplore);
 commands.set('inventory', execInventory);
 commands.set('use',       execUse);
 commands.set('trade',     execTrade);
+commands.set('daily',     execDaily);
+commands.set('reroll',    execReroll);
 commands.set('achievements', execAchievements);
 commands.set('world', execWorld);
 

@@ -1,6 +1,7 @@
 import db from '../database/index';
 import { getPlayer } from './player';
 import { grantGold } from './player';
+import { getTitleByAchievement, unlockTitle } from './titles';
 import type { PlayerRow } from '../utils/embeds';
 
 export interface AchievementDef {
@@ -107,6 +108,9 @@ export function unlockAchievement(userId: string, guildId: string, achievementId
     INSERT INTO player_achievements (user_id, guild_id, achievement_id) VALUES (?, ?, ?)
   `).run(userId, guildId, achievementId);
   if (def.rewardGold > 0) grantGold(userId, guildId, def.rewardGold);
+  // Unlock associated title
+  const title = getTitleByAchievement(achievementId);
+  if (title) unlockTitle(userId, guildId, title.id);
   return def;
 }
 
