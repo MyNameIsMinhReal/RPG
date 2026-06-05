@@ -654,7 +654,8 @@ async function renderMerchantBuy(
 
     if (cid === `merch_leave_${userId}`) {
       collector.stop();
-      await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn vẫy tay chào lái buôn và bước đi.')], components: [] });
+      const leaveReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn vẫy tay chào lái buôn và bước đi.')], components: buildContinueExploreRow(userId) });
+      attachContinueExploreHandler(leaveReply, interaction, userId, guildId);
 
     } else if (cid === `merch_sell_${userId}`) {
       collector.stop();
@@ -793,7 +794,8 @@ async function renderMerchantSell(
       await showMerchant(interaction, userId, guildId);
     } else if (cid === `merch_sellleave_${userId}`) {
       collector.stop();
-      await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn vẫy tay chào lái buôn và bước đi.')], components: [] });
+      const leaveReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn vẫy tay chào lái buôn và bước đi.')], components: buildContinueExploreRow(userId) });
+      attachContinueExploreHandler(leaveReply, interaction, userId, guildId);
     } else if (cid === `merch_sellitem_${userId}`) {
       const sel    = compInt as StringSelectMenuInteraction;
       const itemId = sel.values[0].replace('sell_', '');
@@ -1047,7 +1049,8 @@ async function showAncientAltar(
   const cid = btn?.customId ?? `altar_skip_${userId}`;
 
   if (cid === `altar_skip_${userId}` || !btn) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn rời bàn thờ cổ mà không chạm vào...')], components: [] });
+    const skipReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn rời bàn thờ cổ mà không chạm vào...')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(skipReply, interaction, userId, guildId);
     return;
   }
 
@@ -1146,7 +1149,8 @@ async function showMysteriousFigure(
   const cid = btn?.customId ?? `myst_skip_${userId}`;
 
   if (cid === `myst_skip_${userId}` || !btn) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 "Có lẽ lần khác vậy..." Bóng người biến mất vào bóng tối.')], components: [] });
+    const skipReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 "Có lẽ lần khác vậy..." Bóng người biến mất vào bóng tối.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(skipReply, interaction, userId, guildId);
     return;
   }
 
