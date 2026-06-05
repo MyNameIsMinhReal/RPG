@@ -33,6 +33,7 @@ export interface PlayerRow {
   atk: number; def: number; gold: number; soul_shards: number;
   zone_id: string; deaths: number; kills: number; created_at: number;
   last_explore?: number;
+  reputation?: number;
 }
 
 // ── Simple embeds ───────────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ export function buildProfileEmbed(
       { name: '🏅 Level', value: `**${player.level}**`, inline: true },
       { name: '🪙 Gold',  value: `**${player.gold.toLocaleString()}**`, inline: true },
       { name: '💀 Soul Shards', value: `**${player.soul_shards}**`, inline: true },
+      { name: '🤝 Reputation', value: `**${player.reputation ?? 0}**`, inline: true },
       { name: '☠️ Deaths / 🗡️ Kills', value: `**${player.deaths}** / **${player.kills}**`, inline: true },
       {
         name: '🏆 Thành tựu',

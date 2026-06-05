@@ -96,6 +96,33 @@ export function getShopDiscount(guildId: string): number {
   return raw ? parseInt(raw) : 0;
 }
 
+export function getShopMarkup(guildId: string): number {
+  const raw = getFlag(guildId, 'shop_markup');
+  return raw ? parseInt(raw) : 0;
+}
+
+export function increaseShopMarkup(guildId: string, amount: number, cap = 75): number {
+  const next = Math.min(cap, Math.max(0, getShopMarkup(guildId) + amount));
+  setFlag(guildId, 'shop_markup', String(next));
+  setWorldEvent(guildId, 'merchant_fear', `🛒 Thương nhân bắt đầu thuê vệ sĩ — giá shop toàn thế giới tăng **${next}%**.`, 86400);
+  return next;
+}
+
+export function getShopkeeperRobberyCount(guildId: string, userId: string): number {
+  const raw = getFlag(guildId, `shopkeeper_robbery_${userId}`);
+  return raw ? parseInt(raw) || 0 : 0;
+}
+
+export function getShopkeeperThreatMultiplier(guildId: string, userId: string): number {
+  return getShopkeeperRobberyCount(guildId, userId) > 0 ? 2 : 1;
+}
+
+export function recordShopkeeperRobbery(guildId: string, userId: string): number {
+  const next = getShopkeeperRobberyCount(guildId, userId) + 1;
+  setFlag(guildId, `shopkeeper_robbery_${userId}`, String(next));
+  return next;
+}
+
 export function getExpBonus(guildId: string): number {
   const raw = getFlag(guildId, 'global_exp_bonus');
   return raw ? parseInt(raw) : 0;
@@ -149,6 +176,9 @@ export function getWorldSummary(guildId: string): WorldSummary {
 
   if (getFlag(guildId, 'shop_discount'))
     activeBonuses.push(`🛒 Giảm giá shop ${getShopDiscount(guildId)}% (Mine Colossus đã ngã)`);
+
+  if (getFlag(guildId, 'shop_markup'))
+    activeDebuffs.push(`🛒 Giá shop +${getShopMarkup(guildId)}% vì thương nhân bị cướp`);
 
   if (getFlag(guildId, 'forest_drop_bonus'))
     activeBonuses.push('🌲 Drop rate +20% tại Rừng Bóng Tối');

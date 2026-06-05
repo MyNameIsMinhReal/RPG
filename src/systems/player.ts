@@ -150,6 +150,19 @@ export function setZone(userId: string, guildId: string, zoneId: string): void {
     .run(zoneId, userId, guildId);
 }
 
+// ── Reputation ────────────────────────────────────────────────────────────
+export function adjustReputation(userId: string, guildId: string, amount: number): number {
+  db.prepare(`
+    UPDATE players
+    SET reputation = MAX(-100, MIN(100, COALESCE(reputation, 0) + ?))
+    WHERE user_id = ? AND guild_id = ?
+  `).run(amount, userId, guildId);
+
+  const row = db.prepare('SELECT reputation FROM players WHERE user_id=? AND guild_id=?')
+    .get(userId, guildId) as unknown as { reputation: number } | undefined;
+  return row?.reputation ?? 0;
+}
+
 // ── Skill Pool ────────────────────────────────────────────────────────────
 export function getSkillPool(userId: string, guildId: string): SkillPoolEntry[] {
   return db.prepare('SELECT skill_id, learned_at FROM skill_pool WHERE user_id=? AND guild_id=?')

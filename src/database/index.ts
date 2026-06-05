@@ -125,6 +125,10 @@ if (!playerColumns.some((col: any) => col.name === 'last_explore')) {
   db.exec('ALTER TABLE players ADD COLUMN last_explore INTEGER DEFAULT 0');
 }
 
+if (!playerColumns.some((col: any) => col.name === 'reputation')) {
+  db.exec('ALTER TABLE players ADD COLUMN reputation INTEGER DEFAULT 0');
+}
+
 export default db;
 
 // ── Equipment & Title tables (added) ─────────────────────────────────────

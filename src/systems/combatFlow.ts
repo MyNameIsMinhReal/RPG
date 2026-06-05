@@ -32,6 +32,43 @@ export type CombatDeathHandler = (
   enemy: any
 ) => Promise<void>;
 
+
+function applyShopkeeperStockUse(enemy: any, result: any): void {
+  if (!enemy?.isShopkeeper || enemy.shopStockUsed || !enemy.shopStock) return;
+  if (!result?.newState || result.enemyDied || result.playerDied || result.fled) return;
+
+  const state = result.newState;
+  if (state.enemy_hp > Math.floor(state.enemy_max_hp * 0.5)) return;
+
+  const itemCount = Array.isArray(enemy.shopStock.itemIds) ? enemy.shopStock.itemIds.length : 0;
+  const gearCount = Array.isArray(enemy.shopStock.equipmentIds) ? enemy.shopStock.equipmentIds.length : 0;
+  const stockCount = itemCount + gearCount;
+  if (stockCount <= 0) {
+    enemy.shopStockUsed = true;
+    return;
+  }
+
+  enemy.shopStockUsed = true;
+  enemy.shopStock.itemIds = [];
+  enemy.shopStock.equipmentIds = [];
+
+  const heal = Math.max(10, Math.floor(state.enemy_max_hp * Math.min(0.35, 0.12 + stockCount * 0.04)));
+  const atkBoost = Math.max(2, Math.ceil(stockCount * 1.5));
+  const defBoost = Math.max(1, Math.ceil(stockCount * 0.8));
+
+  state.enemy_hp = Math.min(state.enemy_max_hp, state.enemy_hp + heal);
+  state.enemy_atk += atkBoost;
+  state.enemy_def += defBoost;
+
+  const logs: string[] = result.logLines ?? [];
+  logs.push(
+    `🛒 **Shopkeeper nổi giận!** Hắn uống sạch potion, phá seal sách phép và mặc vội trang bị đang bán.\n` +
+    `❤️ +${heal} HP · ⚔️ +${atkBoost} ATK · 🛡️ +${defBoost} DEF\n` +
+    `📦 Hàng trong shop đã bị dùng hết — nếu thắng sẽ không còn gì để cướp.`
+  );
+  state.combat_log = JSON.stringify(logs.slice(-6));
+}
+
 export async function startCombatFlow(
   interaction: ChatInputCommandInteraction,
   userId: string,
@@ -121,6 +158,8 @@ export async function startCombatFlow(
         await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
         return;
       }
+
+      applyShopkeeperStockUse(enemy, result);
 
       if (result.enemyDied) {
         deleteCombat(current.message_id);
@@ -246,6 +285,8 @@ export async function startCombatFlowWithEnemy(
         await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
         return;
       }
+
+      applyShopkeeperStockUse(enemy, result);
 
       if (result.enemyDied) {
         deleteCombat(current.message_id);
