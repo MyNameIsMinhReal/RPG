@@ -23,7 +23,7 @@ import {
 import { getZone, ZONES, ZONE_ORDER } from '../data/zones';
 import { ENEMIES, getEnemiesForZone, getBossForZone, getEnemy } from '../data/enemies';
 import { getItem, ITEMS } from '../data/items';
-import { getZoneEquipment } from '../data/equipment';
+import { getEquipment, getZoneEquipment } from '../data/equipment';
 import { incrementDaily } from './daily';
 import { wearEquipment } from '../systems/equipment';
 import { getSkill } from '../data/skills';
@@ -548,6 +548,113 @@ async function showLootFind(
   attachContinueExploreHandler(lootReply, interaction, userId, guildId);
 }
 
+
+type MerchantStock = {
+  itemIds: string[];
+  equipmentIds: string[];
+};
+
+type MerchantItem = NonNullable<ReturnType<typeof getItem>>;
+type MerchantEquipment = ReturnType<typeof getZoneEquipment>[number];
+
+function shuffleStock<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function takeRandomStock<T>(items: T[], count: number): T[] {
+  return shuffleStock(items).slice(0, Math.max(0, count));
+}
+
+function takeWeightedUnique<T>(
+  items: T[],
+  count: number,
+  weightFn: (item: T) => number
+): T[] {
+  const pool = items
+    .map(item => ({ item, weight: Math.max(0, weightFn(item)) }))
+    .filter(x => x.weight > 0);
+
+  const picked: T[] = [];
+  while (picked.length < count && pool.length > 0) {
+    const total = pool.reduce((sum, x) => sum + x.weight, 0);
+    let roll = Math.random() * total;
+    let index = 0;
+
+    for (; index < pool.length; index++) {
+      roll -= pool[index].weight;
+      if (roll <= 0) break;
+    }
+
+    const [chosen] = pool.splice(Math.min(index, pool.length - 1), 1);
+    picked.push(chosen.item);
+  }
+
+  return picked;
+}
+
+function uniqueIds(ids: string[]): string[] {
+  return [...new Set(ids)];
+}
+
+function buildRandomMerchantStock(zoneId: string): MerchantStock {
+  const zone = getZone(zoneId)!;
+  const zoneIdx = Math.max(0, ZONE_ORDER.indexOf(zoneId));
+
+  const buyableItems = zone.shopItems
+    .map(id => getItem(id))
+    .filter((item): item is MerchantItem => Boolean(item?.buyPrice));
+
+  const consumables = buyableItems.filter(item => item.type === 'consumable');
+  const skillBooks  = buyableItems.filter(item => item.type === 'skill_book');
+
+  const itemStock: MerchantItem[] = [];
+
+  // Luôn có ít nhất 1 đồ hồi phục/tiện ích, nhưng không bày toàn bộ shop.
+  const consumableCount = Math.min(consumables.length, zoneIdx >= 3 ? randInt(1, 2) : 1);
+  itemStock.push(...takeRandomStock(consumables, consumableCount));
+
+  // Skill book mạnh nên chỉ xuất hiện đôi khi, tối đa 1 cuốn/lần gặp.
+  const bookChance = zoneIdx === 0 ? 0.30 : zoneIdx <= 2 ? 0.40 : 0.50;
+  if (skillBooks.length > 0 && Math.random() < bookChance) {
+    itemStock.push(pick(skillBooks));
+  }
+
+  // Fallback để tránh shop trống nếu zone không có consumable buyPrice.
+  if (itemStock.length === 0 && buyableItems.length > 0) {
+    itemStock.push(pick(buyableItems));
+  }
+
+  const equipmentPool = getZoneEquipment(zoneId)
+    .filter(eq => Boolean(eq.buyPrice))
+    // Chặn đồ quá mạnh trong merchant thường. Epic/legendary/mythic nên để boss/drop/soul shop.
+    .filter(eq => eq.rarity === 'common' || eq.rarity === 'rare');
+
+  const equipmentCount = Math.min(
+    equipmentPool.length,
+    zoneIdx === 0 ? 1 : Math.random() < 0.75 ? 1 : 2
+  );
+
+  const equipmentStock = takeWeightedUnique<MerchantEquipment>(
+    equipmentPool,
+    equipmentCount,
+    eq => {
+      if (eq.rarity === 'common') return 100;
+      if (eq.rarity === 'rare') return zoneIdx <= 0 ? 0 : 30;
+      return 0;
+    }
+  );
+
+  return {
+    itemIds: uniqueIds(itemStock.map(item => item.id)),
+    equipmentIds: uniqueIds(equipmentStock.map(eq => eq.id))
+  };
+}
+
 // ── Merchant encounter ────────────────────────────────────────────────────────
 async function showMerchant(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
@@ -558,23 +665,25 @@ async function showMerchant(
   const { getShopDiscount } = await import('../systems/world');
   const discount = getShopDiscount(guildId);
 
-  await renderMerchantBuy(interaction, userId, guildId, zone.id, discount, player.gold);
+  const stock = buildRandomMerchantStock(zone.id);
+  await renderMerchantBuy(interaction, userId, guildId, zone.id, discount, player.gold, stock);
 }
 
 async function renderMerchantBuy(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string, zoneId: string,
-  discount: number, playerGold: number
+  discount: number, playerGold: number, stock: MerchantStock
 ): Promise<void> {
   const zone  = getZone(zoneId)!;
-  const { getShopDiscount } = await import('../systems/world');
 
-  const shopItems = zone.shopItems
+  const shopItems = stock.itemIds
     .map(id => getItem(id))
-    .filter(Boolean) as NonNullable<ReturnType<typeof getItem>>[];
+    .filter((item): item is MerchantItem => Boolean(item?.buyPrice));
 
-  // Equipment for sale in this zone
-  const eqItems = getZoneEquipment(zoneId);
+  // Random equipment stock for this merchant encounter.
+  const eqItems = stock.equipmentIds
+    .map(id => getEquipment(id))
+    .filter((eq): eq is MerchantEquipment => Boolean(eq?.buyPrice));
 
   const itemLines = [
     ...shopItems.map(item => {
@@ -597,7 +706,8 @@ async function renderMerchantBuy(
     .setTitle('🛒 Lái Buôn Lữ Hành!')
     .setDescription(
       `*Một lái buôn xuất hiện từ sau cây...*\n` +
-      discountNote + '\n' + itemLines + `\n\n🪙 Gold của bạn: **${playerGold}**`
+      `📦 Kho hàng hôm nay là **ngẫu nhiên**. Hàng hiếm xuất hiện ít, không phải lúc nào cũng có.\n` +
+      discountNote + '\n' + (itemLines || '*Hôm nay lái buôn không có gì đáng mua.*') + `\n\n🪙 Gold của bạn: **${playerGold}**`
     );
 
   const allBuyOptions = [
@@ -659,7 +769,7 @@ async function renderMerchantBuy(
 
     } else if (cid === `merch_sell_${userId}`) {
       collector.stop();
-      await renderMerchantSell(interaction, userId, guildId, zoneId, discount);
+      await renderMerchantSell(interaction, userId, guildId, zoneId, discount, stock);
 
     } else if (cid === `merch_buy_${userId}`) {
       const sel = compInt as StringSelectMenuInteraction;
@@ -672,12 +782,13 @@ async function renderMerchantBuy(
       let displayName = '';
 
       if (isBuyEq) {
-        const { getEquipment: getEq } = await import('../data/equipment');
-        const eq = getEq(itemId);
+        if (!stock.equipmentIds.includes(itemId)) return;
+        const eq = getEquipment(itemId);
         if (!eq?.buyPrice) return;
         price = Math.floor(eq.buyPrice * (1 - discount / 100));
         displayName = `${eq.icon} ${eq.name}`;
       } else {
+        if (!stock.itemIds.includes(itemId)) return;
         const item = getItem(itemId);
         if (!item?.buyPrice) return;
         price = Math.floor(item.buyPrice * (1 - discount / 100));
@@ -715,7 +826,7 @@ async function renderMerchantBuy(
 
 async function renderMerchantSell(
   interaction: ChatInputCommandInteraction,
-  userId: string, guildId: string, zoneId: string, discount: number
+  userId: string, guildId: string, zoneId: string, discount: number, stock: MerchantStock
 ): Promise<void> {
   const player    = getPlayer(userId, guildId)!;
   const inventory = getInventory(userId, guildId);
@@ -739,7 +850,10 @@ async function renderMerchantSell(
     }).catch(() => null);
     if (btn) {
       const deferred = await btn.deferUpdate().then(() => true).catch(() => false);
-      if (deferred) await showMerchant(interaction, userId, guildId);
+      if (deferred) {
+        const fresh = getPlayer(userId, guildId)!;
+        await renderMerchantBuy(interaction, userId, guildId, zoneId, discount, fresh.gold, stock);
+      }
     }
     return;
   }
@@ -791,7 +905,8 @@ async function renderMerchantSell(
 
     if (cid === `merch_sellback_${userId}`) {
       collector.stop();
-      await showMerchant(interaction, userId, guildId);
+      const fresh = getPlayer(userId, guildId)!;
+      await renderMerchantBuy(interaction, userId, guildId, zoneId, discount, fresh.gold, stock);
     } else if (cid === `merch_sellleave_${userId}`) {
       collector.stop();
       const leaveReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn vẫy tay chào lái buôn và bước đi.')], components: buildContinueExploreRow(userId) });
