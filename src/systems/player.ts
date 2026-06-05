@@ -221,7 +221,7 @@ export function removeItem(userId: string, guildId: string, itemId: string, qty 
 // ── Death handling ────────────────────────────────────────────────────────
 export function killPlayer(userId: string, guildId: string): void {
   db.prepare(`
-    UPDATE players SET alive=0, deaths=deaths+1
+    UPDATE players SET alive=0, hp=0, mp=0, deaths=deaths+1
     WHERE user_id=? AND guild_id=?
   `).run(userId, guildId);
 }

@@ -101,6 +101,25 @@ function buildContinueExploreRow(userId: string) {
   )];
 }
 
+async function ensurePlayerAlive(
+  interaction: ChatInputCommandInteraction,
+  userId: string,
+  guildId: string
+): Promise<boolean> {
+  const player = getPlayer(userId, guildId);
+  if (player?.alive) return true;
+
+  await interaction.editReply({
+    embeds: [simpleEmbed(
+      COLORS.danger,
+      `☠️ **${player?.name ?? 'Nhân vật'}** đã chết. Linh hồn đang chờ vòng chuyển sinh mới.\n\nDùng \`/start\` để tái sinh rồi mới có thể khám phá tiếp.`
+    )],
+    components: []
+  }).catch(() => {});
+
+  return false;
+}
+
 async function attachContinueExploreHandler(
   message: Message<boolean>,
   interaction: ChatInputCommandInteraction,
@@ -130,6 +149,10 @@ async function attachContinueExploreHandler(
 
     await message.edit({ components: [] }).catch(() => {});
     collector.stop('continue');
+
+    if (!(await ensurePlayerAlive(interaction, userId, guildId))) {
+      return;
+    }
 
     if (i.customId === `continue_explore_${userId}`) {
       await handleSearch(interaction, userId, guildId);
@@ -172,6 +195,8 @@ async function showExploreMenu(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string
 ): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+
   const player  = getPlayer(userId, guildId)!;
   const zone    = getZone(player.zone_id)!;
   const bossId  = zone.bossId;
@@ -208,6 +233,12 @@ async function showExploreMenu(
 
     if (processing) return;
     processing = true;
+
+    if (!(await ensurePlayerAlive(interaction, userId, guildId))) {
+      await reply.edit({ components: [] }).catch(() => {});
+      collector.stop('dead');
+      return;
+    }
 
     await reply.edit({ components: [] }).catch(() => {});
     collector.stop('action');
@@ -253,6 +284,8 @@ function buildExploreRows(
 async function handleZonePicker(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+
   const player = getPlayer(userId, guildId)!;
   const options = Object.values(ZONES).map(z => {
     const locked = player.level < z.minLevel;
@@ -292,6 +325,8 @@ async function handleZonePicker(
 async function handleTravel(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string, targetId: string
 ): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+
   const player = getPlayer(userId, guildId)!;
   const target = ZONES[targetId];
   if (!target) return;
@@ -328,6 +363,8 @@ async function handleTravel(
 async function handleRest(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+
   const player = getPlayer(userId, guildId)!;
   const cost   = player.zone_id === 'village' ? 0 : 15;
 
@@ -360,6 +397,8 @@ async function handleRest(
 async function handleSearch(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+
   const player = getPlayer(userId, guildId)!;
 
   if (!canExplore(player)) {
@@ -437,6 +476,8 @@ async function handleSearch(
 async function handleBoss(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+
   const player = getPlayer(userId, guildId)!;
   const zone   = getZone(player.zone_id)!;
   if (!zone.bossId) return;
@@ -1000,9 +1041,8 @@ async function handleDeath(
   await btnInt.editReply({
     embeds: [deathImg],
     files: deathFiles,
-    components: buildContinueExploreRow(userId)
+    components: []
   });
-  attachContinueExploreHandler(btnInt.message, interaction, userId, guildId);
 }
 
 // ── Event: Healing Spring ─────────────────────────────────────────────────────
