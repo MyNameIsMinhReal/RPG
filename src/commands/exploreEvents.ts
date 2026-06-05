@@ -26,7 +26,7 @@ import {
   spendGold,
   updatePlayerHpMp
 } from '../systems/player';
-import { startCombatFlowWithEnemy, type CombatDeathHandler, type CombatVictoryHandler } from '../systems/combatFlow';
+import { startCombatFlowWithEnemy, type CombatDeathHandler, type CombatVictoryHandler, type CombatFleeHandler } from '../systems/combatFlow';
 import { getEquipment } from '../data/equipment';
 import { getItem } from '../data/items';
 import { getZone, ZONES } from '../data/zones';
@@ -34,6 +34,7 @@ import { getFlag, getShopMarkup, getShopkeeperRobberyCount, increaseShopMarkup, 
 import { COLORS, simpleEmbed, type PlayerRow } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
+import { getBuff, consumeBuff } from '../systems/consumables';
 
 export type ExploreEventType =
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -79,6 +80,7 @@ export interface ExploreEventCallbacks {
   ) => Promise<void> | void;
   handleVictory: CombatVictoryHandler;
   handleDeath: CombatDeathHandler;
+  handleFlee: CombatFleeHandler;
 }
 
 export interface RunExploreEventInput {
@@ -100,20 +102,25 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
   const robberyCount = getShopkeeperRobberyCount(guildId, player.user_id);
   const markup = getShopMarkup(guildId);
   const missingChildStage = Number(getFlag(guildId, `missing_child_${player.user_id}`) ?? '0') || 0;
+  const detection = !!consumeBuff(player.user_id, guildId, 'scroll_detection');
+  const lucky = !!consumeBuff(player.user_id, guildId, 'luck');
+  const blackMarketAccess = !!getBuff(player.user_id, guildId, 'black_market_access');
+  const goodBoost = detection ? 2 : lucky ? 1 : 0;
+  const badPenalty = detection ? 0.45 : 1;
 
   const table: Array<[ExploreEventType, number]> = [
-    ['combat', hasCombat ? 18 : 0],
-    ['ambush', hasCombat ? 7 : 0],
+    ['combat', hasCombat ? 15 : 0],
+    ['ambush', hasCombat ? Math.floor(7 * badPenalty) : 0],
     ['legacy', hasLegacy ? 6 : 0],
-    ['merchant', 7],
-    ['spring', 5],
-    ['trap', 5],
+    ['merchant', 7 + goodBoost],
+    ['spring', 5 + goodBoost],
+    ['trap', Math.floor(5 * badPenalty)],
     ['altar', 4],
     ['mysterious', 4],
     ['villager', 4],
     ['caravan', 3],
-    ['loot', 4],
-    ['soul_shop', player.soul_shards >= 1 ? 4 : 1],
+    ['loot', 4 + goodBoost],
+    ['soul_shop', (player.soul_shards >= 1 ? 4 : 1) + goodBoost],
     ['abandoned_camp', 4],
     ['lost_pouch', 3],
     ['rune_stone', 3],
@@ -147,7 +154,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['magic_fountain', 3],
     ['laughing_bones', 3],
     ['missing_child_chain', missingChildStage > 0 ? 4 : 2],
-    ['black_market', (rep <= -30 || wanted >= 3) ? 5 : 0],
+    ['black_market', blackMarketAccess ? 10 : ((rep <= -30 || wanted >= 3) ? 5 : 0)],
     ['atonement_monk', (wanted > 0 || rep < -15) ? 4 : 0],
     ['conditional_miniboss', hasCombat && (wanted >= 3 || rep <= -60 || deaths >= 3 || robberyCount >= 2) ? 4 : 0],
   ];
@@ -354,7 +361,8 @@ async function showBloodTrail(ctx: RunExploreEventInput): Promise<void> {
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
         title: '🩸 Dấu Máu Đã Khép Lại', description: `Bạn hạ **${e.name}** và tìm thấy chiến lợi phẩm cạnh xác nạn nhân.`, exp: Math.floor(ctx.player.exp_next * 0.18), gold: randInt(25, 65), soulShards: randInt(1, 100) <= 35 ? 1 : 0, items: [pick(['elixir','book_berserker','book_counter','book_mend_wounds'])]
       }),
-      nonLethalLoss as any
+      nonLethalLoss as any,
+      ctx.callbacks.handleFlee
     );
   }
   if (cid === `blood_check_${ctx.userId}`) {
@@ -389,7 +397,8 @@ async function showNamelessGrave(ctx: RunExploreEventInput): Promise<void> {
       const ghost = eventEnemy(ctx, base, { id: 'grave_spirit', name: 'Linh Hồn Phẫn Nộ', icon: '👻', hp: Math.floor(base.hp * 0.9), atk: Math.floor(base.atk * 1.05), def: base.def });
       return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, ghost, undefined,
         async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '👻 Linh Hồn Được Giải Thoát', description: 'Lời nguyền trong mộ tan biến.', exp: Math.floor(ctx.player.exp_next * 0.12), soulShards: 1 }),
-        ctx.callbacks.handleDeath
+        ctx.callbacks.handleDeath,
+        ctx.callbacks.handleFlee
       );
     }
     const hp = Math.min(fresh.max_hp, fresh.hp + Math.floor(fresh.max_hp * (rep >= 30 ? 0.35 : 0.2)));
@@ -582,11 +591,16 @@ async function showBountyHunter(ctx: RunExploreEventInput): Promise<void> {
     });
     return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '⚔️ Thợ Săn Gục Ngã', description: 'Bạn sống sót qua cuộc truy sát.', exp: Math.floor(fresh.exp_next * 0.22), gold: randInt(40, 100), items: [pick(['elixir','book_counter','book_shadow_step'])] }),
-      ctx.callbacks.handleDeath
+      ctx.callbacks.handleDeath,
+      ctx.callbacks.handleFlee
     );
   }
   if (cid === `bh_bribe_${ctx.userId}`) {
-    if (fresh.gold < bribe) return finish(ctx, simpleEmbed(COLORS.warning, `💰 Bạn không đủ tiền hối lộ. Cần **${bribe} Gold**.`));
+    if (getItemQty(ctx.userId, ctx.guildId, 'bribe_coin') > 0) {
+      removeItem(ctx.userId, ctx.guildId, 'bribe_coin', 1);
+      return finish(ctx, simpleEmbed(COLORS.info, `🪙 Bạn búng **Bribe Coin**. Thợ săn bắt lấy đồng xu, kiểm tra dấu niêm phong rồi lặng lẽ biến mất.`));
+    }
+    if (fresh.gold < bribe) return finish(ctx, simpleEmbed(COLORS.warning, `💰 Bạn không đủ tiền hối lộ. Cần **${bribe} Gold** hoặc **Bribe Coin**.`));
     spendGold(ctx.userId, ctx.guildId, bribe);
     return finish(ctx, simpleEmbed(COLORS.info, `💰 Bạn trả **${bribe} Gold**. Thợ săn biến mất không nói thêm lời nào.`));
   }
@@ -645,7 +659,8 @@ async function showFailedLegacy(ctx: RunExploreEventInput): Promise<void> {
     const enemy = eventEnemy(ctx, pick(ctx.enemies), { id: 'fallen_self', name: `Bóng Ma ${ctx.player.name}`, icon: '🪞', hp: Math.floor(ctx.player.max_hp * 0.9), atk: ctx.player.atk + 5, def: ctx.player.def + 2 });
     return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🪞 Bạn Vượt Qua Chính Mình', description: 'Bóng ma tan thành những mảnh sáng nhỏ.', exp: Math.floor(ctx.player.exp_next * 0.25), soulShards: 1 }),
-      ctx.callbacks.handleDeath
+      ctx.callbacks.handleDeath,
+      ctx.callbacks.handleFlee
     );
   }
   return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn rời khỏi di sản cũ. Có những ký ức nên để chúng ngủ yên.'));
@@ -665,7 +680,8 @@ async function showMirrorClone(ctx: RunExploreEventInput): Promise<void> {
     const enemy = eventEnemy(ctx, pick(ctx.enemies), { id: 'mirror_clone', name: `Bản Sao ${ctx.player.name}`, icon: '🪞', hp: Math.floor(ctx.player.max_hp * 1.05), atk: ctx.player.atk + 4, def: ctx.player.def + 2 });
     return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🪞 Gương Vỡ', description: 'Bạn đánh bại phản chiếu méo mó của mình.', exp: Math.floor(ctx.player.exp_next * 0.3), soulShards: randInt(1,100) <= 50 ? 1 : 0 }),
-      ctx.callbacks.handleDeath
+      ctx.callbacks.handleDeath,
+      ctx.callbacks.handleFlee
     );
   }
   if (cid === `mirror_break_${ctx.userId}`) {
@@ -1016,7 +1032,8 @@ async function showMissingChildChain(ctx: RunExploreEventInput): Promise<void> {
     const enemy = eventEnemy(ctx, base, { id: 'child_cave_guard', name: `Kẻ Canh Hang ${base.name}`, icon: base.icon, hp: Math.floor(base.hp * 1.2), atk: Math.floor(base.atk * 1.1), def: base.def });
     return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '👣 Dấu Chân Dẫn Tới Hang', description: 'Bạn đánh bại kẻ canh hang. Từ bên trong vọng ra tiếng khóc trẻ con.', exp: Math.floor(ctx.player.exp_next * 0.2), gold: randInt(25, 80) }),
-      ctx.callbacks.handleDeath
+      ctx.callbacks.handleDeath,
+      ctx.callbacks.handleFlee
     );
   }
 
@@ -1030,6 +1047,8 @@ async function showMissingChildChain(ctx: RunExploreEventInput): Promise<void> {
 }
 
 async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
+  consumeBuff(ctx.userId, ctx.guildId, 'black_market_access');
+
   const wanted = getWantedLevel(ctx.userId, ctx.guildId);
   const embed = new EmbedBuilder().setColor(COLORS.dark)
     .setTitle('🌑 Chợ Đen Trong Hẻm')
@@ -1041,9 +1060,13 @@ async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
 
   const stock = [
     { id: 'black_market_token', label: 'Black Market Token', price: 180, desc: 'Mở đường vào chợ đen lần sau' },
-    { id: 'blood_vial', label: 'Blood Vial', price: 120, desc: 'Hồi máu nhưng khiến danh tiếng xấu hơn' },
+    { id: 'blood_vial', label: 'Blood Vial', price: 120, desc: 'Hồi máu + ATK, giảm reputation' },
     { id: 'assassins_smoke', label: "Assassin's Smoke", price: 220, desc: 'Hỗ trợ cướp shopkeeper' },
+    { id: 'arson_bottle', label: 'Arson Bottle', price: 150, desc: 'Gây sát thương lửa trong combat' },
+    { id: 'rage_elixir', label: 'Rage Elixir', price: 180, desc: 'ATK mạnh nhưng nguy hiểm' },
+    { id: 'cracked_soul_charm', label: 'Cracked Soul Charm', price: 420, desc: '25% sống sót với 1 HP khi chết' },
     { id: 'cursed_cloth', label: 'Cursed Cloth', price: 90, desc: 'Nguyên liệu craft cursed' },
+    { id: 'bone_glue', label: 'Bone Glue', price: 70, desc: 'Nguyên liệu undead/cursed' },
     { id: 'soul_dust', label: 'Soul Dust', price: 140, desc: 'Nguyên liệu craft linh hồn' },
   ];
 

@@ -6,6 +6,7 @@ import { unlockRecipesBySource } from './crafting';
 import { EQUIPMENT, getEquipment } from '../data/equipment';
 import { addItem as addItemFn } from './player';
 import { randInt } from '../utils/format';
+import { getGreedGoldBonusPercent } from './consumables';
 import { incrementDaily } from '../commands/daily';
 import type { PlayerRow } from '../utils/embeds';
 import type { EnemyDef } from '../data/enemies';
@@ -26,7 +27,9 @@ export function processVictoryRewards(
   enemy: EnemyDef
 ): VictoryRewardResult {
   const dropBonus = getDropBonus(guildId, player.zone_id);
-  const gold      = randInt(enemy.goldMin, enemy.goldMax);
+  const baseGold  = randInt(enemy.goldMin, enemy.goldMax);
+  const greedGoldBonus = getGreedGoldBonusPercent(userId, guildId);
+  const gold      = Math.max(0, Math.floor(baseGold * (1 + greedGoldBonus / 100)));
   const exp       = enemy.expReward;
   const drops: string[] = [];
 
@@ -56,7 +59,8 @@ export function processVictoryRewards(
     }
   }
 
-  let bonusLine = '';
+  let bonusLine = greedGoldBonus > 0 ? `
+📜 Scroll of Greed: gold +${greedGoldBonus}% (**${baseGold} → ${gold}**)` : '';
   if (enemy.boss && enemy.deathWorldFlag) {
     bonusLine = '\n\n' + onBossKilled(guildId, enemy.id, player.name, player.zone_id);
     logEvent(guildId, userId, player.name, 'boss_kill', `tiêu diệt Boss **${enemy.icon} ${enemy.name}**!`, player.zone_id);

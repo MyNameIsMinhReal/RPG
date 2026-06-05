@@ -393,6 +393,50 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     ingredients: [{ itemId: 'merchant_seal', amount: 1 }, { itemId: 'cursed_cloth', amount: 2 }, { itemId: 'soul_dust', amount: 1 }],
     unlockedBy: 'default'
   },
+
+  {
+    id: 'craft_weapon_oil', resultItemId: 'weapon_oil', resultAmount: 1,
+    category: 'potion', resultRarity: 'common', goldCost: 35, levelRequired: 1,
+    successRate: 100, craftingExp: 6,
+    ingredients: [{ itemId: 'rusty_gear', amount: 1 }, { itemId: 'herb', amount: 2 }],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_armor_polish', resultItemId: 'armor_polish', resultAmount: 1,
+    category: 'potion', resultRarity: 'common', goldCost: 35, levelRequired: 1,
+    successRate: 100, craftingExp: 6,
+    ingredients: [{ itemId: 'rusty_gear', amount: 1 }, { itemId: 'bone_glue', amount: 1 }],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_scroll_detection', resultItemId: 'scroll_detection', resultAmount: 1,
+    category: 'potion', resultRarity: 'rare', goldCost: 90, levelRequired: 2,
+    successRate: 100, craftingExp: 14,
+    ingredients: [{ itemId: 'rune_ink', amount: 1 }, { itemId: 'broken_rune', amount: 1 }],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_scroll_silence', resultItemId: 'scroll_silence', resultAmount: 1,
+    category: 'potion', resultRarity: 'rare', goldCost: 130, levelRequired: 3,
+    successRate: 95, craftingExp: 18,
+    ingredients: [{ itemId: 'rune_ink', amount: 2 }, { itemId: 'cursed_cloth', amount: 1 }, { itemId: 'broken_rune', amount: 1 }],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_bone_glue', resultItemId: 'bone_glue', resultAmount: 1,
+    category: 'material', resultRarity: 'common', goldCost: 15, levelRequired: 1,
+    successRate: 100, craftingExp: 4,
+    ingredients: [{ itemId: 'bone_shard', amount: 2 }, { itemId: 'herb', amount: 1 }],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_rune_ink', resultItemId: 'rune_ink', resultAmount: 1,
+    category: 'material', resultRarity: 'rare', goldCost: 45, levelRequired: 2,
+    successRate: 100, craftingExp: 10,
+    ingredients: [{ itemId: 'broken_rune', amount: 1 }, { itemId: 'mana_crystal', amount: 1 }],
+    unlockedBy: 'default'
+  },
+
 ];
 
 export function getRecipe(id: string): CraftRecipe | undefined {

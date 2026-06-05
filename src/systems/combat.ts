@@ -4,6 +4,7 @@ import { getSkill } from '../data/skills';
 import { getEnemy, type EnemyDef } from '../data/enemies';
 import { getLoadout, applyPassiveStats, getPlayer } from './player';
 import { getEquipmentStats } from './equipment';
+import { getBuff, consumeBuff } from './consumables';
 import type { CombatState } from '../utils/embeds';
 import type { PlayerRow } from '../utils/embeds';
 
@@ -114,6 +115,7 @@ export function tickEffects(effects: Effect[]): { effects: Effect[]; burnDmg: nu
   const next = effects
     .map(e => {
       if (e.name === 'burn') burnDmg += e.value ?? 5;
+      if (e.name === 'poison') burnDmg += e.value ?? 4;
       return { ...e, duration: e.duration - 1 };
     })
     .filter(e => e.duration > 0);
@@ -178,6 +180,14 @@ export function processAttack(state: CombatState, playerAtk: number): ActionResu
     const bonus = effects.find(e => e.name === 'berserk')?.value ?? 50;
     effectiveAtk = Math.floor(effectiveAtk * (1 + bonus / 100));
     logs.push(`🔱 **Last Stand** còn hiệu lực — ATK +${bonus}%.`);
+  }
+
+  const oilBoost = (effects.find(e => e.name === 'weapon_oil')?.value ?? 0) +
+    (effects.find(e => e.name === 'rage_elixir')?.value ?? 0) +
+    (effects.find(e => e.name === 'blood_vial')?.value ?? 0);
+  if (oilBoost > 0) {
+    effectiveAtk = Math.floor(effectiveAtk * (1 + oilBoost / 100));
+    logs.push(`🧪 Consumable buff: ATK +${oilBoost}%.`);
   }
 
   // Equipment stats
@@ -273,12 +283,15 @@ export function processSkill(
   }
 
   // MP check
-  if (skill.mpCost && player_mp < skill.mpCost) {
-    logs.push(`❌ Không đủ MP để dùng **${skill.name}**! (cần ${skill.mpCost}, có ${player_mp})`);
+  const focusDiscount = hasEffect(effects, 'focus_tonic') ? 20 : 0;
+  const realMpCost = Math.max(0, Math.ceil((skill.mpCost ?? 0) * (1 - focusDiscount / 100)));
+  if (realMpCost && player_mp < realMpCost) {
+    logs.push(`❌ Không đủ MP để dùng **${skill.name}**! (cần ${realMpCost}, có ${player_mp})`);
     return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
   }
 
-  player_mp -= skill.mpCost ?? 0;
+  player_mp -= realMpCost;
+  if (focusDiscount > 0 && (skill.mpCost ?? 0) > 0) logs.push(`💠 Focus Tonic: MP cost giảm còn **${realMpCost}**.`);
 
   // ── World skills ────────────────────────────────────────────────────────
   if (skill.type === 'world') {
@@ -364,13 +377,37 @@ export function processDefend(state: CombatState, playerAtk: number, _h: number,
 export function processFlee(state: CombatState): ActionResult {
   const passives = getPassives(state.user_id, state.guild_id);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
-  if (randInt(1, 100) <= 60) {
-    logs.push(`🏃 Bạn **bỏ chạy** thành công!`);
-    return { newState: state, logLines: logs, playerDied: false, enemyDied: false, fled: true };
-  }
-  logs.push(`🏃 Cố bỏ chạy nhưng thất bại!`);
   const effects = parseEffects(state.active_effects);
-  return enemyTurn(state, state, state.player_hp, state.player_mp, effects, logs, 0, passives);
+
+  const attemptEffect = effects.find(e => e.name === 'flee_attempts');
+  const failedAttempts = Math.max(0, attemptEffect?.value ?? 0);
+  const attemptNo = failedAttempts + 1;
+  const chance = Math.min(90, 40 + failedAttempts * 15);
+  const nextChance = Math.min(90, chance + 15);
+  const roll = randInt(1, 100);
+
+  logs.push(`🏃 **Bỏ chạy lần ${attemptNo}** — tỉ lệ thành công **${chance}%**.`);
+
+  if (roll <= chance) {
+    logs.push(`✅ Bạn **bỏ chạy thành công** trước khi bị kết liễu!`);
+    return {
+      newState: {
+        ...state,
+        combat_log: JSON.stringify(logs.slice(-4)),
+        active_effects: JSON.stringify(effects.filter(e => e.name !== 'flee_attempts'))
+      },
+      logLines: logs,
+      playerDied: false,
+      enemyDied: false,
+      fled: true
+    };
+  }
+
+  logs.push(`❌ Bỏ chạy thất bại! Lần thử tiếp theo sẽ tăng lên **${nextChance}%**.`);
+  const nextEffects = effects.filter(e => e.name !== 'flee_attempts');
+  nextEffects.push({ name: 'flee_attempts', duration: 999, value: failedAttempts + 1 });
+
+  return enemyTurn(state, state, state.player_hp, state.player_mp, nextEffects, logs, 0, passives);
 }
 
 // ── enemyTurn ─────────────────────────────────────────────────────────────
@@ -446,7 +483,9 @@ function enemyTurn(
 
   // ── Enemy attacks ──────────────────────────────────────────────────────
   const hpPct      = current.enemy_hp / current.enemy_max_hp;
-  const useSpecial = (hpPct < 0.3 && randInt(1, 100) <= 60) || randInt(1, 100) <= 30;
+  const silenced   = hasEffect(effects, 'silence');
+  if (silenced) logs.push(`📜 **${enemy.name}** bị Silence — không thể dùng kỹ năng đặc biệt.`);
+  const useSpecial = !silenced && ((hpPct < 0.3 && randInt(1, 100) <= 60) || randInt(1, 100) <= 30);
   const special    = useSpecial && enemy.specialAttacks.length > 0 ? pick(enemy.specialAttacks) : null;
   let dealDmg      = 0;
 
@@ -457,6 +496,10 @@ function enemyTurn(
     dealDmg  = res.dmg;
   } else {
     dealDmg  = Math.max(1, calcDamage(enemyAtk, defenseBonus));
+    const armorReduce = (effects.find(e => e.name === 'armor_polish')?.value ?? 0) + (effects.find(e => e.name === 'stone_skin')?.value ?? 0);
+    const rageTaken = effects.find(e => e.name === 'incoming_damage_up')?.value ?? 0;
+    if (armorReduce > 0) dealDmg = Math.max(1, Math.floor(dealDmg * (1 - armorReduce / 100)));
+    if (rageTaken > 0) dealDmg = Math.max(1, Math.floor(dealDmg * (1 + rageTaken / 100)));
     playerHp = Math.max(0, playerHp - dealDmg);
     logs.push(`${enemy.icon} **${enemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP còn lại)`);
   }
@@ -512,42 +555,106 @@ function enemyTurn(
 
 // ── processItemUse ────────────────────────────────────────────────────────
 export function processItemUse(state: CombatState, itemId: string): ActionResult {
-  const { getItemQty, removeItem, updatePlayerHpMp } = require('./player');
+  const { getItemQty, removeItem } = require('./player');
   const { getItem } = require('../data/items');
   const effects = parseEffects(state.active_effects);
   const passives = getPassives(state.user_id, state.guild_id);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
-  let { player_hp, player_mp } = state;
+  let { player_hp, player_mp, enemy_hp } = state;
 
   const qty = getItemQty(state.user_id, state.guild_id, itemId);
   const item = getItem(itemId);
+  const enemy = getEnemy(state.enemy_id);
 
-  if (!item || qty <= 0 || item.type !== 'consumable' || !item.effect) {
+  if (!item || qty <= 0 || item.type !== 'consumable') {
     logs.push(`❌ Không thể dùng item này!`);
     return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-4)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
   }
 
+  const effect: any = item.effect ?? {};
+  if (effect.passiveOnly) {
+    logs.push(`💀 **${item.name}** là vật phẩm tự kích hoạt khi bạn sắp chết.`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-4)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
+  if (effect.hpBelowPct && player_hp / state.player_max_hp > effect.hpBelowPct) {
+    logs.push(`❌ **${item.name}** chỉ dùng được khi HP dưới ${Math.floor(effect.hpBelowPct * 100)}%.`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-4)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
+
+  const blockedByBoss = !!enemy?.boss || String(state.enemy_id).includes('shopkeeper') || String(state.enemy_id).includes('bounty');
+  if (itemId === 'scroll_escape') {
+    if (blockedByBoss) {
+      logs.push('📜 Scroll of Escape bị xé vụn — trận này không thể chạy trốn bằng scroll!');
+      return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-4)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+    }
+    removeItem(state.user_id, state.guild_id, itemId, 1);
+    logs.push('📜 **Scroll of Escape** mở ra một khe nứt. Bạn thoát khỏi trận chiến!');
+    return { newState: state, logLines: logs, playerDied: false, enemyDied: false, fled: true };
+  }
+
   removeItem(state.user_id, state.guild_id, itemId, 1);
 
-  if (item.effect.hp) {
-    const gain = Math.min(item.effect.hp, state.player_max_hp - player_hp);
-    player_hp = Math.min(state.player_max_hp, player_hp + item.effect.hp);
-    logs.push(`🎒 Dùng **${item.icon} ${item.name}** — hồi **${gain} HP**! (${player_hp}/${state.player_max_hp})`);
+  if (effect.hpPercent) {
+    const amount = Math.max(1, Math.floor(state.player_max_hp * effect.hpPercent));
+    const gain = Math.min(amount, state.player_max_hp - player_hp);
+    player_hp = Math.min(state.player_max_hp, player_hp + amount);
+    logs.push(`🎒 **${item.icon} ${item.name}** — hồi **${gain} HP**! (${player_hp}/${state.player_max_hp})`);
   }
-  if (item.effect.mp) {
-    const gain = Math.min(item.effect.mp, state.player_max_mp - player_mp);
-    player_mp = Math.min(state.player_max_mp, player_mp + item.effect.mp);
-    logs.push(`🎒 Dùng **${item.icon} ${item.name}** — hồi **${gain} MP**!`);
+  if (effect.hp) {
+    const gain = Math.min(effect.hp, state.player_max_hp - player_hp);
+    player_hp = Math.min(state.player_max_hp, player_hp + effect.hp);
+    logs.push(`🎒 **${item.icon} ${item.name}** — hồi **${gain} HP**! (${player_hp}/${state.player_max_hp})`);
   }
-  if (item.effect.removeEffect) {
+  if (effect.mpPercent) {
+    const amount = Math.max(1, Math.floor(state.player_max_mp * effect.mpPercent));
+    const gain = Math.min(amount, state.player_max_mp - player_mp);
+    player_mp = Math.min(state.player_max_mp, player_mp + amount);
+    logs.push(`🎒 **${item.icon} ${item.name}** — hồi **${gain} MP**!`);
+  }
+  if (effect.mp) {
+    const gain = Math.min(effect.mp, state.player_max_mp - player_mp);
+    player_mp = Math.min(state.player_max_mp, player_mp + effect.mp);
+    logs.push(`🎒 **${item.icon} ${item.name}** — hồi **${gain} MP**!`);
+  }
+
+  const removeEffects: string[] = [];
+  if (effect.removeEffect) removeEffects.push(effect.removeEffect);
+  if (Array.isArray(effect.removeEffects)) removeEffects.push(...effect.removeEffects);
+  for (const removeName of removeEffects) {
     const before = effects.length;
-    const filtered = effects.filter((e: any) => e.name !== item.effect!.removeEffect);
-    if (filtered.length < before) logs.push(`🎒 **${item.name}** — giải trừ **${item.effect.removeEffect}**!`);
+    const filtered = effects.filter((e: any) => e.name !== removeName);
+    if (filtered.length < before) logs.push(`🎒 **${item.name}** — giải trừ **${removeName}**!`);
     effects.splice(0, effects.length, ...filtered);
   }
 
+  // Combat-only special consumables.
+  if (itemId === 'weapon_oil') { addEffect(effects, 'weapon_oil', 999, 10); logs.push('🔩 Weapon Oil: ATK +10% trong trận này.'); }
+  if (itemId === 'armor_polish') { addEffect(effects, 'armor_polish', 999, 10); logs.push('🧼 Armor Polish: sát thương nhận từ đòn thường giảm 10%.'); }
+  if (itemId === 'focus_tonic') { addEffect(effects, 'focus_tonic', 999, 20); addEffect(effects, 'incoming_damage_up', 999, 10); logs.push('💠 Focus Tonic: MP cost -20%, nhưng nhận thêm 10% sát thương thường.'); }
+  if (itemId === 'stone_skin_draught') { addEffect(effects, 'stone_skin', 999, 15); logs.push('🛡️ Stone Skin: sát thương đòn thường giảm 15%.'); }
+  if (itemId === 'quickstep_tea') { addEffect(effects, 'dodge', 1); logs.push('⚡ Quickstep Tea: né đòn tiếp theo.'); }
+  if (itemId === 'rage_elixir') { addEffect(effects, 'rage_elixir', 999, 25); addEffect(effects, 'incoming_damage_up', 999, 15); logs.push('🔥 Rage Elixir: ATK +25%, nhưng nhận thêm 15% sát thương thường.'); }
+  if (itemId === 'blood_vial') { addEffect(effects, 'blood_vial', 999, 10); logs.push('🩸 Blood Vial: ATK +10% trong trận này.'); }
+  if (itemId === 'scroll_silence') {
+    if (enemy?.boss) logs.push('📜 Boss chính kháng Silence! Scroll tan thành bụi.');
+    else { addEffect(effects, 'silence', 2); logs.push('📜 Scroll of Silence: enemy không dùng skill trong 2 lượt.'); }
+  }
+  if (itemId === 'warding_charm') { addEffect(effects, 'ward', 1); logs.push('🧿 Warding Charm: bùa hộ mệnh chờ chặn debuff tiếp theo.'); }
+  if (itemId === 'arson_bottle') {
+    if (enemy?.boss) logs.push('🔥 Boss chính dập tắt Arson Bottle trước khi lửa lan ra.');
+    else {
+      const dmg = Math.max(8, Math.floor(state.player_max_hp * 0.08));
+      enemy_hp = Math.max(0, enemy_hp - dmg);
+      logs.push(`🔥 Arson Bottle phát nổ, gây **${dmg}** sát thương trực tiếp!`);
+    }
+  }
+
+  if (enemy_hp <= 0) {
+    return makeResult(state, { ...state, enemy_hp }, player_hp, player_mp, effects, logs, false, true, false);
+  }
+
   // Item use triggers enemy turn (costs your action)
-  return enemyTurn(state, { ...state }, player_hp, player_mp, effects, logs, 0, passives);
+  return enemyTurn(state, { ...state, enemy_hp }, player_hp, player_mp, effects, logs, 0, passives);
 }
 
 // ── Special attack dispatch ───────────────────────────────────────────────

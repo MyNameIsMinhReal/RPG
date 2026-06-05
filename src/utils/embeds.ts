@@ -134,7 +134,7 @@ export function buildCombatEmbed(
   logLines: string[]
 ): EmbedBuilder {
   const effects: Array<{ name: string; duration: number }> = JSON.parse(state.active_effects || '[]')
-    .filter((e: any) => !['last_stand_used'].includes(e.name)); // hide internal flags
+    .filter((e: any) => !['last_stand_used', 'flee_attempts'].includes(e.name)); // hide internal flags
 
   const effectIcons: Record<string, string> = {
     burn: '🔥', slow: '🧊', stun: '💫', dodge: '🌑',

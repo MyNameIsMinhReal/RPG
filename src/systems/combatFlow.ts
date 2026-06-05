@@ -3,7 +3,7 @@ import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ComponentType, StringSelectMenuInteraction
 } from 'discord.js';
-import { getPlayer, getLoadout, applyPassiveStats } from './player';
+import { getPlayer, getLoadout, applyPassiveStats, getItemQty, removeItem } from './player';
 import {
   getCombatByUser, saveCombat, deleteCombat,
   processAttack, processSkill, processDefend, processFlee, processItemUse
@@ -14,6 +14,7 @@ import { getItem } from '../data/items';
 import { buildCombatEmbed, buildCombatButtons, buildSkillSelectMenu, simpleEmbed, COLORS } from '../utils/embeds';
 import { withImage } from '../utils/eventImages';
 import { getEnemyAtkBonus } from './world';
+import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumables';
 
 export type CombatVictoryHandler = (
   interaction: ChatInputCommandInteraction,
@@ -34,6 +35,42 @@ export type CombatDeathHandler = (
   enemy: any
 ) => Promise<void>;
 
+export type CombatFleeHandler = (
+  interaction: ChatInputCommandInteraction,
+  btnInt: ButtonInteraction,
+  userId: string,
+  guildId: string,
+  player: any,
+  enemy: any,
+  state: any,
+  logLines: string[]
+) => Promise<void>;
+
+
+const COMBAT_USABLE_ITEM_IDS = new Set([
+  'health_potion','minor_healing_potion','healing_potion','emergency_potion','mana_potion','mana_flask','elixir','moonwater',
+  'antidote','cooling_salve','purifying_salt','scroll_escape','scroll_silence','warding_charm','arson_bottle',
+  'weapon_oil','armor_polish','focus_tonic','stone_skin_draught','quickstep_tea','rage_elixir','blood_vial'
+]);
+
+function isCombatUsableItem(itemId: string): boolean {
+  return COMBAT_USABLE_ITEM_IDS.has(itemId);
+}
+
+function tryCrackedSoulCharm(userId: string, guildId: string, result: any): boolean {
+  if (!result?.playerDied) return false;
+  if (getItemQty(userId, guildId, 'cracked_soul_charm') <= 0) return false;
+  removeItem(userId, guildId, 'cracked_soul_charm', 1);
+  if (Math.random() > 0.25) return false;
+  result.playerDied = false;
+  result.newState.player_hp = 1;
+  result.logLines = [
+    ...(result.logLines ?? []),
+    '💀 **Cracked Soul Charm vỡ tan!** Linh hồn kéo bạn trở lại với **1 HP**.'
+  ];
+  result.newState.combat_log = JSON.stringify(result.logLines.slice(-6));
+  return true;
+}
 
 function applyShopkeeperStockUse(enemy: any, result: any): void {
   if (!enemy?.isShopkeeper || enemy.shopStockUsed || !enemy.shopStock) return;
@@ -77,19 +114,26 @@ export async function startCombatFlow(
   guildId: string,
   enemyId: string,
   onVictory: CombatVictoryHandler,
-  onDeath: CombatDeathHandler
+  onDeath: CombatDeathHandler,
+  onFlee?: CombatFleeHandler
 ): Promise<void> {
   const player      = getPlayer(userId, guildId)!;
   const enemy       = getEnemy(enemyId)!;
   const loadout     = getLoadout(userId, guildId);
-  const withPassive = applyPassiveStats(player);
+  const withPassiveRaw = applyPassiveStats(player);
+  const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
+  const withPassive    = buffedStart.player;
 
   const atkBonus     = getEnemyAtkBonus(guildId);
-  const adjustedAtk  = enemy.atk + Math.floor(enemy.atk * atkBonus / 100);
+  const greedBuff    = getBuff(userId, guildId, 'scroll_greed');
+  const greedAtk     = greedBuff ? 15 : 0;
+  const adjustedAtk  = enemy.atk + Math.floor(enemy.atk * (atkBonus + greedAtk) / 100);
 
   const log0 = enemy.boss
-    ? `👑 **BOSS** — **${enemy.icon} ${enemy.name}** xuất hiện!\n*"${enemy.lore}"*`
+    ? `👑 **BOSS** — **${enemy.icon} ${enemy.name}** xuất hiện!
+*"${enemy.lore}"*`
     : `⚠️ **${enemy.icon} ${enemy.name}** (Lv.${enemy.level}) tấn công!`;
+  const openingLogs = [log0, ...buffedStart.logs, ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
 
   const initState = {
     message_id: 'temp', channel_id: interaction.channelId,
@@ -100,14 +144,14 @@ export async function startCombatFlow(
     player_hp: withPassive.hp, player_max_hp: withPassive.max_hp,
     player_mp: withPassive.mp, player_max_mp: withPassive.max_mp,
     turn: 1, is_defending: 0,
-    active_effects: '[]',
-    combat_log: JSON.stringify([log0]),
+    active_effects: buffedStart.logs.some(l => l.includes('Quickstep')) ? JSON.stringify([{ name: 'dodge', duration: 1 }]) : '[]',
+    combat_log: JSON.stringify(openingLogs),
     player_stamina: 100, player_max_stamina: 100
   };
 
-  const combatEmbed = buildCombatEmbed(initState, player.name, enemy.icon, [log0]);
+  const combatEmbed = buildCombatEmbed(initState, player.name, enemy.icon, openingLogs);
   const inventory0  = getInventory(userId, guildId);
-  const hasItems0   = inventory0.some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && !!it.effect; });
+  const hasItems0   = inventory0.some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && isCombatUsableItem(e.item_id); });
   const buttons     = buildCombatButtons(userId, loadout.length > 0, 100, hasItems0);
   const imgKey      = enemy.boss ? 'boss' : 'combat';
   const { files: combatFiles, embed: combatEmbedWithImg } = withImage(combatEmbed, imgKey);
@@ -148,7 +192,7 @@ export async function startCombatFlow(
       else if (cid === `rpg_item_${userId}`) {
         // Show consumable select menu
         const inv = getInventory(userId, guildId);
-        const consumables = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && !!it.effect && e.quantity > 0; });
+        const consumables = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && e.quantity > 0 && isCombatUsableItem(e.item_id); });
         if (!consumables.length) { await compInt.editReply({ content: '🎒 Không có đồ dùng được!' }); return; }
         const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder: ARB2 } = require('discord.js');
         const opts = consumables.map((e: any) => {
@@ -187,8 +231,12 @@ export async function startCombatFlow(
 
       if (result.fled) {
         deleteCombat(current.message_id);
-        collector.stop();
-        await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
+        collector.stop('fled');
+        if (onFlee) {
+          await onFlee(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState, result.logLines);
+        } else {
+          await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
+        }
         return;
       }
 
@@ -220,6 +268,14 @@ export async function startCombatFlow(
       }
 
       if (result.playerDied) {
+        if (tryCrackedSoulCharm(userId, guildId, result)) {
+          saveCombat(result.newState);
+          await compInt.editReply({
+            embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
+            components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
+          }).catch(() => {});
+          return;
+        }
         deleteCombat(current.message_id);
         collector.stop();
         if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, enemy);
@@ -230,7 +286,7 @@ export async function startCombatFlow(
       const updatedLoadout = getLoadout(userId, guildId);
       await compInt.editReply({
         embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-        components: buildCombatButtons(userId, updatedLoadout.length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && !!it.effect; }))
+        components: buildCombatButtons(userId, updatedLoadout.length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && isCombatUsableItem(e.item_id); }))
       }).catch(() => {});
     } catch (err) {
       console.error('Combat interaction error:', err);
@@ -255,7 +311,8 @@ export async function startCombatFlowWithEnemy(
   enemy: any,
   bonus?: { bonusGold: number; bonusDesc: string; bonusItem?: string },
   onVictory?: CombatVictoryHandler,
-  onDeath?: CombatDeathHandler
+  onDeath?: CombatDeathHandler,
+  onFlee?: CombatFleeHandler
 ): Promise<void> {
   if (enemy.id && !getEnemy(enemy.id)) {
     // register inline definition into the map for the duration of combat
@@ -267,9 +324,22 @@ export async function startCombatFlowWithEnemy(
   }
   const player      = getPlayer(userId, guildId)!;
   const loadout     = getLoadout(userId, guildId);
-  const withPassive = applyPassiveStats(player);
+  const withPassiveRaw = applyPassiveStats(player);
+  const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
+  const withPassive    = buffedStart.player;
+
+  const greedBuff = getBuff(userId, guildId, 'scroll_greed');
+  if (greedBuff) enemy.atk = Math.floor(enemy.atk * 1.15);
+  const smokeBuff = enemy?.isShopkeeper ? consumeBuff(userId, guildId, 'assassins_smoke') : undefined;
+  if (smokeBuff) enemy.def = Math.max(0, Math.floor(enemy.def * 0.8));
 
   const log0 = `⚠️ **${enemy.icon} ${enemy.name}** (Lv.${enemy.level}) xuất hiện!`;
+  const openingLogs = [
+    log0,
+    ...buffedStart.logs,
+    ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : []),
+    ...(smokeBuff ? ['🗡️ Assassin’s Smoke: shopkeeper DEF -20% khi mở combat.'] : [])
+  ];
   const initState = {
     message_id: 'temp', channel_id: interaction.channelId,
     user_id: userId, guild_id: guildId,
@@ -279,12 +349,12 @@ export async function startCombatFlowWithEnemy(
     player_hp: withPassive.hp, player_max_hp: withPassive.max_hp,
     player_mp: withPassive.mp, player_max_mp: withPassive.max_mp,
     turn: 1, is_defending: 0,
-    active_effects: '[]', combat_log: JSON.stringify([log0]),
+    active_effects: buffedStart.logs.some(l => l.includes('Quickstep')) ? JSON.stringify([{ name: 'dodge', duration: 1 }]) : '[]', combat_log: JSON.stringify(openingLogs),
     player_stamina: 100, player_max_stamina: 100
   };
-  const combatEmbed2 = buildCombatEmbed(initState, player.name, enemy.icon, [log0]);
+  const combatEmbed2 = buildCombatEmbed(initState, player.name, enemy.icon, openingLogs);
   const inventory0   = getInventory(userId, guildId);
-  const hasItems0    = inventory0.some((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && !!it.effect; });
+  const hasItems0    = inventory0.some((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); });
   const buttons      = buildCombatButtons(userId, loadout.length > 0, 100, hasItems0);
   const reply        = await interaction.editReply({ embeds: [combatEmbed2], components: buttons });
 
@@ -329,7 +399,7 @@ export async function startCombatFlowWithEnemy(
       else if (cid === `rpg_flee_${userId}`)    result = processFlee(current);
       else if (cid === `rpg_item_${userId}`) {
         const inv = getInventory(userId, guildId);
-        const cons = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && !!it.effect && e.quantity > 0; });
+        const cons = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && e.quantity > 0 && isCombatUsableItem(e.item_id); });
         if (!cons.length) return;
         const { StringSelectMenuBuilder: SMB2, StringSelectMenuOptionBuilder: SMOB2, ActionRowBuilder: ARB3 } = require('discord.js');
         const opts2 = cons.map((e: any) => { const it = getItem(e.item_id)!; return new SMOB2().setLabel(`${it.name} ×${e.quantity}`).setValue(`useitem_${e.item_id}`).setEmoji(it.icon); });
@@ -355,8 +425,12 @@ export async function startCombatFlowWithEnemy(
 
       if (result.fled) {
         deleteCombat(current.message_id);
-        collector.stop();
-        await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
+        collector.stop('fled');
+        if (onFlee) {
+          await onFlee(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState, result.logLines);
+        } else {
+          await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
+        }
         return;
       }
 
@@ -388,6 +462,14 @@ export async function startCombatFlowWithEnemy(
       }
 
       if (result.playerDied) {
+        if (tryCrackedSoulCharm(userId, guildId, result)) {
+          saveCombat(result.newState);
+          await compInt.editReply({
+            embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
+            components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
+          }).catch(() => {});
+          return;
+        }
         deleteCombat(current.message_id);
         collector.stop();
         if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, enemy);
@@ -397,7 +479,7 @@ export async function startCombatFlowWithEnemy(
       saveCombat(result.newState);
       await compInt.editReply({
         embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-        components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0)
+        components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
       }).catch(() => {});
     } catch (err) {
       console.error('Combat interaction error:', err);

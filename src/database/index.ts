@@ -222,3 +222,18 @@ try { db.exec(`ALTER TABLE players ADD COLUMN permanent_atk_bonus INTEGER DEFAUL
 try { db.exec(`ALTER TABLE players ADD COLUMN permanent_def_bonus INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE players ADD COLUMN permanent_max_hp_bonus INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE players ADD COLUMN permanent_max_mp_bonus INTEGER DEFAULT 0`); } catch {}
+
+
+// ── Temporary player buffs from consumables ─────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS player_buffs (
+    user_id     TEXT NOT NULL,
+    guild_id    TEXT NOT NULL,
+    buff_key    TEXT NOT NULL,
+    value       INTEGER DEFAULT 0,
+    charges     INTEGER DEFAULT 1,
+    expires_at  INTEGER,
+    created_at  INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id, buff_key)
+  );
+`);

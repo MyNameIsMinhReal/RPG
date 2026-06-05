@@ -36,6 +36,7 @@ import { getSkill } from '../data/skills';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { pickExploreEvent, runExploreEvent } from './exploreEvents';
+import { consumeBuff } from '../systems/consumables';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -439,7 +440,7 @@ async function handleSearch(
     enemies,
     legacies,
     callbacks: {
-      startCombat: (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath),
+      startCombat: (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee),
       showAmbush: () => showAmbush(interaction, userId, guildId, pick(enemies).id),
       showLegacyFind: () => showLegacyFind(interaction, userId, guildId, legacies),
       showMerchant: () => showMerchant(interaction, userId, guildId),
@@ -460,7 +461,8 @@ async function handleSearch(
       buildContinueExploreRow,
       attachContinueExploreHandler,
       handleVictory,
-      handleDeath
+      handleDeath,
+      handleFlee
     }
   });
 }
@@ -475,7 +477,7 @@ async function handleBoss(
   const zone   = getZone(player.zone_id)!;
   if (!zone.bossId) return;
   setExploreCooldown(userId, guildId);
-  await startCombatFlow(interaction, userId, guildId, zone.bossId, handleVictory, handleDeath);
+  await startCombatFlow(interaction, userId, guildId, zone.bossId, handleVictory, handleDeath, handleFlee);
 }
 
 // ── Legacy find ───────────────────────────────────────────────────────────────
@@ -817,7 +819,8 @@ async function showSpiritTrial(
       });
       attachContinueExploreHandler(btnInt.message, int, uid, gid);
     },
-    handleDeath
+    handleDeath,
+    handleFlee
   );
 }
 
@@ -882,7 +885,12 @@ function buildRandomMerchantStock(zoneId: string): MerchantStock {
   const zone = getZone(zoneId)!;
   const zoneIdx = Math.max(0, ZONE_ORDER.indexOf(zoneId));
 
-  const buyableItems = zone.shopItems
+  const commonConsumableIds = [
+    'minor_healing_potion','healing_potion','emergency_potion','mana_flask','antidote','cooling_salve',
+    'weapon_oil','armor_polish','hunter_meal','quickstep_tea','scroll_escape','scroll_detection',
+    'strange_mushroom','suspicious_fish','fate_dice','bribe_coin'
+  ];
+  const buyableItems = uniqueIds([...zone.shopItems, ...commonConsumableIds])
     .map(id => getItem(id))
     .filter((item): item is MerchantItem => Boolean(item?.buyPrice));
 
@@ -892,7 +900,7 @@ function buildRandomMerchantStock(zoneId: string): MerchantStock {
   const itemStock: MerchantItem[] = [];
 
   // Luôn có ít nhất 1 đồ hồi phục/tiện ích, nhưng không bày toàn bộ shop.
-  const consumableCount = Math.min(consumables.length, zoneIdx >= 3 ? randInt(1, 2) : 1);
+  const consumableCount = Math.min(consumables.length, zoneIdx >= 3 ? randInt(2, 4) : randInt(1, 3));
   itemStock.push(...takeRandomStock(consumables, consumableCount));
 
   // Skill book mạnh nên chỉ xuất hiện đôi khi, tối đa 1 cuốn/lần gặp.
@@ -940,7 +948,8 @@ async function showMerchant(
   const zone   = getZone(player.zone_id)!;
 
   const { getShopDiscount } = await import('../systems/world');
-  const discount = getShopDiscount(guildId);
+  const fakeId = consumeBuff(userId, guildId, 'fake_identity');
+  const discount = getShopDiscount(guildId) + (fakeId ? 10 : 0);
   const markup = getEffectiveShopMarkup(guildId);
 
   const stock = buildRandomMerchantStock(zone.id);
@@ -1326,7 +1335,8 @@ async function startShopkeeperCombat(
     interaction, userId, guildId, enemy,
     undefined,
     handleShopkeeperVictory,
-    handleDeath
+    handleDeath,
+    handleFlee
   );
 }
 
@@ -1474,6 +1484,26 @@ async function handleVictory(
   const { embed: victoryImg, files: victoryFiles } = withImage(embed, 'victory');
   await btnInt.editReply({ embeds: [victoryImg], files: victoryFiles, components: buildContinueExploreRow(userId) });
   attachContinueExploreHandler(btnInt.message, interaction, userId, guildId);
+}
+
+async function handleFlee(
+  interaction: ChatInputCommandInteraction, btnInt: ButtonInteraction,
+  userId: string, guildId: string, player: any, enemy: any,
+  state: any, logLines: string[] = []
+): Promise<void> {
+  updatePlayerHpMp(userId, guildId, state.player_hp, state.player_mp);
+
+  const summary = logLines.slice(-3).join('\n') || '✅ Bạn đã thoát khỏi trận chiến.';
+  const reply = await btnInt.editReply({
+    embeds: [simpleEmbed(
+      COLORS.warning,
+      `${summary}\n\n🚶 Bạn rút lui để giữ mạng. Có thể tiếp tục khám phá khi đã sẵn sàng.`
+    )],
+    files: [],
+    components: buildContinueExploreRow(userId)
+  });
+
+  attachContinueExploreHandler(reply as Message<boolean>, interaction, userId, guildId);
 }
 
 async function handleDeath(
@@ -1854,21 +1884,21 @@ async function showAmbush(
     }
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `💥 Dính đòn phục kích −**${dmg} HP**! (${newHp}/${player.max_hp})\nChiến đấu bắt đầu!`)], components: [] });
     await new Promise(r => setTimeout(r, 1200));
-    await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath);
+    await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee);
   } else {
     // Try dodge
     const dodged = randInt(1, 100) <= 50;
     if (dodged) {
       await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `🌑 Bạn né được đòn phục kích! Chiến đấu bình thường bắt đầu!`)], components: [] });
       await new Promise(r => setTimeout(r, 1000));
-      await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath);
+      await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee);
     } else {
       const dmg   = Math.max(1, Math.floor(firstStrikeDmg * 1.3)); // penalty for failed dodge
       const newHp = Math.max(1, player.hp - dmg);
       updatePlayerHpMp(userId, guildId, newHp, player.mp);
       await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Né thất bại! −**${dmg} HP** (${newHp}/${player.max_hp})\nChiến đấu bắt đầu!`)], components: [] });
       await new Promise(r => setTimeout(r, 1200));
-      await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath);
+      await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee);
     }
   }
 }
@@ -1935,7 +1965,7 @@ async function showVillagerRescue(
   await startCombatFlowWithEnemy(interaction, userId, guildId, banditEnemy, {
     bonusGold: goldReward,
     bonusDesc: `👨‍👩‍👧 Dân làng cảm ơn bạn và trao **${goldReward} Gold**!`
-  }, handleVictory, handleDeath);
+  }, handleVictory, handleDeath, handleFlee);
 }
 
 // ── Event: Caravan Robbery ────────────────────────────────────────────────────
@@ -2017,7 +2047,7 @@ async function showCaravanRobbery(
       bonusGold: randInt(80, 150),
       bonusDesc: `🛒 Thương nhân trả ơn với **{gold} Gold** và hàng hóa!`,
       bonusItem: 'elixir'
-    }, handleVictory, handleDeath);
+    }, handleVictory, handleDeath, handleFlee);
   } else {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '😈 Bạn chọn đứng về phía bọn cướp...')], components: [] });
     await new Promise(r => setTimeout(r, 800));
@@ -2025,7 +2055,7 @@ async function showCaravanRobbery(
       bonusGold: randInt(40, 80),
       bonusDesc: `💰 Chia chác chiến lợi phẩm: +**{gold} Gold** + đồ cướp được!`,
       bonusItem: pick(['health_potion','mana_potion','antidote'])
-    }, handleVictory, handleDeath);
+    }, handleVictory, handleDeath, handleFlee);
   }
 }
 

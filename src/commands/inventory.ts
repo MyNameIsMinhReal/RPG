@@ -17,6 +17,7 @@ import { getEquipment, EQUIPMENT, RARITY_COLORS, RARITY_LABELS, SLOT_ICONS, getZ
 import { getWornEquipment, wearEquipment, removeEquipment, getOwnedEquipment, formatWornGear } from '../systems/equipment';
 import { getUnlockedTitles, getSelectedTitle, selectTitle } from '../systems/titles';
 import { bar } from '../utils/format';
+import { useItemOutsideCombat, getActiveBuffLines } from '../systems/consumables';
 
 export const data = new SlashCommandBuilder()
   .setName('inventory')
@@ -393,38 +394,22 @@ async function handleUseItem(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string, itemId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
-  const item   = getItem(itemId);
-  if (!item?.effect) { await renderTab(interaction, userId, guildId, 'items'); return; }
+  const item = getItem(itemId);
+  if (!item) { await renderTab(interaction, userId, guildId, 'items'); return; }
 
-  const qty = getItemQty(userId, guildId, itemId);
-  if (qty <= 0) { await renderTab(interaction, userId, guildId, 'items'); return; }
-
-  let newHp = player.hp, newMp = player.mp;
-  const lines: string[] = [];
-
-  if (item.effect.hp) {
-    const gain = Math.min(item.effect.hp, player.max_hp - player.hp);
-    newHp = Math.min(player.max_hp, player.hp + item.effect.hp);
-    lines.push(`❤️ +**${gain} HP**  \`${bar(newHp, player.max_hp, 8)}\` ${newHp}/${player.max_hp}`);
-  }
-  if (item.effect.mp) {
-    const gain = Math.min(item.effect.mp, player.max_mp - player.mp);
-    newMp = Math.min(player.max_mp, player.mp + item.effect.mp);
-    lines.push(`💧 +**${gain} MP**  \`${bar(newMp, player.max_mp, 8)}\` ${newMp}/${player.max_mp}`);
-  }
-
-  removeItem(userId, guildId, itemId, 1);
-  updatePlayerHpMp(userId, guildId, newHp, newMp);
+  const beforeQty = getItemQty(userId, guildId, itemId);
+  const result = useItemOutsideCombat(userId, guildId, itemId);
+  const afterQty = getItemQty(userId, guildId, itemId);
 
   const inv     = getInventory(userId, guildId);
   const fresh   = getPlayer(userId, guildId)!;
   const [embed, actionRows] = buildItemsTab(fresh, inv, userId);
 
   embed.spliceFields(0, embed.data.fields?.length ?? 0);
+  embed.setColor(result.ok ? COLORS.success : COLORS.warning);
   embed.setDescription(
-    `✅ Dùng **${item.icon} ${item.name}**\n${lines.join('\n')}\n\n` +
-    `🪙 Gold: **${fresh.gold}**`
+    `${result.ok ? '✅' : '⚠️'} **${result.title}**\n${result.lines.join('\n') || '*Không có hiệu ứng*'}\n\n` +
+    `🪙 Gold: **${fresh.gold}** · Còn lại: **${afterQty}**/${beforeQty} ${item.icon} ${item.name}`
   );
 
   const tabSelect = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
@@ -433,12 +418,13 @@ async function handleUseItem(
       new StringSelectMenuOptionBuilder().setLabel('🔮 Skill Pool').setValue('skills'),
       new StringSelectMenuOptionBuilder().setLabel('📌 Loadout').setValue('loadout'),
       new StringSelectMenuOptionBuilder().setLabel('📚 Skill Books').setValue('books'),
+      new StringSelectMenuOptionBuilder().setLabel('⚔️ Trang Bị').setValue('equip'),
+      new StringSelectMenuOptionBuilder().setLabel('🏅 Danh Hiệu').setValue('titles'),
     ])
   );
 
   await interaction.editReply({ embeds: [embed], components: [tabSelect, ...actionRows].slice(0,5) });
-  // Re-attach collector via renderTab
-  setTimeout(() => renderTab(interaction, userId, guildId, 'items'), 200);
+  setTimeout(() => renderTab(interaction, userId, guildId, 'items'), 250);
 }
 
 // ── Action: Pick slot for equip ────────────────────────────────────────────────
