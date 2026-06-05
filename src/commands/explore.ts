@@ -36,7 +36,13 @@ export const data = new SlashCommandBuilder()
 
 // ─────────────────────────────────────────────────────────────────────────────
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  await interaction.deferReply();
+  const deferred = await interaction.deferReply({ flags: 64 }).then(() => true).catch((err) => {
+  if (err?.code === 10062) return false;
+  console.error('[EXPLORE] deferReply failed:', err);
+  return false;
+});
+
+if (!deferred) return;
   const { id: userId } = interaction.user;
   const guildId = interaction.guildId!;
   const player  = getPlayer(userId, guildId);
