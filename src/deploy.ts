@@ -6,6 +6,7 @@ import { data as exploreData   } from './commands/explore';
 import { data as inventoryData } from './commands/inventory';
 import { data as useData       } from './commands/use';
 import { data as tradeData     } from './commands/trade';
+import { data as craftData     } from './commands/craft';
 import { data as dailyData     } from './commands/daily';
 import { data as rerollData    } from './commands/reroll';
 import { data as achievementsData } from './commands/achievements';
@@ -18,6 +19,7 @@ const commands = [
   inventoryData,
   useData,
   tradeData,
+  craftData,
   dailyData,
   rerollData,
   achievementsData,

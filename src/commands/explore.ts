@@ -69,48 +69,7 @@ if (!deferred) return;
     return;
   }
 
-async function attachContinueExploreHandler(
-  message: Message<boolean>,
-  interaction: ChatInputCommandInteraction,
-  userId: string,
-  guildId: string
-): Promise<void> {
-  let processing = false;
-
-  const collector = message.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
-    time: 120_000
-  });
-
-  collector.on('collect', async (i) => {
-    if (
-      i.customId !== `continue_explore_${userId}` &&
-      i.customId !== `continue_menu_${userId}`
-    ) {
-      return;
-    }
-
-    await i.deferUpdate().catch(() => {});
-
-    if (processing) return;
-    processing = true;
-
-    await message.edit({ components: [] }).catch(() => {});
-    collector.stop('continue');
-
-    if (i.customId === `continue_explore_${userId}`) {
-      await handleSearch(interaction, userId, guildId);
-    } else {
-      await showExploreMenu(interaction, userId, guildId);
-    }
-  });
-
-  collector.on('end', (_c, reason) => {
-    if (reason === 'time') {
-      message.edit({ components: [] }).catch(() => {});
-    }
-  });
-}
+  await showExploreMenu(interaction, userId, guildId);
 }
 
 async function clearStaleCombat(
@@ -163,7 +122,8 @@ async function attachContinueExploreHandler(
       return;
     }
 
-    await i.deferUpdate().catch(() => {});
+    const deferred = await i.deferUpdate().then(() => true).catch(() => false);
+    if (!deferred) return;
 
     if (processing) return;
     processing = true;
@@ -171,7 +131,11 @@ async function attachContinueExploreHandler(
     await message.edit({ components: [] }).catch(() => {});
     collector.stop('continue');
 
-    await showExploreMenu(interaction, userId, guildId);
+    if (i.customId === `continue_explore_${userId}`) {
+      await handleSearch(interaction, userId, guildId);
+    } else {
+      await showExploreMenu(interaction, userId, guildId);
+    }
   });
 
   collector.on('end', (_c, reason) => {
@@ -239,7 +203,8 @@ async function showExploreMenu(
   });
 
   collector.on('collect', async (i) => {
-    await i.deferUpdate().catch(() => {});
+    const deferred = await i.deferUpdate().then(() => true).catch(() => false);
+    if (!deferred) return;
 
     if (processing) return;
     processing = true;
@@ -318,7 +283,8 @@ async function handleZonePicker(
   }).catch(() => null);
 
   if (!sel) { await interaction.editReply({ components: [] }); return; }
-  await sel.deferUpdate();
+  const deferred = await sel.deferUpdate().then(() => true).catch(() => false);
+  if (!deferred) return;
   const zoneId = sel.values[0].replace(`ex_travel_${userId}_`, '');
   await handleTravel(interaction, userId, guildId, zoneId);
 }
@@ -394,8 +360,19 @@ async function handleRest(
 async function handleSearch(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
+  const player = getPlayer(userId, guildId)!;
+
+  if (!canExplore(player)) {
+    const remaining = exploreCooldownRemaining(player);
+    const reply = await interaction.editReply({
+      embeds: [simpleEmbed(COLORS.warning, `⏳ Hãy chờ **${remaining} giây** trước khi khám phá tiếp.`)],
+      components: buildContinueExploreRow(userId)
+    });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+
   incrementDaily(userId, guildId, 'explore_count');
-  const player   = getPlayer(userId, guildId)!;
   const zone     = getZone(player.zone_id)!;
   const enemies  = getEnemiesForZone(player.zone_id);
   const legacies = getLegaciesInZone(guildId, player.zone_id, 5);
@@ -511,7 +488,8 @@ async function showLegacyFind(
     return;
   }
 
-  await btn.deferUpdate();
+  const deferredBtn = await btn.deferUpdate().then(() => true).catch(() => false);
+  if (!deferredBtn) return;
 
   const player = getPlayer(userId, guildId)!;
   const results: string[] = [];
@@ -669,7 +647,9 @@ async function renderMerchantBuy(
   });
 
   collector.on('collect', async (compInt) => {
-    await compInt.deferUpdate();
+    const deferred = await compInt.deferUpdate().then(() => true).catch(() => false);
+    if (!deferred) return;
+
     const cid = (compInt as any).customId as string;
 
     if (cid === `merch_leave_${userId}`) {
@@ -756,7 +736,10 @@ async function renderMerchantSell(
     const btn = await reply.awaitMessageComponent({
       componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 20_000
     }).catch(() => null);
-    if (btn) { await btn.deferUpdate(); await showMerchant(interaction, userId, guildId); }
+    if (btn) {
+      const deferred = await btn.deferUpdate().then(() => true).catch(() => false);
+      if (deferred) await showMerchant(interaction, userId, guildId);
+    }
     return;
   }
 
@@ -800,7 +783,9 @@ async function renderMerchantSell(
   });
 
   collector.on('collect', async (compInt) => {
-    await compInt.deferUpdate();
+    const deferred = await compInt.deferUpdate().then(() => true).catch(() => false);
+    if (!deferred) return;
+
     const cid = (compInt as any).customId as string;
 
     if (cid === `merch_sellback_${userId}`) {
@@ -1506,7 +1491,9 @@ async function showSoulShop(
   });
 
   collector.on('collect', async (compInt) => {
-    await compInt.deferUpdate();
+    const deferred = await compInt.deferUpdate().then(() => true).catch(() => false);
+    if (!deferred) return;
+
     const cid = (compInt as any).customId as string;
     collector.stop();
 
