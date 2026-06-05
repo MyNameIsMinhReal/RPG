@@ -63,7 +63,48 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  await showExploreMenu(interaction, userId, guildId);
+async function attachContinueExploreHandler(
+  message: Message<boolean>,
+  interaction: ChatInputCommandInteraction,
+  userId: string,
+  guildId: string
+): Promise<void> {
+  let processing = false;
+
+  const collector = message.createMessageComponentCollector({
+    filter: i => i.user.id === userId,
+    time: 120_000
+  });
+
+  collector.on('collect', async (i) => {
+    if (
+      i.customId !== `continue_explore_${userId}` &&
+      i.customId !== `continue_menu_${userId}`
+    ) {
+      return;
+    }
+
+    await i.deferUpdate().catch(() => {});
+
+    if (processing) return;
+    processing = true;
+
+    await message.edit({ components: [] }).catch(() => {});
+    collector.stop('continue');
+
+    if (i.customId === `continue_explore_${userId}`) {
+      await handleSearch(interaction, userId, guildId);
+    } else {
+      await showExploreMenu(interaction, userId, guildId);
+    }
+  });
+
+  collector.on('end', (_c, reason) => {
+    if (reason === 'time') {
+      message.edit({ components: [] }).catch(() => {});
+    }
+  });
+}
 }
 
 async function clearStaleCombat(

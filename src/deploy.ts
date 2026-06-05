@@ -11,7 +11,18 @@ import { data as rerollData    } from './commands/reroll';
 import { data as achievementsData } from './commands/achievements';
 import { data as worldData } from './commands/world';
 
-const commands = [startData, profileData, exploreData, inventoryData, useData, tradeData, achievementsData, worldData].map(c => c.toJSON());
+const commands = [
+  startData,
+  profileData,
+  exploreData,
+  inventoryData,
+  useData,
+  tradeData,
+  dailyData,
+  rerollData,
+  achievementsData,
+  worldData
+].map(c => c.toJSON());
 const token    = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;
 

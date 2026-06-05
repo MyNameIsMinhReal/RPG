@@ -79,57 +79,74 @@ export async function startCombatFlow(
     time: 300_000
   });
 
+  let processing = false;
+
   collector.on('collect', async (compInt) => {
-    await compInt.deferUpdate();
-    const current = getCombatByUser(userId, guildId);
-    if (!current) { collector.stop(); return; }
+    const deferred = await compInt.deferUpdate().then(() => true).catch(() => false);
+    if (!deferred) return;
 
-    const fresh        = getPlayer(userId, guildId)!;
-    const freshPassive = applyPassiveStats(fresh);
-    const cid          = (compInt as any).customId as string;
+    if (processing) return;
+    processing = true;
 
-    let result;
-    if      (cid === `rpg_attack_${userId}`)   result = processAttack(current, freshPassive.atk);
-    else if (cid === `rpg_defend_${userId}`)   result = processDefend(current, freshPassive.atk, 0, 0);
-    else if (cid === `rpg_flee_${userId}`)     result = processFlee(current);
-    else if (cid === `rpg_skill_${userId}`) {
-      if (!loadout.length) return;
-      await compInt.editReply({ components: [buildSkillSelectMenu(userId, loadout, current.player_mp)] });
-      return;
-    } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
-      const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
-      result = processSkill(current, skillId, freshPassive.atk, 0, 0);
-    } else return;
+    try {
+      const current = getCombatByUser(userId, guildId);
+      if (!current) {
+        collector.stop();
+        return;
+      }
 
-    if (!result) return;
+      const fresh        = getPlayer(userId, guildId)!;
+      const freshPassive = applyPassiveStats(fresh);
+      const cid          = (compInt as any).customId as string;
 
-    if (result.fled) {
-      deleteCombat(current.message_id);
-      collector.stop();
-      await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] });
-      return;
+      let result;
+      if      (cid === `rpg_attack_${userId}`)   result = processAttack(current, freshPassive.atk);
+      else if (cid === `rpg_defend_${userId}`)   result = processDefend(current, freshPassive.atk, 0, 0);
+      else if (cid === `rpg_flee_${userId}`)     result = processFlee(current);
+      else if (cid === `rpg_skill_${userId}`) {
+        const updatedLoadout = getLoadout(userId, guildId);
+        if (!updatedLoadout.length) return;
+        await compInt.editReply({ components: [buildSkillSelectMenu(userId, updatedLoadout, current.player_mp)] }).catch(() => {});
+        return;
+      } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
+        const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
+        result = processSkill(current, skillId, freshPassive.atk, 0, 0);
+      } else return;
+
+      if (!result) return;
+
+      if (result.fled) {
+        deleteCombat(current.message_id);
+        collector.stop();
+        await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
+        return;
+      }
+
+      if (result.enemyDied) {
+        deleteCombat(current.message_id);
+        collector.stop();
+        if (onVictory) await onVictory(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState);
+        return;
+      }
+
+      if (result.playerDied) {
+        deleteCombat(current.message_id);
+        collector.stop();
+        if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, enemy);
+        return;
+      }
+
+      saveCombat(result.newState);
+      const updatedLoadout = getLoadout(userId, guildId);
+      await compInt.editReply({
+        embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
+        components: [buildCombatButtons(userId, updatedLoadout.length > 0)]
+      }).catch(() => {});
+    } catch (err) {
+      console.error('Combat interaction error:', err);
+    } finally {
+      processing = false;
     }
-
-    if (result.enemyDied) {
-      deleteCombat(current.message_id);
-      collector.stop();
-      if (onVictory) await onVictory(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState);
-      return;
-    }
-
-    if (result.playerDied) {
-      deleteCombat(current.message_id);
-      collector.stop();
-      if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, enemy);
-      return;
-    }
-
-    saveCombat(result.newState);
-    const updatedLoadout = getLoadout(userId, guildId);
-    await compInt.editReply({
-      embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-      components: [buildCombatButtons(userId, updatedLoadout.length > 0)]
-    });
   });
 
   collector.on('end', (_c, reason) => {
@@ -182,55 +199,78 @@ export async function startCombatFlowWithEnemy(
   const state = { ...initState, message_id: reply.id };
   saveCombat(state);
 
-  const collector = reply.createMessageComponentCollector({ filter: i => i.user.id === userId, time: 300_000 });
+  const collector = reply.createMessageComponentCollector({
+    filter: i => i.user.id === userId,
+    time: 300_000
+  });
+
+  let processing = false;
 
   collector.on('collect', async (compInt) => {
-    await compInt.deferUpdate();
-    const current = getCombatByUser(userId, guildId);
-    if (!current) { collector.stop(); return; }
+    const deferred = await compInt.deferUpdate().then(() => true).catch(() => false);
+    if (!deferred) return;
 
-    const fresh        = getPlayer(userId, guildId)!;
-    const freshPassive = applyPassiveStats(fresh);
-    const cid          = (compInt as any).customId as string;
+    if (processing) return;
+    processing = true;
 
-    let result;
-    if      (cid === `rpg_attack_${userId}`)  result = processAttack(current, freshPassive.atk);
-    else if (cid === `rpg_defend_${userId}`)  result = processDefend(current, freshPassive.atk, 0, 0);
-    else if (cid === `rpg_flee_${userId}`)    result = processFlee(current);
-    else if (cid === `rpg_skill_${userId}`) {
-      if (!loadout.length) return;
-      await compInt.editReply({ components: [buildSkillSelectMenu(userId, loadout, current.player_mp)] });
-      return;
-    } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
-      const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
-      result = processSkill(current, skillId, freshPassive.atk, 0, 0);
-    } else return;
+    try {
+      const current = getCombatByUser(userId, guildId);
+      if (!current) {
+        collector.stop();
+        return;
+      }
 
-    if (!result) return;
+      const fresh        = getPlayer(userId, guildId)!;
+      const freshPassive = applyPassiveStats(fresh);
+      const cid          = (compInt as any).customId as string;
 
-    if (result.fled) {
-      deleteCombat(current.message_id); collector.stop();
-      await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] });
-      return;
+      let result;
+      if      (cid === `rpg_attack_${userId}`)  result = processAttack(current, freshPassive.atk);
+      else if (cid === `rpg_defend_${userId}`)  result = processDefend(current, freshPassive.atk, 0, 0);
+      else if (cid === `rpg_flee_${userId}`)    result = processFlee(current);
+      else if (cid === `rpg_skill_${userId}`) {
+        const updatedLoadout = getLoadout(userId, guildId);
+        if (!updatedLoadout.length) return;
+        await compInt.editReply({ components: [buildSkillSelectMenu(userId, updatedLoadout, current.player_mp)] }).catch(() => {});
+        return;
+      } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
+        const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
+        result = processSkill(current, skillId, freshPassive.atk, 0, 0);
+      } else return;
+
+      if (!result) return;
+
+      if (result.fled) {
+        deleteCombat(current.message_id);
+        collector.stop();
+        await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
+        return;
+      }
+
+      if (result.enemyDied) {
+        deleteCombat(current.message_id);
+        collector.stop();
+        if (onVictory) await onVictory(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState);
+        return;
+      }
+
+      if (result.playerDied) {
+        deleteCombat(current.message_id);
+        collector.stop();
+        if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, enemy);
+        return;
+      }
+
+      saveCombat(result.newState);
+      await compInt.editReply({
+        embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
+        components: [buildCombatButtons(userId, getLoadout(userId, guildId).length > 0)]
+      }).catch(() => {});
+    } catch (err) {
+      console.error('Combat interaction error:', err);
+    } finally {
+      processing = false;
     }
-
-    if (result.enemyDied) {
-      deleteCombat(current.message_id); collector.stop();
-      if (onVictory) await onVictory(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState);
-      return;
-    }
-
-    if (result.playerDied) {
-      deleteCombat(current.message_id); collector.stop();
-      if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, enemy);
-      return;
-    }
-
-    saveCombat(result.newState);
-    await compInt.editReply({
-      embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-      components: [buildCombatButtons(userId, getLoadout(userId, guildId).length > 0)]
-    });
   });
 
   collector.on('end', (_c, reason) => {
