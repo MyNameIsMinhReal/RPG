@@ -101,20 +101,36 @@ async function attachContinueExploreHandler(
   userId: string,
   guildId: string
 ): Promise<void> {
+  let processing = false;
+
   const collector = message.createMessageComponentCollector({
     filter: i => i.user.id === userId,
     time: 120_000
   });
 
   collector.on('collect', async (i) => {
-    if (i.customId !== `continue_explore_${userId}` && i.customId !== `continue_menu_${userId}`) return;
-    await i.deferUpdate();
+    if (
+      i.customId !== `continue_explore_${userId}` &&
+      i.customId !== `continue_menu_${userId}`
+    ) {
+      return;
+    }
+
+    await i.deferUpdate().catch(() => {});
+
+    if (processing) return;
+    processing = true;
+
+    await message.edit({ components: [] }).catch(() => {});
     collector.stop('continue');
+
     await showExploreMenu(interaction, userId, guildId);
   });
 
   collector.on('end', (_c, reason) => {
-    if (reason === 'time') message.edit({ components: [] }).catch(() => {});
+    if (reason === 'time') {
+      message.edit({ components: [] }).catch(() => {});
+    }
   });
 }
 
@@ -168,17 +184,25 @@ async function showExploreMenu(
   const { embed: zoneEmbed, files: zoneFiles } = withImage(embed, `zone_${player.zone_id}`);
   const reply = await interaction.editReply({ embeds: [zoneEmbed], files: zoneFiles, components: rows });
 
+  let processing = false;
+
   const collector = reply.createMessageComponentCollector({
     filter: i => i.user.id === userId,
     time: 90_000
   });
 
   collector.on('collect', async (i) => {
-    await i.deferUpdate();
+    await i.deferUpdate().catch(() => {});
+
+    if (processing) return;
+    processing = true;
+
+    await reply.edit({ components: [] }).catch(() => {});
     collector.stop('action');
+
     const cid = (i as any).customId as string;
 
-    if (cid === `ex_search_${userId}`)   await handleSearch(interaction, userId, guildId);
+    if (cid === `ex_search_${userId}`) await handleSearch(interaction, userId, guildId);
     else if (cid === `ex_boss_${userId}`) await handleBoss(interaction, userId, guildId);
     else if (cid === `ex_rest_${userId}`) await handleRest(interaction, userId, guildId);
     else if (cid === `ex_zone_${userId}`) await handleZonePicker(interaction, userId, guildId);
@@ -189,7 +213,9 @@ async function showExploreMenu(
   });
 
   collector.on('end', (_c, reason) => {
-    if (reason === 'time') interaction.editReply({ components: [] }).catch(() => {});
+    if (reason === 'time') {
+      reply.edit({ components: [] }).catch(() => {});
+    }
   });
 }
 
