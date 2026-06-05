@@ -1,7 +1,7 @@
 import { getPlayer, updatePlayerLastExplore } from './player';
 import type { PlayerRow } from '../utils/embeds';
 
-const EXPLORE_COOLDOWN_SECONDS = 45;
+const EXPLORE_COOLDOWN_SECONDS = 5;
 
 export function canExplore(player: PlayerRow): boolean {
   const now = Math.floor(Date.now() / 1000);
