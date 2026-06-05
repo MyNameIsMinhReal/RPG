@@ -38,12 +38,35 @@ client.on('interactionCreate', async (interaction: Interaction) => {
   if (!handler) return;
   try {
     await handler(interaction);
-  } catch (err) {
-    console.error(`[CMD] ${interaction.commandName}:`, err);
-    const msg = { content: '❌ Có lỗi xảy ra!', ephemeral: true };
-    if (interaction.replied || interaction.deferred) await interaction.followUp(msg).catch(() => {});
-    else await interaction.reply(msg).catch(() => {});
+} catch (err: any) {
+  if (err?.code === 10062) {
+    console.warn(`[CMD] ${interaction.commandName}: interaction expired/unknown`);
+    return;
   }
+
+  console.error(`[CMD] ${interaction.commandName}:`, err);
+
+  if (!interaction.isRepliable()) return;
+
+  if (interaction.deferred) {
+    await interaction.editReply({
+      content: '❌ Có lỗi xảy ra khi xử lý lệnh. Thử lại sau nhé.',
+      embeds: [],
+      components: [],
+      files: []
+    }).catch(() => {});
+  } else if (interaction.replied) {
+    await interaction.followUp({
+      content: '❌ Có lỗi xảy ra khi xử lý lệnh. Thử lại sau nhé.',
+      flags: 64
+    }).catch(() => {});
+  } else {
+    await interaction.reply({
+      content: '❌ Có lỗi xảy ra khi xử lý lệnh. Thử lại sau nhé.',
+      flags: 64
+    }).catch(() => {});
+  }
+}
 });
 
 const token = process.env.DISCORD_TOKEN;
