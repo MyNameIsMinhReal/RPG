@@ -488,6 +488,11 @@ async function handleSearch(
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
 
   const player = getPlayer(userId, guildId)!;
+  const currentZone = getZone(player.zone_id)!;
+  if (currentZone.safe) {
+    await showExploreMenu(interaction, userId, guildId);
+    return;
+  }
 
   if (!canExplore(player)) {
     const remaining = exploreCooldownRemaining(player);

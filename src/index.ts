@@ -220,6 +220,26 @@ class PrefixCommandOptions {
     if (required) throw new Error(`Missing required user option: ${name}`);
     return null;
   }
+
+  getSubcommand(required = true): string {
+    if (this.tokens.length > 0) return this.tokens[0].toLowerCase();
+    // Default subcommand per command
+    const defaults: Record<string, string> = {
+      worldboss: 'status',
+      pet:       'list',
+      guild:     'info',
+    };
+    const def = defaults[this.commandName];
+    if (def) return def;
+    if (required) throw new Error(`Missing subcommand for ${this.commandName}`);
+    return '';
+  }
+
+  getSubcommandGroup(required = true): string | null {
+    // Prefix commands have no subcommand groups
+    if (required) return null;
+    return null;
+  }
 }
 
 class PrefixInteractionAdapter {
