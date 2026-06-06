@@ -6,7 +6,7 @@ import {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder
 } from 'discord.js';
-import { bar, hpLabel } from './format';
+import { bar } from './format';
 import { getSkill } from '../data/skills';
 import { getZone } from '../data/zones';
 import { getSelectedTitle, getUnlockedTitles } from '../systems/titles';
@@ -57,10 +57,8 @@ export function buildProfileEmbed(
   avatarURL?: string | null,
   achievementSummary?: { unlocked: number; total: number }
 ): EmbedBuilder {
-  const zone         = getZone(player.zone_id);
-  const aliveStatus  = player.alive ? '🟢 Alive' : '💀 Dead';
+  const zone          = getZone(player.zone_id);
   const selectedTitle = getSelectedTitle(player.user_id, player.guild_id);
-  const titleLine    = selectedTitle ? `${selectedTitle.icon} *${selectedTitle.name}*` : '';
   const unlockedCount = getUnlockedTitles(player.user_id, player.guild_id).length;
 
   const maxSkillSlots = 4 + Math.min(2, player.extra_skill_slots ?? 0);
@@ -73,47 +71,62 @@ export function buildProfileEmbed(
 
   const gearStr = formatWornGear(player.user_id, player.guild_id);
 
-  const embed = new EmbedBuilder()
+  const hpPct = player.hp / player.max_hp;
+  const hpDot = hpPct > 0.6 ? '🟢' : hpPct > 0.3 ? '🟡' : '🔴';
+
+  const descLines = [
+    `${zone?.icon ?? '❓'} **${zone?.name ?? player.zone_id}**  ·  ${player.alive ? '🟢 Đang sống' : '💀 Đã chết'}`,
+    selectedTitle ? `${selectedTitle.icon} *${selectedTitle.name}*` : '',
+  ].filter(Boolean).join('\n');
+
+  return new EmbedBuilder()
     .setColor(player.alive ? COLORS.success : COLORS.death)
-    .setTitle(`${player.alive ? '⚔️' : '💀'} ${player.name}${selectedTitle ? ` — ${selectedTitle.icon}` : ''}`)
-    .setDescription([
-      `${zone?.icon ?? '❓'} **${zone?.name ?? player.zone_id}**  ·  ${aliveStatus}`,
-      titleLine
-    ].filter(Boolean).join('\n'))
+    .setTitle(`${player.alive ? '⚔️' : '💀'} ${player.name}${selectedTitle ? `  ${selectedTitle.icon}` : ''}`)
+    .setDescription(descLines)
     .setThumbnail(avatarURL ?? null)
     .addFields(
       {
-        name: '── Stats ──',
+        name: '📊 Chỉ Số',
         value: [
-          `❤️  HP  \`${bar(player.hp, player.max_hp)}\` ${hpLabel(player.hp, player.max_hp)}`,
-          `💧  MP  \`${bar(player.mp, player.max_mp)}\` ${player.mp}/${player.max_mp}`,
-          `⭐  EXP \`${bar(player.exp, player.exp_next)}\` ${player.exp}/${player.exp_next}`,
+          `${hpDot} HP  \`${bar(player.hp, player.max_hp)}\` **${player.hp}**/${player.max_hp}`,
+          `💧 MP  \`${bar(player.mp, player.max_mp)}\` **${player.mp}**/${player.max_mp}`,
+          `⭐ EXP \`${bar(player.exp, player.exp_next)}\` **${player.exp}**/${player.exp_next}`,
         ].join('\n'),
-        inline: false
+        inline: false,
       },
-      { name: '⚔️ ATK',  value: `**${player.atk}**`, inline: true },
-      { name: '🛡️ DEF',  value: `**${player.def}**`, inline: true },
-      { name: '🏅 Level', value: `**${player.level}**`, inline: true },
+      { name: '⚔️ ATK',   value: `**${player.atk}**`,                  inline: true },
+      { name: '🛡️ DEF',   value: `**${player.def}**`,                  inline: true },
+      { name: '🏅 Level', value: `**${player.level}**`,                  inline: true },
       { name: '🪙 Gold',  value: `**${player.gold.toLocaleString()}**`, inline: true },
-      { name: '💀 Soul Shards', value: `**${player.soul_shards}**`, inline: true },
-      { name: '🤝 Reputation', value: `**${player.reputation ?? 0}**`, inline: true },
-      { name: '📜 Wanted', value: `**${player.wanted_level ?? 0}/5**`, inline: true },
-      { name: '✨ Soul Perks', value: `Stats +${player.bonus_stat_points ?? 0} · Slots +${player.extra_skill_slots ?? 0}`, inline: true },
-      { name: '☠️ Deaths / 🗡️ Kills', value: `**${player.deaths}** / **${player.kills}**`, inline: true },
+      { name: '💀 Soul',  value: `**${player.soul_shards}**`,            inline: true },
+      { name: '🤝 Rep',   value: `**${player.reputation ?? 0}**`,        inline: true },
+      { name: '📜 Wanted',      value: `**${player.wanted_level ?? 0}/5**`,                             inline: true },
+      { name: '✨ Soul Perks',  value: `+${player.bonus_stat_points ?? 0} stat · +${player.extra_skill_slots ?? 0} slot`, inline: true },
+      { name: '☠️ Chết / 🗡️ Kill', value: `**${player.deaths}** / **${player.kills}**`,                inline: true },
       {
-        name: '🏆 Thành tựu',
-        value: `**${achievementSummary?.unlocked ?? 0}/${achievementSummary?.total ?? 0}** đã mở  ·  🏅 **${unlockedCount}** danh hiệu`,
-        inline: false
+        name: '🏆 Thành Tựu',
+        value: `**${achievementSummary?.unlocked ?? 0}**/**${achievementSummary?.total ?? 0}** đã mở  ·  🏅 **${unlockedCount}** danh hiệu`,
+        inline: false,
       },
-      { name: '🎽 Trang bị', value: gearStr || '*Chưa trang bị gì*', inline: false },
-      { name: '🔮 Skill Loadout', value: skillSlots || '*(Chưa equip skill nào)*', inline: false }
+      { name: '🎽 Trang Bị',     value: gearStr || '*Chưa trang bị gì*',        inline: false },
+      { name: '🔮 Skill Loadout', value: skillSlots || '*Chưa equip skill nào*', inline: false }
     )
-    .setFooter({ text: `Lần đầu chơi: <t:${player.created_at}:D>` });
-
-  return embed;
+    .setFooter({ text: `Nhân vật tạo từ <t:${player.created_at}:D>` });
 }
 
 // ── Combat embed ──────────────────────────────────────────────────────────
+export interface CombatEnemy {
+  id: string;
+  name: string;
+  icon: string;
+  hp: number;
+  max_hp: number;
+  atk: number;
+  def: number;
+  specialAttacks: string[];
+  boss?: boolean;
+}
+
 export interface CombatState {
   message_id: string; channel_id: string;
   user_id: string; guild_id: string;
@@ -125,6 +138,7 @@ export interface CombatState {
   turn: number; is_defending: number;
   active_effects: string; combat_log: string;
   player_stamina: number; player_max_stamina: number;
+  enemies_json?: string; // JSON CombatEnemy[] for group fights
 }
 
 export function buildCombatEmbed(
@@ -134,54 +148,95 @@ export function buildCombatEmbed(
   logLines: string[]
 ): EmbedBuilder {
   const effects: Array<{ name: string; duration: number }> = JSON.parse(state.active_effects || '[]')
-    .filter((e: any) => !['last_stand_used', 'flee_attempts'].includes(e.name)); // hide internal flags
+    .filter((e: any) => !['last_stand_used', 'flee_attempts'].includes(e.name));
 
   const effectIcons: Record<string, string> = {
     burn: '🔥', slow: '🧊', stun: '💫', dodge: '🌑',
-    berserk: '😤', poison: '☠️', shield: '🛡️'
+    berserk: '😤', poison: '☠️', shield: '🛡️', shadow_step: '👤',
+    focus_tonic: '🎯',
   };
-  const effectStr = effects.length
-    ? effects.map((e: any) => `${effectIcons[e.name] ?? '✨'} ${e.name} ×${e.duration}`).join('  ')
-    : '*—*';
 
-  // HP color indicator
+  // Parse group enemies
+  const groupEnemies: CombatEnemy[] | null = state.enemies_json
+    ? (() => { try { return JSON.parse(state.enemies_json); } catch { return null; } })()
+    : null;
+  const isGroup = !!(groupEnemies && groupEnemies.length > 1);
+  const aliveCount = isGroup ? groupEnemies!.filter(e => e.hp > 0).length : 0;
+
+  // Dynamic embed color based on player HP
   const hpPct = state.player_hp / state.player_max_hp;
-  const hpColor = hpPct > 0.6 ? '🟢' : hpPct > 0.3 ? '🟡' : '🔴';
-  const ePct = state.enemy_hp / state.enemy_max_hp;
-  const eColor = ePct > 0.6 ? '🟢' : ePct > 0.3 ? '🟡' : '🔴';
+  const embedColor = hpPct < 0.2 ? 0xED4245     // critical — red
+    : hpPct < 0.5 ? 0xE67E22                    // damaged  — orange
+    : state.is_defending ? 0x5865F2              // defending — blue
+    : 0x2C2F33;                                  // normal    — dark
 
-  const logStr = logLines.slice(-4).join('\n') || '*...*';
+  const pStatus = hpPct < 0.2 ? '🔴' : hpPct < 0.5 ? '🟡' : '🟢';
 
-  return new EmbedBuilder()
-    .setColor(COLORS.dark)
-    .setTitle(`⚔️ COMBAT  ·  Lượt ${state.turn}`)
-    .setDescription(`**${playerName}** ⚔️ **${enemyIcon} ${state.enemy_name}**`)
-    .addFields(
-      {
-        name: `${hpColor} ${playerName}`,
-        value: [
-          `❤️ \`${bar(state.player_hp, state.player_max_hp, 12)}\` **${state.player_hp}**/${state.player_max_hp}`,
-          `💧 \`${bar(state.player_mp, state.player_max_mp, 12)}\` **${state.player_mp}**/${state.player_max_mp}`,
-          `⚡ \`${bar(state.player_stamina ?? 100, state.player_max_stamina ?? 100, 12)}\` **${state.player_stamina ?? 100}**/${state.player_max_stamina ?? 100}${(state.player_stamina ?? 100) <= 10 ? ' *(kiệt sức!)*' : ''}`,
-        ].join('\n'),
-        inline: true
-      },
-      {
-        name: `${eColor} ${enemyIcon} ${state.enemy_name}`,
-        value: `❤️ \`${bar(state.enemy_hp, state.enemy_max_hp, 12)}\` **${state.enemy_hp}**/${state.enemy_max_hp}`,
-        inline: true
-      },
-      {
-        name: '✨ Hiệu ứng',
-        value: effectStr,
-        inline: false
-      },
-      {
-        name: '📜 Log',
-        value: logStr,
-        inline: false
-      }
-    );
+  // Player stats block
+  const sta = state.player_stamina ?? 100;
+  const maxSta = state.player_max_stamina ?? 100;
+  const playerStats = [
+    `❤️ \`${bar(state.player_hp, state.player_max_hp, 10)}\` **${state.player_hp}**/${state.player_max_hp}`,
+    `💧 \`${bar(state.player_mp, state.player_max_mp, 10)}\` **${state.player_mp}**/${state.player_max_mp}`,
+    `⚡ \`${bar(sta, maxSta, 10)}\` **${sta}**/${maxSta}${sta <= 10 ? '  ⚠️ *kiệt sức!*' : ''}`,
+  ].join('\n');
+
+  // Log: last 3 lines as Discord blockquotes
+  const logStr = logLines.length
+    ? logLines.slice(-3).map(l => `> ${l}`).join('\n')
+    : '> *...*';
+
+  // Description
+  const desc = isGroup
+    ? `**${playerName}** ⚔️ **Nhóm kẻ thù** — ${aliveCount}/${groupEnemies!.length} còn sống`
+    : `**${playerName}** ⚔️ **${enemyIcon} ${state.enemy_name}**`;
+
+  const embed = new EmbedBuilder()
+    .setColor(embedColor)
+    .setTitle(`⚔️ Trận Chiến · Lượt ${state.turn}`)
+    .setDescription(desc);
+
+  // Player field
+  embed.addFields({
+    name: `${pStatus} ${playerName}`,
+    value: playerStats,
+    inline: !isGroup,
+  });
+
+  // Enemy field(s)
+  if (isGroup) {
+    const enemyLines = groupEnemies!.map((e, i) => {
+      if (e.hp <= 0) return `☠️ ~~**[${i + 1}] ${e.icon} ${e.name}**~~ — đã chết`;
+      const pct = e.hp / e.max_hp;
+      const col = pct > 0.6 ? '🟢' : pct > 0.3 ? '🟡' : '🔴';
+      return `${col} **[${i + 1}] ${e.icon} ${e.name}**\n❤️ \`${bar(e.hp, e.max_hp, 8)}\` **${e.hp}**/${e.max_hp}`;
+    }).join('\n');
+    embed.addFields({ name: `👹 Kẻ Thù (${aliveCount} còn sống)`, value: enemyLines, inline: false });
+  } else {
+    const ePct = state.enemy_hp / state.enemy_max_hp;
+    const eStatus = ePct > 0.6 ? '🟢' : ePct > 0.3 ? '🟡' : '🔴';
+    embed.addFields({
+      name: `${eStatus} ${enemyIcon} ${state.enemy_name}`,
+      value: `❤️ \`${bar(state.enemy_hp, state.enemy_max_hp, 10)}\` **${state.enemy_hp}**/${state.enemy_max_hp}`,
+      inline: true,
+    });
+  }
+
+  // Effects — only shown when non-empty
+  if (effects.length) {
+    const effectStr = effects.map((e: any) => `${effectIcons[e.name] ?? '✨'} **${e.name}** ×${e.duration}`).join('  ');
+    embed.addFields({ name: '✨ Hiệu ứng', value: effectStr, inline: false });
+  }
+
+  // Log
+  embed.addFields({ name: '📋 Diễn biến', value: logStr, inline: false });
+
+  // Footer: defending hint
+  if (state.is_defending) {
+    embed.setFooter({ text: '🛡️ Đang phòng thủ — giảm sát thương nhận vào lượt này' });
+  }
+
+  return embed;
 }
 
 // ── Combat action buttons ─────────────────────────────────────────────────
@@ -257,30 +312,45 @@ export function buildVictoryEmbed(
   drops: string[],
   leveledUp: boolean, newLevel?: number
 ): EmbedBuilder {
-  const dropStr = drops.length ? drops.join(', ') : '*Không có*';
-  let desc = `Đã đánh bại **${enemyIcon} ${enemyName}**!\n\n`;
-  desc += `+${expGained} ⭐ EXP  ·  +${goldGained} 🪙 Gold\n`;
-  desc += `📦 Loot: ${dropStr}`;
-  if (leveledUp) desc += `\n\n🎉 **LEVEL UP!** → Lv.**${newLevel}**`;
-
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(COLORS.gold)
-    .setTitle('🏆 Chiến thắng!')
-    .setDescription(desc);
+    .setTitle('🏆 Chiến Thắng!')
+    .setDescription(`> ✦ **${playerName}** đã hạ gục **${enemyIcon} ${enemyName}**!`)
+    .addFields(
+      { name: '⭐ EXP',   value: `+**${expGained}**`,                   inline: true },
+      { name: '🪙 Gold',  value: `+**${goldGained.toLocaleString()}**`, inline: true },
+      {
+        name: '📦 Loot',
+        value: drops.length ? drops.join('\n') : '*Không có gì rơi...*',
+        inline: false,
+      }
+    );
+
+  if (leveledUp) {
+    embed.addFields({
+      name: '🎉 LEVEL UP!',
+      value: `Chúc mừng! Bạn đạt **Lv. ${newLevel}** — bạn đã mạnh hơn!`,
+      inline: false,
+    });
+  }
+
+  embed.setFooter({ text: '⚔️ Tiếp tục khám phá để tìm kiếm thêm phần thưởng' });
+  return embed;
 }
 
 // ── Death embed ───────────────────────────────────────────────────────────
 export function buildDeathEmbed(playerName: string, enemyName: string, goldLeft: number): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(COLORS.death)
-    .setTitle('☠️ Bạn đã chết...')
+    .setTitle('☠️ Bạn Đã Ngã Xuống')
     .setDescription(
-      `**${playerName}** đã ngã xuống trước **${enemyName}**.\n\n` +
-      `🪙 **${goldLeft}** gold rơi lại tại nơi bạn tử trận.\n` +
-      `💀 Soul Shard nhận được như phần thưởng.\n\n` +
-      `*Dùng \`/start\` để hồi sinh và bắt đầu lại...*\n` +
-      `*Những kỹ năng đã học vẫn còn đó. Nhưng thế giới đã thay đổi.*`
-    );
+      `> *"Bóng tối nuốt chửng tất cả..."*\n\n` +
+      `**${playerName}** thất bại trước **${enemyName}**.`
+    )
+    .addFields(
+      { name: '🪙 Gold Rơi Lại', value: `**${goldLeft.toLocaleString()}** 🪙`, inline: true }
+    )
+    .setFooter({ text: 'Dùng /start để hồi sinh  ·  Kỹ năng đã học vẫn còn đó' });
 }
 
 // ── Explore embed ─────────────────────────────────────────────────────────
@@ -298,16 +368,17 @@ export function buildExploreEmbed(
     .setDescription(`*${ambiance}*`)
     .addFields(
       {
-        name: '👤 Explorer', value: playerName, inline: true
+        name: '👻 Di Sản',
+        value: legacyCount > 0 ? `**${legacyCount}** legacy đang chờ` : '*Không có*',
+        inline: true,
       },
       {
-        name: '👻 Di Sản', value: `${legacyCount} legacy trong zone này`, inline: true
-      },
-      {
-        name: '👑 Boss', value: bossSlain ? '✅ Đã bị tiêu diệt' : '⚠️ Vẫn còn đó', inline: true
+        name: '👑 Boss',
+        value: bossSlain ? '✅ Đã bị tiêu diệt' : '⚠️ Vẫn đang rình rập',
+        inline: true,
       }
     )
-    .setFooter({ text: 'Chọn hành động bên dưới' });
+    .setFooter({ text: `👤 ${playerName}  ·  Chọn hành động bên dưới` });
 }
 
 export function buildExploreButtons(userId: string, isSafe: boolean, hasBoss: boolean): ActionRowBuilder<ButtonBuilder> {

@@ -12,7 +12,7 @@ import {
   addPermanentStat, addKeepItemCharge, addExtraSkillSlot, improveDeathPenaltyReduction, addRebirthBlessing, addMerchantMercy
 } from '../systems/player';
 import { getCombatByUser, saveCombat, deleteCombat } from '../systems/combat';
-import { startCombatFlow, startCombatFlowWithEnemy, } from '../systems/combatFlow';
+import { startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow } from '../systems/combatFlow';
 import { canExplore, exploreCooldownRemaining, setExploreCooldown } from '../systems/economy';
 import { processVictoryRewards, processDeathPenalty } from '../systems/rewards';
 import {
@@ -37,6 +37,7 @@ import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { pickExploreEvent, runExploreEvent } from './exploreEvents';
 import { consumeBuff } from '../systems/consumables';
+import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -199,7 +200,7 @@ async function resumeCombat(
 }
 
 // ── Main explore menu ─────────────────────────────────────────────────────────
-async function showExploreMenu(
+export async function showExploreMenu(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string
 ): Promise<void> {
@@ -261,6 +262,11 @@ async function showExploreMenu(
       const zoneId = cid.replace(`ex_travel_${userId}_`, '');
       await handleTravel(interaction, userId, guildId, zoneId);
     }
+    // Village services
+    else if (cid === `vill_shop_${userId}`)   await handleVillageService(interaction, userId, guildId, 'shop');
+    else if (cid === `vill_smith_${userId}`)  await handleVillageService(interaction, userId, guildId, 'smith');
+    else if (cid === `vill_tavern_${userId}`) await handleVillageService(interaction, userId, guildId, 'tavern');
+    else if (cid === `vill_board_${userId}`)  await handleVillageService(interaction, userId, guildId, 'board');
   });
 
   collector.on('end', (_c, reason) => {
@@ -285,7 +291,19 @@ function buildExploreRows(
     new ButtonBuilder().setCustomId(`ex_zone_${userId}`)
       .setLabel('Zone').setEmoji('🗺️').setStyle(ButtonStyle.Secondary)
   );
-  return [row1];
+  if (!isSafe) return [row1];
+
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_shop_${userId}`)
+      .setLabel('Cửa hàng').setEmoji('🏪').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`vill_smith_${userId}`)
+      .setLabel('Lò rèn').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`vill_tavern_${userId}`)
+      .setLabel('Quán trọ').setEmoji('🍺').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`vill_board_${userId}`)
+      .setLabel('Nhiệm vụ').setEmoji('📋').setStyle(ButtonStyle.Secondary)
+  );
+  return [row1, row2];
 }
 
 // ── Zone picker ───────────────────────────────────────────────────────────────
@@ -353,18 +371,41 @@ async function handleTravel(
   }
   if (target.travelCost > 0) spendGold(userId, guildId, target.travelCost);
   setZone(userId, guildId, targetId);
+  await showExploreMenu(interaction, userId, guildId);
+}
 
-  await interaction.editReply({
-    embeds: [
-      new EmbedBuilder().setColor(target.color)
-        .setTitle(`${target.icon} Đã đến ${target.name}`)
-        .setDescription(`*${target.description}*`)
-        .addFields(
-          target.travelCost > 0 ? [{ name: '💸 Chi phí', value: `−${target.travelCost} 🪙`, inline: true }] : []
-        )
-    ],
-    components: []
-  });
+// ── Village services hub ──────────────────────────────────────────────────────
+async function handleVillageService(
+  interaction: ChatInputCommandInteraction,
+  userId: string, guildId: string,
+  service: 'shop' | 'smith' | 'tavern' | 'board'
+): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+
+  let backHandled = false;
+
+  const runService = async () => {
+    if (service === 'shop')   await showVillageShop(interaction, userId, guildId);
+    else if (service === 'smith')  await showVillageBlacksmith(interaction, userId, guildId);
+    else if (service === 'tavern') await showVillageTavern(interaction, userId, guildId);
+    else if (service === 'board')  await showVillageBoard(interaction, userId, guildId);
+  };
+
+  await runService();
+
+  // After service renders, wait for the back button
+  const msg = await interaction.fetchReply();
+  const back = await msg.awaitMessageComponent({
+    filter: i => i.user.id === userId && i.customId === `vill_back_${userId}`,
+    componentType: ComponentType.Button,
+    time: 60_000
+  }).catch(() => null);
+
+  if (back && !backHandled) {
+    backHandled = true;
+    await back.deferUpdate();
+    await showExploreMenu(interaction, userId, guildId);
+  }
 }
 
 // ── Rest ──────────────────────────────────────────────────────────────────────
@@ -423,6 +464,16 @@ async function handleSearch(
   const zone     = getZone(player.zone_id)!;
   const enemies  = getEnemiesForZone(player.zone_id);
   const legacies = getLegaciesInZone(guildId, player.zone_id, 5);
+
+  // 25% chance of group encounter when zone has ≥2 non-boss enemies
+  if (enemies.length >= 2 && Math.random() < 0.25) {
+    setExploreCooldown(userId, guildId);
+    const shuffled = [...enemies].sort(() => Math.random() - 0.5);
+    const count = (enemies.length >= 3 && Math.random() < 0.4) ? 3 : 2;
+    const groupIds = shuffled.slice(0, count).map(e => e.id);
+    await startGroupCombatFlow(interaction, userId, guildId, groupIds, handleVictory, handleDeath, handleFlee);
+    return;
+  }
 
   const hasCombat = enemies.length > 0;
   const hasLegacy = legacies.length > 0;
@@ -1455,19 +1506,41 @@ async function handleVictory(
   userId: string, guildId: string, player: any, enemy: any,
   state: any
 ): Promise<void> {
-  const rewards = processVictoryRewards(userId, guildId, player, enemy);
-  const bonus   = (enemy as any).combatBonus;
+  updatePlayerHpMp(userId, guildId, state.player_hp, state.player_mp);
 
+  // Group combat: reward for each enemy in the group
+  const groupEnemies: any[] | undefined = enemy._groupEnemies;
+  let rewards;
+  if (groupEnemies && groupEnemies.length > 0) {
+    const freshPlayer = { ...player };
+    const first = processVictoryRewards(userId, guildId, freshPlayer, groupEnemies[0]);
+    const combined = { ...first };
+    for (let i = 1; i < groupEnemies.length; i++) {
+      const r = processVictoryRewards(userId, guildId, freshPlayer, groupEnemies[i]);
+      combined.gold += r.gold;
+      combined.exp += r.exp;
+      combined.drops = [...combined.drops, ...r.drops];
+      if (r.leveledUp) { combined.leveledUp = true; combined.newLevel = r.newLevel; }
+    }
+    rewards = combined;
+  } else {
+    rewards = processVictoryRewards(userId, guildId, player, enemy);
+  }
+
+  const bonus = (enemy as any).combatBonus;
   if (bonus) {
     grantGold(userId, guildId, bonus.bonusGold);
     if (bonus.bonusItem) addItem(userId, guildId, bonus.bonusItem, 1);
     rewards.bonusDescription += '\n\n' + bonus.bonusDesc.replace('{gold}', String(bonus.bonusGold));
   }
 
-  updatePlayerHpMp(userId, guildId, state.player_hp, state.player_mp);
+  const displayName = groupEnemies
+    ? groupEnemies.map((e: any) => `${e.icon} ${e.name}`).join(', ')
+    : enemy.name;
+  const displayIcon = groupEnemies ? '⚔️' : enemy.icon;
 
   const embed = buildVictoryEmbed(
-    player.name, enemy.name, enemy.icon,
+    player.name, displayName, displayIcon,
     rewards.exp, rewards.gold, rewards.drops,
     rewards.leveledUp, rewards.newLevel
   );

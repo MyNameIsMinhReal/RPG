@@ -188,6 +188,8 @@ try { db.exec(`ALTER TABLE players ADD COLUMN crafting_level INTEGER DEFAULT 1`)
 // ── Stamina columns for active_combats ───────────────────────────────────
 try { db.exec(`ALTER TABLE active_combats ADD COLUMN player_stamina     INTEGER DEFAULT 100`); } catch {}
 try { db.exec(`ALTER TABLE active_combats ADD COLUMN player_max_stamina INTEGER DEFAULT 100`); } catch {}
+// ── Group combat column ───────────────────────────────────────────────────
+try { db.exec(`ALTER TABLE active_combats ADD COLUMN enemies_json TEXT DEFAULT NULL`); } catch {}
 
 // ── Wanted / factions / soul perks / pets ────────────────────────────────
 try { db.exec(`ALTER TABLE players ADD COLUMN wanted_level INTEGER DEFAULT 0`); } catch {}
@@ -223,6 +225,77 @@ try { db.exec(`ALTER TABLE players ADD COLUMN permanent_def_bonus INTEGER DEFAUL
 try { db.exec(`ALTER TABLE players ADD COLUMN permanent_max_hp_bonus INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE players ADD COLUMN permanent_max_mp_bonus INTEGER DEFAULT 0`); } catch {}
 
+// ── Class system ──────────────────────────────────────────────────────────
+try { db.exec(`ALTER TABLE players ADD COLUMN class TEXT DEFAULT 'warrior'`); } catch {}
+
+// ── Fishing / Gathering cooldowns ─────────────────────────────────────────
+try { db.exec(`ALTER TABLE players ADD COLUMN last_fish    INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN last_gather  INTEGER DEFAULT 0`); } catch {}
+
+// ── World boss ────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS world_boss_state (
+    guild_id    TEXT PRIMARY KEY,
+    boss_id     TEXT NOT NULL,
+    boss_name   TEXT NOT NULL,
+    boss_icon   TEXT NOT NULL,
+    current_hp  INTEGER NOT NULL,
+    max_hp      INTEGER NOT NULL,
+    spawned_at  INTEGER DEFAULT (unixepoch()),
+    expires_at  INTEGER NOT NULL,
+    is_alive    INTEGER DEFAULT 1
+  );
+  CREATE TABLE IF NOT EXISTS world_boss_damage (
+    guild_id    TEXT NOT NULL,
+    user_id     TEXT NOT NULL,
+    damage      INTEGER DEFAULT 0,
+    attacks     INTEGER DEFAULT 0,
+    last_attack INTEGER DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id)
+  );
+`);
+
+// ── Duel ──────────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS active_duels (
+    duel_id         TEXT PRIMARY KEY,
+    guild_id        TEXT NOT NULL,
+    challenger_id   TEXT NOT NULL,
+    target_id       TEXT NOT NULL,
+    challenger_hp   INTEGER NOT NULL,
+    target_hp       INTEGER NOT NULL,
+    challenger_max  INTEGER NOT NULL,
+    target_max      INTEGER NOT NULL,
+    turn_user       TEXT NOT NULL,
+    status          TEXT DEFAULT 'pending',
+    message_id      TEXT,
+    channel_id      TEXT,
+    created_at      INTEGER DEFAULT (unixepoch())
+  );
+`);
+
+
+// ── Equipment upgrades (blacksmith) ──────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS equipment_upgrades (
+    user_id       TEXT NOT NULL,
+    guild_id      TEXT NOT NULL,
+    slot          TEXT NOT NULL,
+    upgrade_level INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, guild_id, slot)
+  );
+`);
+
+// ── Village bounty claims ─────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS village_bounty_claims (
+    user_id  TEXT NOT NULL,
+    guild_id TEXT NOT NULL,
+    date     TEXT NOT NULL,
+    slot     INTEGER NOT NULL,
+    PRIMARY KEY (user_id, guild_id, date, slot)
+  );
+`);
 
 // ── Temporary player buffs from consumables ─────────────────────────────
 db.exec(`

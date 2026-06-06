@@ -19,7 +19,12 @@ import { data as craftData,     execute as execCraft     } from './commands/craf
 import { data as dailyData,     execute as execDaily     } from './commands/daily';
 import { data as rerollData,    execute as execReroll    } from './commands/reroll';
 import { data as achievementsData, execute as execAchievements } from './commands/achievements';
-import { data as worldData, execute as execWorld } from './commands/world';
+import { data as worldData,     execute as execWorld     } from './commands/world';
+import { data as prestigeData,  execute as execPrestige  } from './commands/prestige';
+import { data as fishData,      execute as execFish      } from './commands/fish';
+import { data as gatherData,    execute as execGather    } from './commands/gather';
+import { data as worldbossData, execute as execWorldboss } from './commands/worldboss';
+import { data as duelData,      execute as execDuel      } from './commands/duel';
 
 const client = new Client({
   intents: [
@@ -41,7 +46,12 @@ commands.set('craft',     execCraft);
 commands.set('daily',     execDaily);
 commands.set('reroll',    execReroll);
 commands.set('achievements', execAchievements);
-commands.set('world', execWorld);
+commands.set('world',     execWorld);
+commands.set('prestige',  execPrestige);
+commands.set('fish',      execFish);
+commands.set('gather',    execGather);
+commands.set('worldboss', execWorldboss);
+commands.set('duel',      execDuel);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive
@@ -109,6 +119,28 @@ const prefixAliases = new Map<string, string>([
   ['w', 'world'],
   ['world', 'world'],
   ['server', 'world'],
+
+  // Prestige
+  ['prestige', 'prestige'],
+  ['pr', 'prestige'],
+
+  // Fish
+  ['fish', 'fish'],
+  ['f', 'fish'],
+
+  // Gather
+  ['gather', 'gather'],
+  ['g', 'gather'],
+  ['mine', 'gather'],
+
+  // World Boss
+  ['worldboss', 'worldboss'],
+  ['wb', 'worldboss'],
+  ['boss', 'worldboss'],
+
+  // Duel
+  ['duel', 'duel'],
+  ['pvp', 'duel'],
 ]);
 
 const PREFIX_HELP = [

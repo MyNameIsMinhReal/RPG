@@ -237,6 +237,70 @@ export const ITEMS: Record<string, ItemDef> = {
     effect: { passiveOnly: true }, sellPrice: 120, buyPrice: 420
   },
 
+  // ── FISHING MATERIALS ───────────────────────────────────────────
+  common_fish: {
+    id: 'common_fish', name: 'Common Fish', icon: '🐟',
+    type: 'material', stackable: true,
+    description: 'Cá bình thường câu được từ suối.',
+    sellPrice: 8
+  },
+  silver_fish: {
+    id: 'silver_fish', name: 'Silver Fish', icon: '🐠',
+    type: 'material', stackable: true,
+    description: 'Cá bạc hiếm, vảy sáng lấp lánh.',
+    sellPrice: 22
+  },
+  golden_fish: {
+    id: 'golden_fish', name: 'Golden Fish', icon: '🐡',
+    type: 'material', stackable: true,
+    description: 'Cá vàng cực hiếm. May mắn mới câu được.',
+    sellPrice: 60
+  },
+  glowing_bait: {
+    id: 'glowing_bait', name: 'Glowing Bait', icon: '✨',
+    type: 'material', stackable: true,
+    description: 'Mồi câu phát sáng — tăng cơ hội cá hiếm.',
+    sellPrice: 15
+  },
+  mystery_shell: {
+    id: 'mystery_shell', name: 'Mystery Shell', icon: '🐚',
+    type: 'material', stackable: true,
+    description: 'Vỏ sò bí ẩn chứa năng lượng biển.',
+    sellPrice: 30
+  },
+
+  // ── GATHERING MATERIALS ──────────────────────────────────────────
+  iron_ore: {
+    id: 'iron_ore', name: 'Iron Ore', icon: '🪨',
+    type: 'material', stackable: true,
+    description: 'Quặng sắt khai thác từ vách đá.',
+    sellPrice: 12
+  },
+  mana_crystal: {
+    id: 'mana_crystal', name: 'Mana Crystal', icon: '💠',
+    type: 'material', stackable: true,
+    description: 'Tinh thể mana kết tinh từ đất ma pháp.',
+    sellPrice: 28
+  },
+  rare_herb: {
+    id: 'rare_herb', name: 'Rare Herb', icon: '🌺',
+    type: 'material', stackable: true,
+    description: 'Thảo dược quý hiếm chỉ mọc ở vùng đất linh.',
+    sellPrice: 20
+  },
+  glowing_mushroom: {
+    id: 'glowing_mushroom', name: 'Glowing Mushroom', icon: '🍄',
+    type: 'material', stackable: true,
+    description: 'Nấm phát sáng dùng cho các công thức ma pháp.',
+    sellPrice: 18
+  },
+  void_shard: {
+    id: 'void_shard', name: 'Void Shard', icon: '🌑',
+    type: 'material', stackable: true,
+    description: 'Mảnh hư không. Cực hiếm, tỏa ra khí lạnh.',
+    sellPrice: 75
+  },
+
   // ── MATERIALS ───────────────────────────────────────────────────
   rune_ink: {
     id: 'rune_ink', name: 'Rune Ink', icon: '🪄',

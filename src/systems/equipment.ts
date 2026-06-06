@@ -1,6 +1,8 @@
 import db from '../database/index';
 import { getEquipment, getSetBonuses, SLOT_ICONS, SLOT_LABELS, RARITY_LABELS, type EquipmentDef, type EquipSlot, type EquipStats, type EquipEffect } from '../data/equipment';
 
+export const UPGRADE_MAX = 5;
+
 export interface WornEntry {
   user_id: string; guild_id: string;
   slot: EquipSlot; equipment_id: string;
@@ -47,7 +49,7 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
     effects: [], activeSetNames: []
   };
 
-  // Individual item stats
+  // Individual item stats + blacksmith upgrade bonuses
   for (const entry of worn) {
     const def = getEquipment(entry.equipment_id);
     if (!def) continue;
@@ -63,6 +65,15 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
     if (def.effects) def.effects.forEach(e => {
       if (!stats.effects.includes(e)) stats.effects.push(e);
     });
+    // Blacksmith upgrade bonuses
+    const upRow = db.prepare('SELECT upgrade_level FROM equipment_upgrades WHERE user_id=? AND guild_id=? AND slot=?')
+      .get(userId, guildId, entry.slot) as any;
+    const upLv = upRow?.upgrade_level ?? 0;
+    if (upLv > 0) {
+      if (entry.slot === 'weapon') stats.atk! += upLv * 2;
+      else if (entry.slot === 'armor') stats.def! += upLv * 2;
+      else stats.atk! += upLv; // accessory: +1 ATK per level
+    }
   }
 
   // Set bonuses

@@ -48,6 +48,38 @@ export const ENEMIES: Record<string, EnemyDef> = {
     zones: ['forest'],
     lore: 'Cây cổ thụ ngàn năm bị hồn ma chiếm đóng, rễ cây trở thành nanh vuốt.'
   },
+  moss_lurker: {
+    id: 'moss_lurker', name: 'Moss Lurker', icon: '🌱', level: 2,
+    hp: 55, atk: 12, def: 4, expReward: 35, goldMin: 8, goldMax: 20,
+    drops: [{ itemId: 'healing_herb', chance: 50 }, { itemId: 'slime_core', chance: 35 }, { itemId: 'wood', chance: 30 }],
+    specialAttacks: ['toxic_spores', 'ambush'],
+    zones: ['forest'],
+    lore: 'Sinh vật rêu ẩn nấp trong bóng tối, chờ đợi để tấn công bất ngờ.'
+  },
+  thornhound: {
+    id: 'thornhound', name: 'Thornhound', icon: '🐾', level: 3,
+    hp: 70, atk: 17, def: 6, expReward: 55, goldMin: 12, goldMax: 28,
+    drops: [{ itemId: 'leather', chance: 50 }, { itemId: 'wolf_fang', chance: 35 }, { itemId: 'healing_herb', chance: 25 }],
+    specialAttacks: ['savage_bite', 'frenzy'],
+    zones: ['forest'],
+    lore: 'Chó rừng mọc gai từ da thịt, mỗi cú cắn để lại vết thương sâu.'
+  },
+  cursed_treant: {
+    id: 'cursed_treant', name: 'Cursed Treant', icon: '🌲', level: 4,
+    hp: 100, atk: 15, def: 14, expReward: 75, goldMin: 18, goldMax: 38,
+    drops: [{ itemId: 'ancient_bark', chance: 50 }, { itemId: 'wood', chance: 60 }, { itemId: 'healing_herb', chance: 20 }],
+    specialAttacks: ['thorn_lash', 'bark_regen'],
+    zones: ['forest'],
+    lore: 'Cây cổ thụ bị nguyền rủa, không thể chết nhưng cũng không thể sống.'
+  },
+  will_o_wisp: {
+    id: 'will_o_wisp', name: "Will-o'-Wisp", icon: '🔵', level: 2,
+    hp: 45, atk: 14, def: 3, expReward: 38, goldMin: 6, goldMax: 18,
+    drops: [{ itemId: 'mana_crystal', chance: 40 }, { itemId: 'ectoplasm', chance: 30 }],
+    specialAttacks: ['soul_flicker', 'bewitch'],
+    zones: ['forest'],
+    lore: 'Đốm lửa ma quái dẫn đường lạc, hút cạn linh hồn kẻ theo đuổi.'
+  },
   ancient_oak: {
     id: 'ancient_oak', name: 'Ancient Oak', icon: '🌳', level: 5,
     hp: 200, atk: 22, def: 15, expReward: 200, goldMin: 80, goldMax: 120,
@@ -81,6 +113,30 @@ export const ENEMIES: Record<string, EnemyDef> = {
     zones: ['shrine'],
     lore: 'Bóng ma không đầu lang thang, tìm kiếm linh hồn để hoàn chỉnh bản thân.'
   },
+  bone_mage: {
+    id: 'bone_mage', name: 'Bone Mage', icon: '🧙', level: 5,
+    hp: 85, atk: 22, def: 7, expReward: 95, goldMin: 22, goldMax: 48,
+    drops: [{ itemId: 'bone_shard', chance: 55 }, { itemId: 'ancient_bone', chance: 30 }, { itemId: 'mana_crystal', chance: 20 }],
+    specialAttacks: ['bone_shards', 'death_curse'],
+    zones: ['shrine'],
+    lore: 'Pháp sư xương chỉ còn lại bộ cốt, điều khiển xương tấn công từ xa.'
+  },
+  spirit_knight: {
+    id: 'spirit_knight', name: 'Spirit Knight', icon: '⚔️', level: 5,
+    hp: 110, atk: 20, def: 15, expReward: 100, goldMin: 25, goldMax: 55,
+    drops: [{ itemId: 'ancient_bone', chance: 35 }, { itemId: 'silver_ore', chance: 25 }, { itemId: 'bone_shard', chance: 40 }],
+    specialAttacks: ['spectral_slash', 'banish'],
+    zones: ['shrine'],
+    lore: 'Chiến binh linh hồn còn mang vũ khí, trung thành bảo vệ đền ngay cả sau khi chết.'
+  },
+  cursed_idol: {
+    id: 'cursed_idol', name: 'Cursed Idol', icon: '🗿', level: 4,
+    hp: 95, atk: 19, def: 10, expReward: 80, goldMin: 18, goldMax: 42,
+    drops: [{ itemId: 'ectoplasm', chance: 45 }, { itemId: 'mana_crystal', chance: 30 }, { itemId: 'frost_shard', chance: 20 }],
+    specialAttacks: ['idol_curse', 'hex_bolt'],
+    zones: ['shrine'],
+    lore: 'Tượng thờ bị nhiễm tà khí, phóng ra các tia nguyền rủa vào kẻ xâm phạm.'
+  },
   shrine_guardian: {
     id: 'shrine_guardian', name: 'Shrine Guardian', icon: '⛩️', level: 6,
     hp: 280, atk: 28, def: 20, expReward: 350, goldMin: 120, goldMax: 200,
@@ -111,6 +167,30 @@ export const ENEMIES: Record<string, EnemyDef> = {
     specialAttacks: ['blood_drain', 'screech'],
     zones: ['mines'],
     lore: 'Sống trong bóng tối tuyệt đối, hút máu để duy trì sự bất tử.'
+  },
+  lava_crab: {
+    id: 'lava_crab', name: 'Lava Crab', icon: '🦀', level: 6,
+    hp: 120, atk: 24, def: 12, expReward: 130, goldMin: 28, goldMax: 55,
+    drops: [{ itemId: 'burning_core', chance: 45 }, { itemId: 'iron_ore', chance: 40 }, { itemId: 'stone', chance: 35 }],
+    specialAttacks: ['magma_claw', 'heat_burst'],
+    zones: ['mines'],
+    lore: 'Cua dung nham sống trong lõi núi lửa, mai giáp nóng đỏ rực như than hồng.'
+  },
+  crystal_spider: {
+    id: 'crystal_spider', name: 'Crystal Spider', icon: '🕷️', level: 7,
+    hp: 105, atk: 28, def: 8, expReward: 145, goldMin: 32, goldMax: 65,
+    drops: [{ itemId: 'shadow_essence', chance: 40 }, { itemId: 'iron_ore', chance: 30 }, { itemId: 'black_iron', chance: 15 }],
+    specialAttacks: ['crystal_web', 'venom_inject'],
+    zones: ['mines'],
+    lore: 'Nhện pha lê dệt tơ cứng như thép, nọc độc làm tê liệt toàn thân.'
+  },
+  iron_sentinel: {
+    id: 'iron_sentinel', name: 'Iron Sentinel', icon: '🤖', level: 8,
+    hp: 150, atk: 32, def: 20, expReward: 170, goldMin: 40, goldMax: 75,
+    drops: [{ itemId: 'black_iron', chance: 50 }, { itemId: 'iron_ore', chance: 60 }, { itemId: 'troll_hide', chance: 20 }],
+    specialAttacks: ['iron_crush', 'fortress_stance'],
+    zones: ['mines'],
+    lore: 'Bộ giáp sắt được pháp thuật ban linh hồn, bảo vệ hầm mỏ vĩnh cửu.'
   },
   mine_colossus: {
     id: 'mine_colossus', name: 'Mine Colossus', icon: '🪨', level: 9,
@@ -145,6 +225,30 @@ export const ENEMIES: Record<string, EnemyDef> = {
     specialAttacks: ['skill_echo', 'mind_crush'],
     zones: ['wastes'],
     lore: 'Phản chiếu nỗi sợ hãi của người đối diện, bắt chước từng động tác một cách hoàn hảo.'
+  },
+  mirage_hunter: {
+    id: 'mirage_hunter', name: 'Mirage Hunter', icon: '👤', level: 9,
+    hp: 170, atk: 36, def: 13, expReward: 210, goldMin: 52, goldMax: 105,
+    drops: [{ itemId: 'void_essence', chance: 45 }, { itemId: 'shadow_essence', chance: 35 }, { itemId: 'abyss_core', chance: 12 }],
+    specialAttacks: ['phantom_shot', 'mirror_split'],
+    zones: ['wastes'],
+    lore: 'Thợ săn ảo ảnh, phân thân để tấn công từ mọi hướng cùng lúc.'
+  },
+  mind_leech: {
+    id: 'mind_leech', name: 'Mind Leech', icon: '🧠', level: 10,
+    hp: 190, atk: 38, def: 15, expReward: 260, goldMin: 60, goldMax: 115,
+    drops: [{ itemId: 'broken_soul', chance: 30 }, { itemId: 'void_essence', chance: 40 }, { itemId: 'demon_seal', chance: 15 }],
+    specialAttacks: ['psychic_drain', 'thought_devour'],
+    zones: ['wastes'],
+    lore: 'Ký sinh trùng tâm trí, bám vào não bộ và hút cạn ký ức cùng linh lực.'
+  },
+  abyss_fiend: {
+    id: 'abyss_fiend', name: 'Abyss Fiend', icon: '😈', level: 12,
+    hp: 240, atk: 44, def: 17, expReward: 360, goldMin: 75, goldMax: 140,
+    drops: [{ itemId: 'abyss_core', chance: 45 }, { itemId: 'demon_horn', chance: 25 }, { itemId: 'cursed_blood', chance: 18 }],
+    specialAttacks: ['abyss_strike', 'doom_call'],
+    zones: ['wastes'],
+    lore: 'Quỷ vực sâu tràn ra từ các khe nứt của thực tại, mang theo hơi thở huỷ diệt.'
   },
   the_forgotten: {
     id: 'the_forgotten', name: 'The Forgotten', icon: '❓', level: 14,

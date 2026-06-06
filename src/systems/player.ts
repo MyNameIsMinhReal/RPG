@@ -2,6 +2,7 @@ import db from '../database/index';
 import { expNext } from '../utils/format';
 import { SKILLS, getSkill } from '../data/skills';
 import { getEquipmentStats } from './equipment';
+import { CLASSES, getClass } from '../data/classes';
 import type { PlayerRow } from '../utils/embeds';
 
 export interface SkillPoolEntry { skill_id: string; learned_at: number; }
@@ -14,12 +15,19 @@ export function getPlayer(userId: string, guildId: string): PlayerRow | undefine
     .get(userId, guildId) as unknown as PlayerRow | undefined;
 }
 
-export function createPlayer(userId: string, guildId: string, name: string): PlayerRow {
+export function createPlayer(userId: string, guildId: string, name: string, classId = 'warrior'): PlayerRow {
+  const cls = CLASSES[classId] ?? CLASSES.warrior;
   db.prepare(`
     INSERT OR REPLACE INTO players
-    (user_id, guild_id, name, alive, level, exp, exp_next, hp, max_hp, mp, max_mp, atk, def, gold, soul_shards, zone_id, deaths, kills)
-    VALUES (?, ?, ?, 1, 1, 0, 100, 100, 100, 50, 50, 10, 5, 50, 0, 'village', 0, 0)
-  `).run(userId, guildId, name);
+    (user_id, guild_id, name, alive, level, exp, exp_next, hp, max_hp, mp, max_mp, atk, def, gold, soul_shards, zone_id, deaths, kills, class)
+    VALUES (?, ?, ?, 1, 1, 0, 100, ?, ?, ?, ?, ?, ?, 50, 0, 'village', 0, 0, ?)
+  `).run(
+    userId, guildId, name,
+    100 + cls.hpBonus, 100 + cls.hpBonus,
+    50  + cls.mpBonus, 50  + cls.mpBonus,
+    10  + cls.atkBonus, 5 + cls.defBonus,
+    classId
+  );
   return getPlayer(userId, guildId)!;
 }
 
@@ -31,6 +39,11 @@ export function resetPlayer(userId: string, guildId: string): void {
   const pHp  = current?.permanent_max_hp_bonus ?? 0;
   const pMp  = current?.permanent_max_mp_bonus ?? 0;
   const blessing = current?.rebirth_blessing ? 1 : 0;
+  const cls = getClass(current?.class ?? 'warrior') ?? CLASSES.warrior;
+  const baseHp  = 100 + pHp  + blessing * 20 + cls.hpBonus;
+  const baseMp  = 50  + pMp  + blessing * 10 + cls.mpBonus;
+  const baseAtk = 10  + pAtk + blessing * 2  + cls.atkBonus;
+  const baseDef = 5   + pDef + blessing      + cls.defBonus;
   db.prepare(`
     UPDATE players SET
       alive = 1, level = 1, exp = 0, exp_next = 100,
@@ -38,11 +51,14 @@ export function resetPlayer(userId: string, guildId: string): void {
       atk = ?, def = ?, gold = ?, zone_id = 'village', kills = 0,
       rebirth_blessing = MAX(0, COALESCE(rebirth_blessing,0) - ?)
     WHERE user_id = ? AND guild_id = ?
-  `).run(100 + pHp + blessing * 20, 100 + pHp + blessing * 20, 50 + pMp + blessing * 10, 50 + pMp + blessing * 10, 10 + pAtk + blessing * 2, 5 + pDef + blessing, 50 + blessing * 50, blessing, userId, guildId);
+  `).run(baseHp, baseHp, baseMp, baseMp, baseAtk, baseDef, 50 + blessing * 50, blessing, userId, guildId);
   // Clear loadout (pool is kept)
   db.prepare('DELETE FROM skill_loadout WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
-  // Clear inventory
-  db.prepare('DELETE FROM inventory WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
+  // Clear inventory but KEEP items currently equipped in equipment_worn
+  db.prepare(`
+    DELETE FROM inventory WHERE user_id = ? AND guild_id = ?
+    AND item_id NOT IN (SELECT equipment_id FROM equipment_worn WHERE user_id = ? AND guild_id = ?)
+  `).run(userId, guildId, userId, guildId);
 }
 
 // ── Stat helpers ──────────────────────────────────────────────────────────
@@ -344,6 +360,12 @@ export function addMerchantMercy(userId: string, guildId: string, amount = 1): n
   db.prepare('UPDATE players SET merchant_mercy = COALESCE(merchant_mercy,0) + ? WHERE user_id=? AND guild_id=?')
     .run(amount, userId, guildId);
   return (getPlayer(userId, guildId)?.merchant_mercy ?? 0);
+}
+
+export function getClassPassives(userId: string, guildId: string): { dodgeBonus: number; skillDmgMult: number; classId: string } {
+  const player = getPlayer(userId, guildId) as any;
+  const cls = getClass(player?.class ?? 'warrior') ?? CLASSES.warrior;
+  return { dodgeBonus: cls.dodgeBonus, skillDmgMult: cls.skillDmgMult, classId: cls.id };
 }
 
 export function addPet(userId: string, guildId: string, petId: string): boolean {
