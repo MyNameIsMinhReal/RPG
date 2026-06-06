@@ -234,6 +234,7 @@ class PrefixInteractionAdapter {
   public readonly commandName: string;
   public readonly user;
   public readonly guildId;
+  public readonly channelId: string;
   public readonly guild;
   public readonly client;
   public readonly channel;
@@ -245,6 +246,7 @@ class PrefixInteractionAdapter {
     this.commandName = commandName;
     this.user = sourceMessage.author;
     this.guildId = sourceMessage.guildId;
+    this.channelId = sourceMessage.channelId;
     this.guild = sourceMessage.guild;
     this.client = sourceMessage.client;
     this.channel = sourceMessage.channel;

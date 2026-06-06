@@ -39,11 +39,12 @@ export function saveCombat(state: CombatState): void {
      player_stamina, player_max_stamina, enemies_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    state.message_id, state.channel_id, state.user_id, state.guild_id,
-    state.enemy_id, state.enemy_name,
-    state.enemy_hp, state.enemy_max_hp, state.enemy_atk, state.enemy_def,
-    state.player_hp, state.player_max_hp, state.player_mp, state.player_max_mp,
-    state.turn, state.is_defending, state.active_effects, state.combat_log,
+    state.message_id ?? '',    state.channel_id ?? '',  state.user_id ?? '',  state.guild_id ?? '',
+    state.enemy_id ?? '',      state.enemy_name ?? '',
+    state.enemy_hp ?? 0,       state.enemy_max_hp ?? 0, state.enemy_atk ?? 0, state.enemy_def ?? 0,
+    state.player_hp ?? 0,      state.player_max_hp ?? 0, state.player_mp ?? 0, state.player_max_mp ?? 0,
+    state.turn ?? 1,           state.is_defending ?? 0,
+    state.active_effects ?? '[]', state.combat_log ?? '[]',
     state.player_stamina ?? 100, state.player_max_stamina ?? 100,
     state.enemies_json ?? null
   );
