@@ -24,6 +24,7 @@ import { execute as execWorldboss } from './commands/worldboss';
 import { execute as execDuel      } from './commands/duel';
 import { execute as execGuild     } from './commands/guild';
 import { execute as execPet       } from './commands/pet';
+import { execute as execChapter   } from './commands/chapter';
 
 const client = new Client({
   intents: [
@@ -50,6 +51,7 @@ commands.set('worldboss', execWorldboss);
 commands.set('duel',      execDuel);
 commands.set('guild',     execGuild);
 commands.set('pet',       execPet);
+commands.set('chapter',   execChapter);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive
@@ -133,6 +135,11 @@ const prefixAliases = new Map<string, string>([
 
   // Pet
   ['pet', 'pet'],
+
+  // Chapter / story
+  ['chapter', 'chapter'],
+  ['story', 'chapter'],
+  ['ch', 'chapter'],
 ]);
 
 const PREFIX_HELP = [

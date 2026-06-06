@@ -37,6 +37,7 @@ import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { pickExploreEvent, runExploreEvent } from './exploreEvents';
 import { updatePityCounters } from '../systems/pity';
+import { incrementChapterObjective } from '../systems/chapter';
 import { consumeBuff } from '../systems/consumables';
 import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
 import { doGather } from './gather';
@@ -525,6 +526,7 @@ async function handleSearch(
 
   const event = pickExploreEvent({ player, guildId, hasCombat, hasLegacy });
   updatePityCounters(userId, guildId, event);
+  incrementChapterObjective(userId, guildId, 'explore_zone', { zoneId: zone.id });
 
   setExploreCooldown(userId, guildId);
 
@@ -1607,6 +1609,18 @@ async function handleVictory(
   const achievementMessages = awardAchievements(userId, guildId);
   if (achievementMessages.length) {
     embed.addFields({ name: '🏆 Thành tựu mới', value: achievementMessages.join('\n'), inline: false });
+  }
+
+  // Chapter objective hooks
+  const killEnemy = groupEnemies ? null : enemy;
+  if (killEnemy) {
+    if (killEnemy.boss) incrementChapterObjective(userId, guildId, 'kill_boss', { enemyId: killEnemy.id });
+    if (killEnemy.id === 'bandit') incrementChapterObjective(userId, guildId, 'rescue_villager', {});
+    incrementChapterObjective(userId, guildId, 'kill_in_zone', { zoneId: player.zone_id });
+  } else if (groupEnemies) {
+    for (let i = 0; i < groupEnemies.length; i++) {
+      incrementChapterObjective(userId, guildId, 'kill_in_zone', { zoneId: player.zone_id });
+    }
   }
 
   const { embed: victoryImg, files: victoryFiles } = withImage(embed, 'victory');

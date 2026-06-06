@@ -172,6 +172,26 @@ db.exec(`
 `);
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS chapter_state (
+    user_id         TEXT NOT NULL,
+    guild_id        TEXT NOT NULL,
+    current_chapter INTEGER DEFAULT 1,
+    PRIMARY KEY (user_id, guild_id)
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chapter_progress (
+    user_id    TEXT NOT NULL,
+    guild_id   TEXT NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    obj_id     TEXT NOT NULL,
+    progress   INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, guild_id, chapter_id, obj_id)
+  );
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS explore_pity (
     user_id  TEXT NOT NULL,
     guild_id TEXT NOT NULL,

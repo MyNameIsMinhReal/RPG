@@ -50,7 +50,12 @@ export const TITLES: TitleDef[] = [
     icon: '🤝',
     description: 'Thương nhân điêu luyện của thế giới ngầm.',
     fromAchievement: 'trader'
-  }
+  },
+  // Chapter titles — granted directly, not via achievement
+  { id: 'pathfinder',  name: 'Người Mở Đường', icon: '🌲', description: 'Hoàn thành Chương 1 — đã xua tan bóng tối khỏi rừng.', fromAchievement: '' },
+  { id: 'ruin_seeker', name: 'Nhà Khám Cổ Tích', icon: '⛩️', description: 'Hoàn thành Chương 2 — đã giải mã bí mật đền cổ.', fromAchievement: '' },
+  { id: 'mine_lord',   name: 'Chúa Hầm Mỏ', icon: '⛏️', description: 'Hoàn thành Chương 3 — đã phá vỡ lời nguyền hầm mỏ.', fromAchievement: '' },
+  { id: 'world_ender', name: 'Kẻ Tận Thế', icon: '🌌', description: 'Hoàn thành Chương 4 — đã đánh bại thực thể cuối cùng.', fromAchievement: '' },
 ];
 
 export function getTitleByAchievement(achievementId: string): TitleDef | undefined {
