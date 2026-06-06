@@ -1728,10 +1728,11 @@ async function showTrap(
     await (btn?.deferUpdate() ?? Promise.resolve());
 
     if (!btn || btn.customId === `trap_avoid_${userId}`) {
-      await interaction.editReply({
+      const avoidReply = await interaction.editReply({
         embeds: [new EmbedBuilder().setColor(COLORS.success).setDescription('✅ Bạn cẩn thận bước qua bẫy an toàn.')],
-        components: []
+        components: buildContinueExploreRow(userId)
       });
+      attachContinueExploreHandler(avoidReply, interaction, userId, guildId);
       return;
     }
     // Brave: take reduced damage
