@@ -56,6 +56,8 @@ export const TITLES: TitleDef[] = [
   { id: 'ruin_seeker', name: 'Nhà Khám Cổ Tích', icon: '⛩️', description: 'Hoàn thành Chương 2 — đã giải mã bí mật đền cổ.', fromAchievement: '' },
   { id: 'mine_lord',   name: 'Chúa Hầm Mỏ', icon: '⛏️', description: 'Hoàn thành Chương 3 — đã phá vỡ lời nguyền hầm mỏ.', fromAchievement: '' },
   { id: 'world_ender', name: 'Kẻ Tận Thế', icon: '🌌', description: 'Hoàn thành Chương 4 — đã đánh bại thực thể cuối cùng.', fromAchievement: '' },
+  // Event chain titles
+  { id: 'soul_guide', name: 'Người Dẫn Lối Linh Hồn', icon: '🕯️', description: 'Đã dẫn linh hồn đứa trẻ về nơi an nghỉ.', fromAchievement: '' },
 ];
 
 export function getTitleByAchievement(achievementId: string): TitleDef | undefined {
