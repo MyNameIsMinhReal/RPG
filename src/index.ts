@@ -25,6 +25,8 @@ import { execute as execFish      } from './commands/fish';
 import { execute as execGather    } from './commands/gather';
 import { execute as execWorldboss } from './commands/worldboss';
 import { execute as execDuel      } from './commands/duel';
+import { execute as execGuild     } from './commands/guild';
+import { execute as execPet       } from './commands/pet';
 
 const client = new Client({
   intents: [
@@ -52,6 +54,8 @@ commands.set('fish',      execFish);
 commands.set('gather',    execGather);
 commands.set('worldboss', execWorldboss);
 commands.set('duel',      execDuel);
+commands.set('guild',     execGuild);
+commands.set('pet',       execPet);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive
@@ -141,6 +145,14 @@ const prefixAliases = new Map<string, string>([
   // Duel
   ['duel', 'duel'],
   ['pvp', 'duel'],
+
+  // Guild
+  ['guild', 'guild'],
+  ['clan', 'guild'],
+  ['gc', 'guild'],
+
+  // Pet
+  ['pet', 'pet'],
 ]);
 
 const PREFIX_HELP = [

@@ -16,6 +16,8 @@ import { data as gatherData    } from './commands/gather';
 import { data as duelData      } from './commands/duel';
 import { data as worldbossData } from './commands/worldboss';
 import { data as fishData      } from './commands/fish';
+import { data as guildData     } from './commands/guild';
+import { data as petData       } from './commands/pet';
 
 const commands = [
   startData,
@@ -34,6 +36,8 @@ const commands = [
   duelData,
   worldbossData,
   fishData,
+  guildData,
+  petData,
 ].map(c => c.toJSON());
 const token    = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;

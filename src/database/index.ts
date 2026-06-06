@@ -310,3 +310,78 @@ db.exec(`
     PRIMARY KEY (user_id, guild_id, buff_key)
   );
 `);
+
+// ── Clan (in-game guild) system ──────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS clans (
+    clan_id      TEXT PRIMARY KEY,
+    discord_gid  TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    tag          TEXT NOT NULL,
+    owner_id     TEXT NOT NULL,
+    description  TEXT DEFAULT '',
+    level        INTEGER DEFAULT 1,
+    exp          INTEGER DEFAULT 0,
+    treasury     INTEGER DEFAULT 0,
+    created_at   INTEGER DEFAULT (unixepoch()),
+    UNIQUE(discord_gid, name),
+    UNIQUE(discord_gid, tag)
+  );
+
+  CREATE TABLE IF NOT EXISTS clan_members (
+    clan_id      TEXT NOT NULL,
+    user_id      TEXT NOT NULL,
+    discord_gid  TEXT NOT NULL,
+    rank         TEXT DEFAULT 'member',
+    contribution INTEGER DEFAULT 0,
+    joined_at    INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (clan_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS clan_buffs (
+    clan_id      TEXT NOT NULL,
+    buff_type    TEXT NOT NULL,
+    value        INTEGER DEFAULT 0,
+    expires_at   INTEGER NOT NULL,
+    PRIMARY KEY (clan_id, buff_type)
+  );
+
+  CREATE TABLE IF NOT EXISTS clan_wars (
+    war_id           TEXT PRIMARY KEY,
+    discord_gid      TEXT NOT NULL,
+    attacker_clan_id TEXT NOT NULL,
+    defender_clan_id TEXT NOT NULL,
+    attacker_score   INTEGER DEFAULT 0,
+    defender_score   INTEGER DEFAULT 0,
+    status           TEXT DEFAULT 'active',
+    winner_clan_id   TEXT,
+    started_at       INTEGER DEFAULT (unixepoch()),
+    ends_at          INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS clan_stocks (
+    clan_id         TEXT PRIMARY KEY,
+    total_shares    INTEGER DEFAULT 1000,
+    available_shares INTEGER DEFAULT 800,
+    price           INTEGER DEFAULT 10,
+    last_updated    INTEGER DEFAULT (unixepoch())
+  );
+
+  CREATE TABLE IF NOT EXISTS stock_holdings (
+    user_id      TEXT NOT NULL,
+    discord_gid  TEXT NOT NULL,
+    clan_id      TEXT NOT NULL,
+    shares       INTEGER DEFAULT 0,
+    avg_cost     INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, discord_gid, clan_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS stock_history (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    clan_id     TEXT NOT NULL,
+    price       INTEGER NOT NULL,
+    recorded_at INTEGER DEFAULT (unixepoch())
+  );
+`);
+
+try { db.exec(`ALTER TABLE players ADD COLUMN active_pet TEXT DEFAULT NULL`); } catch {}

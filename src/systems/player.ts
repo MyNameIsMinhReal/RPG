@@ -81,6 +81,44 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
   bonusMaxHp += eq.maxHp ?? 0;
   bonusMaxMp += eq.maxMp ?? 0;
 
+  // Pet passive bonus
+  const activePetId = (player as any).active_pet as string | null;
+  if (activePetId) {
+    const petRow = db.prepare('SELECT level FROM player_pets WHERE user_id=? AND guild_id=? AND pet_id=?')
+      .get(player.user_id, player.guild_id, activePetId) as { level: number } | undefined;
+    if (petRow) {
+      const { getPet, petPassiveValue } = require('../data/pets') as typeof import('../data/pets');
+      const petDef = getPet(activePetId);
+      if (petDef) {
+        const pct = petPassiveValue(petDef, petRow.level) / 100;
+        switch (petDef.passiveType) {
+          case 'atk_pct': bonusAtk   += Math.floor(player.atk    * pct); break;
+          case 'def_pct': bonusDef   += Math.floor(player.def    * pct); break;
+          case 'hp_pct':  bonusMaxHp += Math.floor(player.max_hp * pct); break;
+          case 'mp_pct':  bonusMaxMp += Math.floor(player.max_mp * pct); break;
+        }
+      }
+    }
+  }
+
+  // Guild buff bonus (atk / def / hp / mp)
+  const membership = db.prepare('SELECT clan_id FROM clan_members WHERE user_id=? AND discord_gid=?')
+    .get(player.user_id, player.guild_id) as { clan_id: string } | undefined;
+  if (membership) {
+    const now   = Math.floor(Date.now() / 1000);
+    const buffs = db.prepare('SELECT buff_type, value FROM clan_buffs WHERE clan_id=? AND expires_at>?')
+      .all(membership.clan_id, now) as { buff_type: string; value: number }[];
+    for (const b of buffs) {
+      const pct = b.value / 100;
+      switch (b.buff_type) {
+        case 'atk':  bonusAtk   += Math.floor(player.atk    * pct); break;
+        case 'def':  bonusDef   += Math.floor(player.def    * pct); break;
+        case 'hp':   bonusMaxHp += Math.floor(player.max_hp * pct); break;
+        case 'mp':   bonusMaxMp += Math.floor(player.max_mp * pct); break;
+      }
+    }
+  }
+
   return {
     ...player,
     atk:    player.atk    + bonusAtk,
