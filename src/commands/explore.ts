@@ -36,6 +36,7 @@ import { getSkill } from '../data/skills';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { pickExploreEvent, runExploreEvent } from './exploreEvents';
+import { updatePityCounters } from '../systems/pity';
 import { consumeBuff } from '../systems/consumables';
 import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
 import { doGather } from './gather';
@@ -523,6 +524,7 @@ async function handleSearch(
   const hasLegacy = legacies.length > 0;
 
   const event = pickExploreEvent({ player, guildId, hasCombat, hasLegacy });
+  updatePityCounters(userId, guildId, event);
 
   setExploreCooldown(userId, guildId);
 

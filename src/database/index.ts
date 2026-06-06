@@ -171,6 +171,16 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS explore_pity (
+    user_id  TEXT NOT NULL,
+    guild_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    counter  INTEGER DEFAULT 0,
+    PRIMARY KEY (user_id, guild_id, event_id)
+  );
+`);
+
 // ── Crafting tables ───────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS unlocked_recipes (

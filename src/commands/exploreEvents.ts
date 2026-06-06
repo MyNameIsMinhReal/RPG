@@ -37,6 +37,7 @@ import { withImage } from '../utils/eventImages';
 import { getBuff, consumeBuff } from '../systems/consumables';
 import { doFish } from './fish';
 import { onlyUser } from '../utils/collectors';
+import { getPityCounters, getPityBonus, PITY_EVENTS } from '../systems/pity';
 
 export type ExploreEventType =
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -110,7 +111,9 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
   const goodBoost = detection ? 2 : lucky ? 1 : 0;
   const badPenalty = detection ? 0.45 : 1;
 
-  const table: Array<[ExploreEventType, number]> = [
+  const pity = getPityCounters(player.user_id, guildId);
+
+  const base: Array<[ExploreEventType, number]> = [
     ['combat', hasCombat ? 15 : 0],
     ['ambush', hasCombat ? Math.floor(7 * badPenalty) : 0],
     ['legacy', hasLegacy ? 6 : 0],
@@ -161,6 +164,14 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['conditional_miniboss', hasCombat && (wanted >= 3 || rep <= -60 || deaths >= 3 || robberyCount >= 2) ? 4 : 0],
     ['fishing_spot', ['forest', 'shrine', 'mines'].includes(player.zone_id) ? 5 : 0],
   ];
+
+  // Apply pity bonus to unconditional events that haven't appeared in a while.
+  const table = base.map(([event, w]): [ExploreEventType, number] => {
+    if (w > 0 && PITY_EVENTS.has(event)) {
+      return [event, w + getPityBonus(pity.get(event) ?? 0)];
+    }
+    return [event, w];
+  });
 
   const total = table.reduce((sum, [, weight]) => sum + Math.max(0, weight), 0);
   let roll = randInt(1, total || 1);
