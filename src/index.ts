@@ -326,6 +326,8 @@ function getPrefixUsage(commandName: string): string | null {
       return 'Cách dùng: `rpg u <item_id>`\nVí dụ: `rpg u healing_potion`';
     case 'trade':
       return 'Cách dùng: `rpg t @user <gold>`\nVí dụ: `rpg t @Minh 100`';
+    case 'duel':
+      return 'Cách dùng: `rpg duel @user`\nVí dụ: `rpg duel @Minh`';
     default:
       return null;
   }
@@ -342,6 +344,11 @@ function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): s
     const hasUser = message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
     const hasAmount = /(?:^|\s)\d+(?:\s|$)/.test(args);
     if (!hasUser || !hasAmount) return getPrefixUsage('trade');
+  }
+
+  if (parsed.commandName === 'duel') {
+    const hasUser = message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
+    if (!hasUser) return getPrefixUsage('duel');
   }
 
   return null;
