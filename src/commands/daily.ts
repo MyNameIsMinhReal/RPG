@@ -49,10 +49,9 @@ export function getOrCreateDaily(userId: string, guildId: string): DailyRow {
 
 export function incrementDaily(userId: string, guildId: string, field: 'explore_count' | 'kill_count' | 'potion_used'): void {
   const date = todayStr();
-  db.prepare(`
-    INSERT INTO daily_quests (user_id, guild_id, date) VALUES (?, ?, ?)
-    ON CONFLICT(user_id, guild_id, date) DO UPDATE SET ${field} = ${field} + 1
-  `).run(userId, guildId, date);
+  getOrCreateDaily(userId, guildId);
+  db.prepare(`UPDATE daily_quests SET ${field} = ${field} + 1 WHERE user_id=? AND guild_id=? AND date=?`)
+    .run(userId, guildId, date);
 }
 
 // ── Rewards ────────────────────────────────────────────────────────────────
