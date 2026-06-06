@@ -79,7 +79,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const qty = caught.id === 'common_fish' && Math.random() < 0.3 ? 2 : 1;
   addItem(userId, guildId, caught.id, qty);
 
-  const isRare = caught.id === 'golden_fish' || caught.id === 'void_shard';
+  const isRare = caught.id === 'golden_fish' || caught.id === 'glowing_bait';
 
   await interaction.editReply({
     embeds: [new EmbedBuilder()

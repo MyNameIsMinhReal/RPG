@@ -9,22 +9,22 @@ import {
   User
 } from 'discord.js';
 
-import { data as startData,     execute as execStart     } from './commands/start';
-import { data as profileData,   execute as execProfile   } from './commands/profile';
-import { data as exploreData,   execute as execExplore   } from './commands/explore';
-import { data as inventoryData, execute as execInventory } from './commands/inventory';
-import { data as useData,       execute as execUse       } from './commands/use';
-import { data as tradeData,     execute as execTrade     } from './commands/trade';
-import { data as craftData,     execute as execCraft     } from './commands/craft';
-import { data as dailyData,     execute as execDaily     } from './commands/daily';
-import { data as rerollData,    execute as execReroll    } from './commands/reroll';
-import { data as achievementsData, execute as execAchievements } from './commands/achievements';
-import { data as worldData,     execute as execWorld     } from './commands/world';
-import { data as prestigeData,  execute as execPrestige  } from './commands/prestige';
-import { data as fishData,      execute as execFish      } from './commands/fish';
-import { data as gatherData,    execute as execGather    } from './commands/gather';
-import { data as worldbossData, execute as execWorldboss } from './commands/worldboss';
-import { data as duelData,      execute as execDuel      } from './commands/duel';
+import { execute as execStart     } from './commands/start';
+import { execute as execProfile   } from './commands/profile';
+import { execute as execExplore   } from './commands/explore';
+import { execute as execInventory } from './commands/inventory';
+import { execute as execUse       } from './commands/use';
+import { execute as execTrade     } from './commands/trade';
+import { execute as execCraft     } from './commands/craft';
+import { execute as execDaily     } from './commands/daily';
+import { execute as execReroll    } from './commands/reroll';
+import { execute as execAchievements } from './commands/achievements';
+import { execute as execWorld     } from './commands/world';
+import { execute as execPrestige  } from './commands/prestige';
+import { execute as execFish      } from './commands/fish';
+import { execute as execGather    } from './commands/gather';
+import { execute as execWorldboss } from './commands/worldboss';
+import { execute as execDuel      } from './commands/duel';
 
 const client = new Client({
   intents: [
@@ -157,6 +157,11 @@ const PREFIX_HELP = [
   '`rpg rr` / `rpg reroll` — reroll skill book',
   '`rpg a` / `rpg ach` — thành tựu',
   '`rpg w` / `rpg world` — trạng thái thế giới',
+  '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
+  '`rpg f` / `rpg fish` — câu cá (cooldown 60s)',
+  '`rpg g` / `rpg mine` — thu thập vật liệu (cooldown 60s)',
+  '`rpg wb` / `rpg boss` — world boss',
+  '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
 ].join('\n');
 
 function stripInteractionOnlyOptions(options: any): any {

@@ -143,6 +143,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   await updateDuelMessage();
 
+  let chalDefending = false;
+  let targDefending = false;
+
   // Combat rounds
   for (let round = 0; round < 20; round++) {
     const turnUserId = turn === 0 ? challengerId : targetUser.id;
@@ -168,11 +171,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     if (defending) {
       const turnName = turn === 0 ? chalUsername : targetUser.username;
       log += `\n🛡️ *${turnName} phòng thủ!*`;
+      if (turn === 0) chalDefending = true; else targDefending = true;
     } else {
-      // Attack
+      // Attack — check if the DEFENDER was defending last turn
       const atkAtk  = turn === 0 ? chalEnhanced.atk  : targEnhanced.atk;
       const defDef  = turn === 0 ? targEnhanced.def   : chalEnhanced.def;
-      const defenseBonus = defending ? Math.floor(defDef * 0.5) : 0;
+      const targetIsDefending = turn === 0 ? targDefending : chalDefending;
+      const defenseBonus = targetIsDefending ? Math.floor(defDef * 0.5) : 0;
       const dmg = Math.max(1, atkAtk - defDef - defenseBonus + Math.floor(Math.random() * 8) - 3);
       const atkName  = turn === 0 ? chalUsername    : targetUser.username;
       const defName  = turn === 0 ? targetUser.username : chalUsername;
@@ -180,7 +185,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       if (turn === 0) tHp = Math.max(0, tHp - dmg);
       else            cHp = Math.max(0, cHp - dmg);
 
-      log += `\n⚔️ *${atkName}* → **${dmg} DMG** → *${defName}*`;
+      const guardNote = targetIsDefending ? ' 🛡️' : '';
+      log += `\n⚔️ *${atkName}* → **${dmg} DMG** → *${defName}*${guardNote}`;
+      // Attacker's own defend stance clears when they act
+      if (turn === 0) chalDefending = false; else targDefending = false;
     }
 
     defending = false;

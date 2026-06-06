@@ -2,8 +2,7 @@ import {
   SlashCommandBuilder, ChatInputCommandInteraction,
   EmbedBuilder, PermissionFlagsBits
 } from 'discord.js';
-import { getPlayer, updatePlayerHpMp, killPlayer } from '../systems/player';
-import { applyPassiveStats } from '../systems/player';
+import { getPlayer, updatePlayerHpMp, killPlayer, applyPassiveStats } from '../systems/player';
 import { COLORS } from '../utils/embeds';
 import db from '../database/index';
 
@@ -23,7 +22,12 @@ const WORLD_BOSSES = [
 ];
 
 function getBoss(guildId: string): BossState | undefined {
-  return db.prepare('SELECT * FROM world_boss_state WHERE guild_id=? AND is_alive=1').get(guildId) as any;
+  const boss = db.prepare('SELECT * FROM world_boss_state WHERE guild_id=? AND is_alive=1').get(guildId) as BossState | undefined;
+  if (boss && boss.expires_at < Math.floor(Date.now() / 1000)) {
+    db.prepare('UPDATE world_boss_state SET is_alive=0 WHERE guild_id=?').run(guildId);
+    return undefined;
+  }
+  return boss;
 }
 
 function getDamageRow(guildId: string, userId: string): DamageRow | undefined {
