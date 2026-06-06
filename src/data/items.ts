@@ -81,10 +81,10 @@ export const ITEMS: Record<string, ItemDef> = {
     effect: { hpPercent: 0.25 }, sellPrice: 8, buyPrice: 20
   },
   healing_potion: {
-    id: 'healing_potion', name: 'Healing Potion', icon: '🧪',
+    id: 'healing_potion', name: 'Healing Potion', icon: '🍶',
     type: 'consumable', stackable: true,
-    description: 'Hồi **45% HP tối đa**.',
-    effect: { hpPercent: 0.45 }, sellPrice: 18, buyPrice: 45
+    description: 'Hồi **65% HP tối đa**. Phiên bản mạnh hơn Health Potion.',
+    effect: { hpPercent: 0.65 }, sellPrice: 30, buyPrice: 75
   },
   emergency_potion: {
     id: 'emergency_potion', name: 'Emergency Potion', icon: '🚨',
@@ -93,10 +93,10 @@ export const ITEMS: Record<string, ItemDef> = {
     effect: { hpPercent: 0.35, hpBelowPct: 0.30 }, sellPrice: 28, buyPrice: 75
   },
   mana_flask: {
-    id: 'mana_flask', name: 'Mana Flask', icon: '🔵',
+    id: 'mana_flask', name: 'Mana Flask', icon: '🫙',
     type: 'consumable', stackable: true,
-    description: 'Hồi **30% MP tối đa**.',
-    effect: { mpPercent: 0.30 }, sellPrice: 14, buyPrice: 35
+    description: 'Hồi **50% MP tối đa**. Phiên bản mạnh hơn Mana Potion.',
+    effect: { mpPercent: 0.50 }, sellPrice: 22, buyPrice: 55
   },
   focus_tonic: {
     id: 'focus_tonic', name: 'Focus Tonic', icon: '💠',

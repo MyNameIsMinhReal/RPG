@@ -17,6 +17,7 @@ import type { CombatEnemy } from '../utils/embeds';
 import { withImage } from '../utils/eventImages';
 import { getEnemyAtkBonus } from './world';
 import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumables';
+import { incrementDaily } from '../commands/daily';
 
 export type CombatVictoryHandler = (
   interaction: ChatInputCommandInteraction,
@@ -256,6 +257,7 @@ export async function startCombatFlow(
         const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
         if (!itemId) return;
         result = processItemUse(current, itemId);
+        if (result.itemConsumed) incrementDaily(userId, guildId, 'potion_used');
       }
       else if (cid === `rpg_skill_${userId}`) {
         const updatedLoadout = getLoadout(userId, guildId);
@@ -475,6 +477,7 @@ export async function startCombatFlowWithEnemy(
         const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
         if (!itemId) return;
         result = processItemUse(current, itemId);
+        if (result.itemConsumed) incrementDaily(userId, guildId, 'potion_used');
       }
       else if (cid === `rpg_skill_${userId}`) {
         const updatedLoadout = getLoadout(userId, guildId);
@@ -694,6 +697,7 @@ export async function startGroupCombatFlow(
         const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
         if (!itemId) return;
         result = processItemUse(current, itemId);
+        if (result.itemConsumed) incrementDaily(userId, guildId, 'potion_used');
       }
       else if (cid === `rpg_skill_${userId}`) {
         const updatedLoadout = getLoadout(userId, guildId);

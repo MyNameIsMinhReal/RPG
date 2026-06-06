@@ -178,11 +178,12 @@ function calcDamage(atk: number, def: number, variance = 0.15): number {
 
 // ── Action result ─────────────────────────────────────────────────────────
 export interface ActionResult {
-  newState:   CombatState;
-  logLines:   string[];
-  playerDied: boolean;
-  enemyDied:  boolean;
-  fled:       boolean;
+  newState:    CombatState;
+  logLines:    string[];
+  playerDied:  boolean;
+  enemyDied:   boolean;
+  fled:        boolean;
+  itemConsumed?: boolean;
 }
 
 // ── processAttack ─────────────────────────────────────────────────────────
@@ -681,7 +682,7 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
     }
     removeItem(state.user_id, state.guild_id, itemId, 1);
     logs.push('📜 **Scroll of Escape** mở ra một khe nứt. Bạn thoát khỏi trận chiến!');
-    return { newState: state, logLines: logs, playerDied: false, enemyDied: false, fled: true };
+    return { newState: state, logLines: logs, playerDied: false, enemyDied: false, fled: true, itemConsumed: true };
   }
 
   removeItem(state.user_id, state.guild_id, itemId, 1);
@@ -745,14 +746,12 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
   const itemAllDead = itemGroupEnemies ? itemGroupEnemies.every(e => e.hp <= 0) : enemy_hp <= 0;
   const itemUpdatedState = { ...state, enemy_hp };
 
-  if (itemAllDead) {
-    return makeResult(state, itemUpdatedState, player_hp, player_mp, effects, logs, false, true, false);
-  }
-
-  if (itemGroupEnemies) {
-    return groupEnemyTurn(state, itemUpdatedState, player_hp, player_mp, effects, logs, 0, passives, itemGroupEnemies);
-  }
-  return enemyTurn(state, itemUpdatedState, player_hp, player_mp, effects, logs, 0, passives);
+  const baseResult = itemAllDead
+    ? makeResult(state, itemUpdatedState, player_hp, player_mp, effects, logs, false, true, false)
+    : itemGroupEnemies
+      ? groupEnemyTurn(state, itemUpdatedState, player_hp, player_mp, effects, logs, 0, passives, itemGroupEnemies)
+      : enemyTurn(state, itemUpdatedState, player_hp, player_mp, effects, logs, 0, passives);
+  return { ...baseResult, itemConsumed: true };
 }
 
 // ── groupEnemyTurn ────────────────────────────────────────────────────────
