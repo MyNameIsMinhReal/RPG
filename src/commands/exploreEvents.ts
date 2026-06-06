@@ -36,6 +36,7 @@ import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { getBuff, consumeBuff } from '../systems/consumables';
 import { doFish } from './fish';
+import { onlyUser } from '../utils/collectors';
 
 export type ExploreEventType =
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -274,7 +275,7 @@ async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
 
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
   const btn   = await reply.awaitMessageComponent({
-    filter: i => i.user.id === ctx.userId,
+    filter: onlyUser(ctx.userId),
     time: 30_000,
   }).catch(() => null);
 
@@ -292,7 +293,7 @@ async function awaitButton(ctx: RunExploreEventInput, row: ActionRowBuilder<Butt
   const payload = imageKey ? withImage(embed, imageKey) : { embed, files: [] as any[] };
   const reply = await ctx.interaction.editReply({ embeds: [payload.embed], files: payload.files, components: [row] });
   const btn = await reply.awaitMessageComponent({
-    filter: i => i.user.id === ctx.userId,
+    filter: onlyUser(ctx.userId),
     time
   }).catch(() => null);
   if (!btn || !btn.isButton()) return null;
@@ -1132,7 +1133,7 @@ async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
   ));
 
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: rows });
-  const comp = await reply.awaitMessageComponent({ filter: i => i.user.id === ctx.userId, time: 45_000 }).catch(() => null);
+  const comp = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 45_000 }).catch(() => null);
   if (!comp) return finish(ctx, simpleEmbed(COLORS.info, '🌑 Cánh cửa chợ đen khép lại.'));
   const ok = await comp.deferUpdate().then(() => true).catch(() => false);
   if (!ok) return;

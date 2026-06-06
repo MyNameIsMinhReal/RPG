@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { getPlayer, addItem, getItemQty, getInventory, removeItem, grantSoulShards } from './player';
 import { getBookTier, pickDifferentBook } from '../commands/reroll';
+import { onlyUser } from '../utils/collectors';
 import { getWornEquipment, UPGRADE_MAX } from './equipment';
 import { COLORS } from '../utils/embeds';
 import { getItem, ITEMS } from '../data/items';
@@ -81,7 +82,7 @@ export async function showVillageShop(
   const msg = await interaction.editReply({ embeds: [shopEmbed], components: [selectRow, backRow(userId)] });
 
   const sel = await msg.awaitMessageComponent({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     componentType: ComponentType.StringSelect,
     time: 45_000
   }).catch(() => null);
@@ -116,12 +117,13 @@ export async function showVillageShop(
   const msg2 = await interaction.editReply({ embeds: [confirmEmbed], components: [confirmRow] });
 
   const btn = await msg2.awaitMessageComponent({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     componentType: ComponentType.Button,
     time: 30_000
   }).catch(() => null);
 
   if (!btn || btn.customId !== `vill_buy_confirm_${userId}`) {
+    if (btn) await btn.deferUpdate();
     await showVillageShop(interaction, userId, guildId);
     return;
   }
@@ -225,7 +227,7 @@ export async function showVillageBlacksmith(
   const msg = await interaction.editReply({ embeds: [bsEmbed], components: [selectRow, bsBottomRow] });
 
   const sel = await msg.awaitMessageComponent({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     time: 45_000
   }).catch(() => null);
 
@@ -277,12 +279,13 @@ export async function showVillageBlacksmith(
   const msg2 = await interaction.editReply({ embeds: [confirmEmbed], components: [confirmRow] });
 
   const btn = await msg2.awaitMessageComponent({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     componentType: ComponentType.Button,
     time: 30_000
   }).catch(() => null);
 
   if (!btn || btn.customId !== `vill_bs_confirm_${userId}`) {
+    if (btn) await btn.deferUpdate();
     await showVillageBlacksmith(interaction, userId, guildId);
     return;
   }
@@ -385,7 +388,7 @@ async function showBlacksmithReroll(
   const msg = await interaction.editReply({ embeds: [rerollEmbed], components: [rrSelectRow, backRow(userId)] });
 
   const sel = await msg.awaitMessageComponent({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     time: 30_000
   }).catch(() => null);
 
@@ -471,12 +474,13 @@ export async function showVillageTavern(
   const msg = await interaction.editReply({ embeds: [embed], components: [restRow] });
 
   const btn = await msg.awaitMessageComponent({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     componentType: ComponentType.Button,
     time: 30_000
   }).catch(() => null);
 
   if (!btn || btn.customId !== `vill_rest_confirm_${userId}`) {
+    if (btn) await btn.deferUpdate();
     await interaction.editReply({ components: [] });
     return;
   }
@@ -638,7 +642,11 @@ export async function showVillageBoard(
   if (claimableIdx === -1) return;
 
   const btn = await msg.awaitMessageComponent({
-    filter: i => i.user.id === userId && i.customId === `vill_board_claim_${userId}`,
+    filter: (i) => {
+      if (i.user.id !== userId) { i.reply({ content: '❌ Đây không phải tương tác của bạn.', flags: 64 }).catch(() => {}); return false; }
+      if (i.customId !== `vill_board_claim_${userId}`) { i.deferUpdate().catch(() => {}); return false; }
+      return true;
+    },
     componentType: ComponentType.Button,
     time: 60_000
   }).catch(() => null);

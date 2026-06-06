@@ -471,16 +471,12 @@ export function processFlee(state: CombatState): ActionResult {
   const logs: string[] = JSON.parse(state.combat_log || '[]');
   const effects = parseEffects(state.active_effects);
 
-  const attemptEffect = effects.find(e => e.name === 'flee_attempts');
-  const failedAttempts = Math.max(0, attemptEffect?.value ?? 0);
-  const attemptNo = failedAttempts + 1;
-  const chance = Math.min(90, 40 + failedAttempts * 15);
-  const nextChance = Math.min(90, chance + 15);
+  const FLEE_CHANCE = 60;
   const roll = randInt(1, 100);
 
-  logs.push(`🏃 **Bỏ chạy lần ${attemptNo}** — tỉ lệ thành công **${chance}%**.`);
+  logs.push(`🏃 **Bỏ chạy** — tỉ lệ thành công **${FLEE_CHANCE}%**.`);
 
-  if (roll <= chance) {
+  if (roll <= FLEE_CHANCE) {
     logs.push(`✅ Bạn **bỏ chạy thành công** trước khi bị kết liễu!`);
     return {
       newState: {
@@ -495,9 +491,8 @@ export function processFlee(state: CombatState): ActionResult {
     };
   }
 
-  logs.push(`❌ Bỏ chạy thất bại! Lần thử tiếp theo sẽ tăng lên **${nextChance}%**.`);
+  logs.push(`❌ Bỏ chạy thất bại! Tỉ lệ vẫn là **${FLEE_CHANCE}%** lần sau.`);
   const nextEffects = effects.filter(e => e.name !== 'flee_attempts');
-  nextEffects.push({ name: 'flee_attempts', duration: 999, value: failedAttempts + 1 });
 
   const fleeGroupEnemies = getGroupEnemies(state);
   if (fleeGroupEnemies) {

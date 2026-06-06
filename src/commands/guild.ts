@@ -6,6 +6,7 @@ import {
 import db from '../database/index';
 import { getPlayer } from '../systems/player';
 import { COLORS } from '../utils/embeds';
+import { onlyUser } from '../utils/collectors';
 
 export const data = new SlashCommandBuilder()
   .setName('guild')
@@ -786,7 +787,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
 
     const btn = await msg.awaitMessageComponent({
       componentType: ComponentType.Button,
-      filter: b => b.user.id === targetUser.id,
+      filter: onlyUser(targetUser.id),
       time: 60_000,
     }).catch(() => null);
 

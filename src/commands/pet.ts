@@ -6,6 +6,7 @@ import db from '../database/index';
 import { getPlayer, addItem } from '../systems/player';
 import { PETS, getPet, petPassiveValue, RARITY_COLOR, RARITY_LABEL } from '../data/pets';
 import { COLORS } from '../utils/embeds';
+import { onlyUser } from '../utils/collectors';
 
 export const data = new SlashCommandBuilder()
   .setName('pet')
@@ -192,7 +193,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
 
     const btn = await confirmMsg.awaitMessageComponent({
       componentType: ComponentType.Button,
-      filter: b => b.user.id === userId,
+      filter: onlyUser(userId),
       time: 20_000,
     }).catch(() => null);
 

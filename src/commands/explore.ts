@@ -39,6 +39,7 @@ import { pickExploreEvent, runExploreEvent } from './exploreEvents';
 import { consumeBuff } from '../systems/consumables';
 import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
 import { doGather } from './gather';
+import { onlyUser } from '../utils/collectors';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -139,7 +140,7 @@ async function attachContinueExploreHandler(
   let processing = false;
 
   const collector = message.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     time: 120_000
   });
 
@@ -165,7 +166,13 @@ async function attachContinueExploreHandler(
     }
 
     if (i.customId === `continue_explore_${userId}`) {
-      await handleSearch(interaction, userId, guildId);
+      const p = getPlayer(userId, guildId)!;
+      const z = getZone(p.zone_id)!;
+      if (z.safe) {
+        await showExploreMenu(interaction, userId, guildId);
+      } else {
+        await handleSearch(interaction, userId, guildId);
+      }
     } else {
       await showExploreMenu(interaction, userId, guildId);
     }
@@ -233,7 +240,7 @@ export async function showExploreMenu(
   let processing = false;
 
   const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     time: 90_000
   });
 
@@ -257,7 +264,6 @@ export async function showExploreMenu(
 
     if (cid === `ex_search_${userId}`) await handleSearch(interaction, userId, guildId);
     else if (cid === `ex_boss_${userId}`) await handleBoss(interaction, userId, guildId);
-    else if (cid === `ex_rest_${userId}`) await handleRest(interaction, userId, guildId);
     else if (cid === `ex_zone_${userId}`) await handleZonePicker(interaction, userId, guildId);
     else if (cid.startsWith(`ex_travel_${userId}_`)) {
       const zoneId = cid.replace(`ex_travel_${userId}_`, '');
@@ -288,8 +294,6 @@ function buildExploreRows(
     new ButtonBuilder().setCustomId(`ex_boss_${userId}`)
       .setLabel('Thách Boss').setEmoji('👑').setStyle(ButtonStyle.Danger)
       .setDisabled(isSafe || !hasBoss || playerLevel < zoneMinLevel + 2),
-    new ButtonBuilder().setCustomId(`ex_rest_${userId}`)
-      .setLabel('Nghỉ ngơi').setEmoji('💤').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`ex_zone_${userId}`)
       .setLabel('Zone').setEmoji('🗺️').setStyle(ButtonStyle.Secondary)
   );
@@ -346,7 +350,7 @@ async function handleZonePicker(
 
   const sel = await reply.awaitMessageComponent({
     componentType: ComponentType.StringSelect,
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     time: 30_000
   }).catch(() => null);
 
@@ -402,10 +406,25 @@ async function handleVillageService(
 
   await runService();
 
-  // After service renders, wait for the back button
+  // If the service cleared all components (e.g. user clicked back inside the service),
+  // navigate immediately without waiting for a button that no longer exists.
   const msg = await interaction.fetchReply();
+  const hasBackBtn = msg.components.some(row => {
+    const comps = (row as any).components;
+    return Array.isArray(comps) && comps.some((c: any) => c.customId === `vill_back_${userId}`);
+  });
+
+  if (!hasBackBtn) {
+    if (!backHandled) await showExploreMenu(interaction, userId, guildId);
+    return;
+  }
+
   const back = await msg.awaitMessageComponent({
-    filter: i => i.user.id === userId && i.customId === `vill_back_${userId}`,
+    filter: (i) => {
+      if (i.user.id !== userId) { i.reply({ content: '❌ Đây không phải tương tác của bạn.', flags: 64 }).catch(() => {}); return false; }
+      if (i.customId !== `vill_back_${userId}`) { i.deferUpdate().catch(() => {}); return false; }
+      return true;
+    },
     componentType: ComponentType.Button,
     time: 60_000
   }).catch(() => null);
@@ -583,7 +602,7 @@ async function showLegacyFind(
 
   const btn = await reply.awaitMessageComponent({
     componentType: ComponentType.Button,
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     time: 30_000
   }).catch(() => null);
 
@@ -714,7 +733,7 @@ async function showLostPouch(
   );
 
   const reply = await interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30_000 }).catch(() => null);
+  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
 
   if (!btn || !deferred || btn.customId === `pouch_return_${userId}`) {
@@ -750,7 +769,7 @@ async function showRuneStone(
   );
   const { embed: imgEmbed, files } = withImage(embed, 'altar');
   const reply = await interaction.editReply({ embeds: [imgEmbed], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30_000 }).catch(() => null);
+  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
 
   if (!btn || !deferred || btn.customId === `rune_skip_${userId}`) {
@@ -784,7 +803,7 @@ async function showTreasureChest(
   );
   const { embed, files } = withImage(new EmbedBuilder().setColor(COLORS.gold).setTitle('🧰 Rương Cũ').setDescription('*Một chiếc rương gỗ bị dây leo phủ kín. Khóa đã rỉ sét...*'), 'loot');
   const reply = await interaction.editReply({ embeds: [embed], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25_000 }).catch(() => null);
+  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
 
   if (!btn || !deferred || btn.customId === `chest_leave_${userId}`) {
@@ -825,7 +844,7 @@ async function showWanderingHealer(
   );
   const { embed, files } = withImage(new EmbedBuilder().setColor(COLORS.success).setTitle('💚 Tu Sĩ Lang Thang').setDescription(`Một tu sĩ đề nghị chữa trị cho bạn với giá **${price} Gold**.`), 'mysterious');
   const reply = await interaction.editReply({ embeds: [embed], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25_000 }).catch(() => null);
+  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
 
   if (!btn || !deferred || btn.customId !== `healer_pay_${userId}`) {
@@ -869,7 +888,7 @@ async function showSpiritTrial(
     new ButtonBuilder().setCustomId(`trial_leave_${userId}`).setLabel('Rời đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
   );
   const reply = await interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25_000 }).catch(() => null);
+  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
   if (!btn || !deferred || btn.customId !== `trial_accept_${userId}`) {
     const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn không đáp lại lời thách đấu của linh hồn.')], components: buildContinueExploreRow(userId) });
@@ -1115,7 +1134,7 @@ async function renderMerchantBuy(
   const reply = await interaction.editReply({ embeds: [merchEmbed], files: merchFiles, components: rows });
 
   const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
+    filter: onlyUser(userId),
     time: 60_000
   });
 
@@ -1189,7 +1208,12 @@ async function renderMerchantBuy(
   });
 
   collector.on('end', (_c, reason) => {
-    if (reason === 'time') interaction.editReply({ components: [] }).catch(() => {});
+    if (reason === 'time') {
+      interaction.editReply({
+        embeds: [simpleEmbed(COLORS.info, '🚶 Lái buôn đã rời đi.')],
+        components: buildContinueExploreRow(userId)
+      }).then(r => attachContinueExploreHandler(r, interaction, userId, guildId)).catch(() => {});
+    }
   });
 }
 
@@ -1215,7 +1239,7 @@ async function renderMerchantSell(
 
     const reply = await interaction.fetchReply();
     const btn = await reply.awaitMessageComponent({
-      componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 20_000
+      componentType: ComponentType.Button, filter: onlyUser(userId), time: 20_000
     }).catch(() => null);
     if (btn) {
       const deferred = await btn.deferUpdate().then(() => true).catch(() => false);
@@ -1263,7 +1287,7 @@ async function renderMerchantSell(
   const reply = await interaction.editReply({ embeds: [sellEmbed], files: sellFiles, components: rows });
 
   const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId, time: 60_000
+    filter: onlyUser(userId), time: 60_000
   });
 
   collector.on('collect', async (compInt) => {
@@ -1312,7 +1336,12 @@ async function renderMerchantSell(
   });
 
   collector.on('end', (_c, reason) => {
-    if (reason === 'time') interaction.editReply({ components: [] }).catch(() => {});
+    if (reason === 'time') {
+      interaction.editReply({
+        embeds: [simpleEmbed(COLORS.info, '🚶 Lái buôn đã rời đi.')],
+        components: buildContinueExploreRow(userId)
+      }).then(r => attachContinueExploreHandler(r, interaction, userId, guildId)).catch(() => {});
+    }
   });
 }
 
@@ -1382,7 +1411,7 @@ async function renderShopkeeperRobPrompt(
   );
 
   const reply = await interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30_000 }).catch(() => null);
+  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
 
   if (!btn || !deferred || btn.customId !== `rob_confirm_${userId}`) {
@@ -1693,7 +1722,7 @@ async function showTrap(
     const { embed: trapNoticeEmbed, files: trapNoticeFiles } = withImage(embed, 'trap');
     const reply = await interaction.editReply({ embeds: [trapNoticeEmbed], files: trapNoticeFiles, components: [row] });
     const btn   = await reply.awaitMessageComponent({
-      componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25_000
+      componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000
     }).catch(() => null);
 
     await (btn?.deferUpdate() ?? Promise.resolve());
@@ -1780,7 +1809,7 @@ async function showAncientAltar(
   const { embed: altarEmbed, files: altarFiles } = withImage(embed, 'altar');
   const reply = await interaction.editReply({ embeds: [altarEmbed], files: altarFiles, components: [row] });
   const btn   = await reply.awaitMessageComponent({
-    componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30_000
+    componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000
   }).catch(() => null);
 
   await (btn?.deferUpdate() ?? Promise.resolve());
@@ -1880,7 +1909,7 @@ async function showMysteriousFigure(
   const { embed: mystEmbed, files: mystFiles } = withImage(embed, 'mysterious');
   const reply = await interaction.editReply({ embeds: [mystEmbed], files: mystFiles, components: [row] });
   const btn   = await reply.awaitMessageComponent({
-    componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30_000
+    componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000
   }).catch(() => null);
 
   await (btn?.deferUpdate() ?? Promise.resolve());
@@ -1967,7 +1996,7 @@ async function showAmbush(
   const { embed: ambushEmbed, files: ambushFiles } = withImage(embed, 'ambush');
   const reply = await interaction.editReply({ embeds: [ambushEmbed], files: ambushFiles, components: [row] });
   const btn   = await reply.awaitMessageComponent({
-    componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25_000
+    componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000
   }).catch(() => null);
 
   await (btn?.deferUpdate() ?? Promise.resolve());
@@ -2044,7 +2073,7 @@ async function showVillagerRescue(
   const { embed: vilEmbed, files: vilFiles } = withImage(embed, 'villager');
   const reply = await interaction.editReply({ embeds: [vilEmbed], files: vilFiles, components: [row] });
   const btn   = await reply.awaitMessageComponent({
-    componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 25_000
+    componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000
   }).catch(() => null);
 
   await (btn?.deferUpdate() ?? Promise.resolve());
@@ -2112,7 +2141,7 @@ async function showCaravanRobbery(
   const { embed: caraEmbed, files: caraFiles } = withImage(embed, 'caravan');
   const reply = await interaction.editReply({ embeds: [caraEmbed], files: caraFiles, components: [row] });
   const btn   = await reply.awaitMessageComponent({
-    componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30_000
+    componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000
   }).catch(() => null);
 
   await (btn?.deferUpdate() ?? Promise.resolve());
@@ -2237,7 +2266,7 @@ async function showSoulShop(
   const reply = await interaction.editReply({ embeds: [embed], components: rows });
 
   const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId, time: 60_000
+    filter: onlyUser(userId), time: 60_000
   });
 
   collector.on('collect', async (compInt) => {
@@ -2338,6 +2367,11 @@ async function showSoulShop(
   });
 
   collector.on('end', (_c, reason) => {
-    if (reason === 'time') interaction.editReply({ components: [] }).catch(() => {});
+    if (reason === 'time') {
+      interaction.editReply({
+        embeds: [simpleEmbed(COLORS.info, '💀 Cửa hàng linh hồn đã đóng cửa.')],
+        components: buildContinueExploreRow(userId)
+      }).then(r => attachContinueExploreHandler(r, interaction, userId, guildId)).catch(() => {});
+    }
   });
 }

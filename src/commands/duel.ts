@@ -6,6 +6,7 @@ import { getPlayer, updatePlayerHpMp, killPlayer, adjustReputation, applyPassive
 import { COLORS } from '../utils/embeds';
 import db from '../database/index';
 import { randomUUID } from 'node:crypto';
+import { onlyUser } from '../utils/collectors';
 
 function buildHpBar(current: number, max: number, len = 12): string {
   const filled = Math.max(0, Math.round((current / max) * len));
@@ -103,7 +104,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const msg = await interaction.editReply({ content: `<@${targetUser.id}>`, embeds: [challengeEmbed], components: [row] });
 
   const response = await msg.awaitMessageComponent({
-    filter: i => i.user.id === targetUser.id,
+    filter: onlyUser(targetUser.id),
     componentType: ComponentType.Button,
     time: 30_000
   }).catch(() => null);
@@ -152,7 +153,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     currentTurnUser = turnUserId;
 
     const btnResponse = await msg.awaitMessageComponent({
-      filter: i => i.user.id === turnUserId,
+      filter: onlyUser(turnUserId),
       componentType: ComponentType.Button,
       time: 45_000
     }).catch(() => null);
