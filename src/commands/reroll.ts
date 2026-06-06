@@ -12,7 +12,7 @@ import { pick } from '../utils/format';
 const REROLL_COST = 2; // Soul Shards
 
 // ── Tiered book pools ──────────────────────────────────────────────────────
-const BOOK_TIERS: Record<string, string[]> = {
+export const BOOK_TIERS: Record<string, string[]> = {
   active: [
     'book_fireball','book_ice_lance','book_shield_bash',
     'book_shadow_step','book_mend_wounds','book_thunder_clap'
@@ -26,14 +26,14 @@ const BOOK_TIERS: Record<string, string[]> = {
   soul:     ['book_soul_strike','book_soul_guard','book_soul_drain'],
 };
 
-function getBookTier(bookId: string): string | null {
+export function getBookTier(bookId: string): string | null {
   for (const [tier, books] of Object.entries(BOOK_TIERS)) {
     if (books.includes(bookId)) return tier;
   }
   return null;
 }
 
-function pickDifferentBook(tier: string, current: string): string {
+export function pickDifferentBook(tier: string, current: string): string {
   const pool = BOOK_TIERS[tier].filter(b => b !== current);
   if (!pool.length) return current;
   return pick(pool);

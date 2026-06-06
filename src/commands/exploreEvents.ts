@@ -35,6 +35,7 @@ import { COLORS, simpleEmbed, type PlayerRow } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { getBuff, consumeBuff } from '../systems/consumables';
+import { doFish } from './fish';
 
 export type ExploreEventType =
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -43,7 +44,7 @@ export type ExploreEventType =
   | 'wanted_merchant' | 'bounty_hunter' | 'rebirth_rift' | 'failed_legacy' | 'mirror_clone' | 'talking_corpse'
   | 'black_eclipse' | 'fate_coin' | 'merchant_tax' | 'merchant_guard' | 'wanted_notice' | 'shopkeeper_mercy'
   | 'black_cat' | 'dice_gambler' | 'glowing_mushroom' | 'chained_prisoner' | 'magic_fountain' | 'laughing_bones'
-  | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'nothing';
+  | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'nothing';
 
 export interface PickExploreEventInput {
   player: PlayerRow;
@@ -157,6 +158,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['black_market', blackMarketAccess ? 10 : ((rep <= -30 || wanted >= 3) ? 5 : 0)],
     ['atonement_monk', (wanted > 0 || rep < -15) ? 4 : 0],
     ['conditional_miniboss', hasCombat && (wanted >= 3 || rep <= -60 || deaths >= 3 || robberyCount >= 2) ? 4 : 0],
+    ['fishing_spot', ['forest', 'shrine', 'mines'].includes(player.zone_id) ? 5 : 0],
   ];
 
   const total = table.reduce((sum, [, weight]) => sum + Math.max(0, weight), 0);
@@ -221,6 +223,7 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'black_market': return showBlackMarket(ctx);
     case 'atonement_monk': return showAtonementMonk(ctx);
     case 'conditional_miniboss': return showConditionalMiniboss(ctx);
+    case 'fishing_spot': return showFishingSpot(ctx);
     default: return finish(ctx, simpleEmbed(COLORS.info, `*${pick(getZone(ctx.player.zone_id)?.ambiance ?? ['Không có gì bất thường...'])}*\n\nKhông có gì bất thường...`));
   }
 }
@@ -249,6 +252,40 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder, imageKey?:
 async function finishNoContinue(ctx: RunExploreEventInput, embed: EmbedBuilder, imageKey?: string): Promise<void> {
   const payload = imageKey ? withImage(embed, imageKey) : { embed, files: [] as any[] };
   await ctx.interaction.editReply({ embeds: [payload.embed], files: payload.files, components: [] });
+}
+
+async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
+  const FISHING_SPOTS: Record<string, string> = {
+    forest: '🏞️ Một con suối trong vắt chảy qua kẽ đá — nước lạnh và đầy cá.',
+    shrine: '⛩️ Hồ nước linh thiêng bên đền cổ, cá ở đây khác lạ...',
+    mines:  '⛏️ Dòng suối ngầm đổ ra từ khe đá — bóng cá lấp lánh trong bóng tối.',
+  };
+  const flavor = FISHING_SPOTS[ctx.player.zone_id] ?? '🎣 Bạn tìm thấy một điểm câu cá.';
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`ev_fish_${ctx.userId}`).setLabel('Câu cá').setEmoji('🎣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`ev_skip_${ctx.userId}`).setLabel('Bỏ qua').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x3399ff)
+    .setTitle('🎣 Điểm Câu Cá!')
+    .setDescription(`${flavor}\n\nBạn có muốn thả câu không?`)
+    .setFooter({ text: 'Cooldown 60s dùng chung với lần câu trước' });
+
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn   = await reply.awaitMessageComponent({
+    filter: i => i.user.id === ctx.userId,
+    time: 30_000,
+  }).catch(() => null);
+
+  const deferred = btn ? await btn.deferUpdate().then(() => true).catch(() => false) : false;
+  if (!deferred || !btn || btn.customId === `ev_skip_${ctx.userId}`) {
+    return finish(ctx, simpleEmbed(COLORS.info, '🎣 *Bạn bỏ qua điểm câu cá và tiếp tục hành trình.*'));
+  }
+
+  const { embed: fishEmbed } = doFish(ctx.userId, ctx.guildId, ctx.player.name);
+  const fishReply = await ctx.interaction.editReply({ embeds: [fishEmbed], components: ctx.callbacks.buildContinueExploreRow(ctx.userId) });
+  await ctx.callbacks.attachContinueExploreHandler(fishReply as Message<boolean>, ctx.interaction, ctx.userId, ctx.guildId);
 }
 
 async function awaitButton(ctx: RunExploreEventInput, row: ActionRowBuilder<ButtonBuilder>, embed: EmbedBuilder, imageKey?: string, time = 30_000): Promise<string | null> {

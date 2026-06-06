@@ -17,12 +17,9 @@ import { execute as execUse       } from './commands/use';
 import { execute as execTrade     } from './commands/trade';
 import { execute as execCraft     } from './commands/craft';
 import { execute as execDaily     } from './commands/daily';
-import { execute as execReroll    } from './commands/reroll';
 import { execute as execAchievements } from './commands/achievements';
 import { execute as execWorld     } from './commands/world';
 import { execute as execPrestige  } from './commands/prestige';
-import { execute as execFish      } from './commands/fish';
-import { execute as execGather    } from './commands/gather';
 import { execute as execWorldboss } from './commands/worldboss';
 import { execute as execDuel      } from './commands/duel';
 import { execute as execGuild     } from './commands/guild';
@@ -46,12 +43,9 @@ commands.set('use',       execUse);
 commands.set('trade',     execTrade);
 commands.set('craft',     execCraft);
 commands.set('daily',     execDaily);
-commands.set('reroll',    execReroll);
 commands.set('achievements', execAchievements);
 commands.set('world',     execWorld);
 commands.set('prestige',  execPrestige);
-commands.set('fish',      execFish);
-commands.set('gather',    execGather);
 commands.set('worldboss', execWorldboss);
 commands.set('duel',      execDuel);
 commands.set('guild',     execGuild);
@@ -108,11 +102,6 @@ const prefixAliases = new Map<string, string>([
   ['quest', 'daily'],
   ['quests', 'daily'],
 
-  // Reroll
-  ['r', 'reroll'],
-  ['rr', 'reroll'],
-  ['reroll', 'reroll'],
-
   // Achievements
   ['a', 'achievements'],
   ['ach', 'achievements'],
@@ -127,15 +116,6 @@ const prefixAliases = new Map<string, string>([
   // Prestige
   ['prestige', 'prestige'],
   ['pr', 'prestige'],
-
-  // Fish
-  ['fish', 'fish'],
-  ['f', 'fish'],
-
-  // Gather
-  ['gather', 'gather'],
-  ['g', 'gather'],
-  ['mine', 'gather'],
 
   // World Boss
   ['worldboss', 'worldboss'],
@@ -166,12 +146,9 @@ const PREFIX_HELP = [
   '`rpg t @user <gold>` — chuyển gold, ví dụ `rpg t @Minh 100`',
   '`rpg c` / `rpg craft` — chế tạo',
   '`rpg d` / `rpg daily` — daily quest',
-  '`rpg rr` / `rpg reroll` — reroll skill book',
   '`rpg a` / `rpg ach` — thành tựu',
   '`rpg w` / `rpg world` — trạng thái thế giới',
   '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
-  '`rpg f` / `rpg fish` — câu cá (cooldown 60s)',
-  '`rpg g` / `rpg mine` — thu thập vật liệu (cooldown 60s)',
   '`rpg wb` / `rpg boss` — world boss',
   '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
 ].join('\n');

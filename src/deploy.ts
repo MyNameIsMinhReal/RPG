@@ -1,23 +1,20 @@
 import 'dotenv/config';
 import { REST, Routes } from 'discord.js';
-import { data as startData     } from './commands/start';
-import { data as profileData   } from './commands/profile';
-import { data as exploreData   } from './commands/explore';
-import { data as inventoryData } from './commands/inventory';
-import { data as useData       } from './commands/use';
-import { data as tradeData     } from './commands/trade';
-import { data as craftData     } from './commands/craft';
-import { data as dailyData     } from './commands/daily';
-import { data as rerollData    } from './commands/reroll';
+import { data as startData        } from './commands/start';
+import { data as profileData      } from './commands/profile';
+import { data as exploreData      } from './commands/explore';
+import { data as inventoryData    } from './commands/inventory';
+import { data as useData          } from './commands/use';
+import { data as tradeData        } from './commands/trade';
+import { data as craftData        } from './commands/craft';
+import { data as dailyData        } from './commands/daily';
 import { data as achievementsData } from './commands/achievements';
-import { data as worldData     } from './commands/world';
-import { data as prestigeData  } from './commands/prestige';
-import { data as gatherData    } from './commands/gather';
-import { data as duelData      } from './commands/duel';
-import { data as worldbossData } from './commands/worldboss';
-import { data as fishData      } from './commands/fish';
-import { data as guildData     } from './commands/guild';
-import { data as petData       } from './commands/pet';
+import { data as worldData        } from './commands/world';
+import { data as prestigeData     } from './commands/prestige';
+import { data as duelData         } from './commands/duel';
+import { data as worldbossData    } from './commands/worldboss';
+import { data as guildData        } from './commands/guild';
+import { data as petData          } from './commands/pet';
 
 const commands = [
   startData,
@@ -28,14 +25,11 @@ const commands = [
   tradeData,
   craftData,
   dailyData,
-  rerollData,
   achievementsData,
   worldData,
   prestigeData,
-  gatherData,
   duelData,
   worldbossData,
-  fishData,
   guildData,
   petData,
 ].map(c => c.toJSON());

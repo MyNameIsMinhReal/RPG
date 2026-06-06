@@ -38,6 +38,7 @@ import { withImage } from '../utils/eventImages';
 import { pickExploreEvent, runExploreEvent } from './exploreEvents';
 import { consumeBuff } from '../systems/consumables';
 import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
+import { doGather } from './gather';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -263,6 +264,7 @@ export async function showExploreMenu(
       await handleTravel(interaction, userId, guildId, zoneId);
     }
     // Village services
+    else if (cid === `ex_gather_${userId}`)   await handleGather(interaction, userId, guildId);
     else if (cid === `vill_shop_${userId}`)   await handleVillageService(interaction, userId, guildId, 'shop');
     else if (cid === `vill_smith_${userId}`)  await handleVillageService(interaction, userId, guildId, 'smith');
     else if (cid === `vill_tavern_${userId}`) await handleVillageService(interaction, userId, guildId, 'tavern');
@@ -291,7 +293,14 @@ function buildExploreRows(
     new ButtonBuilder().setCustomId(`ex_zone_${userId}`)
       .setLabel('Zone').setEmoji('🗺️').setStyle(ButtonStyle.Secondary)
   );
-  if (!isSafe) return [row1];
+  if (!isSafe) {
+    // Non-village zones get a gather button
+    row1.addComponents(
+      new ButtonBuilder().setCustomId(`ex_gather_${userId}`)
+        .setLabel('Thu thập').setEmoji('🌿').setStyle(ButtonStyle.Success)
+    );
+    return [row1];
+  }
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`vill_shop_${userId}`)
@@ -440,6 +449,17 @@ async function handleRest(
   );
   const restReply = await interaction.editReply({ embeds: [restEmbed], files: restFiles, components: buildContinueExploreRow(userId) });
   attachContinueExploreHandler(restReply, interaction, userId, guildId);
+}
+
+// ── Gather ────────────────────────────────────────────────────────────────────
+async function handleGather(
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+  const player = getPlayer(userId, guildId)!;
+  const { embed } = doGather(userId, guildId, player.name);
+  const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+  attachContinueExploreHandler(reply, interaction, userId, guildId);
 }
 
 // ── Search: random event ───────────────────────────────────────────────────────

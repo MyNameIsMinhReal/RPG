@@ -4,7 +4,8 @@ import {
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
   ComponentType
 } from 'discord.js';
-import { getPlayer, addItem, getItemQty } from './player';
+import { getPlayer, addItem, getItemQty, getInventory, removeItem, grantSoulShards } from './player';
+import { getBookTier, pickDifferentBook } from '../commands/reroll';
 import { getWornEquipment, UPGRADE_MAX } from './equipment';
 import { COLORS } from '../utils/embeds';
 import { getItem, ITEMS } from '../data/items';
@@ -151,6 +152,8 @@ const UPGRADE_COSTS: Record<number, { iron: number; crystal: number; gold: numbe
   5: { iron: 8, crystal: 4, gold: 400 },
 };
 
+const REROLL_COST = 2; // Soul Shards
+
 function getUpgradeLevel(userId: string, guildId: string, slot: string): number {
   const row = db.prepare('SELECT upgrade_level FROM equipment_upgrades WHERE user_id=? AND guild_id=? AND slot=?')
     .get(userId, guildId, slot) as any;
@@ -173,7 +176,7 @@ export async function showVillageBlacksmith(
   }
 
   const options = worn.map(w => {
-    const eq  = getEquipment(w.equipment_id);
+    const eq   = getEquipment(w.equipment_id);
     const upLv = getUpgradeLevel(userId, guildId, w.slot);
     const nextLv = upLv + 1;
     const cost = UPGRADE_COSTS[nextLv];
@@ -188,8 +191,8 @@ export async function showVillageBlacksmith(
       .setValue(`upgrade_${w.slot}`);
   });
 
-  const ironQty   = getItemQty(userId, guildId, 'iron_ore');
-  const crystQty  = getItemQty(userId, guildId, 'mana_crystal');
+  const ironQty  = getItemQty(userId, guildId, 'iron_ore');
+  const crystQty = getItemQty(userId, guildId, 'mana_crystal');
 
   const bsEmbed = new EmbedBuilder()
     .setColor(0xE67E22)
@@ -198,7 +201,7 @@ export async function showVillageBlacksmith(
       `Vật liệu của bạn:\n> 🪨 **${ironQty} Iron Ore**  ·  💠 **${crystQty} Mana Crystal**  ·  🪙 **${player.gold} Gold**\n\n` +
       `Mỗi nâng cấp: **Weapon** +2 ATK · **Armor** +2 DEF · **Accessory** +1 ATK`
     )
-    .setFooter({ text: 'Tối đa +5 mỗi trang bị' });
+    .setFooter({ text: 'Tối đa +5 mỗi trang bị  ·  🎲 Reroll đổi Skill Book (2 💀)' });
 
   const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
@@ -207,19 +210,42 @@ export async function showVillageBlacksmith(
       .addOptions(options)
   );
 
-  const msg = await interaction.editReply({ embeds: [bsEmbed], components: [selectRow, backRow(userId)] });
+  const bsBottomRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`vill_bs_reroll_${userId}`)
+      .setLabel('Reroll Skill Book')
+      .setEmoji('🎲')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`vill_back_${userId}`)
+      .setLabel('Quay lại')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  const msg = await interaction.editReply({ embeds: [bsEmbed], components: [selectRow, bsBottomRow] });
 
   const sel = await msg.awaitMessageComponent({
     filter: i => i.user.id === userId,
-    componentType: ComponentType.StringSelect,
     time: 45_000
   }).catch(() => null);
 
   if (!sel) { await interaction.editReply({ components: [] }); return; }
   await sel.deferUpdate();
 
-  const slot = sel.values[0].replace('upgrade_', '') as any;
-  const upLv = getUpgradeLevel(userId, guildId, slot);
+  if (sel.customId === `vill_back_${userId}`) {
+    await interaction.editReply({ components: [] });
+    return;
+  }
+
+  if (sel.customId === `vill_bs_reroll_${userId}`) {
+    await showBlacksmithReroll(interaction, userId, guildId);
+    return;
+  }
+
+  if (!sel.isStringSelectMenu()) { await interaction.editReply({ components: [] }); return; }
+
+  const slot  = sel.values[0].replace('upgrade_', '') as any;
+  const upLv  = getUpgradeLevel(userId, guildId, slot);
 
   if (upLv >= UPGRADE_MAX) {
     await interaction.editReply({
@@ -229,10 +255,10 @@ export async function showVillageBlacksmith(
     return;
   }
 
-  const nextLv = upLv + 1;
-  const cost   = UPGRADE_COSTS[nextLv]!;
+  const nextLv    = upLv + 1;
+  const cost      = UPGRADE_COSTS[nextLv]!;
   const wornEntry = worn.find(w => w.slot === slot)!;
-  const eq     = getEquipment(wornEntry.equipment_id);
+  const eq        = getEquipment(wornEntry.equipment_id);
 
   const confirmEmbed = new EmbedBuilder()
     .setColor(0xE67E22)
@@ -294,6 +320,114 @@ export async function showVillageBlacksmith(
       .setColor(0xE67E22)
       .setTitle('⚒️ Nâng cấp thành công!')
       .setDescription(`**${eq?.icon ?? ''} ${eq?.name ?? slot}** → **[+${nextLv}]**\n\n✦ ${bonusDesc} được thêm vào trang bị!`)],
+    components: [backRow(userId)]
+  });
+}
+
+async function showBlacksmithReroll(
+  interaction: ChatInputCommandInteraction,
+  userId: string, guildId: string
+): Promise<void> {
+  const player = getPlayer(userId, guildId)!;
+
+  if (player.soul_shards < REROLL_COST) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setColor(COLORS.warning)
+        .setTitle('❌ Không đủ Soul Shards')
+        .setDescription(
+          `Reroll tốn **${REROLL_COST} 💀 Soul Shards**.\n` +
+          `Bạn hiện có: **${player.soul_shards}** 💀`
+        )],
+      components: [backRow(userId)]
+    });
+    return;
+  }
+
+  const inventory = getInventory(userId, guildId);
+  const books = inventory
+    .filter(e => getItem(e.item_id)?.type === 'skill_book')
+    .map(e => ({ entry: e, item: getItem(e.item_id)!, tier: getBookTier(e.item_id) }))
+    .filter((b): b is typeof b & { tier: string } => b.tier !== null);
+
+  if (!books.length) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(COLORS.info).setDescription('📚 Không có Skill Book nào trong túi có thể reroll!')],
+      components: [backRow(userId)]
+    });
+    return;
+  }
+
+  const options = books.map(({ entry, item, tier }) =>
+    new StringSelectMenuOptionBuilder()
+      .setLabel(`${item.name} [${tier}]`)
+      .setDescription(`Reroll thành book ${tier} khác`)
+      .setValue(entry.item_id)
+      .setEmoji(item.icon)
+  );
+
+  const rerollEmbed = new EmbedBuilder()
+    .setColor(COLORS.magic)
+    .setTitle('🎲 Reroll Skill Book')
+    .setDescription(
+      `Chọn Skill Book muốn đổi thành book **ngẫu nhiên cùng tier**.\n\n` +
+      `💀 Soul Shards: **${player.soul_shards}**  ·  Chi phí: **${REROLL_COST} 💀**\n\n` +
+      `*Tier giữ nguyên (active/passive/reaction/world/soul). Book mới có thể ra book đã có.*`
+    );
+
+  const rrSelectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`vill_bs_rr_sel_${userId}`)
+      .setPlaceholder('Chọn Skill Book muốn reroll...')
+      .addOptions(options)
+  );
+
+  const msg = await interaction.editReply({ embeds: [rerollEmbed], components: [rrSelectRow, backRow(userId)] });
+
+  const sel = await msg.awaitMessageComponent({
+    filter: i => i.user.id === userId,
+    time: 30_000
+  }).catch(() => null);
+
+  if (!sel) { await interaction.editReply({ components: [] }); return; }
+  await sel.deferUpdate();
+
+  if (sel.customId === `vill_back_${userId}`) {
+    await showVillageBlacksmith(interaction, userId, guildId);
+    return;
+  }
+
+  if (!sel.isStringSelectMenu()) { await showVillageBlacksmith(interaction, userId, guildId); return; }
+
+  const bookId  = sel.values[0];
+  const bookDef = getItem(bookId)!;
+  const tier    = getBookTier(bookId)!;
+
+  const freshPlayer = getPlayer(userId, guildId)!;
+  if (freshPlayer.soul_shards < REROLL_COST) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription('❌ Không đủ Soul Shards!')],
+      components: []
+    });
+    return;
+  }
+
+  removeItem(userId, guildId, bookId, 1);
+  grantSoulShards(userId, guildId, -REROLL_COST);
+
+  const newBookId  = pickDifferentBook(tier, bookId);
+  addItem(userId, guildId, newBookId, 1);
+  const newBookDef = getItem(newBookId)!;
+
+  await interaction.editReply({
+    embeds: [new EmbedBuilder()
+      .setColor(COLORS.magic)
+      .setTitle('🎲 Reroll Thành Công!')
+      .setDescription(
+        `**Trước:** ${bookDef.icon} ${bookDef.name}\n` +
+        `**Sau:**   ${newBookDef.icon} **${newBookDef.name}**\n\n` +
+        `💀 Soul Shards còn lại: **${freshPlayer.soul_shards - REROLL_COST}**`
+      )],
     components: [backRow(userId)]
   });
 }
