@@ -10,7 +10,12 @@ import { data as craftData     } from './commands/craft';
 import { data as dailyData     } from './commands/daily';
 import { data as rerollData    } from './commands/reroll';
 import { data as achievementsData } from './commands/achievements';
-import { data as worldData } from './commands/world';
+import { data as worldData     } from './commands/world';
+import { data as prestigeData  } from './commands/prestige';
+import { data as gatherData    } from './commands/gather';
+import { data as duelData      } from './commands/duel';
+import { data as worldbossData } from './commands/worldboss';
+import { data as fishData      } from './commands/fish';
 
 const commands = [
   startData,
@@ -23,7 +28,12 @@ const commands = [
   dailyData,
   rerollData,
   achievementsData,
-  worldData
+  worldData,
+  prestigeData,
+  gatherData,
+  duelData,
+  worldbossData,
+  fishData,
 ].map(c => c.toJSON());
 const token    = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;
