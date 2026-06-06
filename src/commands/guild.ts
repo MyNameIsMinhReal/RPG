@@ -104,17 +104,17 @@ function uid(): string {
 }
 
 function getClan(clanId: string): ClanRow | undefined {
-  return db.prepare('SELECT * FROM clans WHERE clan_id=?').get(clanId) as ClanRow | undefined;
+  return db.prepare('SELECT * FROM clans WHERE clan_id=?').get(clanId) as unknown as ClanRow | undefined;
 }
 
 function getClanByName(discordGid: string, name: string): ClanRow | undefined {
   return db.prepare('SELECT * FROM clans WHERE discord_gid=? AND LOWER(name)=LOWER(?)')
-    .get(discordGid, name) as ClanRow | undefined;
+    .get(discordGid, name) as unknown as ClanRow | undefined;
 }
 
 function getMembership(userId: string, discordGid: string): MemberRow | undefined {
   return db.prepare('SELECT * FROM clan_members WHERE user_id=? AND discord_gid=?')
-    .get(userId, discordGid) as MemberRow | undefined;
+    .get(userId, discordGid) as unknown as MemberRow | undefined;
 }
 
 function getMemberCount(clanId: string): number {
@@ -128,12 +128,12 @@ function calcPrice(clan: ClanRow): number {
 }
 
 function ensureStock(clan: ClanRow): StockRow {
-  const existing = db.prepare('SELECT * FROM clan_stocks WHERE clan_id=?').get(clan.clan_id) as StockRow | undefined;
+  const existing = db.prepare('SELECT * FROM clan_stocks WHERE clan_id=?').get(clan.clan_id) as unknown as StockRow | undefined;
   if (existing) return existing;
   const price = calcPrice(clan);
   db.prepare('INSERT INTO clan_stocks (clan_id, total_shares, available_shares, price) VALUES (?,1000,800,?)')
     .run(clan.clan_id, price);
-  return db.prepare('SELECT * FROM clan_stocks WHERE clan_id=?').get(clan.clan_id) as StockRow;
+  return db.prepare('SELECT * FROM clan_stocks WHERE clan_id=?').get(clan.clan_id) as unknown as StockRow;
 }
 
 function refreshPrice(clan: ClanRow): void {
@@ -187,7 +187,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
   if (group === 'stock') {
     if (sub === 'market') {
       const clans = db.prepare('SELECT * FROM clans WHERE discord_gid=? ORDER BY level DESC, treasury DESC')
-        .all(discordGid) as ClanRow[];
+        .all(discordGid) as unknown as ClanRow[];
 
       if (clans.length === 0) {
         await i.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.info).setTitle('📈 Thị Trường Cổ Phiếu').setDescription('Chưa có guild nào trên server này.')] });
@@ -222,7 +222,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
         'JOIN clans c ON c.clan_id=h.clan_id ' +
         'JOIN clan_stocks cs ON cs.clan_id=h.clan_id ' +
         'WHERE h.user_id=? AND h.discord_gid=? AND h.shares > 0'
-      ).all(userId, discordGid) as (HoldingRow & { name: string; tag: string; level: number; price: number })[];
+      ).all(userId, discordGid) as unknown as (HoldingRow & { name: string; tag: string; level: number; price: number })[];
 
       if (holdings.length === 0) {
         await i.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.info).setTitle('📊 Danh Mục Đầu Tư').setDescription('Bạn chưa sở hữu cổ phiếu nào.\n\nDùng `/guild stock buy` để đầu tư!')] });
@@ -280,8 +280,8 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
       }
 
       // Max 30% per player
-      const existing = db.prepare('SELECT shares FROM stock_holdings WHERE user_id=? AND discord_gid=? AND clan_id=?')
-        .get(userId, discordGid, targetClan.clan_id) as { shares: number } | undefined;
+      const existing = db.prepare('SELECT shares, avg_cost FROM stock_holdings WHERE user_id=? AND discord_gid=? AND clan_id=?')
+        .get(userId, discordGid, targetClan.clan_id) as { shares: number; avg_cost: number } | undefined;
       const alreadyHeld = existing?.shares ?? 0;
       const maxAllowed  = Math.floor(stock.total_shares * 0.30);
       if (alreadyHeld + shares > maxAllowed) {
@@ -820,7 +820,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
     }
     const targetUser   = i.options.getUser('user', true);
     const targetMembership = db.prepare('SELECT * FROM clan_members WHERE clan_id=? AND user_id=?')
-      .get(myMembership.clan_id, targetUser.id) as MemberRow | undefined;
+      .get(myMembership.clan_id, targetUser.id) as unknown as MemberRow | undefined;
 
     if (!targetMembership) {
       await i.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription(`❌ <@${targetUser.id}> không phải thành viên guild của bạn.`)] });
@@ -850,7 +850,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
     }
     const targetUser  = i.options.getUser('user', true);
     const targetM     = db.prepare('SELECT * FROM clan_members WHERE clan_id=? AND user_id=?')
-      .get(myMembership.clan_id, targetUser.id) as MemberRow | undefined;
+      .get(myMembership.clan_id, targetUser.id) as unknown as MemberRow | undefined;
     if (!targetM) {
       await i.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription(`❌ <@${targetUser.id}> không phải thành viên guild.`)] });
       return;
@@ -881,7 +881,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
     }
     const myClan  = getClan(myMembership.clan_id)!;
     const members = db.prepare('SELECT * FROM clan_members WHERE clan_id=? ORDER BY CASE rank WHEN \'owner\' THEN 0 WHEN \'officer\' THEN 1 ELSE 2 END, contribution DESC')
-      .all(myClan.clan_id) as MemberRow[];
+      .all(myClan.clan_id) as unknown as MemberRow[];
 
     const lines = members.map(m => {
       const badge = m.rank === 'owner' ? '👑' : m.rank === 'officer' ? '⚔️' : '👤';
