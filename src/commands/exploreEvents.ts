@@ -42,6 +42,13 @@ import { showForestWhisperingTree } from './exploreEvents.forest';
 import { showShrineSilentBell } from './exploreEvents.shrine';
 import { showMineCollapse } from './exploreEvents.mines';
 import { showWastesAshStorm } from './exploreEvents.wastes';
+import {
+  getTimeOfDay, getTimeWeightMultipliers,
+  showDawnRitual, showDawnTraveler,
+  showNoonRest, showDayPatrol,
+  showDuskTrader, showDuskOmen,
+  showNightPredator, showMidnightWanderer
+} from './exploreEvents.time';
 
 export type ExploreEventType =
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -52,7 +59,12 @@ export type ExploreEventType =
   | 'black_cat' | 'dice_gambler' | 'glowing_mushroom' | 'chained_prisoner' | 'magic_fountain' | 'laughing_bones'
   | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'nothing'
   // Zone-specific events (separate files)
-  | 'forest_tree' | 'shrine_bell' | 'mine_collapse' | 'wastes_storm';
+  | 'forest_tree' | 'shrine_bell' | 'mine_collapse' | 'wastes_storm'
+  // Time-of-day events (separate file)
+  | 'dawn_ritual' | 'dawn_traveler'
+  | 'noon_rest' | 'day_patrol'
+  | 'dusk_trader' | 'dusk_omen'
+  | 'night_predator' | 'midnight_wanderer';
 
 export interface PickExploreEventInput {
   player: PlayerRow;
@@ -118,19 +130,23 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
   const badPenalty = detection ? 0.45 : 1;
 
   const pity = getPityCounters(player.user_id, guildId);
+  const time = getTimeOfDay();
+  const timeMult = getTimeWeightMultipliers(time);
+  const tm = (event: ExploreEventType, base: number) =>
+    base <= 0 ? base : Math.max(1, Math.round(base * (timeMult[event] ?? 1)));
 
   const base: Array<[ExploreEventType, number]> = [
     ['combat', hasCombat ? 15 : 0],
-    ['ambush', hasCombat ? Math.floor(7 * badPenalty) : 0],
+    ['ambush', hasCombat ? Math.floor(tm('ambush', 7) * badPenalty) : 0],
     ['legacy', hasLegacy ? 6 : 0],
-    ['merchant', 7 + goodBoost],
-    ['spring', 5 + goodBoost],
+    ['merchant', tm('merchant', 7 + goodBoost)],
+    ['spring', tm('spring', 5 + goodBoost)],
     ['trap', Math.floor(5 * badPenalty)],
     ['altar', 4],
-    ['mysterious', 4],
-    ['villager', 4],
-    ['caravan', 3],
-    ['loot', 4 + goodBoost],
+    ['mysterious', tm('mysterious', 4)],
+    ['villager', tm('villager', 4)],
+    ['caravan', tm('caravan', 3)],
+    ['loot', tm('loot', 4 + goodBoost)],
     ['soul_shop', (player.soul_shards >= 1 ? 4 : 1) + goodBoost],
     ['abandoned_camp', 4],
     ['lost_pouch', 3],
@@ -140,25 +156,25 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['spirit_trial', hasCombat ? 2 : 0],
 
     // New story events.
-    ['blood_trail', hasCombat ? 4 : 0],
+    ['blood_trail', hasCombat ? tm('blood_trail', 4) : 0],
     ['nameless_grave', 4],
-    ['memory_seller', 3],
+    ['memory_seller', tm('memory_seller', 3)],
     ['stranger_campfire', 4],
     ['cracked_shrine', 4],
     ['injured_monster', hasCombat ? 3 : 0],
-    ['wanted_merchant', 3],
-    ['bounty_hunter', (rep <= -20 || wanted >= 2) && hasCombat ? 5 + wanted * 2 : 0],
+    ['wanted_merchant', tm('wanted_merchant', 3)],
+    ['bounty_hunter', (rep <= -20 || wanted >= 2) && hasCombat ? tm('bounty_hunter', 5 + wanted * 2) : 0],
     ['rebirth_rift', 3],
     ['failed_legacy', deaths > 0 ? 4 : 0],
     ['mirror_clone', hasCombat ? 3 : 0],
-    ['talking_corpse', 3],
-    ['black_eclipse', 1],
+    ['talking_corpse', tm('talking_corpse', 3)],
+    ['black_eclipse', tm('black_eclipse', 1)],
     ['fate_coin', 3],
     ['merchant_tax', robberyCount > 0 || markup > 0 ? 3 : 0],
     ['merchant_guard', (rep <= -35 || wanted >= 3) && hasCombat ? 3 + wanted : 0],
     ['wanted_notice', robberyCount > 0 || rep <= -25 || wanted > 0 ? 3 + wanted : 0],
     ['shopkeeper_mercy', robberyCount > 0 ? 2 : 0],
-    ['black_cat', 3],
+    ['black_cat', tm('black_cat', 3)],
     ['dice_gambler', 3],
     ['glowing_mushroom', 3],
     ['chained_prisoner', 3],
@@ -175,6 +191,16 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['shrine_bell',   player.zone_id === 'shrine' ? 4 : 0],
     ['mine_collapse', player.zone_id === 'mines'  ? 4 : 0],
     ['wastes_storm',  player.zone_id === 'wastes' ? 4 : 0],
+
+    // Time-of-day events
+    ['dawn_ritual',        time === 'dawn'  ? 4 : 0],
+    ['dawn_traveler',      time === 'dawn'  ? 3 : 0],
+    ['noon_rest',          time === 'day'   ? 3 : 0],
+    ['day_patrol',         time === 'day'   ? 3 : 0],
+    ['dusk_trader',        time === 'dusk'  ? 4 : 0],
+    ['dusk_omen',          time === 'dusk'  ? 3 : 0],
+    ['night_predator',     time === 'night' && hasCombat ? 4 : 0],
+    ['midnight_wanderer',  time === 'night' ? 3 : 0],
   ];
 
   // Apply pity bonus to unconditional events that haven't appeared in a while.
@@ -252,6 +278,14 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'shrine_bell':   return showShrineSilentBell(ctx);
     case 'mine_collapse': return showMineCollapse(ctx);
     case 'wastes_storm':  return showWastesAshStorm(ctx);
+    case 'dawn_ritual':       return showDawnRitual(ctx);
+    case 'dawn_traveler':     return showDawnTraveler(ctx);
+    case 'noon_rest':         return showNoonRest(ctx);
+    case 'day_patrol':        return showDayPatrol(ctx);
+    case 'dusk_trader':       return showDuskTrader(ctx);
+    case 'dusk_omen':         return showDuskOmen(ctx);
+    case 'night_predator':    return showNightPredator(ctx);
+    case 'midnight_wanderer': return showMidnightWanderer(ctx);
     default: return finish(ctx, simpleEmbed(COLORS.info, `*${pick(getZone(ctx.player.zone_id)?.ambiance ?? ['Không có gì bất thường...'])}*\n\nKhông có gì bất thường...`));
   }
 }
