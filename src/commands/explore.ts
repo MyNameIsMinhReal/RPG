@@ -13,6 +13,8 @@ import {
 } from '../systems/player';
 import { getCombatByUser, saveCombat, deleteCombat } from '../systems/combat';
 import { startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow } from '../systems/combatFlow';
+import { startPartyCombatFlow } from '../systems/partyCombatFlow';
+import { getPartyOf } from '../systems/party';
 import { canExplore, exploreCooldownRemaining, setExploreCooldown } from '../systems/economy';
 import { processVictoryRewards, processDeathPenalty } from '../systems/rewards';
 import {
@@ -511,13 +513,32 @@ async function handleSearch(
   const enemies  = getEnemiesForZone(player.zone_id);
   const legacies = getLegaciesInZone(guildId, player.zone_id, 5);
 
+  // Detect party
+  const party = getPartyOf(guildId, userId);
+  const isPartyLeader = party?.leaderId === userId && (party?.memberIds.length ?? 0) > 1;
+  const partyMemberIds = isPartyLeader ? party!.memberIds : undefined;
+
+  const startPartyCombat = async (enemyId: string) => {
+    await startPartyCombatFlow(
+      interaction, userId, guildId, partyMemberIds!, enemyId,
+      async () => {
+        const reply = await interaction.fetchReply();
+        attachContinueExploreHandler(reply as any, interaction, userId, guildId);
+      }
+    );
+  };
+
   // 25% chance of group encounter when zone has ≥2 non-boss enemies
   if (enemies.length >= 2 && Math.random() < 0.25) {
     setExploreCooldown(userId, guildId);
-    const shuffled = [...enemies].sort(() => Math.random() - 0.5);
-    const count = (enemies.length >= 3 && Math.random() < 0.4) ? 3 : 2;
-    const groupIds = shuffled.slice(0, count).map(e => e.id);
-    await startGroupCombatFlow(interaction, userId, guildId, groupIds, handleVictory, handleDeath, handleFlee);
+    if (isPartyLeader) {
+      await startPartyCombat(pick(enemies).id);
+    } else {
+      const shuffled = [...enemies].sort(() => Math.random() - 0.5);
+      const count = (enemies.length >= 3 && Math.random() < 0.4) ? 3 : 2;
+      const groupIds = shuffled.slice(0, count).map(e => e.id);
+      await startGroupCombatFlow(interaction, userId, guildId, groupIds, handleVictory, handleDeath, handleFlee);
+    }
     return;
   }
 
@@ -537,8 +558,11 @@ async function handleSearch(
     player,
     enemies,
     legacies,
+    partyMemberIds,
     callbacks: {
-      startCombat: (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee),
+      startCombat: isPartyLeader
+        ? startPartyCombat
+        : (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee),
       handleFlee,
       showAmbush: () => showAmbush(interaction, userId, guildId, pick(enemies).id),
       showLegacyFind: () => showLegacyFind(interaction, userId, guildId, legacies),

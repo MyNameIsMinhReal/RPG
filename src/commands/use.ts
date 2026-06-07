@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { getPlayer, getItemQty } from '../systems/player';
-import { incrementDaily } from './daily';
+import { incrementDaily, countsAsPotion } from './daily';
 import { COLORS } from '../utils/embeds';
 import { getItem } from '../data/items';
 import { useItemOutsideCombat } from '../systems/consumables';
@@ -37,7 +37,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const result = useItemOutsideCombat(userId, guildId, itemId);
   const afterQty = getItemQty(userId, guildId, itemId);
 
-  if (result.consumed) incrementDaily(userId, guildId, 'potion_used');
+  if (result.consumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
 
   await interaction.editReply({
     embeds: [new EmbedBuilder()

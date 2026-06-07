@@ -15,7 +15,7 @@ export const data = new SlashCommandBuilder()
 
 // ── Quest progress helpers ─────────────────────────────────────────────────
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 }
 
 export interface DailyRow {
@@ -52,6 +52,14 @@ export function incrementDaily(userId: string, guildId: string, field: 'explore_
   getOrCreateDaily(userId, guildId);
   db.prepare(`UPDATE daily_quests SET ${field} = ${field} + 1 WHERE user_id=? AND guild_id=? AND date=?`)
     .run(userId, guildId, date);
+}
+
+export function countsAsPotion(itemId: string): boolean {
+  const { getItem } = require('../data/items');
+  const item = getItem(itemId);
+  if (!item || item.type !== 'consumable') return false;
+  const e: any = item.effect ?? {};
+  return !!(e.hp || e.hpPercent || e.mp || e.mpPercent);
 }
 
 // ── Rewards ────────────────────────────────────────────────────────────────
@@ -114,7 +122,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         inline: false
       }
     )
-    .setFooter({ text: `Reset lúc 00:00 UTC  ·  Hôm nay: ${daily.date}` });
+    .setFooter({ text: `Reset lúc 00:00 giờ Việt Nam  ·  Hôm nay: ${daily.date}` });
 
   const canClaim = allDone && !daily.claimed;
 
@@ -139,9 +147,23 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (!btn) { await interaction.editReply({ components: [] }); return; }
   await btn.deferUpdate();
 
-  // Mark claimed
-  db.prepare('UPDATE daily_quests SET claimed=1 WHERE user_id=? AND guild_id=? AND date=?')
-    .run(userId, guildId, todayStr());
+  // Mark claimed — atomic check prevents double-claim
+  const claimRes = db.prepare(`
+    UPDATE daily_quests SET claimed=1
+    WHERE user_id=? AND guild_id=? AND date=?
+      AND claimed=0
+      AND explore_count >= explore_goal
+      AND kill_count >= kill_goal
+      AND potion_used >= potion_goal
+  `).run(userId, guildId, daily.date);
+
+  if ((claimRes as any).changes === 0) {
+    await btn.editReply({
+      embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription('⚠️ Daily đã được claim rồi hoặc chưa đủ điều kiện.')],
+      components: []
+    });
+    return;
+  }
 
   // Give rewards
   grantGold(userId, guildId, DAILY_REWARDS.gold);

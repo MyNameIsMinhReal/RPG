@@ -3,7 +3,7 @@ import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ComponentType, StringSelectMenuInteraction
 } from 'discord.js';
-import { getPlayer, getLoadout, applyPassiveStats, getItemQty, removeItem } from './player';
+import { getPlayer, getLoadout, applyPassiveStats, getItemQty, removeItem, updatePlayerHpMp } from './player';
 import {
   getCombatByUser, saveCombat, deleteCombat,
   processAttack, processSkill, processDefend, processFlee, processItemUse,
@@ -17,7 +17,7 @@ import type { CombatEnemy } from '../utils/embeds';
 import { withImage } from '../utils/eventImages';
 import { getEnemyAtkBonus } from './world';
 import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumables';
-import { incrementDaily } from '../commands/daily';
+import { incrementDaily, countsAsPotion } from '../commands/daily';
 
 export type CombatVictoryHandler = (
   interaction: ChatInputCommandInteraction,
@@ -230,12 +230,13 @@ export async function startCombatFlow(
         const aliveGroup = stateGroup?.filter((e: any) => e.hp > 0) ?? null;
         if (aliveGroup && aliveGroup.length > 1) {
           const { StringSelectMenuBuilder: SMB, StringSelectMenuOptionBuilder: SMOB, ActionRowBuilder: ARB } = require('discord.js');
-          const opts = aliveGroup.map((e: any) => {
-            const origIdx = stateGroup!.findIndex((g: any) => g.id === e.id && g.hp === e.hp);
-            return new SMOB()
-              .setLabel(`[${origIdx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
-              .setValue(`rpg_attackidx_${userId}_${origIdx}`);
-          });
+          const opts = stateGroup!
+            .map((e: any, i: number) => ({ ...e, _idx: i }))
+            .filter((e: any) => e.hp > 0)
+            .map((e: any) => new SMOB()
+              .setLabel(`[${e._idx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
+              .setValue(`rpg_attackidx_${userId}_${e._idx}`)
+            );
           await compInt.editReply({ components: [new ARB().addComponents(
             new SMB().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu tấn công...').addOptions(opts.slice(0, 25))
           ), makeBackRow(userId)]});
@@ -276,7 +277,7 @@ export async function startCombatFlow(
         const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
         if (!itemId) return;
         result = processItemUse(current, itemId);
-        if (result.itemConsumed) incrementDaily(userId, guildId, 'potion_used');
+        if (result.itemConsumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
       }
       else if (cid === `rpg_skill_${userId}`) {
         const updatedLoadout = getLoadout(userId, guildId);
@@ -364,7 +365,10 @@ export async function startCombatFlow(
 
   collector.on('end', (_c, reason) => {
     const cur = getCombatByUser(userId, guildId);
-    if (cur) deleteCombat(cur.message_id);
+    if (cur) {
+      updatePlayerHpMp(userId, guildId, cur.player_hp, cur.player_mp);
+      deleteCombat(cur.message_id);
+    }
     if (reason === 'time') {
       interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⏰ Trận chiến timeout.')], components: [] }).catch(() => {});
     }
@@ -396,6 +400,7 @@ export async function startCombatFlowWithEnemy(
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
   const withPassive    = buffedStart.player;
 
+  enemy = { ...enemy };
   const greedBuff = getBuff(userId, guildId, 'scroll_greed');
   if (greedBuff) enemy.atk = Math.floor(enemy.atk * 1.15);
   const smokeBuff = enemy?.isShopkeeper ? consumeBuff(userId, guildId, 'assassins_smoke') : undefined;
@@ -473,10 +478,13 @@ export async function startCombatFlowWithEnemy(
         const aliveGroup = stateGroup?.filter((e: any) => e.hp > 0) ?? null;
         if (aliveGroup && aliveGroup.length > 1) {
           const { StringSelectMenuBuilder: SMBa, StringSelectMenuOptionBuilder: SMOBa, ActionRowBuilder: ARBa } = require('discord.js');
-          const optsa = aliveGroup.map((e: any) => {
-            const origIdx = stateGroup!.findIndex((g: any) => g.id === e.id && g.hp === e.hp);
-            return new SMOBa().setLabel(`[${origIdx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`).setValue(`rpg_attackidx_${userId}_${origIdx}`);
-          });
+          const optsa = stateGroup!
+            .map((e: any, i: number) => ({ ...e, _idx: i }))
+            .filter((e: any) => e.hp > 0)
+            .map((e: any) => new SMOBa()
+              .setLabel(`[${e._idx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
+              .setValue(`rpg_attackidx_${userId}_${e._idx}`)
+            );
           await compInt.editReply({ components: [new ARBa().addComponents(new SMBa().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu...').addOptions(optsa.slice(0, 25))), makeBackRow(userId)] });
           return;
         }
@@ -502,7 +510,7 @@ export async function startCombatFlowWithEnemy(
         const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
         if (!itemId) return;
         result = processItemUse(current, itemId);
-        if (result.itemConsumed) incrementDaily(userId, guildId, 'potion_used');
+        if (result.itemConsumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
       }
       else if (cid === `rpg_skill_${userId}`) {
         const updatedLoadout = getLoadout(userId, guildId);
@@ -589,7 +597,10 @@ export async function startCombatFlowWithEnemy(
 
   collector.on('end', (_c, reason) => {
     const cur = getCombatByUser(userId, guildId);
-    if (cur) deleteCombat(cur.message_id);
+    if (cur) {
+      updatePlayerHpMp(userId, guildId, cur.player_hp, cur.player_mp);
+      deleteCombat(cur.message_id);
+    }
     if (reason === 'time') {
       interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⏰ Trận chiến timeout.')], components: [] }).catch(() => {});
     }
@@ -692,10 +703,13 @@ export async function startGroupCombatFlow(
         const alive = sg?.filter((e: any) => e.hp > 0) ?? null;
         if (alive && alive.length > 1) {
           const { StringSelectMenuBuilder: SMB, StringSelectMenuOptionBuilder: SMOB, ActionRowBuilder: ARB } = require('discord.js');
-          const opts = alive.map((e: any) => {
-            const origIdx = sg!.findIndex((g: any) => g.id === e.id && g.hp === e.hp);
-            return new SMOB().setLabel(`[${origIdx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`).setValue(`rpg_attackidx_${userId}_${origIdx}`);
-          });
+          const opts = sg!
+            .map((e: any, i: number) => ({ ...e, _idx: i }))
+            .filter((e: any) => e.hp > 0)
+            .map((e: any) => new SMOB()
+              .setLabel(`[${e._idx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
+              .setValue(`rpg_attackidx_${userId}_${e._idx}`)
+            );
           await compInt.editReply({ components: [new ARB().addComponents(new SMB().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu...').addOptions(opts.slice(0, 25))), makeBackRow(userId)] });
           return;
         }
@@ -728,7 +742,7 @@ export async function startGroupCombatFlow(
         const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
         if (!itemId) return;
         result = processItemUse(current, itemId);
-        if (result.itemConsumed) incrementDaily(userId, guildId, 'potion_used');
+        if (result.itemConsumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
       }
       else if (cid === `rpg_skill_${userId}`) {
         const updatedLoadout = getLoadout(userId, guildId);
@@ -792,7 +806,10 @@ export async function startGroupCombatFlow(
 
   collector.on('end', (_c, reason) => {
     const cur = getCombatByUser(userId, guildId);
-    if (cur) deleteCombat(cur.message_id);
+    if (cur) {
+      updatePlayerHpMp(userId, guildId, cur.player_hp, cur.player_mp);
+      deleteCombat(cur.message_id);
+    }
     if (reason === 'time') {
       interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⏰ Trận chiến timeout.')], components: [] }).catch(() => {});
     }

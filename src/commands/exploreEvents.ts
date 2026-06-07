@@ -113,6 +113,8 @@ export interface RunExploreEventInput {
   enemies: any[];
   legacies: any[];
   callbacks: ExploreEventCallbacks;
+  /** When set, explore events use majority voting among all party members */
+  partyMemberIds?: string[];
 }
 
 export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType {
@@ -353,13 +355,51 @@ async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
 async function awaitButton(ctx: RunExploreEventInput, row: ActionRowBuilder<ButtonBuilder>, embed: EmbedBuilder, imageKey?: string, time = 30_000): Promise<string | null> {
   const payload = imageKey ? withImage(embed, imageKey) : { embed, files: [] as any[] };
   const reply = await ctx.interaction.editReply({ embeds: [payload.embed], files: payload.files, components: [row] });
-  const btn = await reply.awaitMessageComponent({
-    filter: onlyUser(ctx.userId),
-    time
-  }).catch(() => null);
-  if (!btn || !btn.isButton()) return null;
-  const ok = await btn.deferUpdate().then(() => true).catch(() => false);
-  return ok ? btn.customId : null;
+
+  // Solo path
+  const memberIds = ctx.partyMemberIds;
+  if (!memberIds || memberIds.length <= 1) {
+    const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time }).catch(() => null);
+    if (!btn || !btn.isButton()) return null;
+    const ok = await btn.deferUpdate().then(() => true).catch(() => false);
+    return ok ? btn.customId : null;
+  }
+
+  // Party voting path — collect votes for `time` ms or until all have voted
+  return new Promise<string | null>(resolve => {
+    const votes = new Map<string, string>(); // userId → customId
+
+    const collector = reply.createMessageComponentCollector({
+      filter: (i) => memberIds.includes(i.user.id) && i.isButton(),
+      time
+    });
+
+    const updateDisplay = async () => {
+      const total = memberIds.length;
+      const voted = votes.size;
+      const statusLine = `🗳️ Đã vote: **${voted}/${total}**` + (voted < total ? ' — đang chờ...' : '');
+      await ctx.interaction.editReply({
+        embeds: [new EmbedBuilder(payload.embed.toJSON()).setFooter({ text: statusLine })]
+      }).catch(() => {});
+    };
+
+    collector.on('collect', async (i) => {
+      votes.set(i.user.id, i.customId);
+      await i.deferUpdate().catch(() => {});
+      await updateDisplay();
+      if (votes.size >= memberIds.length) collector.stop('all_voted');
+    });
+
+    collector.on('end', () => {
+      if (votes.size === 0) { resolve(null); return; }
+      // Tally votes, pick winner (ties broken by first vote cast)
+      const tally = new Map<string, number>();
+      for (const cid of votes.values()) tally.set(cid, (tally.get(cid) ?? 0) + 1);
+      let winner = '', maxV = 0;
+      for (const [cid, count] of tally) { if (count > maxV) { maxV = count; winner = cid; } }
+      resolve(winner || null);
+    });
+  });
 }
 
 function eventEnemy(ctx: RunExploreEventInput, base: any, overrides: Partial<any>) {
@@ -1197,12 +1237,12 @@ async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
   const comp = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 45_000 }).catch(() => null);
   if (!comp) return finish(ctx, simpleEmbed(COLORS.info, '🌑 Cánh cửa chợ đen khép lại.'));
   const ok = await comp.deferUpdate().then(() => true).catch(() => false);
-  if (!ok) return;
+  if (!ok) return finish(ctx, simpleEmbed(COLORS.info, '🌑 Cánh cửa chợ đen khép lại.'));
   if ((comp as any).customId === `black_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn rời chợ đen trước khi bị kéo sâu hơn.'));
 
   const itemId = (comp as any).values?.[0];
   const row = stock.find(x => x.id === itemId);
-  if (!row) return;
+  if (!row) return finish(ctx, simpleEmbed(COLORS.info, '🌑 Cánh cửa chợ đen khép lại.'));
   const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (fresh.gold < row.price) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không đủ Gold.'));
   spendGold(ctx.userId, ctx.guildId, row.price);

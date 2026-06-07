@@ -12,6 +12,7 @@ export interface Effect {
   name: string;
   duration: number;
   value?: number;
+  target?: 'player' | 'enemy';
 }
 
 // ── Combat CRUD ───────────────────────────────────────────────────────────
@@ -147,25 +148,30 @@ export function hasEffect(effects: Effect[], name: string): boolean {
   return effects.some(e => e.name === name && e.duration > 0);
 }
 
-export function tickEffects(effects: Effect[]): { effects: Effect[]; burnDmg: number } {
-  let burnDmg = 0;
+export function tickEffects(effects: Effect[]): { effects: Effect[]; playerBurnDmg: number; enemyBurnDmg: number } {
+  let playerBurnDmg = 0;
+  let enemyBurnDmg = 0;
   const next = effects
     .map(e => {
-      if (e.name === 'burn') burnDmg += e.value ?? 5;
-      if (e.name === 'poison') burnDmg += e.value ?? 4;
+      if (e.name === 'burn' || e.name === 'poison') {
+        const val = e.value ?? (e.name === 'burn' ? 5 : 4);
+        if (e.target === 'enemy') enemyBurnDmg += val;
+        else playerBurnDmg += val;
+      }
       return { ...e, duration: e.duration - 1 };
     })
     .filter(e => e.duration > 0);
-  return { effects: next, burnDmg };
+  return { effects: next, playerBurnDmg, enemyBurnDmg };
 }
 
-export function addEffect(effects: Effect[], name: string, duration: number, value?: number): Effect[] {
+export function addEffect(effects: Effect[], name: string, duration: number, value?: number, target?: 'player' | 'enemy'): Effect[] {
   const idx = effects.findIndex(e => e.name === name);
   if (idx >= 0) {
     effects[idx].duration = Math.max(effects[idx].duration, duration);
     if (value !== undefined) effects[idx].value = value;
+    if (target !== undefined) effects[idx].target = target;
   } else {
-    effects.push({ name, duration, value });
+    effects.push({ name, duration, value, target });
   }
   return effects;
 }
@@ -277,7 +283,7 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
 
   // Equipment effects on hit
   if (eqStats.effects.includes('burn_on_hit') && randInt(1, 100) <= 20) {
-    addEffect(effects, 'burn', 2, 5);
+    addEffect(effects, 'burn', 2, 5, 'enemy');
     logs.push(`🔥 Flameblade — Đốt cháy 2 lượt!`);
   }
   if (eqStats.effects.includes('stun_on_hit') && randInt(1, 100) <= 15) {
@@ -364,25 +370,10 @@ export function processSkill(
   player_mp -= realMpCost;
   if (focusDiscount > 0 && (skill.mpCost ?? 0) > 0) logs.push(`💠 Focus Tonic: MP cost giảm còn **${realMpCost}**.`);
 
-  // ── World skills ────────────────────────────────────────────────────────
+  // ── World skills — blocked in combat ─────────────────────────────────────
   if (skill.type === 'world') {
-    const player = getPlayer(state.user_id, state.guild_id);
-    const zoneId = player?.zone_id ?? 'forest';
-
-    if (skill.worldEffect === 'zone_marked') {
-      const { setFlag } = require('./world');
-      setFlag(state.guild_id, `zone_marked_${zoneId}`, '1', 86400);
-      logs.push(`📍 **Mark Zone!** Drop rate +15% tại zone trong 24h!`);
-    } else if (skill.worldEffect === 'soul_drop') {
-      const sacrifice = Math.floor(state.player_max_hp * 0.2);
-      player_hp = Math.max(1, player_hp - sacrifice);
-      const { grantSoulShards } = require('./player');
-      grantSoulShards(state.user_id, state.guild_id, 2);
-      logs.push(`💀 **Soul Offering!** Hy sinh **${sacrifice} HP** → +**2 Soul Shards**!`);
-    }
-
-    // World skills skip enemy counter
-    return makeResult(state, { ...state }, player_hp, player_mp, effects, logs, false, false, false);
+    logs.push(`❌ **${skill.name}** không thể dùng trong chiến đấu!`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
   }
 
   // ── Damage skills ────────────────────────────────────────────────────────
@@ -423,7 +414,8 @@ export function processSkill(
   // ── Effects — applied REGARDLESS of damage (fixes Shadow Step!) ──────────
   if (skill.effect && skill.effectDuration) {
     const val = skill.effect === 'burn' ? 5 : undefined;
-    addEffect(effects, skill.effect, skill.effectDuration, val);
+    const effectTarget = skill.effect === 'burn' ? 'enemy' as const : undefined;
+    addEffect(effects, skill.effect, skill.effectDuration, val, effectTarget);
     const effectLabels: Record<string, string> = {
       burn: '🔥 Đốt cháy', slow: '🧊 Làm chậm', stun: '💫 Choáng',
       dodge: '🌑 Shadow Step — sẽ né đòn tấn công tiếp theo'
@@ -517,8 +509,9 @@ function enemyTurn(
   if (hasEffect(effects, 'stun')) {
     logs.push(`💫 **${enemy.name}** bị choáng — bỏ qua lượt!`);
     const nextEffects = effects.map(e => e.name === 'stun' ? { ...e, duration: e.duration - 1 } : e).filter(e => e.duration > 0);
-    const { effects: ticked, burnDmg } = tickEffects(nextEffects);
-    if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); logs.push(`🔥 Đốt cháy −**${burnDmg} HP**.`); }
+    const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(nextEffects);
+    if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     if (passives.mpRegenPerTurn > 0) logs.push(`💫 Hồi **${passives.mpRegenPerTurn} MP** (Mana Flow).`);
@@ -534,8 +527,9 @@ function enemyTurn(
       const idx = effects.findIndex(e => e.name === 'shield');
       effects.splice(idx, 1);
       logs.push(`🛡️💀 **Soul Guard** bloqueou o golpe! O ataque foi absorvido!`);
-      const { effects: ticked, burnDmg } = tickEffects(effects);
-      if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); }
+      const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
+      if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); }
+      if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
       playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
       playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
       return makeResult(original, current, playerHp, playerMp, ticked, logs, false, false, false);
@@ -548,8 +542,9 @@ function enemyTurn(
   const passiveDodge = (eqStatsET.dodgeChance ?? 0) + clsPassET.dodgeBonus;
   if (passiveDodge > 0 && !hasEffect(effects, 'dodge') && randInt(1, 100) <= passiveDodge) {
     logs.push(`💨 **Dodge pasif (${passiveDodge}%)** — Tránh đòn!`);
-    const { effects: ticked, burnDmg } = tickEffects(effects);
-    if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); }
+    const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
+    if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     return makeResult(original, current, playerHp, playerMp, ticked, logs, false, false, false);
@@ -561,8 +556,9 @@ function enemyTurn(
     effects.splice(idx, 1);
     logs.push(`🌑 **Shadow Step!** Bạn né hoàn toàn đòn tấn công của **${enemy.name}**!`);
     // Tick remaining effects
-    const { effects: ticked, burnDmg } = tickEffects(effects);
-    if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); logs.push(`🔥 Đốt cháy −**${burnDmg} HP**.`); }
+    const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
+    if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
@@ -584,10 +580,13 @@ function enemyTurn(
   let dealDmg      = 0;
 
   if (special) {
-    const res = applySpecialAttack(special, enemyAtk, enemy, playerHp, playerMp, logs);
+    const res = applySpecialAttack(special, enemyAtk, enemy, playerHp, playerMp, logs, (current as any).player_def ?? 0);
     playerHp = res.playerHp;
     playerMp = res.playerMp;
     dealDmg  = res.dmg;
+    if (res.enemyHeal > 0) {
+      current = { ...current, enemy_hp: Math.min(current.enemy_max_hp, current.enemy_hp + res.enemyHeal) };
+    }
   } else {
     dealDmg  = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
     const armorReduce = (effects.find(e => e.name === 'armor_polish')?.value ?? 0) + (effects.find(e => e.name === 'stone_skin')?.value ?? 0);
@@ -612,17 +611,27 @@ function enemyTurn(
       // Reflect in return state
       current = { ...current, enemy_hp: newEnemyHp };
       if (newEnemyHp <= 0) {
-        const { effects: ticked, burnDmg } = tickEffects(effects);
+        const { effects: ticked } = tickEffects(effects);
         return makeResult(original, current, playerHp, playerMp, ticked, logs, false, true, false);
       }
     }
   }
 
   // ── Tick end-of-turn effects ───────────────────────────────────────────
-  const { effects: ticked, burnDmg } = tickEffects(effects);
-  if (burnDmg > 0) {
-    playerHp = Math.max(0, playerHp - burnDmg);
-    logs.push(`🔥 Đốt cháy gây **${burnDmg}** sát thương theo thời gian.`);
+  const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
+  if (playerBurnDmg > 0) {
+    playerHp = Math.max(0, playerHp - playerBurnDmg);
+    logs.push(`🔥 Đốt cháy gây **${playerBurnDmg}** sát thương theo thời gian.`);
+  }
+  if (enemyBurnDmg > 0) {
+    const newEH = Math.max(0, current.enemy_hp - enemyBurnDmg);
+    logs.push(`🔥 Địch bị đốt cháy gây **${enemyBurnDmg}** sát thương!`);
+    current = { ...current, enemy_hp: newEH };
+    if (newEH <= 0) {
+      playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
+      playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
+      return makeResult(original, current, playerHp, playerMp, ticked, logs, false, true, false);
+    }
   }
 
   // ── Passive regen ──────────────────────────────────────────────────────
@@ -743,8 +752,19 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
     if (enemy?.boss) logs.push('🔥 Boss chính dập tắt Arson Bottle trước khi lửa lan ra.');
     else {
       const dmg = Math.max(8, Math.floor(state.player_max_hp * 0.08));
-      enemy_hp = Math.max(0, enemy_hp - dmg);
-      logs.push(`🔥 Arson Bottle phát nổ, gây **${dmg}** sát thương trực tiếp!`);
+      const arsonGroup = getGroupEnemies(state);
+      if (arsonGroup) {
+        let hit = 0;
+        for (let i = 0; i < arsonGroup.length; i++) {
+          if (arsonGroup[i].hp > 0) { arsonGroup[i] = { ...arsonGroup[i], hp: Math.max(0, arsonGroup[i].hp - dmg) }; hit++; }
+        }
+        enemy_hp = arsonGroup.find(e => e.hp > 0)?.hp ?? 0;
+        state = { ...state, enemies_json: JSON.stringify(arsonGroup) };
+        logs.push(`🔥 Arson Bottle thiêu cháy **${hit}** địch, mỗi con mất **${dmg}** HP!`);
+      } else {
+        enemy_hp = Math.max(0, enemy_hp - dmg);
+        logs.push(`🔥 Arson Bottle phát nổ, gây **${dmg}** sát thương trực tiếp!`);
+      }
     }
   }
 
@@ -772,8 +792,9 @@ function groupEnemyTurn(
   if (hasEffect(effects, 'stun')) {
     logs.push(`💫 Tất cả kẻ thù bị choáng — bỏ qua lượt!`);
     const nextEffects = effects.map(e => e.name === 'stun' ? { ...e, duration: e.duration - 1 } : e).filter(e => e.duration > 0);
-    const { effects: ticked, burnDmg } = tickEffects(nextEffects);
-    if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); logs.push(`🔥 Đốt cháy −**${burnDmg} HP**.`); }
+    const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(nextEffects);
+    if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
+    if (enemyBurnDmg > 0) { const fa = enemies.findIndex(e => e.hp > 0); if (fa >= 0) enemies[fa] = { ...enemies[fa], hp: Math.max(0, enemies[fa].hp - enemyBurnDmg) }; }
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     const updatedState = { ...current, enemies_json: JSON.stringify(enemies) };
@@ -833,8 +854,12 @@ function groupEnemyTurn(
         expReward: 0, goldMin: 0, goldMax: 0, drops: [],
         specialAttacks: combatEnemy.specialAttacks, zones: [], lore: ''
       };
-      const res = applySpecialAttack(special, enemyAtk, fakeDef, playerHp, playerMp, logs);
+      const res = applySpecialAttack(special, enemyAtk, fakeDef, playerHp, playerMp, logs, (current as any).player_def ?? 0);
       playerHp = res.playerHp; playerMp = res.playerMp; dealDmg = res.dmg;
+      if (res.enemyHeal > 0) {
+        const healIdx = enemies.findIndex(e => e === combatEnemy);
+        if (healIdx >= 0) enemies[healIdx] = { ...combatEnemy, hp: Math.min(combatEnemy.max_hp, combatEnemy.hp + res.enemyHeal) };
+      }
     } else {
       dealDmg = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
       const armorReduce = (effects.find(e => e.name === 'armor_polish')?.value ?? 0) + (effects.find(e => e.name === 'stone_skin')?.value ?? 0);
@@ -862,8 +887,19 @@ function groupEnemyTurn(
     }
   }
 
-  const { effects: ticked, burnDmg } = tickEffects(effects);
-  if (burnDmg > 0) { playerHp = Math.max(0, playerHp - burnDmg); logs.push(`🔥 Đốt cháy gây **${burnDmg}** sát thương theo thời gian.`); }
+  const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
+  if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy gây **${playerBurnDmg}** sát thương theo thời gian.`); }
+  if (enemyBurnDmg > 0) {
+    const fa = enemies.findIndex(e => e.hp > 0);
+    if (fa >= 0) {
+      enemies[fa] = { ...enemies[fa], hp: Math.max(0, enemies[fa].hp - enemyBurnDmg) };
+      logs.push(`🔥 Địch bị đốt cháy gây **${enemyBurnDmg}** sát thương!`);
+      if (enemies.every(e => e.hp <= 0)) {
+        const burnKillState = { ...current, enemies_json: JSON.stringify(enemies) };
+        return makeResult(original, burnKillState, playerHp, playerMp, ticked, logs, false, true, false);
+      }
+    }
+  }
   if (passives.hpRegenPerTurn > 0 && playerHp > 0) { playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn); logs.push(`💪 **Tough Body:** Hồi **${passives.hpRegenPerTurn} HP**.`); }
   if (passives.mpRegenPerTurn > 0) { playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn); logs.push(`💫 **Mana Flow:** Hồi **${passives.mpRegenPerTurn} MP**.`); }
 
@@ -881,13 +917,21 @@ function groupEnemyTurn(
 // ── Special attack dispatch ───────────────────────────────────────────────
 function applySpecialAttack(
   special: string, baseAtk: number, enemy: EnemyDef,
-  playerHp: number, playerMp: number, logs: string[]
-): { playerHp: number; playerMp: number; dmg: number } {
+  playerHp: number, playerMp: number, logs: string[],
+  playerDef = 0
+): { playerHp: number; playerMp: number; dmg: number; enemyHeal: number } {
+  // Armor-piercing attacks intentionally ignore DEF; all others use full DEF
+  const PIERCE_DEF = new Set([
+    'piercing_arrow', 'bone_shards', 'backstab', 'ambush', 'phase_through',
+    'phantom_shot', 'spectral_slash', 'banish', 'abyss_strike', 'erase',
+  ]);
+  const def = (n: string) => PIERCE_DEF.has(n) ? 0 : playerDef;
   let dmg = 0;
+  let enemyHeal = 0;
   const n = enemy.name, ic = enemy.icon;
   switch (special) {
     case 'double_bite':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.6, 0)) * 2;
+      dmg = Math.max(1, calcDamage(baseAtk * 0.6, def(special))) * 2;
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`🐺 **${n}** cắn **hai lần**! Tổng **${dmg}** sát thương!`); break;
     case 'drain_mp': {
@@ -895,224 +939,231 @@ function applySpecialAttack(
       logs.push(`${ic} **${n}** hút **${d} MP**!`); break;
     }
     case 'petal_storm':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.8, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.8, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** tung **Petal Storm**! **${dmg}** sát thương!`); break;
     case 'root_slam':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.5, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.5, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** đập rễ cây! **${dmg}** sát thương!`); break;
     case 'nature_regeneration':
-      logs.push(`${ic} **${n}** hồi phục sinh lực từ đất!`); break;
+      enemyHeal = Math.max(1, Math.floor(enemy.hp * 0.15));
+      logs.push(`${ic} **${n}** hồi phục sinh lực từ đất! +**${enemyHeal} HP**`); break;
     case 'divine_judgment':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.4, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.4, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** tung **Divine Judgment**! **${dmg}** sát thương!`); break;
     case 'shatter_guard':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.1, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** phá vỡ phòng thủ! **${dmg}** sát thương!`); break;
     case 'enrage':
-      logs.push(`${ic} **${n}** nổi điên — ATK tăng mạnh!`); break;
+      dmg = Math.max(1, calcDamage(baseAtk * 0.7, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** nổi điên và tung đòn điên cuồng! **${dmg}** sát thương!`); break;
     case 'cave_in':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.2, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.2, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** gây sạt lở! **${dmg}** sát thương!`); break;
     case 'rock_throw':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.9, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.9, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** ném đá! **${dmg}** sát thương!`); break;
     case 'blood_drain':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.9, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.9, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** hút máu! **${dmg}** sát thương!`); break;
     case 'screech':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.5, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.5, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** hét vang! **${dmg}** sát thương + hoa mắt!`); break;
     case 'howl':
-      logs.push(`${ic} **${n}** hú vang — đòn tiếp theo mạnh hơn!`); break;
+      dmg = Math.max(1, calcDamage(baseAtk * 0.6, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`${ic} **${n}** hú vang và lao vào tấn công! **${dmg}** sát thương!`); break;
     case 'piercing_arrow':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.2, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.2, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** bắn **Mũi Tên Xuyên Giáp**! **${dmg}** sát thương!`); break;
     case 'phase_through':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.8, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.8, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** xuyên qua hàng phòng thủ! **${dmg}** sát thương!`); break;
     case 'ground_slam':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.3, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.3, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** đập đất! **${dmg}** sát thương!`); break;
     case 'seismic_slam':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.6, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.6, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** tung **Seismic Slam**! **${dmg}** sát thương khổng lồ!`); break;
     case 'magma_core':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.4, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.4, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** bùng phát lõi magma! **${dmg}** sát thương lửa!`); break;
     case 'void_drain': {
-      dmg = Math.max(1, calcDamage(baseAtk * 0.7, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.7, def(special)));
       const mpD = Math.min(playerMp, 20); playerHp = Math.max(0, playerHp - dmg); playerMp -= mpD;
       logs.push(`${ic} **${n}** dùng **Void Drain**! −${dmg} HP, −${mpD} MP!`); break;
     }
     case 'reality_tear':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.1, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** xé toạc thực tại! **${dmg}** sát thương!`); break;
     case 'skill_echo':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.0, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.0, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** sao chép kỹ năng của bạn! **${dmg}** sát thương!`); break;
     case 'mind_crush':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.2, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.2, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** đè nát tâm trí! **${dmg}** sát thương!`); break;
     case 'erase':
-      dmg = Math.max(1, calcDamage(baseAtk * 2.0, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 2.0, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** cố **XÓA SỔ** bạn! **${dmg}** sát thương khổng lồ!`); break;
     case 'butterfly_curse':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.8, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.8, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** tung **Butterfly Curse!** **${dmg}** sát thương!`); break;
     case 'forgotten_rage':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.8, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.8, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** bùng phát cơn thịnh nộ! **${dmg}** sát thương!`); break;
     case 'backstab':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.3, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.3, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** đâm lén! **${dmg}** sát thương!`); break;
     case 'shield_bash':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.9, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.9, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** húc khiên! **${dmg}** sát thương!`); break;
     // ── Quái mới ──────────────────────────────────────────────────────────
     case 'toxic_spores':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.5, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.5, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** phun **bào tử độc**! **${dmg}** sát thương + ngộ độc!`); break;
     case 'ambush':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.6, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.6, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** tấn công bất ngờ từ bóng tối! **${dmg}** sát thương!`); break;
     case 'savage_bite':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.0, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.0, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** cắn dữ dội! **${dmg}** sát thương!`); break;
     case 'frenzy': {
-      const h1 = Math.max(1, calcDamage(baseAtk * 0.5, 0));
-      const h2 = Math.max(1, calcDamage(baseAtk * 0.5, 0));
-      const h3 = Math.max(1, calcDamage(baseAtk * 0.5, 0));
+      const h1 = Math.max(1, calcDamage(baseAtk * 0.5, def(special)));
+      const h2 = Math.max(1, calcDamage(baseAtk * 0.5, def(special)));
+      const h3 = Math.max(1, calcDamage(baseAtk * 0.5, def(special)));
       dmg = h1 + h2 + h3;
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** phát điên — **3 đòn** liên tiếp! Tổng **${dmg}** sát thương!`); break;
     }
     case 'thorn_lash':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.1, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** quật **gai cây**! **${dmg}** sát thương!`); break;
     case 'bark_regen':
-      logs.push(`${ic} **${n}** bao phủ mình trong vỏ cây dày, hồi sinh lực!`); break;
+      enemyHeal = Math.max(1, Math.floor(enemy.hp * 0.10));
+      logs.push(`${ic} **${n}** bao phủ mình trong vỏ cây dày, hồi **${enemyHeal} HP**!`); break;
     case 'soul_flicker': {
-      dmg = Math.max(1, calcDamage(baseAtk * 0.6, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.6, def(special)));
       const mpD2 = Math.min(playerMp, 20);
       playerHp = Math.max(0, playerHp - dmg);
       playerMp -= mpD2;
       logs.push(`${ic} **${n}** hút linh hồn! −**${dmg} HP**, −**${mpD2} MP**!`); break;
     }
     case 'bewitch':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.8, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.8, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** bùa mê! Bạn bị mê hoặc, hứng **${dmg}** sát thương!`); break;
     case 'bone_shards':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.2, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.2, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** bắn ra mảnh xương! **${dmg}** sát thương xuyên giáp!`); break;
     case 'death_curse':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.5, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.5, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** tung **Lời Nguyền Tử Thần**! **${dmg}** sát thương!`); break;
     case 'spectral_slash':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.1, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** chém bằng lưỡi kiếm linh hồn! **${dmg}** sát thương!`); break;
     case 'banish':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.9, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.9, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** trục xuất linh hồn của bạn! **${dmg}** sát thương!`); break;
     case 'idol_curse':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.0, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.0, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** phóng ra lời nguyền! **${dmg}** sát thương hắc ám!`); break;
     case 'hex_bolt':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.3, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.3, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** bắn **tia tà phép**! **${dmg}** sát thương!`); break;
     case 'magma_claw':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.1, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** càng dung nham! **${dmg}** sát thương lửa!`); break;
     case 'heat_burst':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.4, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.4, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** nổ tung nhiệt! **${dmg}** sát thương bùng cháy!`); break;
     case 'crystal_web':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.7, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.7, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** bẫy tơ pha lê! **${dmg}** sát thương + bẫy di chuyển!`); break;
     case 'venom_inject':
-      dmg = Math.max(1, calcDamage(baseAtk * 0.8, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.8, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** tiêm nọc độc mạnh! **${dmg}** sát thương + độc nặng!`); break;
     case 'iron_crush':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.4, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.4, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** nghiền nát bằng sức mạnh sắt thép! **${dmg}** sát thương!`); break;
     case 'fortress_stance':
-      logs.push(`${ic} **${n}** vào tư thế pháo đài — DEF tăng mạnh lượt này!`); break;
+      enemyHeal = Math.max(1, Math.floor(enemy.hp * 0.08));
+      logs.push(`${ic} **${n}** vào tư thế pháo đài, hồi phục **${enemyHeal} HP**!`); break;
     case 'phantom_shot':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.2, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.2, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** bắn tên ảo ảnh chính xác! **${dmg}** sát thương!`); break;
     case 'mirror_split': {
-      const m1 = Math.max(1, calcDamage(baseAtk * 0.7, 0));
-      const m2 = Math.max(1, calcDamage(baseAtk * 0.7, 0));
+      const m1 = Math.max(1, calcDamage(baseAtk * 0.7, def(special)));
+      const m2 = Math.max(1, calcDamage(baseAtk * 0.7, def(special)));
       dmg = m1 + m2;
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** phân thân tấn công **2 lần**! Tổng **${dmg}** sát thương!`); break;
     }
     case 'psychic_drain': {
-      dmg = Math.max(1, calcDamage(baseAtk * 0.9, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 0.9, def(special)));
       const mpD3 = Math.min(playerMp, 25);
       playerHp = Math.max(0, playerHp - dmg);
       playerMp -= mpD3;
       logs.push(`${ic} **${n}** hút ký ức! −**${dmg} HP**, −**${mpD3} MP**!`); break;
     }
     case 'thought_devour':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.7, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.7, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** nuốt chửng tư duy! **${dmg}** sát thương tâm trí!`); break;
     case 'abyss_strike':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.5, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.5, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** đánh từ vực thẳm! **${dmg}** sát thương hư vô!`); break;
     case 'doom_call':
-      dmg = Math.max(1, calcDamage(baseAtk * 2.0, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 2.0, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** triệu hồi **Lời Tiên Tri Diệt Vong**! **${dmg}** sát thương kinh hoàng!`); break;
     case 'entangle':
-      dmg = Math.max(1, calcDamage(baseAtk * 1.0, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.0, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** trói chặt bằng rễ cây! **${dmg}** sát thương!`); break;
     default:
-      dmg = Math.max(1, calcDamage(baseAtk * 1.1, 0));
+      dmg = Math.max(1, calcDamage(baseAtk * 1.1, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** tung đòn đặc biệt! **${dmg}** sát thương!`);
   }
-  return { playerHp, playerMp, dmg };
+  return { playerHp, playerMp, dmg, enemyHeal };
 }
 
 // ── makeResult ────────────────────────────────────────────────────────────

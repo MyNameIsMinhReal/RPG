@@ -27,6 +27,7 @@ import { execute as execPet       } from './commands/pet';
 import { execute as execGather    } from './commands/gather';
 import { execute as execReroll    } from './commands/reroll';
 import { execute as execFish      } from './commands/fish';
+import { execute as execParty     } from './commands/party';
 
 const client = new Client({
   intents: [
@@ -56,6 +57,7 @@ commands.set('pet',       execPet);
 commands.set('gather',    execGather);
 commands.set('reroll',    execReroll);
 commands.set('fish',      execFish);
+commands.set('party',     execParty);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive

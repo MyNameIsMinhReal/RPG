@@ -397,3 +397,21 @@ db.exec(`
 `);
 
 try { db.exec(`ALTER TABLE players ADD COLUMN active_pet TEXT DEFAULT NULL`); } catch {}
+
+// ── Party system ──────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS parties (
+    guild_id   TEXT NOT NULL,
+    leader_id  TEXT NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (guild_id, leader_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS party_members (
+    guild_id   TEXT NOT NULL,
+    user_id    TEXT NOT NULL,
+    leader_id  TEXT NOT NULL,
+    joined_at  INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (guild_id, user_id)
+  );
+`);
