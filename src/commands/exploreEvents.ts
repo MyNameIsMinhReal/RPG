@@ -38,6 +38,10 @@ import { getBuff, consumeBuff } from '../systems/consumables';
 import { doFish } from './fish';
 import { onlyUser } from '../utils/collectors';
 import { getPityCounters, getPityBonus, PITY_EVENTS } from '../systems/pity';
+import { showForestWhisperingTree } from './exploreEvents.forest';
+import { showShrineSilentBell } from './exploreEvents.shrine';
+import { showMineCollapse } from './exploreEvents.mines';
+import { showWastesAshStorm } from './exploreEvents.wastes';
 
 export type ExploreEventType =
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -46,7 +50,9 @@ export type ExploreEventType =
   | 'wanted_merchant' | 'bounty_hunter' | 'rebirth_rift' | 'failed_legacy' | 'mirror_clone' | 'talking_corpse'
   | 'black_eclipse' | 'fate_coin' | 'merchant_tax' | 'merchant_guard' | 'wanted_notice' | 'shopkeeper_mercy'
   | 'black_cat' | 'dice_gambler' | 'glowing_mushroom' | 'chained_prisoner' | 'magic_fountain' | 'laughing_bones'
-  | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'nothing';
+  | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'nothing'
+  // Zone-specific events (separate files)
+  | 'forest_tree' | 'shrine_bell' | 'mine_collapse' | 'wastes_storm';
 
 export interface PickExploreEventInput {
   player: PlayerRow;
@@ -163,6 +169,12 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['atonement_monk', (wanted > 0 || rep < -15) ? 4 : 0],
     ['conditional_miniboss', hasCombat && (wanted >= 3 || rep <= -60 || deaths >= 3 || robberyCount >= 2) ? 4 : 0],
     ['fishing_spot', ['forest', 'shrine', 'mines'].includes(player.zone_id) ? 5 : 0],
+
+    // Zone-specific events
+    ['forest_tree',   player.zone_id === 'forest' ? 4 : 0],
+    ['shrine_bell',   player.zone_id === 'shrine' ? 4 : 0],
+    ['mine_collapse', player.zone_id === 'mines'  ? 4 : 0],
+    ['wastes_storm',  player.zone_id === 'wastes' ? 4 : 0],
   ];
 
   // Apply pity bonus to unconditional events that haven't appeared in a while.
@@ -236,6 +248,10 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'atonement_monk': return showAtonementMonk(ctx);
     case 'conditional_miniboss': return showConditionalMiniboss(ctx);
     case 'fishing_spot': return showFishingSpot(ctx);
+    case 'forest_tree':   return showForestWhisperingTree(ctx);
+    case 'shrine_bell':   return showShrineSilentBell(ctx);
+    case 'mine_collapse': return showMineCollapse(ctx);
+    case 'wastes_storm':  return showWastesAshStorm(ctx);
     default: return finish(ctx, simpleEmbed(COLORS.info, `*${pick(getZone(ctx.player.zone_id)?.ambiance ?? ['Không có gì bất thường...'])}*\n\nKhông có gì bất thường...`));
   }
 }
