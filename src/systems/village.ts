@@ -209,7 +209,7 @@ export async function showVillageBlacksmith(
     new StringSelectMenuBuilder()
       .setCustomId(`vill_bs_sel_${userId}`)
       .setPlaceholder('Chọn trang bị cần nâng...')
-      .addOptions(options)
+      .addOptions(options.slice(0, 25))
   );
 
   const bsBottomRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -382,7 +382,7 @@ async function showBlacksmithReroll(
     new StringSelectMenuBuilder()
       .setCustomId(`vill_bs_rr_sel_${userId}`)
       .setPlaceholder('Chọn Skill Book muốn reroll...')
-      .addOptions(options)
+      .addOptions(options.slice(0, 25))
   );
 
   const msg = await interaction.editReply({ embeds: [rerollEmbed], components: [rrSelectRow, backRow(userId)] });

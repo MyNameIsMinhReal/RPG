@@ -2,9 +2,11 @@ import db from '../database/index';
 import { getItem } from '../data/items';
 import {
   getPlayer, getItemQty, removeItem, updatePlayerHpMp,
-  adjustReputation, grantGold, grantSoulShards
+  adjustReputation, grantGold, grantSoulShards, addItem, addKeepItemCharge
 } from './player';
 import { getFlag, setFlag } from './world';
+import { MATERIALS } from '../data/materials';
+import { EQUIPMENT } from '../data/equipment';
 import { randInt, pick } from '../utils/format';
 import type { PlayerRow } from '../utils/embeds';
 
@@ -23,6 +25,7 @@ export type BuffKey =
   | 'black_market_access'
   | 'assassins_smoke'
   | 'warding_charm'
+  | 'rune_charm'
   | 'luck';
 
 export interface PlayerBuff {
@@ -102,6 +105,7 @@ export function getActiveBuffLines(userId: string, guildId: string): string[] {
     black_market_access: '🌑 Vé vào chợ đen',
     assassins_smoke: '🗡️ Assassin Smoke: shopkeeper giảm DEF',
     warding_charm: '🧿 Warding Charm: chặn 1 debuff',
+    rune_charm: '🧿 Rune Charm: chặn 1 debuff trận kế tiếp',
     luck: '🍀 May mắn: tăng chút tỉ lệ event tốt'
   };
   return rows.map(r => `${names[r.buff_key] ?? r.buff_key}${r.charges > 1 ? ` ×${r.charges}` : ''}`);
@@ -243,6 +247,46 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
       setFlag(guildId, 'shop_markup', String(Math.max(0, markup - 2)));
       lines.push(`📜 Reputation: **${rep}** (+10)`);
       lines.push('🛒 Giá shop toàn thế giới giảm nhẹ **-2%**.');
+      break;
+    }
+    case 'discount_token':
+      setBuff(userId, guildId, 'fake_identity', 15, 1, 7200);
+      lines.push('🎟️ Lần gặp shop kế tiếp: **giảm giá 15%**.');
+      break;
+    case 'rune_charm':
+      setBuff(userId, guildId, 'rune_charm', 1, 1, 7200);
+      lines.push('🧿 Trận combat kế tiếp: tự động chặn **1 debuff**.');
+      break;
+    case 'soulbound_scroll': {
+      const charges = addKeepItemCharge(userId, guildId, 1);
+      lines.push(`📜 Nhận **1 lượt giữ đồ khi chết**. Tổng lượt giữ đồ: **${charges}**.`);
+      break;
+    }
+    case 'material_chest': {
+      const pool = Object.values(MATERIALS);
+      const count = randInt(2, 4);
+      const got: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const mat = pick(pool);
+        addItem(userId, guildId, mat.id, 1);
+        got.push(`${mat.icon} ${mat.name}`);
+      }
+      lines.push(`📦 Mở rương nhận: ${got.join(', ')}.`);
+      break;
+    }
+    case 'cursed_equipment_box': {
+      const pool = Object.values(EQUIPMENT).filter(e => e.rarity === 'cursed')
+        .concat(Object.values(EQUIPMENT).filter(e => ['rare','epic','legendary','mythic'].includes(e.rarity) && e.rarity !== 'cursed').slice(0, 0));
+      const fallback = Object.values(EQUIPMENT).filter(e => ['rare','epic','legendary','mythic','cursed'].includes(e.rarity));
+      const eq = pick(pool.length ? pool : fallback);
+      addItem(userId, guildId, eq.id, 1);
+      lines.push(`🎁 Mở hộp nhận trang bị: ${eq.icon} **${eq.name}**.`);
+      break;
+    }
+    case 'purification_stone': {
+      db.prepare(`DELETE FROM player_buffs WHERE user_id=? AND guild_id=? AND buff_key IN ('scroll_greed','rage_elixir','blood_vial','assassins_smoke')`)
+        .run(userId, guildId);
+      lines.push('💎 Đã xóa các hiệu ứng bất lợi đang chờ: Greed/Rage/Blood/Smoke.');
       break;
     }
     case 'bribe_coin':

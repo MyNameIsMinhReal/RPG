@@ -12,6 +12,7 @@ import {
 import { awardAchievements } from '../systems/achievements';
 import { COLORS } from '../utils/embeds';
 import { getItem } from '../data/items';
+import { getMaterial } from '../data/materials';
 import { getSkill, SKILLS, type SkillType } from '../data/skills';
 import { getEquipment, EQUIPMENT, RARITY_COLORS, RARITY_LABELS, SLOT_ICONS, getZoneEquipment } from '../data/equipment';
 import { getWornEquipment, wearEquipment, removeEquipment, getOwnedEquipment, formatWornGear } from '../systems/equipment';
@@ -173,12 +174,28 @@ async function renderTab(
   });
 }
 
+
+function safeFieldValue(value: string, limit = 1024): string {
+  if (!value) return '*Trống*';
+  return value.length > limit ? value.slice(0, limit - 20) + '\n… *(còn nữa)*' : value;
+}
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+}
+
+function invDef(id: string) {
+  return getItem(id) ?? getMaterial(id);
+}
+
 // ── Tab: Items ────────────────────────────────────────────────────────────────
 function buildItemsTab(
   player: any, inventory: any[], userId: string
 ): [EmbedBuilder, ActionRowBuilder<any>[]] {
   const consumables = inventory.filter(e => getItem(e.item_id)?.type === 'consumable');
-  const materials   = inventory.filter(e => getItem(e.item_id)?.type === 'material');
+  const materials   = inventory.filter(e => getItem(e.item_id)?.type === 'material' || getMaterial(e.item_id));
   const keyItems    = inventory.filter(e => getItem(e.item_id)?.type === 'key_item');
 
   const embed = new EmbedBuilder()
@@ -189,27 +206,27 @@ function buildItemsTab(
   if (consumables.length) {
     embed.addFields({
       name: '🧪 Consumables',
-      value: consumables.map(e => {
+      value: safeFieldValue(consumables.map(e => {
         const it = getItem(e.item_id)!;
         return `${it.icon} **${it.name}** ×${e.quantity}  — *${it.description.replace(/\*\*/g,'').slice(0,40)}*`;
-      }).join('\n'),
+      }).join('\n')),
       inline: false
     });
   }
   if (materials.length) {
     embed.addFields({
       name: '⚗️ Materials',
-      value: materials.map(e => {
-        const it = getItem(e.item_id)!;
+      value: safeFieldValue(materials.map(e => {
+        const it = invDef(e.item_id)!;
         return `${it.icon} **${it.name}** ×${e.quantity}`;
-      }).join('  ·  '),
+      }).join('  ·  ')),
       inline: false
     });
   }
   if (keyItems.length) {
     embed.addFields({
       name: '🔑 Key Items',
-      value: keyItems.map(e => { const it = getItem(e.item_id)!; return `${it.icon} **${it.name}**`; }).join('  ·  '),
+      value: safeFieldValue(keyItems.map(e => { const it = getItem(e.item_id)!; return `${it.icon} **${it.name}**`; }).join('  ·  ')),
       inline: false
     });
   }
@@ -233,7 +250,7 @@ function buildItemsTab(
       new StringSelectMenuBuilder()
         .setCustomId(`inv_use_${userId}`)
         .setPlaceholder('🧪 Dùng vật phẩm...')
-        .addOptions(options)
+        .addOptions(options.slice(0, 25))
     ));
   }
 
@@ -265,13 +282,13 @@ function buildSkillsTab(
 
     embed.addFields({
       name: typeLabels[type],
-      value: skills.map(sk => {
+      value: safeFieldValue(skills.map(sk => {
         if (!sk) return '';
         const equipped = loadout.find(l => l.skill_id === sk.id);
         const equippedTag = equipped ? ` *(Slot ${equipped.slot})*` : '';
         const mpTag = sk.mpCost ? ` · ${sk.mpCost}MP` : '';
         return `${sk.icon} **${sk.name}**${equippedTag}${mpTag}\n> ${sk.description}`;
-      }).join('\n'),
+      }).join('\n')),
       inline: false
     });
   }
@@ -323,7 +340,7 @@ function buildLoadoutTab(
       new StringSelectMenuBuilder()
         .setCustomId(`inv_equip_pick_${userId}`)
         .setPlaceholder('📎 Equip kỹ năng...')
-        .addOptions(opts)
+        .addOptions(opts.slice(0, 25))
     ));
   }
 
@@ -337,7 +354,9 @@ function buildLoadoutTab(
         .setEmoji(sk?.icon ?? '❌')
         .setStyle(ButtonStyle.Secondary);
     });
-    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...unequipBtns));
+    for (const group of chunkArray(unequipBtns, 5)) {
+      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...group));
+    }
   }
 
   return [embed, rows];
@@ -384,7 +403,7 @@ function buildBooksTab(
       new StringSelectMenuBuilder()
         .setCustomId(`inv_learn_${userId}`)
         .setPlaceholder('📖 Chọn sách để học...')
-        .addOptions(opts)
+        .addOptions(opts.slice(0, 25))
     )
   ]];
 }
@@ -581,7 +600,7 @@ function buildEquipTab(
       new StringSelectMenuBuilder()
         .setCustomId(`inv_wear_${userId}`)
         .setPlaceholder('⚔️ Trang bị gear...')
-        .addOptions(opts)
+        .addOptions(opts.slice(0, 25))
     ));
   }
 
@@ -595,7 +614,9 @@ function buildEquipTab(
         .setEmoji(def?.icon ?? '❌')
         .setStyle(ButtonStyle.Secondary);
     });
-    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...btns));
+    for (const group of chunkArray(btns, 5)) {
+      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...group));
+    }
   }
 
   if (!owned.length) {
@@ -623,7 +644,7 @@ function buildTitlesTab(
   if (unlocked.length) {
     embed.addFields({
       name: '✅ Đã mở khoá',
-      value: unlocked.map(t => `${t.icon} **${t.name}** — *${t.description}*`).join('\n'),
+      value: safeFieldValue(unlocked.map(t => `${t.icon} **${t.name}** — *${t.description}*`).join('\n')),
       inline: false
     });
   } else {
@@ -644,7 +665,7 @@ function buildTitlesTab(
       new StringSelectMenuBuilder()
         .setCustomId(`inv_title_${userId}`)
         .setPlaceholder('🏅 Chọn danh hiệu hiển thị...')
-        .addOptions(opts)
+        .addOptions(opts.slice(0, 25))
     ));
   }
 

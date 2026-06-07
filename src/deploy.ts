@@ -15,7 +15,9 @@ import { data as duelData         } from './commands/duel';
 import { data as worldbossData    } from './commands/worldboss';
 import { data as guildData        } from './commands/guild';
 import { data as petData          } from './commands/pet';
-import { data as chapterData      } from './commands/chapter';
+import { data as gatherData       } from './commands/gather';
+import { data as rerollData       } from './commands/reroll';
+import { data as fishData         } from './commands/fish';
 
 const commands = [
   startData,
@@ -33,7 +35,9 @@ const commands = [
   worldbossData,
   guildData,
   petData,
-  chapterData,
+  gatherData,
+  rerollData,
+  fishData,
 ].map(c => c.toJSON());
 const token    = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;

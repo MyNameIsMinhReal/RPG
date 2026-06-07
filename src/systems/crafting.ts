@@ -113,7 +113,7 @@ export function attemptCraft(
 
   const { level } = getCraftingStats(userId, guildId);
   const successBonus = getLevelSuccessBonus(level);
-  const finalRate    = Math.min(99, recipe.successRate + successBonus);
+  const finalRate    = Math.min(100, recipe.successRate + successBonus);
   const roll         = randInt(1, 100);
   const success      = roll <= finalRate;
 

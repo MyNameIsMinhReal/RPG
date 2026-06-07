@@ -112,6 +112,7 @@ db.exec(`
     player_max_hp   INTEGER NOT NULL,
     player_mp       INTEGER NOT NULL,
     player_max_mp   INTEGER NOT NULL,
+    player_def      INTEGER DEFAULT 0,
     turn            INTEGER DEFAULT 1,
     is_defending    INTEGER DEFAULT 0,
     active_effects  TEXT DEFAULT '[]',
@@ -172,26 +173,6 @@ db.exec(`
 `);
 
 db.exec(`
-  CREATE TABLE IF NOT EXISTS chapter_state (
-    user_id         TEXT NOT NULL,
-    guild_id        TEXT NOT NULL,
-    current_chapter INTEGER DEFAULT 1,
-    PRIMARY KEY (user_id, guild_id)
-  );
-`);
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS chapter_progress (
-    user_id    TEXT NOT NULL,
-    guild_id   TEXT NOT NULL,
-    chapter_id INTEGER NOT NULL,
-    obj_id     TEXT NOT NULL,
-    progress   INTEGER DEFAULT 0,
-    PRIMARY KEY (user_id, guild_id, chapter_id, obj_id)
-  );
-`);
-
-db.exec(`
   CREATE TABLE IF NOT EXISTS explore_pity (
     user_id  TEXT NOT NULL,
     guild_id TEXT NOT NULL,
@@ -218,6 +199,7 @@ try { db.exec(`ALTER TABLE players ADD COLUMN crafting_level INTEGER DEFAULT 1`)
 // ── Stamina columns for active_combats ───────────────────────────────────
 try { db.exec(`ALTER TABLE active_combats ADD COLUMN player_stamina     INTEGER DEFAULT 100`); } catch {}
 try { db.exec(`ALTER TABLE active_combats ADD COLUMN player_max_stamina INTEGER DEFAULT 100`); } catch {}
+try { db.exec(`ALTER TABLE active_combats ADD COLUMN player_def INTEGER DEFAULT 0`); } catch {}
 // ── Group combat column ───────────────────────────────────────────────────
 try { db.exec(`ALTER TABLE active_combats ADD COLUMN enemies_json TEXT DEFAULT NULL`); } catch {}
 

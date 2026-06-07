@@ -108,7 +108,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     new StringSelectMenuBuilder()
       .setCustomId(`reroll_select_${userId}`)
       .setPlaceholder('Chọn Skill Book muốn reroll...')
-      .addOptions(options)
+      .addOptions(options.slice(0, 25))
   );
 
   const embed = new EmbedBuilder()

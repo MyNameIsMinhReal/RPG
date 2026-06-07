@@ -27,10 +27,25 @@ export function getWornInSlot(userId: string, guildId: string, slot: EquipSlot):
 export function wearEquipment(userId: string, guildId: string, equipId: string): void {
   const def = getEquipment(equipId);
   if (!def) return;
+
+  // Accessories share two slots. Data may define all accessories as accessory1,
+  // so auto-fill accessory2 before replacing accessory1.
+  let targetSlot: EquipSlot = def.slot;
+  if (def.slot === 'accessory1' || def.slot === 'accessory2') {
+    const acc1 = getWornInSlot(userId, guildId, 'accessory1');
+    const acc2 = getWornInSlot(userId, guildId, 'accessory2');
+    const alreadyWorn = getWornEquipment(userId, guildId).find(w => w.equipment_id === equipId);
+
+    if (alreadyWorn) targetSlot = alreadyWorn.slot;
+    else if (!acc1) targetSlot = 'accessory1';
+    else if (!acc2) targetSlot = 'accessory2';
+    else targetSlot = 'accessory1';
+  }
+
   db.prepare(`
     INSERT OR REPLACE INTO equipment_worn (user_id, guild_id, slot, equipment_id)
     VALUES (?, ?, ?, ?)
-  `).run(userId, guildId, def.slot, equipId);
+  `).run(userId, guildId, targetSlot, equipId);
 }
 
 export function removeEquipment(userId: string, guildId: string, slot: EquipSlot): void {

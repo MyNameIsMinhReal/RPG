@@ -2,10 +2,11 @@ import {
   SlashCommandBuilder, ChatInputCommandInteraction,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType
 } from 'discord.js';
-import { getPlayer, createPlayer, resetPlayer } from '../systems/player';
+import { getPlayer, createPlayer, resetPlayer, getLoadout, applyPassiveStats } from '../systems/player';
 import { CLASSES } from '../data/classes';
-import { COLORS } from '../utils/embeds';
+import { COLORS, buildProfileEmbed } from '../utils/embeds';
 import { showExploreMenu } from './explore';
+import { getAchievementSummary } from '../systems/achievements';
 
 export const data = new SlashCommandBuilder()
   .setName('start')
@@ -51,8 +52,19 @@ async function waitAndRoute(
   if (btn.customId === `start_explore_${userId}`) {
     await showExploreMenu(interaction, userId, guildId);
   } else {
-    const { execute: execProfile } = await import('./profile');
-    await execProfile(interaction as any);
+    const player = getPlayer(userId, guildId);
+    if (!player) {
+      await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription('Bạn chưa có nhân vật! Dùng `/start`.')], components: [] });
+      return;
+    }
+    const loadout = getLoadout(userId, guildId);
+    const withPassive = applyPassiveStats(player);
+    const achievementSummary = getAchievementSummary(userId, guildId);
+    await interaction.editReply({
+      embeds: [buildProfileEmbed(withPassive, loadout, interaction.user.displayAvatarURL({ size: 128 }), achievementSummary)],
+      components: [exploreRow(userId)]
+    });
+    await waitAndRoute(interaction, userId, guildId);
   }
 }
 

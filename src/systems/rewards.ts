@@ -2,6 +2,7 @@ import { grantGold, incrementKills, grantExp, grantSoulShards, addItem, killPlay
 import { createLegacy, pickLegacySkill } from './legacy';
 import { logEvent, onBossKilled, getDropBonus } from './world';
 import { getItem } from '../data/items';
+import { getMaterial } from '../data/materials';
 import { unlockRecipesBySource } from './crafting';
 import { EQUIPMENT, getEquipment } from '../data/equipment';
 import { addItem as addItemFn } from './player';
@@ -41,7 +42,7 @@ export function processVictoryRewards(
   for (const drop of enemy.drops) {
     if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * dropBonus / 100)) {
       addItem(userId, guildId, drop.itemId, 1);
-      const it = getItem(drop.itemId);
+      const it = getItem(drop.itemId) ?? getMaterial(drop.itemId);
       if (it) drops.push(`${it.icon} ${it.name}`);
     }
   }

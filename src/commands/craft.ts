@@ -106,7 +106,7 @@ async function showCategoryPicker(
     new StringSelectMenuBuilder()
       .setCustomId(`craft_cat_${userId}`)
       .setPlaceholder('Chọn danh mục...')
-      .addOptions(opts)
+      .addOptions(opts.slice(0, 25))
   );
 
   const reply = await interaction.editReply({ embeds: [embed], components: [row] });
@@ -155,7 +155,7 @@ async function showRecipePicker(
     const resultIcon = getItemIcon(r.resultItemId);
     const resultName = getItemName(r.resultItemId);
     const rarity     = RARITY_LABELS[r.resultRarity] ?? r.resultRarity;
-    const rate       = Math.min(99, r.successRate + bonus);
+    const rate       = Math.min(100, r.successRate + bonus);
     const { canCraft } = checkIngredients(userId, guildId, r, player.gold);
     const craftTag   = canCraft ? '✅' : '⚠️';
     return `${craftTag} ${resultIcon} **${resultName}** [${rarity}] — ${rate}% · ${r.goldCost}🪙`;
@@ -191,7 +191,7 @@ async function showRecipePicker(
   const opts = unlocked.slice(0, 25).map(r => {
     const icon = getItemIcon(r.resultItemId);
     const name = getItemName(r.resultItemId);
-    const rate = Math.min(99, r.successRate + bonus);
+    const rate = Math.min(100, r.successRate + bonus);
     const { canCraft } = checkIngredients(userId, guildId, r, player.gold);
     return new StringSelectMenuOptionBuilder()
       .setLabel(`${name} — ${rate}% (${r.goldCost}🪙)`)
@@ -205,7 +205,7 @@ async function showRecipePicker(
       new StringSelectMenuBuilder()
         .setCustomId(`craft_recipe_${userId}`)
         .setPlaceholder('Chọn recipe...')
-        .addOptions(opts)
+        .addOptions(opts.slice(0, 25))
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId(`craft_back_${userId}`).setLabel('← Quay lại').setStyle(ButtonStyle.Secondary)
@@ -242,7 +242,7 @@ async function showRecipeDetail(
   const player   = getPlayer(userId, guildId)!;
   const { level } = getCraftingStats(userId, guildId);
   const bonus    = getLevelSuccessBonus(level);
-  const finalRate = Math.min(99, recipe.successRate + bonus);
+  const finalRate = Math.min(100, recipe.successRate + bonus);
   const { canCraft, missing } = checkIngredients(userId, guildId, recipe, player.gold);
 
   const resultIcon = getItemIcon(recipe.resultItemId);

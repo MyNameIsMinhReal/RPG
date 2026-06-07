@@ -135,6 +135,7 @@ export interface CombatState {
   enemy_atk: number; enemy_def: number;
   player_hp: number; player_max_hp: number;
   player_mp: number; player_max_mp: number;
+  player_def?: number;
   turn: number; is_defending: number;
   active_effects: string; combat_log: string;
   player_stamina: number; player_max_stamina: number;
@@ -300,7 +301,7 @@ export function buildSkillSelectMenu(
     new StringSelectMenuBuilder()
       .setCustomId(`rpg_skillmenu_${userId}`)
       .setPlaceholder('Chọn kỹ năng để sử dụng...')
-      .addOptions(options)
+      .addOptions(options.slice(0, 25))
   );
 }
 

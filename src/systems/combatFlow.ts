@@ -52,7 +52,7 @@ export type CombatFleeHandler = (
 
 const COMBAT_USABLE_ITEM_IDS = new Set([
   'health_potion','minor_healing_potion','healing_potion','emergency_potion','mana_potion','mana_flask','elixir','moonwater',
-  'antidote','cooling_salve','purifying_salt','scroll_escape','scroll_silence','warding_charm','arson_bottle',
+  'antidote','cooling_salve','purifying_salt','purification_stone','scroll_escape','scroll_silence','warding_charm','rune_charm','arson_bottle',
   'weapon_oil','armor_polish','focus_tonic','stone_skin_draught','quickstep_tea','rage_elixir','blood_vial'
 ]);
 
@@ -78,6 +78,19 @@ function hasUsableItems(userId: string, guildId: string): boolean {
 
 function tryCrackedSoulCharm(userId: string, guildId: string, result: any): boolean {
   if (!result?.playerDied) return false;
+
+  if (getItemQty(userId, guildId, 'soul_anchor') > 0) {
+    removeItem(userId, guildId, 'soul_anchor', 1);
+    result.playerDied = false;
+    result.newState.player_hp = 1;
+    result.logLines = [
+      ...(result.logLines ?? []),
+      '⚓ **Soul Anchor kích hoạt!** Linh hồn bị kéo lại, bạn sống sót với **1 HP**.'
+    ];
+    result.newState.combat_log = JSON.stringify(result.logLines.slice(-6));
+    return true;
+  }
+
   if (getItemQty(userId, guildId, 'cracked_soul_charm') <= 0) return false;
   removeItem(userId, guildId, 'cracked_soul_charm', 1);
   if (Math.random() > 0.25) return false;
@@ -162,8 +175,14 @@ export async function startCombatFlow(
     enemy_atk: adjustedAtk, enemy_def: enemy.def,
     player_hp: withPassive.hp, player_max_hp: withPassive.max_hp,
     player_mp: withPassive.mp, player_max_mp: withPassive.max_mp,
+    player_def: withPassive.def,
     turn: 1, is_defending: 0,
-    active_effects: buffedStart.logs.some(l => l.includes('Quickstep')) ? JSON.stringify([{ name: 'dodge', duration: 1 }]) : '[]',
+    active_effects: JSON.stringify([
+      ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
+      ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
+      ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),
+      ...(buffedStart.logs.some(l => l.includes('Rage Elixir')) ? [{ name: 'incoming_damage_up', duration: 999, value: 15 }] : [])
+    ]),
     combat_log: JSON.stringify(openingLogs),
     player_stamina: 100, player_max_stamina: 100
   };
@@ -218,7 +237,7 @@ export async function startCombatFlow(
               .setValue(`rpg_attackidx_${userId}_${origIdx}`);
           });
           await compInt.editReply({ components: [new ARB().addComponents(
-            new SMB().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu tấn công...').addOptions(opts)
+            new SMB().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu tấn công...').addOptions(opts.slice(0, 25))
           ), makeBackRow(userId)]});
           return;
         }
@@ -397,8 +416,14 @@ export async function startCombatFlowWithEnemy(
     enemy_atk: enemy.atk, enemy_def: enemy.def,
     player_hp: withPassive.hp, player_max_hp: withPassive.max_hp,
     player_mp: withPassive.mp, player_max_mp: withPassive.max_mp,
+    player_def: withPassive.def,
     turn: 1, is_defending: 0,
-    active_effects: buffedStart.logs.some(l => l.includes('Quickstep')) ? JSON.stringify([{ name: 'dodge', duration: 1 }]) : '[]', combat_log: JSON.stringify(openingLogs),
+    active_effects: JSON.stringify([
+      ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
+      ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
+      ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),
+      ...(buffedStart.logs.some(l => l.includes('Rage Elixir')) ? [{ name: 'incoming_damage_up', duration: 999, value: 15 }] : [])
+    ]), combat_log: JSON.stringify(openingLogs),
     player_stamina: 100, player_max_stamina: 100
   };
   const combatEmbed2 = buildCombatEmbed(initState, player.name, enemy.icon, openingLogs);
@@ -452,7 +477,7 @@ export async function startCombatFlowWithEnemy(
             const origIdx = stateGroup!.findIndex((g: any) => g.id === e.id && g.hp === e.hp);
             return new SMOBa().setLabel(`[${origIdx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`).setValue(`rpg_attackidx_${userId}_${origIdx}`);
           });
-          await compInt.editReply({ components: [new ARBa().addComponents(new SMBa().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu...').addOptions(optsa)), makeBackRow(userId)] });
+          await compInt.editReply({ components: [new ARBa().addComponents(new SMBa().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu...').addOptions(optsa.slice(0, 25))), makeBackRow(userId)] });
           return;
         }
         result = processAttack(current, freshPassive.atk);
@@ -609,8 +634,14 @@ export async function startGroupCombatFlow(
     enemy_atk: primary.atk, enemy_def: primary.def,
     player_hp: withPassive.hp, player_max_hp: withPassive.max_hp,
     player_mp: withPassive.mp, player_max_mp: withPassive.max_mp,
+    player_def: withPassive.def,
     turn: 1, is_defending: 0,
-    active_effects: buffedStart.logs.some(l => l.includes('Quickstep')) ? JSON.stringify([{ name: 'dodge', duration: 1 }]) : '[]',
+    active_effects: JSON.stringify([
+      ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
+      ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
+      ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),
+      ...(buffedStart.logs.some(l => l.includes('Rage Elixir')) ? [{ name: 'incoming_damage_up', duration: 999, value: 15 }] : [])
+    ]),
     combat_log: JSON.stringify(openingLogs),
     player_stamina: 100, player_max_stamina: 100,
   };
@@ -665,7 +696,7 @@ export async function startGroupCombatFlow(
             const origIdx = sg!.findIndex((g: any) => g.id === e.id && g.hp === e.hp);
             return new SMOB().setLabel(`[${origIdx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`).setValue(`rpg_attackidx_${userId}_${origIdx}`);
           });
-          await compInt.editReply({ components: [new ARB().addComponents(new SMB().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu...').addOptions(opts)), makeBackRow(userId)] });
+          await compInt.editReply({ components: [new ARB().addComponents(new SMB().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu...').addOptions(opts.slice(0, 25))), makeBackRow(userId)] });
           return;
         }
         result = processAttack(current, freshPassive.atk);

@@ -24,7 +24,9 @@ import { execute as execWorldboss } from './commands/worldboss';
 import { execute as execDuel      } from './commands/duel';
 import { execute as execGuild     } from './commands/guild';
 import { execute as execPet       } from './commands/pet';
-import { execute as execChapter   } from './commands/chapter';
+import { execute as execGather    } from './commands/gather';
+import { execute as execReroll    } from './commands/reroll';
+import { execute as execFish      } from './commands/fish';
 
 const client = new Client({
   intents: [
@@ -51,7 +53,9 @@ commands.set('worldboss', execWorldboss);
 commands.set('duel',      execDuel);
 commands.set('guild',     execGuild);
 commands.set('pet',       execPet);
-commands.set('chapter',   execChapter);
+commands.set('gather',    execGather);
+commands.set('reroll',    execReroll);
+commands.set('fish',      execFish);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive
@@ -136,10 +140,13 @@ const prefixAliases = new Map<string, string>([
   // Pet
   ['pet', 'pet'],
 
-  // Chapter / story
-  ['chapter', 'chapter'],
-  ['story', 'chapter'],
-  ['ch', 'chapter'],
+  // Gathering / Fishing / Reroll
+  ['gather', 'gather'],
+  ['g', 'gather'],
+  ['fish', 'fish'],
+  ['f', 'fish'],
+  ['reroll', 'reroll'],
+  ['rr', 'reroll'],
 ]);
 
 const PREFIX_HELP = [
@@ -158,6 +165,9 @@ const PREFIX_HELP = [
   '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
   '`rpg wb` / `rpg boss` — world boss',
   '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
+  '`rpg g` / `rpg gather` — thu thập nguyên liệu',
+  '`rpg f` / `rpg fish` — câu cá',
+  '`rpg rr` / `rpg reroll` — reroll skill book',
 ].join('\n');
 
 function stripInteractionOnlyOptions(options: any): any {
@@ -188,13 +198,39 @@ class PrefixCommandOptions {
     this.tokens = argsText.trim().split(/\s+/).filter(Boolean);
   }
 
+  private groupNames(): string[] {
+    return this.commandName === 'guild' ? ['war', 'stock'] : [];
+  }
+
+  private subIndex(): number {
+    return this.getSubcommandGroup(false) ? 1 : 0;
+  }
+
+  private payloadTokens(): string[] {
+    const start = this.subIndex() + (this.tokens.length ? 1 : 0);
+    return this.tokens.slice(start);
+  }
+
   getString(name: string, required = false): string | null {
     let value: string | null = null;
+    const sub = this.getSubcommand(false);
+    const group = this.getSubcommandGroup(false);
+    const payload = this.payloadTokens();
 
     if (name === 'item') {
       value = this.argsText.trim() || null;
+    } else if (this.commandName === 'pet' && name === 'pet_id') {
+      value = payload[0] ?? null;
+    } else if (this.commandName === 'guild' && sub === 'create') {
+      if (name === 'tag') value = payload[payload.length - 1] ?? null;
+      if (name === 'name') value = payload.slice(0, -1).join(' ') || null;
+    } else if (this.commandName === 'guild' && name === 'type' && sub === 'buff') {
+      value = payload[0] ?? null;
+    } else if (this.commandName === 'guild' && (name === 'name' || name === 'target')) {
+      const noNumbers = payload.filter(t => !/^-?\d+$/.test(t));
+      value = noNumbers.join(' ') || null;
     } else {
-      value = this.tokens.join(' ') || null;
+      value = payload.join(' ') || null;
     }
 
     if (!value && required) throw new Error(`Missing required string option: ${name}`);
@@ -202,7 +238,8 @@ class PrefixCommandOptions {
   }
 
   getInteger(name: string, required = false): number | null {
-    const numericToken = [...this.tokens].reverse().find(t => /^-?\d+$/.test(t));
+    const payload = this.payloadTokens();
+    const numericToken = [...payload, ...this.tokens].reverse().find(t => /^-?\d+$/.test(t));
     const value = numericToken ? Number.parseInt(numericToken, 10) : null;
 
     if (value === null && required) throw new Error(`Missing required integer option: ${name}`);
@@ -229,7 +266,9 @@ class PrefixCommandOptions {
   }
 
   getSubcommand(required = true): string {
-    if (this.tokens.length > 0) return this.tokens[0].toLowerCase();
+    const group = this.getSubcommandGroup(false);
+    const idx = group ? 1 : 0;
+    if (this.tokens.length > idx) return this.tokens[idx].toLowerCase();
     // Default subcommand per command
     const defaults: Record<string, string> = {
       worldboss: 'status',
@@ -243,8 +282,9 @@ class PrefixCommandOptions {
   }
 
   getSubcommandGroup(required = true): string | null {
-    // Prefix commands have no subcommand groups
-    if (required) return null;
+    const first = this.tokens[0]?.toLowerCase();
+    if (first && this.groupNames().includes(first)) return first;
+    if (required) throw new Error(`Missing subcommand group for ${this.commandName}`);
     return null;
   }
 }

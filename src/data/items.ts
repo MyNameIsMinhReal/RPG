@@ -227,7 +227,7 @@ export const ITEMS: Record<string, ItemDef> = {
   arson_bottle: {
     id: 'arson_bottle', name: 'Arson Bottle', icon: '🔥',
     type: 'consumable', stackable: true,
-    description: 'Trong combat: gây **burn 3 lượt**. Không dùng với boss lớn.',
+    description: 'Trong combat: ném bom lửa gây **sát thương trực tiếp**. Không dùng với boss lớn.',
     effect: { combatOnly: true }, sellPrice: 42, buyPrice: 120
   },
   cracked_soul_charm: {
@@ -566,12 +566,6 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'consumable', stackable: false,
     description: 'Mở ra **1 trang bị Cursed** ngẫu nhiên. Rarity từ Rare trở lên.',
     sellPrice: 200
-  },
-  legacy_pendant: {
-    id: 'legacy_pendant', name: 'Legacy Pendant', icon: '📿',
-    type: 'consumable', stackable: false,
-    description: '**Passive:** Khi tìm thấy Legacy, nhận thêm **50% gold** và chance nhận skill cao hơn.',
-    sellPrice: 150
   },
   soulbound_scroll: {
     id: 'soulbound_scroll', name: 'Soulbound Scroll', icon: '📜',

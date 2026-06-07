@@ -35,15 +35,15 @@ export function saveCombat(state: CombatState): void {
     (message_id, channel_id, user_id, guild_id, enemy_id, enemy_name,
      enemy_hp, enemy_max_hp, enemy_atk, enemy_def,
      player_hp, player_max_hp, player_mp, player_max_mp,
-     turn, is_defending, active_effects, combat_log,
+     player_def, turn, is_defending, active_effects, combat_log,
      player_stamina, player_max_stamina, enemies_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     state.message_id ?? '',    state.channel_id ?? '',  state.user_id ?? '',  state.guild_id ?? '',
     state.enemy_id ?? '',      state.enemy_name ?? '',
     state.enemy_hp ?? 0,       state.enemy_max_hp ?? 0, state.enemy_atk ?? 0, state.enemy_def ?? 0,
     state.player_hp ?? 0,      state.player_max_hp ?? 0, state.player_mp ?? 0, state.player_max_mp ?? 0,
-    state.turn ?? 1,           state.is_defending ?? 0,
+    (state as any).player_def ?? 0, state.turn ?? 1,           state.is_defending ?? 0,
     state.active_effects ?? '[]', state.combat_log ?? '[]',
     state.player_stamina ?? 100, state.player_max_stamina ?? 100,
     state.enemies_json ?? null
@@ -97,6 +97,7 @@ export function startCombat(
     enemy_atk: enemy.atk, enemy_def: enemy.def,
     player_hp: boosted.hp, player_max_hp: boosted.max_hp,
     player_mp: boosted.mp, player_max_mp: boosted.max_mp,
+    player_def: boosted.def,
     turn: 1, is_defending: 0,
     active_effects: '[]', combat_log: '[]',
     player_stamina: 100, player_max_stamina: 100
@@ -527,7 +528,7 @@ function enemyTurn(
   // ── Shield (Soul Guard): block one massive/lethal hit ──────────────────
   if (hasEffect(effects, 'shield')) {
     // Pre-calc if this would be a fatal/heavy hit
-    const preDmg = Math.max(1, enemy.atk - defenseBonus);
+    const preDmg = Math.max(1, enemy.atk - ((current as any).player_def ?? 0) - defenseBonus);
     const wouldBeHeavy = preDmg >= playerHp || preDmg > current.player_max_hp * 0.5;
     if (wouldBeHeavy) {
       const idx = effects.findIndex(e => e.name === 'shield');
@@ -588,7 +589,7 @@ function enemyTurn(
     playerMp = res.playerMp;
     dealDmg  = res.dmg;
   } else {
-    dealDmg  = Math.max(1, calcDamage(enemyAtk, defenseBonus));
+    dealDmg  = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
     const armorReduce = (effects.find(e => e.name === 'armor_polish')?.value ?? 0) + (effects.find(e => e.name === 'stone_skin')?.value ?? 0);
     const rageTaken = effects.find(e => e.name === 'incoming_damage_up')?.value ?? 0;
     if (armorReduce > 0) dealDmg = Math.max(1, Math.floor(dealDmg * (1 - armorReduce / 100)));
@@ -715,6 +716,11 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
   if (Array.isArray(effect.removeEffects)) removeEffects.push(...effect.removeEffects);
   for (const removeName of removeEffects) {
     const before = effects.length;
+    if (removeName === 'all') {
+      effects.splice(0, effects.length);
+      if (before > 0) logs.push(`🎒 **${item.name}** — giải trừ toàn bộ hiệu ứng bất lợi!`);
+      continue;
+    }
     const filtered = effects.filter((e: any) => e.name !== removeName);
     if (filtered.length < before) logs.push(`🎒 **${item.name}** — giải trừ **${removeName}**!`);
     effects.splice(0, effects.length, ...filtered);
@@ -732,7 +738,7 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
     if (enemy?.boss) logs.push('📜 Boss chính kháng Silence! Scroll tan thành bụi.');
     else { addEffect(effects, 'silence', 2); logs.push('📜 Scroll of Silence: enemy không dùng skill trong 2 lượt.'); }
   }
-  if (itemId === 'warding_charm') { addEffect(effects, 'ward', 1); logs.push('🧿 Warding Charm: bùa hộ mệnh chờ chặn debuff tiếp theo.'); }
+  if (itemId === 'warding_charm' || itemId === 'rune_charm') { addEffect(effects, 'ward', 1); logs.push(`🧿 ${item.name}: bùa hộ mệnh chờ chặn debuff tiếp theo.`); }
   if (itemId === 'arson_bottle') {
     if (enemy?.boss) logs.push('🔥 Boss chính dập tắt Arson Bottle trước khi lửa lan ra.');
     else {
@@ -789,7 +795,7 @@ function groupEnemyTurn(
 
     // Shield check (first heavy hit)
     if (hasEffect(effects, 'shield')) {
-      const preDmg = Math.max(1, combatEnemy.atk + enemyAtkMod - defenseBonus);
+      const preDmg = Math.max(1, combatEnemy.atk + enemyAtkMod - (((current as any).player_def ?? 0) + defenseBonus));
       if (preDmg >= playerHp || preDmg > current.player_max_hp * 0.5) {
         const idx = effects.findIndex(e => e.name === 'shield');
         effects.splice(idx, 1);
@@ -830,7 +836,7 @@ function groupEnemyTurn(
       const res = applySpecialAttack(special, enemyAtk, fakeDef, playerHp, playerMp, logs);
       playerHp = res.playerHp; playerMp = res.playerMp; dealDmg = res.dmg;
     } else {
-      dealDmg = Math.max(1, calcDamage(enemyAtk, defenseBonus));
+      dealDmg = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
       const armorReduce = (effects.find(e => e.name === 'armor_polish')?.value ?? 0) + (effects.find(e => e.name === 'stone_skin')?.value ?? 0);
       const rageTaken = effects.find(e => e.name === 'incoming_damage_up')?.value ?? 0;
       if (armorReduce > 0) dealDmg = Math.max(1, Math.floor(dealDmg * (1 - armorReduce / 100)));

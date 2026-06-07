@@ -1,5 +1,5 @@
-import { EmbedBuilder } from 'discord.js';
-import { addItem } from '../systems/player';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
+import { addItem, getPlayer } from '../systems/player';
 import { COLORS } from '../utils/embeds';
 import db from '../database/index';
 
@@ -78,3 +78,23 @@ export function doFish(userId: string, guildId: string, playerName: string): Fis
   };
 }
 
+
+
+export const data = new SlashCommandBuilder()
+  .setName('fish')
+  .setDescription('Câu cá — cooldown 60 giây');
+
+export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply();
+  const { id: userId } = interaction.user;
+  const guildId = interaction.guildId!;
+  const player = getPlayer(userId, guildId);
+
+  if (!player?.alive) {
+    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.danger).setDescription('❌ Bạn đã chết. Dùng `/start` để hồi sinh.')] });
+    return;
+  }
+
+  const { embed } = doFish(userId, guildId, player.name);
+  await interaction.editReply({ embeds: [embed] });
+}
