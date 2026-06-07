@@ -24,8 +24,6 @@ import { execute as execWorldboss } from './commands/worldboss';
 import { execute as execDuel      } from './commands/duel';
 import { execute as execGuild     } from './commands/guild';
 import { execute as execPet       } from './commands/pet';
-import { execute as execGather    } from './commands/gather';
-import { execute as execReroll    } from './commands/reroll';
 import { execute as execParty     } from './commands/party';
 import { execute as execChapter   } from './commands/chapter';
 
@@ -54,8 +52,6 @@ commands.set('worldboss', execWorldboss);
 commands.set('duel',      execDuel);
 commands.set('guild',     execGuild);
 commands.set('pet',       execPet);
-commands.set('gather',    execGather);
-commands.set('reroll',    execReroll);
 commands.set('party',     execParty);
 commands.set('chapter',   execChapter);
 
@@ -142,11 +138,6 @@ const prefixAliases = new Map<string, string>([
   // Pet
   ['pet', 'pet'],
 
-  // Gathering / Reroll
-  ['gather', 'gather'],
-  ['g', 'gather'],
-  ['reroll', 'reroll'],
-  ['rr', 'reroll'],
 
   // Party
   ['party', 'party'],
@@ -174,8 +165,6 @@ const PREFIX_HELP = [
   '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
   '`rpg wb` / `rpg boss` — world boss',
   '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
-  '`rpg g` / `rpg gather` — thu thập nguyên liệu',
-  '`rpg rr` / `rpg reroll` — reroll skill book',
   '`rpg pt` / `rpg party` — xem party hiện tại',
   '`rpg pt create` — tạo party',
   '`rpg pt invite @user` — mời người vào party',

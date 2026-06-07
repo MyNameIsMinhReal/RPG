@@ -19,7 +19,7 @@ import { data as partyData        } from './commands/party';
 import { data as chapterData      } from './commands/chapter';
 
 // Slash commands public cho người chơi.
-// gather/reroll được giữ dạng prefix-only: rpg g / rpg rr. Fishing là event trong explore, không có lệnh riêng.
+// Fishing là event trong explore, không có lệnh riêng.
 const commands = [
   startData,
   profileData,
@@ -66,7 +66,6 @@ const rest = new REST({ version: '10' }).setToken(token);
     }
 
     commands.forEach(c => console.log(`   /${c.name}`));
-    console.log('ℹ️ Prefix-only: rpg g / rpg gather, rpg rr / rpg reroll');
   } catch (err) {
     console.error('❌ Deploy failed:', err);
     process.exit(1);

@@ -35,7 +35,7 @@ import { COLORS, simpleEmbed, type PlayerRow } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { getBuff, consumeBuff } from '../systems/consumables';
-import { doFish } from './fish';
+import { startFishingMiniGame } from './fish';
 import { onlyUser } from '../utils/collectors';
 import { incrementChapterObjective } from '../systems/chapter';
 import { getPityCounters, getPityBonus, PITY_EVENTS } from '../systems/pity';
@@ -202,7 +202,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['black_market', blackMarketAccess ? 10 : ((rep <= -30 || wanted >= 3) ? 5 : 0)],
     ['atonement_monk', (wanted > 0 || rep < -15) ? 4 : 0],
     ['conditional_miniboss', hasCombat && (wanted >= 3 || rep <= -60 || deaths >= 3 || robberyCount >= 2) ? 4 : 0],
-    ['fishing_spot', ['forest', 'shrine', 'mines'].includes(player.zone_id) ? 5 : 0],
+    ['fishing_spot', player.zone_id ? 5 : 0],
 
     // High reputation events — appear more often as reputation climbs.
     ['rep_honored_patrol',      rep >= 25 ? tm('rep_honored_patrol', 3 + highRepBonus) : 0],
@@ -414,24 +414,36 @@ async function finishNoContinue(ctx: RunExploreEventInput, embed: EmbedBuilder, 
 
 async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
   const FISHING_SPOTS: Record<string, string> = {
+    village: '🏘️ Một ao nhỏ sau quán trọ Ashveil. Trông yên bình nhưng đôi lúc có bóng cá rất lớn.',
     forest: '🏞️ Một con suối trong vắt chảy qua kẽ đá — nước lạnh và đầy cá.',
     shrine: '⛩️ Hồ nước linh thiêng bên đền cổ, cá ở đây khác lạ...',
     mines:  '⛏️ Dòng suối ngầm đổ ra từ khe đá — bóng cá lấp lánh trong bóng tối.',
+    wastes: '🌌 Một hồ nước đen phản chiếu bầu trời méo mó. Thứ bên dưới có lẽ không chỉ là cá.',
   };
   const flavor = FISHING_SPOTS[ctx.player.zone_id] ?? '🎣 Bạn tìm thấy một điểm câu cá.';
+  const baitQty = getItemQty(ctx.userId, ctx.guildId, 'glowing_bait');
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`ev_fish_${ctx.userId}`).setLabel('Câu cá').setEmoji('🎣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`ev_fish_cast_${ctx.userId}`).setLabel('Thả câu').setEmoji('🎣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`ev_fish_bait_${ctx.userId}`).setLabel(`Dùng Glowing Bait${baitQty > 0 ? ` x${baitQty}` : ''}`).setEmoji('✨').setStyle(ButtonStyle.Success).setDisabled(baitQty <= 0),
     new ButtonBuilder().setCustomId(`ev_skip_${ctx.userId}`).setLabel('Bỏ qua').setStyle(ButtonStyle.Secondary),
   );
   const embed = new EmbedBuilder()
     .setColor(0x3399ff)
-    .setTitle('🎣 Điểm Câu Cá!')
-    .setDescription(`${flavor}\n\nBạn có muốn thả câu không?`)
-    .setFooter({ text: 'Cooldown 60s dùng chung với lần câu trước' });
+    .setTitle('🎣 Fishing Spot')
+    .setDescription([
+      flavor,
+      '',
+      'Mini game gồm 2 pha:',
+      '1. Canh đúng lúc cá cắn câu.',
+      '2. Chọn hướng kéo để hạ HP cá, giữ tension dưới 100% và không để cạn stamina.',
+      '',
+      'Một số **pet egg mới** chỉ có thể kiếm được từ câu cá hiếm.',
+    ].join('\n'))
+    .setFooter({ text: 'Fishing Spot có thể xuất hiện ở mọi zone · cooldown 60s' });
 
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn   = await reply.awaitMessageComponent({
+  const btn = await reply.awaitMessageComponent({
     filter: onlyUser(ctx.userId),
     time: 30_000,
   }).catch(() => null);
@@ -441,9 +453,18 @@ async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.info, '🎣 *Bạn bỏ qua điểm câu cá và tiếp tục hành trình.*'));
   }
 
-  const { embed: fishEmbed } = doFish(ctx.userId, ctx.guildId, ctx.player.name);
-  const fishReply = await ctx.interaction.editReply({ embeds: [fishEmbed], components: ctx.callbacks.buildContinueExploreRow(ctx.userId) });
-  await ctx.callbacks.attachContinueExploreHandler(fishReply as Message<boolean>, ctx.interaction, ctx.userId, ctx.guildId);
+  const useBait = btn.customId === `ev_fish_bait_${ctx.userId}`;
+  await startFishingMiniGame({
+    interaction: ctx.interaction,
+    userId: ctx.userId,
+    guildId: ctx.guildId,
+    playerName: ctx.player.name,
+    zoneId: ctx.player.zone_id,
+    useBait,
+    partyMemberIds: ctx.partyMemberIds,
+    buildContinueExploreRow: ctx.callbacks.buildContinueExploreRow,
+    attachContinueExploreHandler: ctx.callbacks.attachContinueExploreHandler,
+  });
 }
 
 async function awaitButton(ctx: RunExploreEventInput, row: ActionRowBuilder<ButtonBuilder>, embed: EmbedBuilder, imageKey?: string, time = 30_000): Promise<string | null> {
@@ -1292,29 +1313,36 @@ async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
       `*Route ác không chỉ bị phạt — nó cũng mở ra những món không ai dám bán công khai.*`
     );
 
-  const stock = [
-    { id: 'black_market_token', label: 'Black Market Token', price: 180, desc: 'Mở đường vào chợ đen lần sau' },
-    { id: 'blood_vial', label: 'Blood Vial', price: 120, desc: 'Hồi máu + ATK, giảm reputation' },
-    { id: 'assassins_smoke', label: "Assassin's Smoke", price: 220, desc: 'Hỗ trợ cướp shopkeeper' },
-    { id: 'arson_bottle', label: 'Arson Bottle', price: 150, desc: 'Gây sát thương lửa trong combat' },
-    { id: 'rage_elixir', label: 'Rage Elixir', price: 180, desc: 'ATK mạnh nhưng nguy hiểm' },
-    { id: 'cracked_soul_charm', label: 'Cracked Soul Charm', price: 420, desc: '25% sống sót với 1 HP khi chết' },
-    { id: 'cursed_cloth', label: 'Cursed Cloth', price: 90, desc: 'Nguyên liệu craft cursed' },
-    { id: 'bone_glue', label: 'Bone Glue', price: 70, desc: 'Nguyên liệu undead/cursed' },
-    { id: 'soul_dust', label: 'Soul Dust', price: 140, desc: 'Nguyên liệu craft linh hồn' },
+  const fullStock = [
+    { id: 'black_market_token', label: 'Black Market Token', price: 600, desc: 'Mở đường vào chợ đen lần sau', emoji: '🌑' },
+    { id: 'fate_coin', label: 'Fate Coin', price: 1500, desc: 'Đồng xu dùng cho event định mệnh', emoji: '🪙' },
+    { id: 'soul_shard_pack', label: 'Soul Shard', price: 1200, desc: '+1 Soul Shard', emoji: '💀', special: 'soul_shard' },
+    { id: 'material_chest', label: 'Material Chest', price: 1800, desc: 'Rương nguyên liệu ngẫu nhiên', emoji: '📦' },
+    { id: 'cursed_equipment_box', label: 'Cursed Equipment Box', price: 2500, desc: 'Rương trang bị nguyền rủa', emoji: '🎁' },
+    { id: 'book_execute', label: 'Rare Skill Book', price: 3000, desc: 'Execute — skill book hiếm', emoji: '📕' },
+    { id: 'book_meteor_shower', label: 'Epic Skill Book', price: 10000, desc: 'Meteor Shower — skill book rất hiếm', emoji: '📙' },
+    { id: 'soul_anchor', label: 'Soul Anchor', price: 2500, desc: 'Bảo hộ khi chết', emoji: '⚓' },
+    { id: 'blood_vial', label: 'Blood Vial', price: 400, desc: 'Hồi máu + ATK, giảm reputation', emoji: '🩸' },
+    { id: 'assassins_smoke', label: "Assassin's Smoke", price: 650, desc: 'Hỗ trợ cướp shopkeeper', emoji: '💨' },
+    { id: 'arson_bottle', label: 'Arson Bottle', price: 500, desc: 'Gây sát thương lửa trong combat', emoji: '🔥' },
+    { id: 'rage_elixir', label: 'Rage Elixir', price: 700, desc: 'ATK mạnh nhưng nguy hiểm', emoji: '💢' },
+    { id: 'cracked_soul_charm', label: 'Cracked Soul Charm', price: 1000, desc: '25% sống sót với 1 HP khi chết', emoji: '💔' },
   ];
 
+  // Random daily-feeling stock per encounter: enough choice, not the whole catalogue.
+  const stock = fullStock
+    .sort(() => Math.random() - 0.5)
+    .slice(0, wanted >= 3 ? 8 : 6);
+
   const options = stock
-    .filter(x => ctx.player.gold >= x.price)
     .map(x => ({ ...x, item: getItem(x.id) }))
-    .filter(x => x.item)
-    .map(x => ({ x, opt: x.item! }))
-    .map(({ x, opt }) =>
+    .filter(x => x.special || x.item)
+    .map(x =>
       new (require('discord.js').StringSelectMenuOptionBuilder)()
         .setLabel(`${x.label} — ${x.price} Gold`)
         .setDescription(x.desc)
         .setValue(x.id)
-        .setEmoji(opt.icon)
+        .setEmoji(x.item?.icon ?? x.emoji)
     );
 
   const rows: ActionRowBuilder<any>[] = [];
@@ -1341,12 +1369,22 @@ async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
   const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (fresh.gold < row.price) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không đủ Gold.'));
   spendGold(ctx.userId, ctx.guildId, row.price);
-  addItem(ctx.userId, ctx.guildId, row.id, 1);
   const rep = adjustReputation(ctx.userId, ctx.guildId, -3);
   adjustFaction(ctx.userId, ctx.guildId, 'shadow_court', 5);
   adjustFaction(ctx.userId, ctx.guildId, 'merchants', -3);
+
+  if ((row as any).special === 'soul_shard') {
+    grantSoulShards(ctx.userId, ctx.guildId, 1);
+    return finish(ctx, simpleEmbed(COLORS.dark, `🌑 Bạn mua 💀 **Soul Shard** với giá **${row.price} Gold**.
+🤝 Reputation: **${rep}** (-3)
+🌑 Hội Bóng Tối: +5`));
+  }
+
+  addItem(ctx.userId, ctx.guildId, row.id, 1);
   const item = getItem(row.id)!;
-  return finish(ctx, simpleEmbed(COLORS.dark, `🌑 Bạn mua ${item.icon} **${item.name}** với giá **${row.price} Gold**.\n🤝 Reputation: **${rep}** (-3)\n🌑 Hội Bóng Tối: +5`));
+  return finish(ctx, simpleEmbed(COLORS.dark, `🌑 Bạn mua ${item.icon} **${item.name}** với giá **${row.price} Gold**.
+🤝 Reputation: **${rep}** (-3)
+🌑 Hội Bóng Tối: +5`));
 }
 
 async function showAtonementMonk(ctx: RunExploreEventInput): Promise<void> {
