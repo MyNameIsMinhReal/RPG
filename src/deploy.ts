@@ -18,6 +18,8 @@ import { data as petData          } from './commands/pet';
 import { data as partyData        } from './commands/party';
 import { data as chapterData      } from './commands/chapter';
 
+// Slash commands public cho người chơi.
+// gather/reroll được giữ dạng prefix-only: rpg g / rpg rr. Fishing là event trong explore, không có lệnh riêng.
 const commands = [
   startData,
   profileData,
@@ -37,34 +39,36 @@ const commands = [
   partyData,
   chapterData,
 ].map(c => c.toJSON());
+
 const token    = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;
+const guildId  = process.env.GUILD_ID;
 
-if (!token || !clientId) { console.error('❌ Thiếu DISCORD_TOKEN hoặc CLIENT_ID'); process.exit(1); }
-
-const guildId = process.env.GUILD_ID;
-const rest = new REST().setToken(token);
-
-function printCommands(prefix: string, data: any): void {
-  console.log(`${prefix} ${data.length} commands:`);
-  commands.forEach(c => console.log(`   /${c.name}`));
+if (!token || !clientId) {
+  console.error('❌ Thiếu DISCORD_TOKEN hoặc CLIENT_ID');
+  process.exit(1);
 }
+
+const rest = new REST({ version: '10' }).setToken(token);
 
 (async () => {
   try {
-    // Cập nhật global để xóa các slash command cũ như /gather, /fish, /reroll.
-    // Global command của Discord có thể mất một lúc mới biến mất hoàn toàn trên client.
-    const globalData: any = await rest.put(Routes.applicationCommands(clientId), { body: commands });
-    printCommands('✅ Deployed global', globalData);
+    let data: any;
 
-    // Nếu thêm GUILD_ID vào .env, bot cũng deploy vào server đó để cập nhật gần như ngay lập tức.
     if (guildId) {
-      const guildData: any = await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
-      printCommands(`✅ Deployed guild ${guildId}`, guildData);
+      // Tránh bị x2 lệnh khi chuyển từ global command sang guild command.
+      await rest.put(Routes.applicationCommands(clientId), { body: [] });
+      data = await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
+      console.log(`✅ Deployed ${data.length} GUILD commands to ${guildId}:`);
     } else {
-      console.log('ℹ️ Muốn deploy tức thì vào server test, thêm GUILD_ID=<server_id> vào .env rồi chạy npm run deploy.');
+      data = await rest.put(Routes.applicationCommands(clientId), { body: commands });
+      console.log(`✅ Deployed ${data.length} GLOBAL commands:`);
     }
+
+    commands.forEach(c => console.log(`   /${c.name}`));
+    console.log('ℹ️ Prefix-only: rpg g / rpg gather, rpg rr / rpg reroll');
   } catch (err) {
-    console.error('❌ Deploy failed:', err); process.exit(1);
+    console.error('❌ Deploy failed:', err);
+    process.exit(1);
   }
 })();

@@ -12,6 +12,7 @@ import {
 import { getEnemy, getEnemiesForZone } from '../data/enemies';
 import { getInventory } from './player';
 import { getItem } from '../data/items';
+import { getSkill } from '../data/skills';
 import { buildCombatEmbed, buildCombatButtons, buildSkillSelectMenu, simpleEmbed, COLORS } from '../utils/embeds';
 import type { CombatEnemy } from '../utils/embeds';
 import { withImage } from '../utils/eventImages';
@@ -74,6 +75,10 @@ function hasUsableItems(userId: string, guildId: string): boolean {
     const it = getItem(e.item_id);
     return it?.type === 'consumable' && isCombatUsableItem(e.item_id);
   });
+}
+
+function hasActiveCombatSkills(userId: string, guildId: string): boolean {
+  return getLoadout(userId, guildId).some(entry => getSkill(entry.skill_id)?.type === 'active');
 }
 
 function tryCrackedSoulCharm(userId: string, guildId: string, result: any): boolean {
@@ -190,7 +195,7 @@ export async function startCombatFlow(
   const combatEmbed = buildCombatEmbed(initState, player.name, enemy.icon, openingLogs);
   const inventory0  = getInventory(userId, guildId);
   const hasItems0   = inventory0.some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && isCombatUsableItem(e.item_id); });
-  const buttons     = buildCombatButtons(userId, loadout.length > 0, 100, hasItems0);
+  const buttons     = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0);
   const imgKey      = enemy.boss ? 'boss' : 'combat';
   const { files: combatFiles, embed: combatEmbedWithImg } = withImage(combatEmbed, imgKey);
   const reply       = await interaction.editReply({ embeds: [combatEmbedWithImg], files: combatFiles, components: buttons });
@@ -290,7 +295,7 @@ export async function startCombatFlow(
       } else if (cid === `rpg_back_${userId}`) {
         await compInt.editReply({
           embeds: [buildCombatEmbed(current, fresh.name, enemy.icon, JSON.parse(current.combat_log ?? '[]'))],
-          components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, current.player_stamina ?? 100, hasUsableItems(userId, guildId))
+          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId))
         }).catch(() => {});
         return;
       } else return;
@@ -340,7 +345,7 @@ export async function startCombatFlow(
           saveCombat(result.newState);
           await compInt.editReply({
             embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-            components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
+            components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
           }).catch(() => {});
           return;
         }
@@ -354,7 +359,7 @@ export async function startCombatFlow(
       const updatedLoadout = getLoadout(userId, guildId);
       await compInt.editReply({
         embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-        components: buildCombatButtons(userId, updatedLoadout.length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && isCombatUsableItem(e.item_id); }))
+        components: buildCombatButtons(userId, updatedLoadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && isCombatUsableItem(e.item_id); }))
       }).catch(() => {});
     } catch (err) {
       console.error('Combat interaction error:', err);
@@ -386,13 +391,17 @@ export async function startCombatFlowWithEnemy(
   onDeath?: CombatDeathHandler,
   onFlee?: CombatFleeHandler
 ): Promise<void> {
+  // Clone enemy trước khi gắn bonus/buff để không sửa object gốc trong data runtime.
+  enemy = {
+    ...enemy,
+    drops: Array.isArray(enemy?.drops) ? [...enemy.drops] : enemy?.drops,
+    specialAttacks: Array.isArray(enemy?.specialAttacks) ? [...enemy.specialAttacks] : enemy?.specialAttacks,
+  };
+  if (bonus) enemy.combatBonus = bonus;
   if (enemy.id && !getEnemy(enemy.id)) {
     // register inline definition into the map for the duration of combat
     const { ENEMIES } = await import('../data/enemies');
     if (enemy.id && !ENEMIES[enemy.id]) ENEMIES[enemy.id] = enemy;
-  }
-  if (bonus) {
-    enemy.combatBonus = bonus;
   }
   const player      = getPlayer(userId, guildId)!;
   const loadout     = getLoadout(userId, guildId);
@@ -400,7 +409,6 @@ export async function startCombatFlowWithEnemy(
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
   const withPassive    = buffedStart.player;
 
-  enemy = { ...enemy };
   const greedBuff = getBuff(userId, guildId, 'scroll_greed');
   if (greedBuff) enemy.atk = Math.floor(enemy.atk * 1.15);
   const smokeBuff = enemy?.isShopkeeper ? consumeBuff(userId, guildId, 'assassins_smoke') : undefined;
@@ -434,7 +442,7 @@ export async function startCombatFlowWithEnemy(
   const combatEmbed2 = buildCombatEmbed(initState, player.name, enemy.icon, openingLogs);
   const inventory0   = getInventory(userId, guildId);
   const hasItems0    = inventory0.some((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); });
-  const buttons      = buildCombatButtons(userId, loadout.length > 0, 100, hasItems0);
+  const buttons      = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0);
   const reply        = await interaction.editReply({ embeds: [combatEmbed2], components: buttons });
 
   const state = { ...initState, message_id: reply.id };
@@ -523,7 +531,7 @@ export async function startCombatFlowWithEnemy(
       } else if (cid === `rpg_back_${userId}`) {
         await compInt.editReply({
           embeds: [buildCombatEmbed(current, fresh.name, enemy.icon, JSON.parse(current.combat_log ?? '[]'))],
-          components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, current.player_stamina ?? 100, hasUsableItems(userId, guildId))
+          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId))
         }).catch(() => {});
         return;
       } else return;
@@ -573,7 +581,7 @@ export async function startCombatFlowWithEnemy(
           saveCombat(result.newState);
           await compInt.editReply({
             embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-            components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
+            components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
           }).catch(() => {});
           return;
         }
@@ -586,7 +594,7 @@ export async function startCombatFlowWithEnemy(
       saveCombat(result.newState);
       await compInt.editReply({
         embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-        components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
+        components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
       }).catch(() => {});
     } catch (err) {
       console.error('Combat interaction error:', err);
@@ -669,7 +677,7 @@ export async function startGroupCombatFlow(
   const combatEmbed = buildCombatEmbed(initState, player.name, '⚔️', openingLogs);
   const inventory0  = getInventory(userId, guildId);
   const hasItems0   = inventory0.some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); });
-  const buttons     = buildCombatButtons(userId, loadout.length > 0, 100, hasItems0);
+  const buttons     = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0);
   const { files: combatFiles, embed: combatEmbedWithImg } = withImage(combatEmbed, 'combat');
   const reply       = await interaction.editReply({ embeds: [combatEmbedWithImg], files: combatFiles, components: buttons });
 
@@ -755,7 +763,7 @@ export async function startGroupCombatFlow(
       } else if (cid === `rpg_back_${userId}`) {
         await compInt.editReply({
           embeds: [buildCombatEmbed(current, fresh.name, '⚔️', JSON.parse(current.combat_log ?? '[]'))],
-          components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, current.player_stamina ?? 100, hasUsableItems(userId, guildId))
+          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId))
         }).catch(() => {});
         return;
       } else return;
@@ -782,7 +790,7 @@ export async function startGroupCombatFlow(
           saveCombat(result.newState);
           await compInt.editReply({
             embeds: [buildCombatEmbed(result.newState, fresh.name, '⚔️', result.logLines)],
-            components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
+            components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
           }).catch(() => {});
           return;
         }
@@ -795,7 +803,7 @@ export async function startGroupCombatFlow(
       saveCombat(result.newState);
       await compInt.editReply({
         embeds: [buildCombatEmbed(result.newState, fresh.name, '⚔️', result.logLines)],
-        components: buildCombatButtons(userId, getLoadout(userId, guildId).length > 0, result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
+        components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
       }).catch(() => {});
     } catch (err) {
       console.error('Group combat interaction error:', err);

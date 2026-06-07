@@ -285,11 +285,15 @@ export function buildSkillSelectMenu(
   loadout: Array<{ slot: number; skill_id: string }>,
   playerMp: number
 ): ActionRowBuilder<StringSelectMenuBuilder> {
-  const options = loadout.map(entry => {
-    const sk = getSkill(entry.skill_id)!;
+  const activeLoadout = loadout
+    .map(entry => ({ entry, skill: getSkill(entry.skill_id) }))
+    .filter(x => x.skill?.type === 'active');
+
+  const options = activeLoadout.map(({ entry, skill }) => {
+    const sk = skill!;
     const canAfford = !sk.mpCost || playerMp >= sk.mpCost;
     const label = `[${entry.slot}] ${sk.name}`;
-    const desc = sk.mpCost ? `${sk.mpCost} MP${canAfford ? '' : ' (không đủ MP)'}` : 'Passive/World';
+    const desc = sk.mpCost ? `${sk.mpCost} MP${canAfford ? '' : ' (không đủ MP)'}` : 'Không tốn MP';
     return new StringSelectMenuOptionBuilder()
       .setLabel(label)
       .setDescription(desc)
@@ -297,10 +301,19 @@ export function buildSkillSelectMenu(
       .setEmoji(sk.icon);
   });
 
+  // Fallback bảo vệ nếu UI gọi nhầm khi người chơi không có active skill.
+  if (!options.length) {
+    options.push(new StringSelectMenuOptionBuilder()
+      .setLabel('Không có kỹ năng active')
+      .setDescription('Passive / world skill không dùng trong combat')
+      .setValue(`rpg_useskill_${userId}__no_active`)
+      .setEmoji('⚠️'));
+  }
+
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`rpg_skillmenu_${userId}`)
-      .setPlaceholder('Chọn kỹ năng để sử dụng...')
+      .setPlaceholder('Chọn kỹ năng active để sử dụng...')
       .addOptions(options.slice(0, 25))
   );
 }

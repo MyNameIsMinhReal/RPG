@@ -118,3 +118,120 @@ export async function showMineCollapse(ctx: RunExploreEventInput): Promise<void>
     )
   );
 }
+
+// ════════════════════════════════════════════════════════════════
+//  MINES — Vỉa Quặng, Đường Hầm Vọng Âm, Thang Máy Gỉ
+// ════════════════════════════════════════════════════════════════
+export async function showMineRichOreVein(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`ov_mine_${ctx.userId}`).setLabel('Đào quặng').setEmoji('⛏️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`ov_careful_${ctx.userId}`).setLabel('Đào cẩn thận').setEmoji('🧤').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`ov_mark_${ctx.userId}`).setLabel('Đánh dấu rồi đi').setEmoji('📍').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x777777)
+    .setTitle('⛏️ Vỉa Quặng Lấp Lánh')
+    .setDescription('Ánh đuốc phản chiếu lên một vỉa quặng mới lộ ra sau vách đá nứt. Có cả quặng thường lẫn tinh thể xanh nhạt.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '⛏️ *Bạn đánh dấu vị trí trong đầu rồi đi tiếp.*'));
+  await btn.deferUpdate().catch(() => {});
+
+  if (btn.customId === `ov_mine_${ctx.userId}`) {
+    addItem(ctx.userId, ctx.guildId, 'iron_ore', randInt(3, 6));
+    if (randInt(1, 100) <= 30) addItem(ctx.userId, ctx.guildId, 'mana_crystal', 1);
+    const dmg = Math.max(1, Math.floor(player.max_hp * 0.08));
+    const hp = Math.max(1, player.hp - dmg);
+    updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
+    return finish(ctx, simpleEmbed(COLORS.warning, `⛏️ Bạn đào mạnh tay. Đá vụn rơi xuống vai, nhưng túi quặng đầy lên.\n🪨 +**3–6× Iron Ore**\n💠 Có thể nhận **Mana Crystal**\n❤️ HP mất **${dmg}**`));
+  }
+
+  if (btn.customId === `ov_careful_${ctx.userId}`) {
+    addItem(ctx.userId, ctx.guildId, 'iron_ore', randInt(2, 4));
+    const exp = randInt(20, 35);
+    grantExp(ctx.userId, ctx.guildId, exp);
+    return finish(ctx, simpleEmbed(COLORS.success, `🧤 Bạn tách quặng từng lớp, không làm hỏng tinh thể.\n🪨 +**2–4× Iron Ore**\n⭐ +**${exp} EXP**`));
+  }
+
+  grantExp(ctx.userId, ctx.guildId, 15);
+  return finish(ctx, simpleEmbed(COLORS.info, '📍 Bạn đánh dấu vỉa quặng để tránh làm hầm sập.\n⭐ +**15 EXP** *(kinh nghiệm thăm dò)*'));
+}
+
+export async function showMineEchoTunnel(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`et_call_${ctx.userId}`).setLabel('Gọi vào bóng tối').setEmoji('📣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`et_listen_${ctx.userId}`).setLabel('Lắng nghe vọng âm').setEmoji('👂').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`et_leave_${ctx.userId}`).setLabel('Đi đường khác').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x666688)
+    .setTitle('📣 Đường Hầm Vọng Âm')
+    .setDescription('Bạn bước tới một đường hầm dài hun hút. Mỗi tiếng thở của bạn vang lại thành nhiều giọng khác nhau.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton() || btn.customId === `et_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '📣 *Bạn chọn đường khác, ít tiếng vọng hơn.*'));
+  await btn.deferUpdate().catch(() => {});
+
+  if (btn.customId === `et_listen_${ctx.userId}`) {
+    const exp = randInt(25, 50);
+    grantExp(ctx.userId, ctx.guildId, exp);
+    if (randInt(1, 100) <= 30) addItem(ctx.userId, ctx.guildId, 'silver_ore', 1);
+    return finish(ctx, simpleEmbed(COLORS.info, `👂 Bạn nghe tiếng vọng và đoán ra một lối rẽ an toàn.\n⭐ +**${exp} EXP**\n🪙 Có thể tìm thấy **Silver Ore**.`));
+  }
+
+  const roll = randInt(1, 100);
+  if (roll <= 45) {
+    const gold = randInt(40, 90);
+    grantGold(ctx.userId, ctx.guildId, gold);
+    return finish(ctx, simpleEmbed(COLORS.gold, `📣 Tiếng gọi làm rơi một túi đồ từ khe đá phía trên.\n🪙 +**${gold} Gold**`));
+  }
+  if (ctx.enemies.length) {
+    await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '📣 Có thứ trả lời tiếng gọi của bạn — bằng tiếng móng vuốt trên đá.\n\n*Chiến đấu bắt đầu...*')], components: [] });
+    await new Promise(r => setTimeout(r, 600));
+    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+  }
+  const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
+  const hp = Math.max(1, player.hp - dmg);
+  updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
+  return finish(ctx, simpleEmbed(COLORS.warning, `📣 Tiếng vọng làm trần hầm rung chuyển.\n❤️ HP mất **${dmg}**`));
+}
+
+export async function showMineRustedLift(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`rl_ride_${ctx.userId}`).setLabel('Đi xuống bằng thang').setEmoji('🛗').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`rl_repair_${ctx.userId}`).setLabel('Sửa tạm dây kéo').setEmoji('🔧').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`rl_salvage_${ctx.userId}`).setLabel('Gỡ phụ tùng').setEmoji('⚙️').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x8B6F47)
+    .setTitle('🛗 Thang Máy Gỉ Sét')
+    .setDescription('Một thang nâng cũ treo trên miệng hố sâu. Dây xích kêu ken két, nhưng bên dưới có ánh kim loại lấp lánh.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🛗 *Bạn không tin cái thang này và rời đi.*'));
+  await btn.deferUpdate().catch(() => {});
+
+  if (btn.customId === `rl_repair_${ctx.userId}`) {
+    const exp = randInt(25, 45);
+    grantExp(ctx.userId, ctx.guildId, exp);
+    addItem(ctx.userId, ctx.guildId, 'rusty_gear', 2);
+    return finish(ctx, simpleEmbed(COLORS.success, `🔧 Bạn sửa tạm bộ kéo rồi hạ thang xuống một đoạn an toàn.\n⚙️ +**2× Rusty Gear**\n⭐ +**${exp} EXP**`));
+  }
+  if (btn.customId === `rl_salvage_${ctx.userId}`) {
+    addItem(ctx.userId, ctx.guildId, 'rusty_gear', randInt(2, 4));
+    return finish(ctx, simpleEmbed(COLORS.info, '⚙️ Bạn gỡ được vài bánh răng còn dùng được.\n⚙️ +**2–4× Rusty Gear**'));
+  }
+
+  const dmg = Math.max(1, Math.floor(player.max_hp * randInt(8, 18) / 100));
+  const hp = Math.max(1, player.hp - dmg);
+  updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
+  const rewards = [
+    () => { grantGold(ctx.userId, ctx.guildId, randInt(90, 180)); return '🪙 Bạn tìm được một rương vàng cũ dưới đáy hố.'; },
+    () => { addItem(ctx.userId, ctx.guildId, 'black_iron', 1); return '⬛ Bạn tìm được **1× Black Iron** trong lớp đá sâu.'; },
+    () => { addItem(ctx.userId, ctx.guildId, 'mana_crystal', 2); return '💠 Bạn tìm được **2× Mana Crystal** mọc trên vách đá.'; },
+  ];
+  return finish(ctx, simpleEmbed(COLORS.warning, `🛗 Thang rơi nửa chừng rồi kẹt lại. Bạn sống sót, nhưng không nguyên vẹn.\n❤️ HP mất **${dmg}**\n${pick(rewards)()}`));
+}

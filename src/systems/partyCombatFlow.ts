@@ -15,11 +15,18 @@ import {
   ButtonStyle,
   Message
 } from 'discord.js';
-import { getPlayer, grantExp, grantGold, updatePlayerHpMp } from './player';
+import { getPlayer, grantExp, grantGold, updatePlayerHpMp, applyPassiveStats, removeItem, addItem } from './player';
 import { getEnemy } from '../data/enemies';
+import { getItem } from '../data/items';
+import { getMaterial } from '../data/materials';
+import { EQUIPMENT, getEquipment } from '../data/equipment';
 import { incrementKills } from './player';
 import { COLORS } from '../utils/embeds';
-import { randInt, pick } from '../utils/format';
+import { randInt, pick, bar } from '../utils/format';
+import { incrementDaily, countsAsPotion } from '../commands/daily';
+import { incrementChapterObjective } from './chapter';
+import { logEvent, onBossKilled } from './world';
+import { unlockRecipesBySource } from './crafting';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +37,8 @@ export interface PartyMember {
   max_hp: number;
   mp: number;
   max_mp: number;
+  stamina: number;
+  max_stamina: number;
   atk: number;
   def: number;
   alive: boolean;
@@ -52,6 +61,10 @@ type PartyAction = 'attack' | 'defend' | 'potion' | 'flee';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const SESSION_TIMEOUT_MS = 60_000;
+const PARTY_MAX_STAMINA = 100;
+const ATTACK_STAMINA_COST = 15;
+const DEFEND_STAMINA_GAIN = 25;
+const TURN_STAMINA_REGEN = 6;
 
 function hpBar(hp: number, max: number): string {
   const pct = Math.max(0, Math.min(1, hp / max));
@@ -68,9 +81,14 @@ function buildCombatEmbed(
 ): EmbedBuilder {
   const memberLines = members.map(m => {
     if (!m.alive) return `💀 ~~**${m.name}**~~ — KO'd`;
-    const bar = hpBar(m.hp, m.max_hp);
-    return `❤️ **${m.name}** — ${bar} ${m.hp}/${m.max_hp} HP`;
-  }).join('\n');
+    const staWarn = m.stamina <= 10 ? '  ⚠️ *kiệt sức!*' : '';
+    return [
+      `**${m.name}**`,
+      `❤️ \`${bar(m.hp, m.max_hp, 8)}\` **${m.hp}**/${m.max_hp} HP`,
+      `💧 \`${bar(m.mp, m.max_mp, 8)}\` **${m.mp}**/${m.max_mp} MP`,
+      `⚡ \`${bar(m.stamina, m.max_stamina, 8)}\` **${m.stamina}**/${m.max_stamina} Stamina${staWarn}`
+    ].join('\n');
+  }).join('\n\n');
 
   const eBar = hpBar(enemy.hp, enemy.max_hp);
   const waitingStr = pendingVoters.length
@@ -114,18 +132,59 @@ function findBestPotion(userId: string, guildId: string): string | null {
   return null;
 }
 
-function applyPotion(member: PartyMember, userId: string, guildId: string): { member: PartyMember; log: string } {
-  const { useItemOutsideCombat } = require('./consumables');
+function applyPotion(member: PartyMember, userId: string, guildId: string): { member: PartyMember; log: string; consumed: boolean; itemId?: string } {
   const pid = findBestPotion(userId, guildId);
-  if (!pid) return { member, log: `🧪 **${member.name}** không có potion nào!` };
+  if (!pid) return { member, log: `🧪 **${member.name}** không có potion nào!`, consumed: false };
 
-  const result = useItemOutsideCombat(userId, guildId, pid);
-  // Re-read HP/MP from DB since useItemOutsideCombat saves to DB
-  const fresh = getPlayer(userId, guildId)!;
+  const item = getItem(pid);
+  const effect: any = item?.effect ?? {};
+  if (!item || item.type !== 'consumable') {
+    return { member, log: `🧪 **${member.name}** không dùng được vật phẩm này!`, consumed: false };
+  }
+
+  const beforeHp = member.hp;
+  const beforeMp = member.mp;
+  let hp = member.hp;
+  let mp = member.mp;
+
+  if (effect.hpPercent) hp = Math.min(member.max_hp, hp + Math.max(1, Math.floor(member.max_hp * effect.hpPercent)));
+  if (effect.hp) hp = Math.min(member.max_hp, hp + effect.hp);
+  if (effect.mpPercent) mp = Math.min(member.max_mp, mp + Math.max(1, Math.floor(member.max_mp * effect.mpPercent)));
+  if (effect.mp) mp = Math.min(member.max_mp, mp + effect.mp);
+
+  const consumed = removeItem(userId, guildId, pid, 1);
+  if (!consumed) return { member, log: `🧪 **${member.name}** không có ${item.name}!`, consumed: false };
+
+  const hpGain = hp - beforeHp;
+  const mpGain = mp - beforeMp;
+  const parts = [hpGain > 0 ? `+${hpGain} HP` : '', mpGain > 0 ? `+${mpGain} MP` : ''].filter(Boolean).join(', ') || 'không hồi thêm vì đã đầy';
   return {
-    member: { ...member, hp: fresh.hp, mp: fresh.mp },
-    log: `🧪 **${member.name}** dùng potion: ${result.lines[0] ?? `+HP`}`
+    member: { ...member, hp, mp },
+    log: `🧪 **${member.name}** dùng **${item.icon} ${item.name}** — ${parts}.`,
+    consumed: true,
+    itemId: pid
   };
+}
+
+function rollPartyDrops(userId: string, guildId: string, enemyDef: any): string[] {
+  const drops: string[] = [];
+  for (const drop of enemyDef.drops ?? []) {
+    if (Math.random() * 100 <= drop.chance) {
+      addItem(userId, guildId, drop.itemId, 1);
+      const it = getItem(drop.itemId) ?? getMaterial(drop.itemId);
+      drops.push(it ? `${it.icon} ${it.name}` : drop.itemId);
+    }
+  }
+
+  const eqDrops = Object.values(EQUIPMENT).filter(e => e.dropFrom?.includes(enemyDef.id) && e.dropChance);
+  for (const eq of eqDrops) {
+    if (Math.random() * 100 <= (eq.dropChance ?? 0)) {
+      addItem(userId, guildId, eq.id, 1);
+      const def = getEquipment(eq.id);
+      drops.push(def ? `${def.icon} ${def.name}` : eq.id);
+    }
+  }
+  return drops;
 }
 
 // ── Main flow ─────────────────────────────────────────────────────────────────
@@ -140,20 +199,34 @@ export async function startPartyCombatFlow(
   onWipe?: (members: PartyMember[], enemy: PartyCombatEnemy) => Promise<void>
 ): Promise<void> {
   // ── Load members ────────────────────────────────────────────────────────────
-  const members: PartyMember[] = memberIds.map(uid => {
-    const p = getPlayer(uid, guildId)!;
-    return {
+  const members: PartyMember[] = [];
+  for (const uid of memberIds) {
+    const base = getPlayer(uid, guildId);
+    if (!base?.alive) continue;
+    const p = applyPassiveStats(base);
+    members.push({
       user_id: uid,
       name: p.name,
       hp: p.hp,
       max_hp: p.max_hp,
       mp: p.mp,
       max_mp: p.max_mp,
+      stamina: PARTY_MAX_STAMINA,
+      max_stamina: PARTY_MAX_STAMINA,
       atk: p.atk,
       def: p.def,
       alive: true
-    };
-  });
+    });
+  }
+
+  if (members.length === 0) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription('⚠️ Không có thành viên party nào còn sống để bắt đầu combat.')],
+      components: []
+    });
+    return;
+  }
+  const activeMemberIds = members.map(m => m.user_id);
 
   // ── Load & scale enemy ──────────────────────────────────────────────────────
   const baseDef = getEnemy(enemyId)!;
@@ -198,7 +271,7 @@ export async function startPartyCombatFlow(
 
     await new Promise<void>(resolve => {
       const collector = reply.createMessageComponentCollector({
-        filter: i => memberIds.includes(i.user.id) && i.customId.endsWith(`_${sessionId}`),
+        filter: i => activeMemberIds.includes(i.user.id) && i.customId.endsWith(`_${sessionId}`),
         time: SESSION_TIMEOUT_MS
       });
 
@@ -228,6 +301,7 @@ export async function startPartyCombatFlow(
     // ── Check flee ─────────────────────────────────────────────────────────────
     const fleeCount = [...actions.values()].filter(a => a === 'flee').length;
     if (fleeCount > 0 && randInt(1, 100) <= 50) {
+      for (const m of members) updatePlayerHpMp(m.user_id, guildId, m.alive ? m.hp : 1, m.mp);
       await interaction.editReply({
         embeds: [new EmbedBuilder().setColor(COLORS.info)
           .setTitle('🏃 Party Tháo Chạy!')
@@ -246,16 +320,35 @@ export async function startPartyCombatFlow(
       if (mIdx < 0) continue;
 
       if (action === 'attack') {
+        if ((members[mIdx].stamina ?? PARTY_MAX_STAMINA) <= 10) {
+          defenders.add(uid);
+          members[mIdx] = {
+            ...members[mIdx],
+            stamina: Math.min(members[mIdx].max_stamina, members[mIdx].stamina + DEFEND_STAMINA_GAIN)
+          };
+          log.push(`⚡ **${members[mIdx].name}** quá kiệt sức để tấn công nên chuyển sang phòng thủ.`);
+          continue;
+        }
+
+        members[mIdx] = {
+          ...members[mIdx],
+          stamina: Math.max(0, members[mIdx].stamina - ATTACK_STAMINA_COST)
+        };
         const dmg = calcDmg(members[mIdx].atk, enemy.def);
         enemy.hp = Math.max(0, enemy.hp - dmg);
         log.push(`⚔️ **${members[mIdx].name}** gây **${dmg}** sát thương! (${enemy.hp}/${enemy.max_hp})`);
         if (enemy.hp <= 0) break;
       } else if (action === 'defend') {
         defenders.add(uid);
-        log.push(`🛡️ **${members[mIdx].name}** phòng thủ.`);
+        members[mIdx] = {
+          ...members[mIdx],
+          stamina: Math.min(members[mIdx].max_stamina, members[mIdx].stamina + DEFEND_STAMINA_GAIN)
+        };
+        log.push(`🛡️ **${members[mIdx].name}** phòng thủ và hồi **${DEFEND_STAMINA_GAIN} ⚡ Stamina**.`);
       } else if (action === 'potion') {
-        const { member: updated, log: pLog } = applyPotion(members[mIdx], uid, guildId);
+        const { member: updated, log: pLog, consumed, itemId } = applyPotion(members[mIdx], uid, guildId);
         members[mIdx] = updated;
+        if (consumed && itemId && countsAsPotion(itemId)) incrementDaily(uid, guildId, 'potion_used');
         log.push(pLog);
       }
     }
@@ -285,6 +378,15 @@ export async function startPartyCombatFlow(
         members[tIdx] = { ...members[tIdx], alive: false };
         log.push(`💀 **${target.name}** đã ngã xuống!`);
       }
+    }
+
+    // Natural stamina regen each turn end
+    for (let i = 0; i < members.length; i++) {
+      if (!members[i].alive) continue;
+      members[i] = {
+        ...members[i],
+        stamina: Math.min(members[i].max_stamina, members[i].stamina + TURN_STAMINA_REGEN)
+      };
     }
 
     turn++;
@@ -320,11 +422,25 @@ export async function startPartyCombatFlow(
   );
 
   const rewardLines: string[] = [];
+  const bossLines: string[] = [];
   for (const m of survivors) {
     grantExp(m.user_id, guildId, expReward);
     grantGold(m.user_id, guildId, goldReward);
     incrementKills(m.user_id, guildId);
-    rewardLines.push(`⚔️ **${m.name}** — +**${expReward} EXP**, +**${goldReward} Gold**`);
+    incrementDaily(m.user_id, guildId, 'kill_count');
+    const fresh = getPlayer(m.user_id, guildId);
+    if (fresh) {
+      incrementChapterObjective(m.user_id, guildId, 'kill_in_zone', { zoneId: fresh.zone_id, enemyId: baseDef.id });
+      if (baseDef.boss) incrementChapterObjective(m.user_id, guildId, 'kill_boss', { zoneId: fresh.zone_id, enemyId: baseDef.id });
+      logEvent(guildId, m.user_id, fresh.name, baseDef.boss ? 'boss_kill' : 'kill', `cùng party tiêu diệt **${baseDef.icon} ${baseDef.name}**.`, fresh.zone_id);
+      if (baseDef.boss && baseDef.deathWorldFlag) unlockRecipesBySource(m.user_id, guildId, baseDef.id);
+    }
+    const drops = rollPartyDrops(m.user_id, guildId, baseDef);
+    rewardLines.push(`⚔️ **${m.name}** — +**${expReward} EXP**, +**${goldReward} Gold**${drops.length ? `\n  📦 ${drops.join(', ')}` : ''}`);
+  }
+  if (baseDef.boss && baseDef.deathWorldFlag && survivors[0]) {
+    const first = getPlayer(survivors[0].user_id, guildId);
+    if (first) bossLines.push(onBossKilled(guildId, baseDef.id, first.name, first.zone_id));
   }
   for (const m of members.filter(m => !m.alive)) {
     rewardLines.push(`💀 ~~**${m.name}**~~ — KO'd, không nhận thưởng`);
@@ -335,7 +451,7 @@ export async function startPartyCombatFlow(
       .setTitle(`🏆 Chiến Thắng! ${enemy.icon} ${enemy.name} Bị Hạ!`)
       .setDescription(
         `Party đã chiến thắng sau **${turn - 1} lượt**!\n\n` +
-        `**Phần thưởng (chia đều):**\n${rewardLines.join('\n')}`
+        `**Phần thưởng (chia đều):**\n${rewardLines.join('\n')}\n${bossLines.length ? `\n${bossLines.join('\n')}` : ''}`
       )
     ],
     components: []

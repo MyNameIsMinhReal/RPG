@@ -103,6 +103,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const msg = await interaction.editReply({ content: `<@${targetUser.id}>`, embeds: [challengeEmbed], components: [row] });
 
+  db.prepare(`
+    INSERT INTO active_duels
+    (duel_id, guild_id, challenger_id, target_id, challenger_hp, target_hp,
+     challenger_max, target_max, turn_user, status, message_id, channel_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+  `).run(
+    duelId, guildId, challengerId, targetUser.id,
+    chalHp, targHp, chalMax, targMax,
+    challengerId, msg.id, interaction.channelId
+  );
+
   const response = await msg.awaitMessageComponent({
     filter: onlyUser(targetUser.id),
     componentType: ComponentType.Button,
@@ -110,6 +121,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }).catch(() => null);
 
   if (!response || response.customId === 'duel_decline') {
+    db.prepare(`UPDATE active_duels SET status='declined' WHERE duel_id=?`).run(duelId);
     await interaction.editReply({
       content: '',
       embeds: [new EmbedBuilder().setColor(COLORS.dark).setDescription(`❌ **${targetUser.username}** từ chối duel.`)],
@@ -119,6 +131,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   await response.deferUpdate();
+  db.prepare(`UPDATE active_duels SET status='active', turn_user=? WHERE duel_id=?`).run(challengerId, duelId);
 
   // ── Combat loop ──────────────────────────────────────────────────
   let cHp = chalHp, tHp = targHp;
@@ -199,6 +212,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const nextName = turn === 0 ? chalUsername : targetUser.username;
     currentTurnUser = turn === 0 ? challengerId : targetUser.id;
+    db.prepare(`UPDATE active_duels SET challenger_hp=?, target_hp=?, turn_user=? WHERE duel_id=?`)
+      .run(cHp, tHp, currentTurnUser, duelId);
     await interaction.editReply({
       content: `<@${currentTurnUser}>`,
       embeds: [buildDuelEmbed(chalUsername, cHp, chalMax, targetUser.username, tHp, targMax, log, `Lượt của: ${nextName}`)],
@@ -221,6 +236,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   updatePlayerHpMp(targetUser.id, guildId, Math.max(1, tHp), target.mp);
 
   log += `\n\n🏆 **${winName}** chiến thắng!`;
+  db.prepare(`UPDATE active_duels SET challenger_hp=?, target_hp=?, status='done' WHERE duel_id=?`)
+    .run(Math.max(0, cHp), Math.max(0, tHp), duelId);
 
   await interaction.editReply({
     content: '',

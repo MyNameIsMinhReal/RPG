@@ -550,3 +550,241 @@ export async function showMidnightWanderer(ctx: RunExploreEventInput): Promise<v
   );
 }
 
+
+// ════════════════════════════════════════════════════════════════════════
+//  EXTRA TIME EVENTS
+// ════════════════════════════════════════════════════════════════════════
+
+export async function showDawnDewBlessing(ctx: RunExploreEventInput): Promise<void> {
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`dew_drink_${ctx.userId}`).setLabel('Uống sương mai').setEmoji('💧').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`dew_collect_${ctx.userId}`).setLabel('Thu vào lọ').setEmoji('🫙').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`dew_leave_${ctx.userId}`).setLabel('Để nguyên').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x99DDFF)
+    .setTitle('💧 Sương Mai Phủ Lá')
+    .setDescription('Những giọt sương đầu ngày đọng trên lá, phát sáng nhẹ dưới bình minh. Có vẻ đây không phải nước bình thường.');
+  const cid = await awaitBtn(ctx, embed, row);
+  if (!cid || cid === `dew_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '💧 *Bạn để những giọt sương lại cho khu rừng.*'));
+
+  if (cid === `dew_drink_${ctx.userId}`) {
+    const hp = Math.min(fresh.max_hp, fresh.hp + Math.floor(fresh.max_hp * 0.25));
+    const mp = Math.min(fresh.max_mp, fresh.mp + Math.floor(fresh.max_mp * 0.35));
+    updatePlayerHpMp(ctx.userId, ctx.guildId, hp, mp);
+    return finish(ctx, simpleEmbed(COLORS.success, `💧 Sương tan trên đầu lưỡi, lạnh nhưng sạch như ánh sáng.\n❤️ HP: **${hp}/${fresh.max_hp}**\n🔵 MP: **${mp}/${fresh.max_mp}**`));
+  }
+
+  addItem(ctx.userId, ctx.guildId, 'mana_potion', 1);
+  if (randInt(1, 100) <= 25) addItem(ctx.userId, ctx.guildId, 'moonwater', 1);
+  return finish(ctx, simpleEmbed(COLORS.success, '🫙 Bạn hứng được sương vào một lọ nhỏ.\n🔵 +**1× Mana Potion**\n🌙 Có thể nhận thêm **Moonwater** nếu may mắn.'));
+}
+
+export async function showDawnHunterTracks(ctx: RunExploreEventInput): Promise<void> {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`ht_follow_${ctx.userId}`).setLabel('Lần theo dấu').setEmoji('👣').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`ht_mark_${ctx.userId}`).setLabel('Đánh dấu đường săn').setEmoji('📍').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`ht_ignore_${ctx.userId}`).setLabel('Bỏ qua').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0xCCAA66)
+    .setTitle('👣 Dấu Chân Sớm')
+    .setDescription('Trên nền đất ẩm buổi sớm, bạn thấy một chuỗi dấu chân còn mới. Kẻ để lại chúng đang ở rất gần.');
+  const cid = await awaitBtn(ctx, embed, row);
+  if (!cid || cid === `ht_ignore_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '👣 *Bạn không mạo hiểm và rời khỏi dấu vết.*'));
+
+  if (cid === `ht_mark_${ctx.userId}`) {
+    setBuff(ctx.userId, ctx.guildId, 'scroll_detection', 1, 1, 7200);
+    return finish(ctx, simpleEmbed(COLORS.info, '📍 Bạn đánh dấu hướng đi của dấu chân.\n📜 Lượt explore tiếp theo: tăng tỉ lệ event tốt, giảm ambush.'));
+  }
+
+  if (ctx.enemies.length && randInt(1, 100) <= 60) {
+    await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '👣 Dấu chân dẫn bạn tới ổ săn của quái.\n\n*Chiến đấu bắt đầu...*')], components: [] });
+    await new Promise(r => setTimeout(r, 600));
+    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+  }
+  addItem(ctx.userId, ctx.guildId, 'leather', 2);
+  grantExp(ctx.userId, ctx.guildId, 25);
+  return finish(ctx, simpleEmbed(COLORS.success, '👣 Dấu chân dẫn tới một con mồi đã bỏ lại lớp da khi chạy trốn.\n🟫 +**2× Leather**\n⭐ +**25 EXP**'));
+}
+
+export async function showDayTrainingGround(ctx: RunExploreEventInput): Promise<void> {
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`tg_train_${ctx.userId}`).setLabel('Tập luyện').setEmoji('🏋️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`tg_spar_${ctx.userId}`).setLabel('Đấu tập').setEmoji('⚔️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`tg_rest_${ctx.userId}`).setLabel('Chỉ quan sát').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0xDDCC88)
+    .setTitle('🏋️ Bãi Tập Giữa Ngày')
+    .setDescription('Dưới nắng cao, vài cọc gỗ và hình nhân cũ đứng giữa bãi đất. Chúng đủ tốt để tập luyện — hoặc đấu thử thật sự.');
+  const cid = await awaitBtn(ctx, embed, row);
+  if (!cid || cid === `tg_rest_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🏋️ *Bạn quan sát cách đặt chân và nhịp thở của những người từng tập ở đây.*\n⭐ +**10 EXP**'));
+
+  if (cid === `tg_train_${ctx.userId}`) {
+    const exp = randInt(30, 60);
+    const dmg = Math.max(1, Math.floor(fresh.max_hp * 0.06));
+    const hp = Math.max(1, fresh.hp - dmg);
+    updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
+    grantExp(ctx.userId, ctx.guildId, exp);
+    setBuff(ctx.userId, ctx.guildId, 'weapon_oil', 5, 1, 3600);
+    return finish(ctx, simpleEmbed(COLORS.success, `🏋️ Bạn tập đến mỏi cơ. Đau, nhưng đáng.\n⭐ +**${exp} EXP**\n❤️ HP mất **${dmg}**\n⚔️ Trận kế tiếp: **ATK +5%**`));
+  }
+
+  if (ctx.enemies.length) {
+    await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '⚔️ Bạn chọn đấu tập... nhưng thứ bước ra từ sau cọc gỗ không phải người.\n\n*Chiến đấu bắt đầu...*')], components: [] });
+    await new Promise(r => setTimeout(r, 600));
+    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+  }
+  return finish(ctx, simpleEmbed(COLORS.info, '⚔️ Không có đối thủ nào xuất hiện. Bạn tự tập một mình.'));
+}
+
+export async function showDaySupplyCart(ctx: RunExploreEventInput): Promise<void> {
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const canBuy = fresh.gold >= 70;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`sc_buy_${ctx.userId}`).setLabel('Mua gói tiếp tế').setEmoji('📦').setStyle(ButtonStyle.Primary).setDisabled(!canBuy),
+    new ButtonBuilder().setCustomId(`sc_help_${ctx.userId}`).setLabel('Giúp đẩy xe').setEmoji('🤝').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`sc_pass_${ctx.userId}`).setLabel('Đi tiếp').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0xFFD36A)
+    .setTitle('📦 Xe Tiếp Tế Ban Ngày')
+    .setDescription('Một chiếc xe tiếp tế bị kẹt bánh giữa đường. Chủ xe vẫy tay gọi bạn, vừa mệt vừa cảnh giác.');
+  const cid = await awaitBtn(ctx, embed, row);
+  if (!cid || cid === `sc_pass_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '📦 *Bạn gật đầu rồi đi tiếp, để chiếc xe lại sau lưng.*'));
+
+  if (cid === `sc_buy_${ctx.userId}`) {
+    spendGold(ctx.userId, ctx.guildId, 70);
+    addItem(ctx.userId, ctx.guildId, 'health_potion', 1);
+    addItem(ctx.userId, ctx.guildId, 'mana_potion', 1);
+    return finish(ctx, simpleEmbed(COLORS.success, '📦 Bạn mua một gói tiếp tế gọn nhẹ.\n💰 -**70 Gold**\n🧪 +**1× Health Potion**\n🔵 +**1× Mana Potion**'));
+  }
+
+  const rep = adjustReputation(ctx.userId, ctx.guildId, 4);
+  const gold = randInt(25, 55);
+  grantGold(ctx.userId, ctx.guildId, gold);
+  if (randInt(1, 100) <= 35) addItem(ctx.userId, ctx.guildId, 'bread', 1);
+  return finish(ctx, simpleEmbed(COLORS.success, `🤝 Bạn giúp đẩy xe khỏi bùn. Chủ xe dúi cho bạn ít tiền cảm ơn.\n🪙 +**${gold} Gold**\n🤝 Reputation: **${rep}** (+4)`));
+}
+
+export async function showDuskCrowOmen(ctx: RunExploreEventInput): Promise<void> {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`co_feed_${ctx.userId}`).setLabel('Cho quạ ăn').setEmoji('🐦‍⬛').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`co_follow_${ctx.userId}`).setLabel('Đi theo đàn quạ').setEmoji('👣').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`co_shoo_${ctx.userId}`).setLabel('Đuổi đi').setEmoji('💢').setStyle(ButtonStyle.Danger),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x4B2E2E)
+    .setTitle('🐦‍⬛ Đàn Quạ Hoàng Hôn')
+    .setDescription('Một đàn quạ đen đậu kín cành cây. Chúng không kêu, chỉ nhìn bạn bằng hàng chục đôi mắt sáng.');
+  const cid = await awaitBtn(ctx, embed, row);
+  if (!cid) return finish(ctx, simpleEmbed(COLORS.info, '🐦‍⬛ *Đàn quạ bay đi khi mặt trời khuất hẳn.*'));
+
+  if (cid === `co_feed_${ctx.userId}`) {
+    const rep = adjustReputation(ctx.userId, ctx.guildId, 3);
+    setBuff(ctx.userId, ctx.guildId, 'luck', 1, 1, 3600);
+    return finish(ctx, simpleEmbed(COLORS.success, `🐦‍⬛ Bạn thả vài mẩu thức ăn xuống đất. Một con quạ để lại vật sáng nhỏ rồi bay đi.\n🍀 May mắn nhẹ trong 1 giờ\n🤝 Reputation: **${rep}** (+3)`));
+  }
+  if (cid === `co_follow_${ctx.userId}`) {
+    const roll = randInt(1, 100);
+    if (roll <= 50) { addItem(ctx.userId, ctx.guildId, 'dark_wing', 1); return finish(ctx, simpleEmbed(COLORS.magic, '👣 Đàn quạ dẫn bạn tới một chiếc lông đen còn ấm.\n🖤 +**1× Dark Wing**')); }
+    if (ctx.enemies.length) { await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '👣 Đàn quạ dẫn bạn tới một xác chết... và thứ đang ăn nó.\n\n*Chiến đấu bắt đầu...*')], components: [] }); await new Promise(r => setTimeout(r, 600)); return ctx.callbacks.startCombat(pick(ctx.enemies).id); }
+  }
+  adjustWanted(ctx.userId, ctx.guildId, 1);
+  return finish(ctx, simpleEmbed(COLORS.warning, '💢 Bạn đuổi đàn quạ. Một con quạ cào lên tấm truy nã gần đó rồi bay đi.\n⚠️ Wanted +1'));
+}
+
+export async function showDuskCardDealer(ctx: RunExploreEventInput): Promise<void> {
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const canPlay = fresh.gold >= 40;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`card_draw_${ctx.userId}`).setLabel('Rút 1 lá - 40 Gold').setEmoji('🃏').setStyle(ButtonStyle.Primary).setDisabled(!canPlay),
+    new ButtonBuilder().setCustomId(`card_watch_${ctx.userId}`).setLabel('Xem bói miễn phí').setEmoji('👁️').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`card_leave_${ctx.userId}`).setLabel('Rời bàn').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x663399)
+    .setTitle('🃏 Người Chia Bài Lúc Chạng Vạng')
+    .setDescription('Một người lạ ngồi bên chiếc bàn gỗ giữa đường, bộ bài úp sẵn. “Hoàng hôn là lúc số phận dễ đổi tay nhất.”');
+  const cid = await awaitBtn(ctx, embed, row);
+  if (!cid || cid === `card_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🃏 *Bạn không ngồi xuống chiếc bàn kỳ lạ đó.*'));
+
+  if (cid === `card_watch_${ctx.userId}`) {
+    setBuff(ctx.userId, ctx.guildId, 'scroll_detection', 1, 1, 7200);
+    return finish(ctx, simpleEmbed(COLORS.info, '👁️ Người chia bài lật một lá trống. “Đường trước mặt ngươi sẽ rõ hơn một chút.”\n📜 Lượt explore kế tiếp tốt hơn.'));
+  }
+
+  spendGold(ctx.userId, ctx.guildId, 40);
+  const roll = randInt(1, 100);
+  if (roll <= 30) { grantGold(ctx.userId, ctx.guildId, 120); return finish(ctx, simpleEmbed(COLORS.gold, '🃏 Lá **Crown**. Bạn thắng lớn.\n🪙 -40 Gold, +**120 Gold**')); }
+  if (roll <= 60) { addItem(ctx.userId, ctx.guildId, 'fate_coin', 1); return finish(ctx, simpleEmbed(COLORS.success, '🃏 Lá **Wheel**. Đồng xu số phận rơi xuống bàn.\n🪙 +**1× Fate Coin**')); }
+  if (roll <= 82) { grantExp(ctx.userId, ctx.guildId, 45); return finish(ctx, simpleEmbed(COLORS.info, '🃏 Lá **Mirror**. Bạn thấy một lựa chọn cũ trong đời mình.\n⭐ +**45 EXP**')); }
+  const dmg = Math.max(1, Math.floor(fresh.max_hp * 0.12));
+  updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, fresh.hp - dmg), fresh.mp);
+  return finish(ctx, simpleEmbed(COLORS.warning, `🃏 Lá **Knife**. Mép lá bài cứa vào lòng bàn tay.\n❤️ HP mất **${dmg}**`));
+}
+
+export async function showNightGhostLantern(ctx: RunExploreEventInput): Promise<void> {
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`gl_follow_${ctx.userId}`).setLabel('Đi theo đèn').setEmoji('🕯️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`gl_pray_${ctx.userId}`).setLabel('Cầu nguyện từ xa').setEmoji('🙏').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`gl_hide_${ctx.userId}`).setLabel('Ẩn nấp').setEmoji('🌑').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x112244)
+    .setTitle('🕯️ Đèn Ma Trên Đường')
+    .setDescription('Một chiếc đèn lồng xanh trôi lơ lửng trên đường mòn. Nó dừng lại mỗi khi bạn dừng lại.');
+  const cid = await awaitBtn(ctx, embed, row);
+  if (!cid || cid === `gl_hide_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🌑 *Bạn nấp sau thân cây cho tới khi ngọn đèn biến mất.*'));
+
+  if (cid === `gl_pray_${ctx.userId}`) {
+    const rep = adjustReputation(ctx.userId, ctx.guildId, 4);
+    const mp = Math.min(fresh.max_mp, fresh.mp + Math.floor(fresh.max_mp * 0.3));
+    updatePlayerHpMp(ctx.userId, ctx.guildId, fresh.hp, mp);
+    return finish(ctx, simpleEmbed(COLORS.success, `🙏 Ngọn đèn khẽ cúi xuống như đáp lễ.\n🔵 MP: **${mp}/${fresh.max_mp}**\n🤝 Reputation: **${rep}** (+4)`));
+  }
+
+  const roll = randInt(1, 100);
+  if (roll <= 45) { grantSoulShards(ctx.userId, ctx.guildId, 1); return finish(ctx, simpleEmbed(COLORS.magic, '🕯️ Ngọn đèn dẫn bạn tới một bia mộ vô danh.\n💀 +**1 Soul Shard**')); }
+  if (roll <= 70 && ctx.enemies.length) { await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '🕯️ Ngọn đèn tắt phụt. Từ bóng tối, có thứ bước ra.\n\n*Chiến đấu bắt đầu...*')], components: [] }); await new Promise(r => setTimeout(r, 600)); return ctx.callbacks.startCombat(pick(ctx.enemies).id); }
+  const dmg = Math.max(1, Math.floor(fresh.max_hp * 0.1));
+  updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, fresh.hp - dmg), fresh.mp);
+  return finish(ctx, simpleEmbed(COLORS.warning, `🕯️ Bạn đi theo quá sâu vào sương lạnh.\n❤️ HP mất **${dmg}**`));
+}
+
+export async function showNightGraveRobbers(ctx: RunExploreEventInput): Promise<void> {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`gr_stop_${ctx.userId}`).setLabel('Ngăn lại').setEmoji('🛡️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`gr_join_${ctx.userId}`).setLabel('Chia phần').setEmoji('💰').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`gr_report_${ctx.userId}`).setLabel('Theo dõi rồi báo tin').setEmoji('👁️').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x222222)
+    .setTitle('🪦 Kẻ Đào Mộ Ban Đêm')
+    .setDescription('Dưới ánh trăng, vài bóng người đang đào bới quanh một ngôi mộ cũ. Họ chưa thấy bạn.');
+  const cid = await awaitBtn(ctx, embed, row);
+  if (!cid) return finish(ctx, simpleEmbed(COLORS.info, '🪦 *Bạn im lặng rời đi trước khi bị phát hiện.*'));
+
+  if (cid === `gr_stop_${ctx.userId}`) {
+    const rep = adjustReputation(ctx.userId, ctx.guildId, 6);
+    if (ctx.enemies.length && randInt(1, 100) <= 50) { await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `🛡️ Bạn bước ra ngăn chúng lại. Chúng rút vũ khí.\n🤝 Reputation: **${rep}** (+6)\n\n*Chiến đấu bắt đầu...*`)], components: [] }); await new Promise(r => setTimeout(r, 600)); return ctx.callbacks.startCombat(pick(ctx.enemies).id); }
+    grantExp(ctx.userId, ctx.guildId, 40);
+    return finish(ctx, simpleEmbed(COLORS.success, `🛡️ Bạn dọa chúng chạy mất.\n🤝 Reputation: **${rep}** (+6)\n⭐ +**40 EXP**`));
+  }
+
+  if (cid === `gr_join_${ctx.userId}`) {
+    const rep = adjustReputation(ctx.userId, ctx.guildId, -8);
+    const gold = randInt(80, 160);
+    grantGold(ctx.userId, ctx.guildId, gold);
+    addItem(ctx.userId, ctx.guildId, 'ancient_bone', 1);
+    return finish(ctx, simpleEmbed(COLORS.warning, `💰 Bạn nhận phần của mình trong im lặng.\n🪙 +**${gold} Gold**\n💀 +**1× Ancient Bone**\n🤝 Reputation: **${rep}** (-8)`));
+  }
+
+  setBuff(ctx.userId, ctx.guildId, 'scroll_detection', 1, 1, 7200);
+  const rep = adjustReputation(ctx.userId, ctx.guildId, 3);
+  return finish(ctx, simpleEmbed(COLORS.info, `👁️ Bạn ghi nhớ mặt chúng và dấu đường.\n📜 Lượt explore sau an toàn hơn\n🤝 Reputation: **${rep}** (+3)`));
+}

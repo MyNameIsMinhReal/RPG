@@ -26,7 +26,6 @@ import { execute as execGuild     } from './commands/guild';
 import { execute as execPet       } from './commands/pet';
 import { execute as execGather    } from './commands/gather';
 import { execute as execReroll    } from './commands/reroll';
-import { execute as execFish      } from './commands/fish';
 import { execute as execParty     } from './commands/party';
 import { execute as execChapter   } from './commands/chapter';
 
@@ -57,7 +56,6 @@ commands.set('guild',     execGuild);
 commands.set('pet',       execPet);
 commands.set('gather',    execGather);
 commands.set('reroll',    execReroll);
-commands.set('fish',      execFish);
 commands.set('party',     execParty);
 commands.set('chapter',   execChapter);
 
@@ -144,58 +142,46 @@ const prefixAliases = new Map<string, string>([
   // Pet
   ['pet', 'pet'],
 
+  // Gathering / Reroll
+  ['gather', 'gather'],
+  ['g', 'gather'],
+  ['reroll', 'reroll'],
+  ['rr', 'reroll'],
+
   // Party
   ['party', 'party'],
   ['pt', 'party'],
 
-  // Chapter / story
+  // Story / chapter
   ['chapter', 'chapter'],
   ['ch', 'chapter'],
   ['story', 'chapter'],
-
-  // Gathering / Fishing / Reroll
-  ['gather', 'gather'],
-  ['g', 'gather'],
-  ['fish', 'fish'],
-  ['f', 'fish'],
-  ['reroll', 'reroll'],
-  ['rr', 'reroll'],
 ]);
 
 const PREFIX_HELP = [
-  '**RPG prefix help:**',
-  '',
-  '**Cơ bản**',
+  '**Prefix commands:**',
   '`rpg s` / `rpg start` — tạo nhân vật hoặc hồi sinh',
   '`rpg p` / `rpg profile` — xem profile của bạn',
   '`rpg p @user` — xem profile người khác',
   '`rpg e` / `rpg explore` — khám phá',
   '`rpg i` / `rpg inv` — túi đồ',
   '`rpg u <item_id>` — dùng vật phẩm, ví dụ `rpg u healing_potion`',
+  '`rpg t @user <gold>` — chuyển gold, ví dụ `rpg t @Minh 100`',
+  '`rpg c` / `rpg craft` — chế tạo',
   '`rpg d` / `rpg daily` — daily quest',
   '`rpg a` / `rpg ach` — thành tựu',
-  '`rpg ch` / `rpg chapter` — cốt truyện chính',
-  '',
-  '**Farm / nâng cấp**',
-  '`rpg c` / `rpg craft` — chế tạo',
-  '`rpg g` / `rpg gather` — thu thập nguyên liệu',
-  '`rpg f` / `rpg fish` — câu cá',
-  '`rpg rr` / `rpg reroll` — reroll skill book',
-  '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
-  '',
-  '**Xã hội / combat**',
-  '`rpg t @user <gold>` — chuyển gold, ví dụ `rpg t @Minh 100`',
-  '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
-  '`rpg wb` / `rpg boss` — world boss',
   '`rpg w` / `rpg world` — trạng thái thế giới',
-  '',
-  '**Party**',
-  '`rpg party` / `rpg pt` — xem party hiện tại',
+  '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
+  '`rpg wb` / `rpg boss` — world boss',
+  '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
+  '`rpg g` / `rpg gather` — thu thập nguyên liệu',
+  '`rpg rr` / `rpg reroll` — reroll skill book',
+  '`rpg pt` / `rpg party` — xem party hiện tại',
   '`rpg pt create` — tạo party',
   '`rpg pt invite @user` — mời người vào party',
   '`rpg pt leave` — rời party',
-  '`rpg pt kick @user` — đuổi thành viên',
-  '`rpg pt disband` — giải tán party',
+  '`rpg pt disband` — giải tán party nếu là leader',
+  '`rpg ch` / `rpg chapter` — xem cốt truyện chính',
 ].join('\n');
 
 function stripInteractionOnlyOptions(options: any): any {
@@ -425,22 +411,10 @@ function getPrefixUsage(commandName: string): string | null {
     case 'duel':
       return 'Cách dùng: `rpg duel @user`\nVí dụ: `rpg duel @Minh`';
     case 'party':
-      return [
-        'Cách dùng party:',
-        '`rpg party` / `rpg pt` — xem party hiện tại',
-        '`rpg pt create` — tạo party',
-        '`rpg pt invite @user` — mời người vào party',
-        '`rpg pt leave` — rời party',
-        '`rpg pt kick @user` — đuổi thành viên',
-        '`rpg pt disband` — giải tán party',
-      ].join('\n');
+      return 'Party:\n`rpg pt` — xem party\n`rpg pt create` — tạo party\n`rpg pt invite @user` — mời người\n`rpg pt kick @user` — đuổi người\n`rpg pt leave` — rời party\n`rpg pt disband` — giải tán party';
     default:
       return null;
   }
-}
-
-function hasPrefixUserArg(message: Message, args: string): boolean {
-  return message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
 }
 
 function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): string | null {
@@ -451,21 +425,23 @@ function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): s
   }
 
   if (parsed.commandName === 'trade') {
-    const hasUser = hasPrefixUserArg(message, args);
+    const hasUser = message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
     const hasAmount = /(?:^|\s)\d+(?:\s|$)/.test(args);
     if (!hasUser || !hasAmount) return getPrefixUsage('trade');
   }
 
   if (parsed.commandName === 'duel') {
-    if (!hasPrefixUserArg(message, args)) return getPrefixUsage('duel');
+    const hasUser = message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
+    if (!hasUser) return getPrefixUsage('duel');
   }
 
   if (parsed.commandName === 'party') {
-    const sub = args.split(/\s+/).filter(Boolean)[0]?.toLowerCase() ?? 'info';
-    const validSubs = new Set(['create', 'invite', 'leave', 'kick', 'disband', 'info']);
-    if (!validSubs.has(sub)) return getPrefixUsage('party');
-    if ((sub === 'invite' || sub === 'kick') && !hasPrefixUserArg(message, args)) {
-      return getPrefixUsage('party');
+    const sub = args.split(/\s+/).filter(Boolean)[0]?.toLowerCase();
+    const valid = new Set(['create', 'invite', 'leave', 'kick', 'disband', 'info']);
+    if (sub && !valid.has(sub)) return getPrefixUsage('party');
+    if (sub === 'invite' || sub === 'kick') {
+      const hasUser = message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
+      if (!hasUser) return getPrefixUsage('party');
     }
   }
 

@@ -44,6 +44,7 @@ import { consumeBuff } from '../systems/consumables';
 import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
 import { doGather } from './gather';
 import { onlyUser } from '../utils/collectors';
+import { incrementChapterObjective } from '../systems/chapter';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -508,22 +509,32 @@ async function handleSearch(
     return;
   }
 
-  incrementDaily(userId, guildId, 'explore_count');
   const zone     = getZone(player.zone_id)!;
   const enemies  = getEnemiesForZone(player.zone_id);
   const legacies = getLegaciesInZone(guildId, player.zone_id, 5);
 
-  // Detect party
+  // Detect party trước khi cộng daily để leader khám phá cũng tính cho cả party.
   const party = getPartyOf(guildId, userId);
   const isPartyLeader = party?.leaderId === userId && (party?.memberIds.length ?? 0) > 1;
   const partyMemberIds = isPartyLeader ? party!.memberIds : undefined;
+
+  if (partyMemberIds?.length) {
+    for (const memberId of partyMemberIds) {
+      incrementDaily(memberId, guildId, 'explore_count');
+      incrementChapterObjective(memberId, guildId, 'explore_zone', { zoneId: player.zone_id });
+    }
+  } else {
+    incrementDaily(userId, guildId, 'explore_count');
+    incrementChapterObjective(userId, guildId, 'explore_zone', { zoneId: player.zone_id });
+  }
 
   const startPartyCombat = async (enemyId: string) => {
     await startPartyCombatFlow(
       interaction, userId, guildId, partyMemberIds!, enemyId,
       async () => {
-        const reply = await interaction.fetchReply();
-        attachContinueExploreHandler(reply as any, interaction, userId, guildId);
+        const reply = await interaction.fetchReply() as Message<boolean>;
+        await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
+        attachContinueExploreHandler(reply, interaction, userId, guildId);
       }
     );
   };
@@ -1619,6 +1630,10 @@ async function handleVictory(
     rewards.bonusDescription += '\n\n' + bonus.bonusDesc.replace('{gold}', String(bonus.bonusGold));
   }
 
+  if ((enemy as any).chapterRescue) {
+    incrementChapterObjective(userId, guildId, 'rescue_villager', { zoneId: player.zone_id, enemyId: enemy.id });
+  }
+
   const displayName = groupEnemies
     ? groupEnemies.map((e: any) => `${e.icon} ${e.name}`).join(', ')
     : enemy.name;
@@ -2089,7 +2104,8 @@ async function showVillagerRescue(
     drops: [{ itemId: 'health_potion', chance: 25 }],
     specialAttacks: ['backstab'], zones: [], boss: false,
     deathWorldFlag: undefined,
-    lore: 'Tên cướp đường thường đánh vào kẻ yếu thế.'
+    lore: 'Tên cướp đường thường đánh vào kẻ yếu thế.',
+    chapterRescue: true
   };
 
   const goldReward = randInt(30, 70);

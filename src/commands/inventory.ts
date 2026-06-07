@@ -19,6 +19,7 @@ import { getWornEquipment, wearEquipment, removeEquipment, getOwnedEquipment, fo
 import { getUnlockedTitles, getSelectedTitle, selectTitle } from '../systems/titles';
 import { bar } from '../utils/format';
 import { useItemOutsideCombat, getActiveBuffLines } from '../systems/consumables';
+import { incrementDaily, countsAsPotion } from './daily';
 
 export const data = new SlashCommandBuilder()
   .setName('inventory')
@@ -378,15 +379,12 @@ function buildBooksTab(
   }
 
   embed.setDescription('Chọn sách để học kỹ năng ngay lập tức.');
-  embed.addFields(books.map(e => {
+  const bookLines = books.map(e => {
     const it = getItem(e.item_id)!;
     const sk = it.teachesSkill ? getSkill(it.teachesSkill) : null;
-    return {
-      name: `${it.icon} ${it.name}`,
-      value: sk ? `${sk.icon} ${sk.name}\n> ${sk.description}` : it.description,
-      inline: false
-    };
-  }));
+    return `${it.icon} **${it.name}** ×${e.quantity}${sk ? ` → ${sk.icon} **${sk.name}**` : ''}\n> ${(sk?.description ?? it.description).slice(0, 140)}`;
+  }).join('\n');
+  embed.addFields({ name: '📚 Sách trong túi', value: safeFieldValue(bookLines), inline: false });
 
   const opts = books.map(e => {
     const it = getItem(e.item_id)!;
@@ -418,6 +416,7 @@ async function handleUseItem(
 
   const beforeQty = getItemQty(userId, guildId, itemId);
   const result = useItemOutsideCombat(userId, guildId, itemId);
+  if (result.consumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
   const afterQty = getItemQty(userId, guildId, itemId);
 
   const inv     = getInventory(userId, guildId);

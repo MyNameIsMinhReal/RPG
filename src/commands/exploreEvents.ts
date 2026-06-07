@@ -37,17 +37,18 @@ import { withImage } from '../utils/eventImages';
 import { getBuff, consumeBuff } from '../systems/consumables';
 import { doFish } from './fish';
 import { onlyUser } from '../utils/collectors';
+import { incrementChapterObjective } from '../systems/chapter';
 import { getPityCounters, getPityBonus, PITY_EVENTS } from '../systems/pity';
-import { showForestWhisperingTree } from './exploreEvents.forest';
-import { showShrineSilentBell } from './exploreEvents.shrine';
-import { showMineCollapse } from './exploreEvents.mines';
-import { showWastesAshStorm } from './exploreEvents.wastes';
+import { showForestWhisperingTree, showForestWolfDen, showForestHerbalistHut, showForestMoonlitClearing } from './exploreEvents.forest';
+import { showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp } from './exploreEvents.shrine';
+import { showMineCollapse, showMineRichOreVein, showMineEchoTunnel, showMineRustedLift } from './exploreEvents.mines';
+import { showWastesAshStorm, showWastesBoneCaravan, showWastesGlassMirage, showWastesFallenBanner } from './exploreEvents.wastes';
 import {
   getTimeOfDay, getTimeWeightMultipliers,
-  showDawnRitual, showDawnTraveler,
-  showNoonRest, showDayPatrol,
-  showDuskTrader, showDuskOmen,
-  showNightPredator, showMidnightWanderer
+  showDawnRitual, showDawnTraveler, showDawnDewBlessing, showDawnHunterTracks,
+  showNoonRest, showDayPatrol, showDayTrainingGround, showDaySupplyCart,
+  showDuskTrader, showDuskOmen, showDuskCrowOmen, showDuskCardDealer,
+  showNightPredator, showMidnightWanderer, showNightGhostLantern, showNightGraveRobbers
 } from './exploreEvents.time';
 
 export type ExploreEventType =
@@ -59,12 +60,15 @@ export type ExploreEventType =
   | 'black_cat' | 'dice_gambler' | 'glowing_mushroom' | 'chained_prisoner' | 'magic_fountain' | 'laughing_bones'
   | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'nothing'
   // Zone-specific events (separate files)
-  | 'forest_tree' | 'shrine_bell' | 'mine_collapse' | 'wastes_storm'
+  | 'forest_tree' | 'forest_wolf_den' | 'forest_herbalist_hut' | 'forest_moonlit_clearing'
+  | 'shrine_bell' | 'shrine_prayer_beads' | 'shrine_seal_door' | 'shrine_spirit_lamp'
+  | 'mine_collapse' | 'mine_ore_vein' | 'mine_echo_tunnel' | 'mine_rusted_lift'
+  | 'wastes_storm' | 'wastes_bone_caravan' | 'wastes_glass_mirage' | 'wastes_fallen_banner'
   // Time-of-day events (separate file)
-  | 'dawn_ritual' | 'dawn_traveler'
-  | 'noon_rest' | 'day_patrol'
-  | 'dusk_trader' | 'dusk_omen'
-  | 'night_predator' | 'midnight_wanderer';
+  | 'dawn_ritual' | 'dawn_traveler' | 'dawn_dew_blessing' | 'dawn_hunter_tracks'
+  | 'noon_rest' | 'day_patrol' | 'day_training_ground' | 'day_supply_cart'
+  | 'dusk_trader' | 'dusk_omen' | 'dusk_crow_omen' | 'dusk_card_dealer'
+  | 'night_predator' | 'midnight_wanderer' | 'night_ghost_lantern' | 'night_grave_robbers';
 
 export interface PickExploreEventInput {
   player: PlayerRow;
@@ -189,20 +193,40 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['fishing_spot', ['forest', 'shrine', 'mines'].includes(player.zone_id) ? 5 : 0],
 
     // Zone-specific events
-    ['forest_tree',   player.zone_id === 'forest' ? 4 : 0],
-    ['shrine_bell',   player.zone_id === 'shrine' ? 4 : 0],
-    ['mine_collapse', player.zone_id === 'mines'  ? 4 : 0],
-    ['wastes_storm',  player.zone_id === 'wastes' ? 4 : 0],
+    ['forest_tree',              player.zone_id === 'forest' ? 4 : 0],
+    ['forest_wolf_den',          player.zone_id === 'forest' ? 3 : 0],
+    ['forest_herbalist_hut',     player.zone_id === 'forest' ? 3 : 0],
+    ['forest_moonlit_clearing',  player.zone_id === 'forest' ? (time === 'night' || time === 'dusk' ? 4 : 2) : 0],
+    ['shrine_bell',              player.zone_id === 'shrine' ? 4 : 0],
+    ['shrine_prayer_beads',      player.zone_id === 'shrine' ? 3 : 0],
+    ['shrine_seal_door',         player.zone_id === 'shrine' ? 3 : 0],
+    ['shrine_spirit_lamp',       player.zone_id === 'shrine' ? (time === 'night' ? 4 : 2) : 0],
+    ['mine_collapse',            player.zone_id === 'mines'  ? 4 : 0],
+    ['mine_ore_vein',            player.zone_id === 'mines'  ? 4 : 0],
+    ['mine_echo_tunnel',         player.zone_id === 'mines'  ? 3 : 0],
+    ['mine_rusted_lift',         player.zone_id === 'mines'  ? 3 : 0],
+    ['wastes_storm',             player.zone_id === 'wastes' ? 4 : 0],
+    ['wastes_bone_caravan',      player.zone_id === 'wastes' ? 3 : 0],
+    ['wastes_glass_mirage',      player.zone_id === 'wastes' ? 3 : 0],
+    ['wastes_fallen_banner',     player.zone_id === 'wastes' ? 3 : 0],
 
     // Time-of-day events
     ['dawn_ritual',        time === 'dawn'  ? 4 : 0],
     ['dawn_traveler',      time === 'dawn'  ? 3 : 0],
+    ['dawn_dew_blessing',  time === 'dawn'  ? 3 : 0],
+    ['dawn_hunter_tracks', time === 'dawn'  ? 3 : 0],
     ['noon_rest',          time === 'day'   ? 3 : 0],
     ['day_patrol',         time === 'day'   ? 3 : 0],
+    ['day_training_ground',time === 'day'   ? 3 : 0],
+    ['day_supply_cart',    time === 'day'   ? 3 : 0],
     ['dusk_trader',        time === 'dusk'  ? 4 : 0],
     ['dusk_omen',          time === 'dusk'  ? 3 : 0],
+    ['dusk_crow_omen',     time === 'dusk'  ? 3 : 0],
+    ['dusk_card_dealer',   time === 'dusk'  ? 3 : 0],
     ['night_predator',     time === 'night' && hasCombat ? 4 : 0],
     ['midnight_wanderer',  time === 'night' ? 3 : 0],
+    ['night_ghost_lantern',time === 'night' ? 3 : 0],
+    ['night_grave_robbers',time === 'night' ? 3 : 0],
   ];
 
   // Apply pity bonus to unconditional events that haven't appeared in a while.
@@ -276,18 +300,38 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'atonement_monk': return showAtonementMonk(ctx);
     case 'conditional_miniboss': return showConditionalMiniboss(ctx);
     case 'fishing_spot': return showFishingSpot(ctx);
-    case 'forest_tree':   return showForestWhisperingTree(ctx);
-    case 'shrine_bell':   return showShrineSilentBell(ctx);
-    case 'mine_collapse': return showMineCollapse(ctx);
-    case 'wastes_storm':  return showWastesAshStorm(ctx);
-    case 'dawn_ritual':       return showDawnRitual(ctx);
-    case 'dawn_traveler':     return showDawnTraveler(ctx);
-    case 'noon_rest':         return showNoonRest(ctx);
-    case 'day_patrol':        return showDayPatrol(ctx);
-    case 'dusk_trader':       return showDuskTrader(ctx);
-    case 'dusk_omen':         return showDuskOmen(ctx);
-    case 'night_predator':    return showNightPredator(ctx);
-    case 'midnight_wanderer': return showMidnightWanderer(ctx);
+    case 'forest_tree':              return showForestWhisperingTree(ctx);
+    case 'forest_wolf_den':          return showForestWolfDen(ctx);
+    case 'forest_herbalist_hut':     return showForestHerbalistHut(ctx);
+    case 'forest_moonlit_clearing':  return showForestMoonlitClearing(ctx);
+    case 'shrine_bell':              return showShrineSilentBell(ctx);
+    case 'shrine_prayer_beads':      return showShrinePrayerBeads(ctx);
+    case 'shrine_seal_door':         return showShrineSealDoor(ctx);
+    case 'shrine_spirit_lamp':       return showShrineSpiritLamp(ctx);
+    case 'mine_collapse':            return showMineCollapse(ctx);
+    case 'mine_ore_vein':            return showMineRichOreVein(ctx);
+    case 'mine_echo_tunnel':         return showMineEchoTunnel(ctx);
+    case 'mine_rusted_lift':         return showMineRustedLift(ctx);
+    case 'wastes_storm':             return showWastesAshStorm(ctx);
+    case 'wastes_bone_caravan':      return showWastesBoneCaravan(ctx);
+    case 'wastes_glass_mirage':      return showWastesGlassMirage(ctx);
+    case 'wastes_fallen_banner':     return showWastesFallenBanner(ctx);
+    case 'dawn_ritual':          return showDawnRitual(ctx);
+    case 'dawn_traveler':        return showDawnTraveler(ctx);
+    case 'dawn_dew_blessing':    return showDawnDewBlessing(ctx);
+    case 'dawn_hunter_tracks':   return showDawnHunterTracks(ctx);
+    case 'noon_rest':            return showNoonRest(ctx);
+    case 'day_patrol':           return showDayPatrol(ctx);
+    case 'day_training_ground':  return showDayTrainingGround(ctx);
+    case 'day_supply_cart':      return showDaySupplyCart(ctx);
+    case 'dusk_trader':          return showDuskTrader(ctx);
+    case 'dusk_omen':            return showDuskOmen(ctx);
+    case 'dusk_crow_omen':       return showDuskCrowOmen(ctx);
+    case 'dusk_card_dealer':     return showDuskCardDealer(ctx);
+    case 'night_predator':       return showNightPredator(ctx);
+    case 'midnight_wanderer':    return showMidnightWanderer(ctx);
+    case 'night_ghost_lantern':  return showNightGhostLantern(ctx);
+    case 'night_grave_robbers':  return showNightGraveRobbers(ctx);
     default: return finish(ctx, simpleEmbed(COLORS.info, `*${pick(getZone(ctx.player.zone_id)?.ambiance ?? ['Không có gì bất thường...'])}*\n\nKhông có gì bất thường...`));
   }
 }
@@ -1180,6 +1224,7 @@ async function showMissingChildChain(ctx: RunExploreEventInput): Promise<void> {
   const gold = randInt(80, 160);
   grantGold(ctx.userId, ctx.guildId, gold);
   grantSoulShards(ctx.userId, ctx.guildId, 1);
+  incrementChapterObjective(ctx.userId, ctx.guildId, 'rescue_villager', { zoneId: ctx.player.zone_id });
   setFlag(ctx.guildId, key, 'done', 604800);
   setFlag(ctx.guildId, 'shop_discount', '10', 86400);
   return finish(ctx, simpleEmbed(COLORS.success, `👧 Bạn cứu được đứa trẻ khỏi hang tối. Dân làng vây quanh bạn trong nước mắt.\n🪙 +**${gold} Gold**\n💀 +**1 Soul Shard**\n🤝 Reputation: **${rep}** (+25)\n🛒 Shop discount **10% trong 24h**.`));

@@ -9,6 +9,7 @@ import { addItem as addItemFn } from './player';
 import { randInt } from '../utils/format';
 import { getGreedGoldBonusPercent } from './consumables';
 import { incrementDaily } from '../commands/daily';
+import { incrementChapterObjective } from './chapter';
 import type { PlayerRow } from '../utils/embeds';
 import type { EnemyDef } from '../data/enemies';
 
@@ -37,6 +38,8 @@ export function processVictoryRewards(
   grantGold(userId, guildId, gold);
   incrementKills(userId, guildId);
   incrementDaily(userId, guildId, 'kill_count');
+  incrementChapterObjective(userId, guildId, 'kill_in_zone', { zoneId: player.zone_id, enemyId: enemy.id });
+  if (enemy.boss) incrementChapterObjective(userId, guildId, 'kill_boss', { zoneId: player.zone_id, enemyId: enemy.id });
   const lvRes = grantExp(userId, guildId, exp);
 
   for (const drop of enemy.drops) {

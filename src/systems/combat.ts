@@ -165,7 +165,7 @@ export function tickEffects(effects: Effect[]): { effects: Effect[]; playerBurnD
 }
 
 export function addEffect(effects: Effect[], name: string, duration: number, value?: number, target?: 'player' | 'enemy'): Effect[] {
-  const idx = effects.findIndex(e => e.name === name);
+  const idx = effects.findIndex(e => e.name === name && (e.target ?? null) === (target ?? null));
   if (idx >= 0) {
     effects[idx].duration = Math.max(effects[idx].duration, duration);
     if (value !== undefined) effects[idx].value = value;
@@ -181,6 +181,72 @@ function calcDamage(atk: number, def: number, variance = 0.15): number {
   const base = Math.max(1, atk - def);
   const v = base * variance;
   return Math.max(1, Math.round(base + randInt(-v, v)));
+}
+
+function targetIsBoss(enemyId: string): boolean {
+  return !!getEnemy(enemyId)?.boss;
+}
+
+function applyOutgoingDamageModifiers(
+  userId: string,
+  guildId: string,
+  dmg: number,
+  isBossTarget: boolean,
+  logs: string[]
+): number {
+  const eqStats = getEquipmentStats(userId, guildId);
+  let finalDmg = dmg;
+  if (isBossTarget && eqStats.effects.includes('boss_damage')) {
+    finalDmg = Math.max(1, Math.floor(finalDmg * 1.15));
+    logs.push('🐉 Boss Damage: sát thương lên boss +15%.');
+  }
+  return finalDmg;
+}
+
+function applyIncomingDamageModifiers(
+  current: CombatState,
+  effects: Effect[],
+  logs: string[],
+  dmg: number,
+  opts: { isBossAttacker?: boolean; isSpecial?: boolean } = {}
+): number {
+  const eqStats = getEquipmentStats(current.user_id, current.guild_id);
+  let finalDmg = dmg;
+  if (opts.isBossAttacker && eqStats.effects.includes('boss_dmg_redux')) {
+    finalDmg = Math.max(1, Math.floor(finalDmg * 0.85));
+    logs.push('🛡️ Boss Damage Redux: giảm 15% sát thương từ boss.');
+  }
+  const armorReduce = (effects.find(e => e.name === 'armor_polish')?.value ?? 0) + (effects.find(e => e.name === 'stone_skin')?.value ?? 0);
+  const rageTaken = effects.find(e => e.name === 'incoming_damage_up')?.value ?? 0;
+  if (armorReduce > 0) finalDmg = Math.max(1, Math.floor(finalDmg * (1 - armorReduce / 100)));
+  if (rageTaken > 0) finalDmg = Math.max(1, Math.floor(finalDmg * (1 + rageTaken / 100)));
+
+  const canBlock = eqStats.effects.includes('block_one_crit') && !hasEffect(effects, 'block_one_crit_used');
+  const heavyHit = finalDmg >= current.player_max_hp * 0.35;
+  if (canBlock && (opts.isSpecial || heavyHit)) {
+    addEffect(effects, 'block_one_crit_used', 999);
+    logs.push('🛡️ Block One Crit: chặn hoàn toàn một đòn nguy hiểm!');
+    return 0;
+  }
+  return finalDmg;
+}
+
+function applyKillEquipmentEffects(current: CombatState, playerHp: number, playerMp: number, logs: string[]): { hp: number; mp: number } {
+  const eqStats = getEquipmentStats(current.user_id, current.guild_id);
+  let hp = playerHp;
+  let mp = playerMp;
+  if (eqStats.effects.includes('kill_hp_regen') || eqStats.effects.includes('blood_kill_regen')) {
+    const pct = eqStats.effects.includes('blood_kill_regen') ? 0.20 : 0.15;
+    const heal = Math.max(1, Math.floor(current.player_max_hp * pct));
+    hp = Math.min(current.player_max_hp, hp + heal);
+    logs.push(`🩸 Kill Regen: hồi **${heal} HP** sau khi hạ địch.`);
+  }
+  if (eqStats.effects.includes('kill_mp_regen')) {
+    const gain = 10;
+    mp = Math.min(current.player_max_mp, mp + gain);
+    logs.push(`💧 Kill MP Regen: hồi **${gain} MP** sau khi hạ địch.`);
+  }
+  return { hp, mp };
 }
 
 // ── Action result ─────────────────────────────────────────────────────────
@@ -257,11 +323,17 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
   const eqStats = getEquipmentStats(state.user_id, state.guild_id);
   const totalCrit    = (eqStats.critChance   ?? 0);
   const totalLifesteal = (eqStats.lifesteal  ?? 0) + (passives.hasVampiric ? 15 : 0);
+  if (eqStats.effects.includes('low_hp_atk') && player_hp / state.player_max_hp < 0.30) {
+    effectiveAtk = Math.floor(effectiveAtk * 1.15);
+    logs.push('🔥 Low HP ATK: HP thấp, ATK +15%.');
+  }
 
   // Crit check — use target's def for group combat
   const isCrit = totalCrit > 0 && randInt(1, 100) <= totalCrit;
   let dmg = calcDamage(effectiveAtk, targetDef);
   if (isCrit) { dmg = Math.floor(dmg * 1.75); }
+  const targetId = groupEnemies ? groupEnemies[actualTargetIdx].id : state.enemy_id;
+  dmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, dmg, targetIsBoss(targetId), logs);
 
   // Apply damage
   if (groupEnemies) {
@@ -339,13 +411,23 @@ export function processSkill(
   _hpRegen: number, _mpRegen: number
 ): ActionResult {
   const skill = getSkill(skillId);
-  if (!skill) return processAttack(state, playerAtk);
+  if (!skill) {
+    const logs: string[] = JSON.parse(state.combat_log || '[]');
+    logs.push('❌ Kỹ năng này không hợp lệ hoặc không dùng được trong combat.');
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
 
   const effects = parseEffects(state.active_effects);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
   const passives = getPassives(state.user_id, state.guild_id);
   let { player_hp, player_mp, enemy_hp } = state;
   let player_stamina = Math.max(0, (state.player_stamina ?? 100) - 10);
+
+  // Chỉ active skill được dùng trong combat. Passive/reaction/world không được bấm để tránh mất lượt/exploit.
+  if (skill.type !== 'active') {
+    logs.push(`❌ **${skill.name}** không phải kỹ năng active, không dùng được trong combat!`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
 
   if ((skill as any).soulCost) {
     const { grantSoulShards, getPlayer: gp } = require('./player');
@@ -370,12 +452,6 @@ export function processSkill(
   player_mp -= realMpCost;
   if (focusDiscount > 0 && (skill.mpCost ?? 0) > 0) logs.push(`💠 Focus Tonic: MP cost giảm còn **${realMpCost}**.`);
 
-  // ── World skills — blocked in combat ─────────────────────────────────────
-  if (skill.type === 'world') {
-    logs.push(`❌ **${skill.name}** không thể dùng trong chiến đấu!`);
-    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
-  }
-
   // ── Damage skills ────────────────────────────────────────────────────────
   if (skill.damage) {
     const skillGroupEnemies = getGroupEnemies(state);
@@ -384,7 +460,15 @@ export function processSkill(
       : state.enemy_def;
     const defPierce = (skill as any).soulCost ? 0.3 : 0.5;
     const clsSkill  = getClassPassives(state.user_id, state.guild_id);
-    const finalDmg  = Math.max(1, Math.round((skill.damage - skillTargetDef * defPierce) * clsSkill.skillDmgMult));
+    const eqStatsSkill = getEquipmentStats(state.user_id, state.guild_id);
+    let skillMult = clsSkill.skillDmgMult;
+    if (eqStatsSkill.effects.includes('low_hp_atk') && player_hp / state.player_max_hp < 0.30) {
+      skillMult *= 1.15;
+      logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
+    }
+    let finalDmg  = Math.max(1, Math.round((skill.damage - skillTargetDef * defPierce) * skillMult));
+    const targetId = skillGroupEnemies ? (skillGroupEnemies.find(e => e.hp > 0)?.id ?? state.enemy_id) : state.enemy_id;
+    finalDmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, finalDmg, targetIsBoss(targetId), logs);
     if (skillGroupEnemies) {
       const firstAlive = skillGroupEnemies.findIndex(e => e.hp > 0);
       if (firstAlive >= 0) {
@@ -428,6 +512,12 @@ export function processSkill(
     }
   }
 
+  const eqStatsAfterSkill = getEquipmentStats(state.user_id, state.guild_id);
+  if (eqStatsAfterSkill.effects.includes('slow_on_skill') && randInt(1, 100) <= 15) {
+    addEffect(effects, 'slow', 1, undefined, 'enemy');
+    logs.push('🧊 Slow on Skill: địch bị làm chậm 1 lượt.');
+  }
+
   const skillGroupEnemies2 = getGroupEnemies(state);
   const skillAllDead = skillGroupEnemies2 ? skillGroupEnemies2.every(e => e.hp <= 0) : enemy_hp <= 0;
   const skillUpdatedState = { ...state, enemy_hp, player_stamina };
@@ -465,12 +555,14 @@ export function processFlee(state: CombatState): ActionResult {
   const logs: string[] = JSON.parse(state.combat_log || '[]');
   const effects = parseEffects(state.active_effects);
 
-  const FLEE_CHANCE = 60;
+  const attempts = effects.find(e => e.name === 'flee_attempts')?.value ?? 0;
+  const fleeChance = Math.min(90, 45 + attempts * 15);
+  const nextChance = Math.min(90, fleeChance + 15);
   const roll = randInt(1, 100);
 
-  logs.push(`🏃 **Bỏ chạy** — tỉ lệ thành công **${FLEE_CHANCE}%**.`);
+  logs.push(`🏃 **Bỏ chạy** — lần ${attempts + 1}, tỉ lệ thành công **${fleeChance}%**.`);
 
-  if (roll <= FLEE_CHANCE) {
+  if (roll <= fleeChance) {
     logs.push(`✅ Bạn **bỏ chạy thành công** trước khi bị kết liễu!`);
     return {
       newState: {
@@ -485,8 +577,9 @@ export function processFlee(state: CombatState): ActionResult {
     };
   }
 
-  logs.push(`❌ Bỏ chạy thất bại! Tỉ lệ vẫn là **${FLEE_CHANCE}%** lần sau.`);
+  logs.push(`❌ Bỏ chạy thất bại! Lần sau tỉ lệ tăng lên **${nextChance}%**.`);
   const nextEffects = effects.filter(e => e.name !== 'flee_attempts');
+  addEffect(nextEffects, 'flee_attempts', 999, attempts + 1);
 
   const fleeGroupEnemies = getGroupEnemies(state);
   if (fleeGroupEnemies) {
@@ -584,15 +677,17 @@ function enemyTurn(
     playerHp = res.playerHp;
     playerMp = res.playerMp;
     dealDmg  = res.dmg;
+    if (dealDmg > 0) {
+      const adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!enemy.boss, isSpecial: true });
+      playerHp = Math.min(current.player_max_hp, playerHp + (dealDmg - adjusted));
+      dealDmg = adjusted;
+    }
     if (res.enemyHeal > 0) {
       current = { ...current, enemy_hp: Math.min(current.enemy_max_hp, current.enemy_hp + res.enemyHeal) };
     }
   } else {
     dealDmg  = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
-    const armorReduce = (effects.find(e => e.name === 'armor_polish')?.value ?? 0) + (effects.find(e => e.name === 'stone_skin')?.value ?? 0);
-    const rageTaken = effects.find(e => e.name === 'incoming_damage_up')?.value ?? 0;
-    if (armorReduce > 0) dealDmg = Math.max(1, Math.floor(dealDmg * (1 - armorReduce / 100)));
-    if (rageTaken > 0) dealDmg = Math.max(1, Math.floor(dealDmg * (1 + rageTaken / 100)));
+    dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!enemy.boss });
     playerHp = Math.max(0, playerHp - dealDmg);
     logs.push(`${enemy.icon} **${enemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP còn lại)`);
   }
@@ -675,6 +770,16 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
   }
 
   const effect: any = item.effect ?? {};
+  const eqStatsItem = getEquipmentStats(state.user_id, state.guild_id);
+  const isHealthPotion = !!(effect.hp || effect.hpPercent);
+  if (isHealthPotion && eqStatsItem.effects.includes('no_healing')) {
+    logs.push(`🚫 **${item.name}** không thể dùng vì trang bị hiện tại chặn hồi máu.`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-4)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
+  const potionMult = isHealthPotion
+    ? Math.max(0, 1 + (eqStatsItem.effects.includes('potion_bonus') ? 0.20 : 0) - (eqStatsItem.effects.includes('blood_kill_regen') ? 0.50 : 0))
+    : 1;
+
   if (effect.passiveOnly) {
     logs.push(`💀 **${item.name}** là vật phẩm tự kích hoạt khi bạn sắp chết.`);
     return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-4)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
@@ -698,14 +803,15 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
   removeItem(state.user_id, state.guild_id, itemId, 1);
 
   if (effect.hpPercent) {
-    const amount = Math.max(1, Math.floor(state.player_max_hp * effect.hpPercent));
+    const amount = Math.max(1, Math.floor(state.player_max_hp * effect.hpPercent * potionMult));
     const gain = Math.min(amount, state.player_max_hp - player_hp);
     player_hp = Math.min(state.player_max_hp, player_hp + amount);
     logs.push(`🎒 **${item.icon} ${item.name}** — hồi **${gain} HP**! (${player_hp}/${state.player_max_hp})`);
   }
   if (effect.hp) {
-    const gain = Math.min(effect.hp, state.player_max_hp - player_hp);
-    player_hp = Math.min(state.player_max_hp, player_hp + effect.hp);
+    const rawHp = Math.max(1, Math.floor(effect.hp * potionMult));
+    const gain = Math.min(rawHp, state.player_max_hp - player_hp);
+    player_hp = Math.min(state.player_max_hp, player_hp + rawHp);
     logs.push(`🎒 **${item.icon} ${item.name}** — hồi **${gain} HP**! (${player_hp}/${state.player_max_hp})`);
   }
   if (effect.mpPercent) {
@@ -725,12 +831,15 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
   if (Array.isArray(effect.removeEffects)) removeEffects.push(...effect.removeEffects);
   for (const removeName of removeEffects) {
     const before = effects.length;
+    const isPlayerDebuff = (e: Effect) => e.target !== 'enemy';
     if (removeName === 'all') {
-      effects.splice(0, effects.length);
-      if (before > 0) logs.push(`🎒 **${item.name}** — giải trừ toàn bộ hiệu ứng bất lợi!`);
+      const removable = new Set(['burn', 'poison', 'curse', 'incoming_damage_up', 'slow', 'silence']);
+      const filtered = effects.filter(e => !(isPlayerDebuff(e) && removable.has(e.name)));
+      effects.splice(0, effects.length, ...filtered);
+      if (effects.length < before) logs.push(`🎒 **${item.name}** — giải trừ toàn bộ hiệu ứng bất lợi!`);
       continue;
     }
-    const filtered = effects.filter((e: any) => e.name !== removeName);
+    const filtered = effects.filter((e: Effect) => !(e.name === removeName && isPlayerDebuff(e)));
     if (filtered.length < before) logs.push(`🎒 **${item.name}** — giải trừ **${removeName}**!`);
     effects.splice(0, effects.length, ...filtered);
   }
@@ -856,16 +965,18 @@ function groupEnemyTurn(
       };
       const res = applySpecialAttack(special, enemyAtk, fakeDef, playerHp, playerMp, logs, (current as any).player_def ?? 0);
       playerHp = res.playerHp; playerMp = res.playerMp; dealDmg = res.dmg;
+      if (dealDmg > 0) {
+        const adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!fakeDef.boss, isSpecial: true });
+        playerHp = Math.min(current.player_max_hp, playerHp + (dealDmg - adjusted));
+        dealDmg = adjusted;
+      }
       if (res.enemyHeal > 0) {
         const healIdx = enemies.findIndex(e => e === combatEnemy);
         if (healIdx >= 0) enemies[healIdx] = { ...combatEnemy, hp: Math.min(combatEnemy.max_hp, combatEnemy.hp + res.enemyHeal) };
       }
     } else {
       dealDmg = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
-      const armorReduce = (effects.find(e => e.name === 'armor_polish')?.value ?? 0) + (effects.find(e => e.name === 'stone_skin')?.value ?? 0);
-      const rageTaken = effects.find(e => e.name === 'incoming_damage_up')?.value ?? 0;
-      if (armorReduce > 0) dealDmg = Math.max(1, Math.floor(dealDmg * (1 - armorReduce / 100)));
-      if (rageTaken > 0) dealDmg = Math.max(1, Math.floor(dealDmg * (1 + rageTaken / 100)));
+      dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!getEnemy(combatEnemy.id)?.boss });
       playerHp = Math.max(0, playerHp - dealDmg);
       logs.push(`${combatEnemy.icon} **${combatEnemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP)`);
     }
@@ -1175,6 +1286,23 @@ function makeResult(
   playerStamina?: number
 ): ActionResult {
   const maxStamina = current.player_max_stamina ?? 100;
+  if (enemyDied) {
+    const killRegen = applyKillEquipmentEffects(current, playerHp, playerMp, logs);
+    playerHp = killRegen.hp;
+    playerMp = killRegen.mp;
+  }
+  const eqStatsEnd = getEquipmentStats(current.user_id, current.guild_id);
+  if (!fled && !enemyDied && !playerDied && playerHp > 0) {
+    if (eqStatsEnd.effects.includes('mp_regen_3t') && current.turn % 3 === 0) {
+      playerMp = Math.min(current.player_max_mp, playerMp + 5);
+      logs.push('💧 MP Regen 3T: hồi **5 MP**.');
+    }
+    if (eqStatsEnd.effects.includes('curse_hp_drain')) {
+      const drain = Math.max(1, Math.floor(current.player_max_hp * 0.02));
+      playerHp = Math.max(1, playerHp - drain);
+      logs.push(`🩸 Curse HP Drain: mất **${drain} HP**.`);
+    }
+  }
   // Natural stamina regen each turn end
   const rawStamina = playerStamina ?? (current.player_stamina ?? 100);
   const regenStamina = Math.min(maxStamina, rawStamina + 6);

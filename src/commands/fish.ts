@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
-import { addItem, getPlayer } from '../systems/player';
+import { addItem, getPlayer, getItemQty, removeItem } from '../systems/player';
 import { COLORS } from '../utils/embeds';
 import db from '../database/index';
 
@@ -14,11 +14,17 @@ export const FISH_TABLE = [
   { id: 'glowing_bait',  weight: 3,  name: 'Glowing Bait ✨'  },
 ];
 
-function weightedPick() {
-  const total = FISH_TABLE.reduce((s, f) => s + f.weight, 0);
+function weightedPick(useBait = false) {
+  const table = FISH_TABLE.map(f => {
+    if (!useBait) return f;
+    const rareBoost = ['silver_fish', 'mystery_shell', 'golden_fish'].includes(f.id) ? 2 : 1;
+    const commonPenalty = f.id === 'common_fish' ? 0.75 : 1;
+    return { ...f, weight: Math.max(1, Math.round(f.weight * rareBoost * commonPenalty)) };
+  });
+  const total = table.reduce((s, f) => s + f.weight, 0);
   let r = Math.random() * total;
-  for (const f of FISH_TABLE) { r -= f.weight; if (r <= 0) return f; }
-  return FISH_TABLE[0];
+  for (const f of table) { r -= f.weight; if (r <= 0) return f; }
+  return table[0];
 }
 
 export function getLastFish(userId: string, guildId: string): number {
@@ -49,17 +55,20 @@ export function doFish(userId: string, guildId: string, playerName: string): Fis
 
   setLastFish(userId, guildId, now);
 
-  if (Math.random() < 0.20) {
+  const usedBait = getItemQty(userId, guildId, 'glowing_bait') > 0;
+  if (usedBait) removeItem(userId, guildId, 'glowing_bait', 1);
+
+  if (Math.random() < (usedBait ? 0.10 : 0.20)) {
     return {
       onCooldown: false,
       embed: new EmbedBuilder().setColor(COLORS.dark)
         .setTitle('🎣 Câu cá')
-        .setDescription('> *Sợi dây rung nhẹ... rồi thôi. Hôm nay cá không hợp tác.*')
+        .setDescription('> *Sợi dây rung nhẹ... rồi thôi. Hôm nay cá không hợp tác.*' + (usedBait ? '\n\n✨ Glowing Bait đã được dùng, nhưng cá vẫn trốn mất.' : ''))
         .setFooter({ text: `${playerName} · cooldown 60s` }),
     };
   }
 
-  const caught = weightedPick();
+  const caught = weightedPick(usedBait);
   const qty    = caught.id === 'common_fish' && Math.random() < 0.3 ? 2 : 1;
   addItem(userId, guildId, caught.id, qty);
   const isRare = caught.id === 'golden_fish' || caught.id === 'glowing_bait';
