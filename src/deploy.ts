@@ -15,9 +15,8 @@ import { data as duelData         } from './commands/duel';
 import { data as worldbossData    } from './commands/worldboss';
 import { data as guildData        } from './commands/guild';
 import { data as petData          } from './commands/pet';
-import { data as gatherData       } from './commands/gather';
-import { data as rerollData       } from './commands/reroll';
-import { data as fishData         } from './commands/fish';
+import { data as partyData        } from './commands/party';
+import { data as chapterData      } from './commands/chapter';
 
 const commands = [
   startData,
@@ -35,21 +34,36 @@ const commands = [
   worldbossData,
   guildData,
   petData,
-  gatherData,
-  rerollData,
-  fishData,
+  partyData,
+  chapterData,
 ].map(c => c.toJSON());
 const token    = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;
 
 if (!token || !clientId) { console.error('❌ Thiếu DISCORD_TOKEN hoặc CLIENT_ID'); process.exit(1); }
 
+const guildId = process.env.GUILD_ID;
 const rest = new REST().setToken(token);
+
+function printCommands(prefix: string, data: any): void {
+  console.log(`${prefix} ${data.length} commands:`);
+  commands.forEach(c => console.log(`   /${c.name}`));
+}
+
 (async () => {
   try {
-    const data: any = await rest.put(Routes.applicationCommands(clientId), { body: commands });
-    console.log(`✅ Deployed ${data.length} commands:`);
-    commands.forEach(c => console.log(`   /${c.name}`));
+    // Cập nhật global để xóa các slash command cũ như /gather, /fish, /reroll.
+    // Global command của Discord có thể mất một lúc mới biến mất hoàn toàn trên client.
+    const globalData: any = await rest.put(Routes.applicationCommands(clientId), { body: commands });
+    printCommands('✅ Deployed global', globalData);
+
+    // Nếu thêm GUILD_ID vào .env, bot cũng deploy vào server đó để cập nhật gần như ngay lập tức.
+    if (guildId) {
+      const guildData: any = await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
+      printCommands(`✅ Deployed guild ${guildId}`, guildData);
+    } else {
+      console.log('ℹ️ Muốn deploy tức thì vào server test, thêm GUILD_ID=<server_id> vào .env rồi chạy npm run deploy.');
+    }
   } catch (err) {
     console.error('❌ Deploy failed:', err); process.exit(1);
   }

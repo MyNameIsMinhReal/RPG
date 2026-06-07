@@ -28,6 +28,7 @@ import { execute as execGather    } from './commands/gather';
 import { execute as execReroll    } from './commands/reroll';
 import { execute as execFish      } from './commands/fish';
 import { execute as execParty     } from './commands/party';
+import { execute as execChapter   } from './commands/chapter';
 
 const client = new Client({
   intents: [
@@ -58,6 +59,7 @@ commands.set('gather',    execGather);
 commands.set('reroll',    execReroll);
 commands.set('fish',      execFish);
 commands.set('party',     execParty);
+commands.set('chapter',   execChapter);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive
@@ -142,6 +144,15 @@ const prefixAliases = new Map<string, string>([
   // Pet
   ['pet', 'pet'],
 
+  // Party
+  ['party', 'party'],
+  ['pt', 'party'],
+
+  // Chapter / story
+  ['chapter', 'chapter'],
+  ['ch', 'chapter'],
+  ['story', 'chapter'],
+
   // Gathering / Fishing / Reroll
   ['gather', 'gather'],
   ['g', 'gather'],
@@ -167,6 +178,8 @@ const PREFIX_HELP = [
   '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
   '`rpg wb` / `rpg boss` — world boss',
   '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
+  '`rpg party` / `rpg pt` — party khám phá',
+  '`rpg ch` / `rpg chapter` — cốt truyện chính',
   '`rpg g` / `rpg gather` — thu thập nguyên liệu',
   '`rpg f` / `rpg fish` — câu cá',
   '`rpg rr` / `rpg reroll` — reroll skill book',
