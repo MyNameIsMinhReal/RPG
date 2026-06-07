@@ -1997,7 +1997,7 @@ async function showMysteriousFigure(
   } else { // 150g bet
     if (roll <= 25) {        // Big win
       grantGold(userId, guildId, 400);
-      const skBook = pick(['book_fireball','book_iron_skin','book_shadow_step']); addItem(userId, guildId, skBook);
+      const skBook = pick(['book_fireball','book_iron_skin','book_shadow_step','book_arcane_bolt','book_cleave','book_purify']); addItem(userId, guildId, skBook);
       title = '🌟 ĐẠI THẮNG!'; desc = `🪙 +**400 Gold** + ${getItem(skBook)?.icon} **${getItem(skBook)?.name}** — "Tuyệt vời! Bạn xứng đáng."`;
     } else if (roll <= 50) { // Good win
       grantGold(userId, guildId, 300);
@@ -2268,9 +2268,14 @@ const SOUL_SHOP_ITEMS: Array<{
   { id: 'mercy_mark',   name: 'Ấn chuộc lỗi thương nhân',    icon: '🧾', cost: 6, desc: 'Dùng trong event chuộc tội/giảm wanted' },
 ];
 
-const COMMON_BOOKS = ['book_fireball','book_ice_lance','book_shield_bash','book_shadow_step','book_mend_wounds','book_thunder_clap',
-                      'book_iron_skin','book_berserker','book_mana_flow','book_vampiric','book_tough_body'];
-const SOUL_BOOKS   = ['book_soul_strike','book_soul_guard','book_soul_drain'];
+const COMMON_BOOKS = [
+  'book_fireball','book_ice_lance','book_shield_bash','book_shadow_step','book_mend_wounds','book_thunder_clap',
+  'book_arcane_bolt','book_poison_dart','book_cleave','book_battle_cry','book_guardian_wall','book_purify',
+  'book_blood_siphon','book_mana_surge','book_frost_nova','book_whirlwind','book_radiant_smite','book_venom_cloud','book_execute','book_meteor_shower',
+  'book_iron_skin','book_berserker','book_mana_flow','book_vampiric','book_tough_body',
+  'book_blade_mastery','book_arcane_mind','book_survival_instinct','book_blood_hunger'
+];
+const SOUL_BOOKS   = ['book_soul_strike','book_soul_guard','book_soul_drain','book_void_rift'];
 
 async function showSoulShop(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string

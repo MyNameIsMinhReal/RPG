@@ -202,6 +202,18 @@ export const MATERIALS: Record<string, MaterialDef> = {
     sellPrice: 100, dropZones: ['wastes'],
     dropFrom: ['echo_demon'], dropChance: 45
   },
+
+  mysterious_shard: {
+    id: 'mysterious_shard', name: 'Mysterious Shard', icon: '💎', rarity: 'rare',
+    description: 'Mảnh tinh thể lạ phản chiếu ký ức và ánh trăng. Dùng cho event/craft đặc biệt.',
+    sellPrice: 45, dropZones: ['forest', 'wastes'], dropChance: 8
+  },
+  ash_crystal: {
+    id: 'ash_crystal', name: 'Ash Crystal', icon: '🔴', rarity: 'rare',
+    description: 'Tinh thể đỏ kết lại trong bão tro nóng. Vật liệu hiếm của Hoang Nguyên.',
+    sellPrice: 55, dropZones: ['wastes'], dropChance: 7
+  },
+
 };
 
 export function getMaterial(id: string): MaterialDef | undefined {

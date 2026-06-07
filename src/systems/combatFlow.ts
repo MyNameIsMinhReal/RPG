@@ -70,6 +70,51 @@ function makeBackRow(userId: string) {
   );
 }
 
+function getAliveGroupTargets(state: any): Array<any & { _idx: number }> | null {
+  if (!state?.enemies_json) return null;
+  try {
+    const enemies = JSON.parse(state.enemies_json);
+    if (!Array.isArray(enemies)) return null;
+    return enemies
+      .map((e: any, i: number) => ({ ...e, _idx: i }))
+      .filter((e: any) => e.hp > 0);
+  } catch {
+    return null;
+  }
+}
+
+function skillNeedsTarget(state: any, skillId: string): boolean {
+  const skill = getSkill(skillId);
+  const aliveTargets = getAliveGroupTargets(state);
+  return !!(skill?.type === 'active' && skill.damage && skill.targetType !== 'all' && skill.targetType !== 'self' && aliveTargets && aliveTargets.length > 1);
+}
+
+function buildSkillTargetRows(userId: string, state: any, skillId: string): any[] {
+  const aliveTargets = getAliveGroupTargets(state) ?? [];
+  const skill = getSkill(skillId);
+  const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder: ARB } = require('discord.js');
+  const opts = aliveTargets.map((e: any) => new StringSelectMenuOptionBuilder()
+    .setLabel(`[${e._idx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
+    .setValue(`skilltarget_${e._idx}`)
+    .setEmoji(e.icon ?? '👹')
+  );
+  return [
+    new ARB().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`rpg_skilltarget_${userId}_${skillId}`)
+        .setPlaceholder(`🎯 Chọn mục tiêu cho ${skill?.name ?? 'skill'}...`)
+        .addOptions(opts.slice(0, 25))
+    ),
+    makeBackRow(userId)
+  ];
+}
+
+function parseTargetIndexFromSelect(compInt: StringSelectMenuInteraction): number {
+  const raw = compInt.values[0] ?? '';
+  const idx = parseInt(raw.replace('skilltarget_', '').replace(/^.*_/, ''), 10);
+  return Number.isFinite(idx) ? idx : 0;
+}
+
 function hasUsableItems(userId: string, guildId: string): boolean {
   return getInventory(userId, guildId).some((e: any) => {
     const it = getItem(e.item_id);
@@ -291,7 +336,15 @@ export async function startCombatFlow(
         return;
       } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
         const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
+        if (skillNeedsTarget(current, skillId)) {
+          await compInt.editReply({ components: buildSkillTargetRows(userId, current, skillId) }).catch(() => {});
+          return;
+        }
         result = processSkill(current, skillId, freshPassive.atk, 0, 0);
+      } else if (cid.startsWith(`rpg_skilltarget_${userId}_`) && compInt.isStringSelectMenu()) {
+        const skillId = cid.replace(`rpg_skilltarget_${userId}_`, '');
+        const targetIdx = parseTargetIndexFromSelect(compInt as StringSelectMenuInteraction);
+        result = processSkill(current, skillId, freshPassive.atk, 0, 0, targetIdx);
       } else if (cid === `rpg_back_${userId}`) {
         await compInt.editReply({
           embeds: [buildCombatEmbed(current, fresh.name, enemy.icon, JSON.parse(current.combat_log ?? '[]'))],
@@ -527,7 +580,15 @@ export async function startCombatFlowWithEnemy(
         return;
       } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
         const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
+        if (skillNeedsTarget(current, skillId)) {
+          await compInt.editReply({ components: buildSkillTargetRows(userId, current, skillId) }).catch(() => {});
+          return;
+        }
         result = processSkill(current, skillId, freshPassive.atk, 0, 0);
+      } else if (cid.startsWith(`rpg_skilltarget_${userId}_`) && compInt.isStringSelectMenu()) {
+        const skillId = cid.replace(`rpg_skilltarget_${userId}_`, '');
+        const targetIdx = parseTargetIndexFromSelect(compInt as StringSelectMenuInteraction);
+        result = processSkill(current, skillId, freshPassive.atk, 0, 0, targetIdx);
       } else if (cid === `rpg_back_${userId}`) {
         await compInt.editReply({
           embeds: [buildCombatEmbed(current, fresh.name, enemy.icon, JSON.parse(current.combat_log ?? '[]'))],
@@ -759,7 +820,15 @@ export async function startGroupCombatFlow(
         return;
       } else if (cid === `rpg_skillmenu_${userId}` && (compInt as any).isStringSelectMenu()) {
         const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
+        if (skillNeedsTarget(current, skillId)) {
+          await compInt.editReply({ components: buildSkillTargetRows(userId, current, skillId) }).catch(() => {});
+          return;
+        }
         result = processSkill(current, skillId, freshPassive.atk, 0, 0);
+      } else if (cid.startsWith(`rpg_skilltarget_${userId}_`) && (compInt as any).isStringSelectMenu()) {
+        const skillId = cid.replace(`rpg_skilltarget_${userId}_`, '');
+        const targetIdx = parseTargetIndexFromSelect(compInt as StringSelectMenuInteraction);
+        result = processSkill(current, skillId, freshPassive.atk, 0, 0, targetIdx);
       } else if (cid === `rpg_back_${userId}`) {
         await compInt.editReply({
           embeds: [buildCombatEmbed(current, fresh.name, '⚔️', JSON.parse(current.combat_log ?? '[]'))],

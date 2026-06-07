@@ -50,6 +50,12 @@ import {
   showDuskTrader, showDuskOmen, showDuskCrowOmen, showDuskCardDealer,
   showNightPredator, showMidnightWanderer, showNightGhostLantern, showNightGraveRobbers
 } from './exploreEvents.time';
+import {
+  showRepHonoredPatrol, showRepGratefulVillagers, showRepSupplyCache, showRepChurchBlessing,
+  showRepYoungSquire, showRepHeroStatue, showRepRoyalMessenger, showRepChampionChallenge,
+  showRepForestRangers, showRepShrinePilgrims, showRepMineRescueCrew, showRepWastesRefugees,
+  showRepDawnProcession, showRepDayPublicThanks, showRepDuskSafeLodging, showRepNightWatchSignal
+} from './exploreEvents.reputation';
 
 export type ExploreEventType =
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -68,7 +74,12 @@ export type ExploreEventType =
   | 'dawn_ritual' | 'dawn_traveler' | 'dawn_dew_blessing' | 'dawn_hunter_tracks'
   | 'noon_rest' | 'day_patrol' | 'day_training_ground' | 'day_supply_cart'
   | 'dusk_trader' | 'dusk_omen' | 'dusk_crow_omen' | 'dusk_card_dealer'
-  | 'night_predator' | 'midnight_wanderer' | 'night_ghost_lantern' | 'night_grave_robbers';
+  | 'night_predator' | 'midnight_wanderer' | 'night_ghost_lantern' | 'night_grave_robbers'
+  // High reputation events (separate file)
+  | 'rep_honored_patrol' | 'rep_grateful_villagers' | 'rep_supply_cache' | 'rep_church_blessing'
+  | 'rep_young_squire' | 'rep_hero_statue' | 'rep_royal_messenger' | 'rep_champion_challenge'
+  | 'rep_forest_rangers' | 'rep_shrine_pilgrims' | 'rep_mine_rescue_crew' | 'rep_wastes_refugees'
+  | 'rep_dawn_procession' | 'rep_day_public_thanks' | 'rep_dusk_safe_lodging' | 'rep_night_watch_signal';
 
 export interface PickExploreEventInput {
   player: PlayerRow;
@@ -134,6 +145,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
   const blackMarketAccess = !!getBuff(player.user_id, guildId, 'black_market_access');
   const goodBoost = detection ? 2 : lucky ? 1 : 0;
   const badPenalty = detection ? 0.45 : 1;
+  const highRepBonus = rep >= 20 ? Math.min(5, Math.floor((rep - 20) / 15) + 1) : 0;
 
   const pity = getPityCounters(player.user_id, guildId);
   const time = getTimeOfDay();
@@ -191,6 +203,28 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['atonement_monk', (wanted > 0 || rep < -15) ? 4 : 0],
     ['conditional_miniboss', hasCombat && (wanted >= 3 || rep <= -60 || deaths >= 3 || robberyCount >= 2) ? 4 : 0],
     ['fishing_spot', ['forest', 'shrine', 'mines'].includes(player.zone_id) ? 5 : 0],
+
+    // High reputation events — appear more often as reputation climbs.
+    ['rep_honored_patrol',      rep >= 25 ? tm('rep_honored_patrol', 3 + highRepBonus) : 0],
+    ['rep_grateful_villagers',  rep >= 30 ? tm('rep_grateful_villagers', 3 + highRepBonus) : 0],
+    ['rep_supply_cache',        rep >= 40 ? tm('rep_supply_cache', 3 + highRepBonus) : 0],
+    ['rep_church_blessing',     rep >= 45 ? tm('rep_church_blessing', 2 + highRepBonus) : 0],
+    ['rep_young_squire',        rep >= 55 ? tm('rep_young_squire', 2 + highRepBonus) : 0],
+    ['rep_hero_statue',         rep >= 65 ? tm('rep_hero_statue', 2 + highRepBonus) : 0],
+    ['rep_royal_messenger',     rep >= 80 ? tm('rep_royal_messenger', 2 + highRepBonus) : 0],
+    ['rep_champion_challenge',  rep >= 90 && hasCombat ? tm('rep_champion_challenge', 2 + highRepBonus) : 0],
+
+    // High reputation zone-specific events.
+    ['rep_forest_rangers',      rep >= 40 && player.zone_id === 'forest' ? 3 + highRepBonus : 0],
+    ['rep_shrine_pilgrims',     rep >= 40 && player.zone_id === 'shrine' ? 3 + highRepBonus : 0],
+    ['rep_mine_rescue_crew',    rep >= 40 && player.zone_id === 'mines'  ? 3 + highRepBonus : 0],
+    ['rep_wastes_refugees',     rep >= 40 && player.zone_id === 'wastes' ? 3 + highRepBonus : 0],
+
+    // High reputation time-specific events.
+    ['rep_dawn_procession',     rep >= 50 && time === 'dawn'  ? 3 + highRepBonus : 0],
+    ['rep_day_public_thanks',   rep >= 50 && time === 'day'   ? 3 + highRepBonus : 0],
+    ['rep_dusk_safe_lodging',   rep >= 50 && time === 'dusk'  ? 3 + highRepBonus : 0],
+    ['rep_night_watch_signal',  rep >= 50 && time === 'night' ? 3 + highRepBonus : 0],
 
     // Zone-specific events
     ['forest_tree',              player.zone_id === 'forest' ? 4 : 0],
@@ -300,6 +334,22 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'atonement_monk': return showAtonementMonk(ctx);
     case 'conditional_miniboss': return showConditionalMiniboss(ctx);
     case 'fishing_spot': return showFishingSpot(ctx);
+    case 'rep_honored_patrol':       return showRepHonoredPatrol(ctx);
+    case 'rep_grateful_villagers':   return showRepGratefulVillagers(ctx);
+    case 'rep_supply_cache':         return showRepSupplyCache(ctx);
+    case 'rep_church_blessing':      return showRepChurchBlessing(ctx);
+    case 'rep_young_squire':         return showRepYoungSquire(ctx);
+    case 'rep_hero_statue':          return showRepHeroStatue(ctx);
+    case 'rep_royal_messenger':      return showRepRoyalMessenger(ctx);
+    case 'rep_champion_challenge':   return showRepChampionChallenge(ctx);
+    case 'rep_forest_rangers':       return showRepForestRangers(ctx);
+    case 'rep_shrine_pilgrims':      return showRepShrinePilgrims(ctx);
+    case 'rep_mine_rescue_crew':     return showRepMineRescueCrew(ctx);
+    case 'rep_wastes_refugees':      return showRepWastesRefugees(ctx);
+    case 'rep_dawn_procession':      return showRepDawnProcession(ctx);
+    case 'rep_day_public_thanks':    return showRepDayPublicThanks(ctx);
+    case 'rep_dusk_safe_lodging':    return showRepDuskSafeLodging(ctx);
+    case 'rep_night_watch_signal':   return showRepNightWatchSignal(ctx);
     case 'forest_tree':              return showForestWhisperingTree(ctx);
     case 'forest_wolf_den':          return showForestWolfDen(ctx);
     case 'forest_herbalist_hut':     return showForestHerbalistHut(ctx);

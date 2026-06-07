@@ -237,6 +237,14 @@ export const ITEMS: Record<string, ItemDef> = {
     effect: { passiveOnly: true }, sellPrice: 120, buyPrice: 420
   },
 
+
+  bread: {
+    id: 'bread', name: 'Bread', icon: '🍞',
+    type: 'consumable', stackable: true,
+    description: 'Ổ bánh mì đơn giản từ xe tiếp tế. Hồi **15% HP tối đa**.',
+    effect: { hpPercent: 0.15 }, sellPrice: 6, buyPrice: 18
+  },
+
   // ── FISHING MATERIALS ───────────────────────────────────────────
   common_fish: {
     id: 'common_fish', name: 'Common Fish', icon: '🐟',
@@ -270,18 +278,6 @@ export const ITEMS: Record<string, ItemDef> = {
   },
 
   // ── GATHERING MATERIALS ──────────────────────────────────────────
-  iron_ore: {
-    id: 'iron_ore', name: 'Iron Ore', icon: '🪨',
-    type: 'material', stackable: true,
-    description: 'Quặng sắt khai thác từ vách đá.',
-    sellPrice: 12
-  },
-  mana_crystal: {
-    id: 'mana_crystal', name: 'Mana Crystal', icon: '💠',
-    type: 'material', stackable: true,
-    description: 'Tinh thể mana kết tinh từ đất ma pháp.',
-    sellPrice: 28
-  },
   rare_herb: {
     id: 'rare_herb', name: 'Rare Herb', icon: '🌺',
     type: 'material', stackable: true,
@@ -368,65 +364,17 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Bùa rune dùng một lần, có thể mở rộng để chặn debuff trong combat.',
     sellPrice: 75
   },
-  wolf_fang: {
-    id: 'wolf_fang', name: 'Wolf Fang', icon: '🦷',
-    type: 'material', stackable: true,
-    description: 'Nanh sói nguyền rủa, phát ra khí lạnh.',
-    sellPrice: 20
-  },
   ancient_bark: {
     id: 'ancient_bark', name: 'Ancient Bark', icon: '🪵',
     type: 'material', stackable: true,
     description: 'Vỏ cây cổ thụ ngàn tuổi, rắn như thép.',
     sellPrice: 25
   },
-  bone_shard: {
-    id: 'bone_shard', name: 'Bone Shard', icon: '🦴',
-    type: 'material', stackable: true,
-    description: 'Mảnh xương của chiến binh đã khuất.',
-    sellPrice: 15
-  },
-  ectoplasm: {
-    id: 'ectoplasm', name: 'Ectoplasm', icon: '🫧',
-    type: 'material', stackable: true,
-    description: 'Tinh chất linh hồn, dùng để làm vật phẩm phép thuật.',
-    sellPrice: 30
-  },
-  troll_hide: {
-    id: 'troll_hide', name: 'Troll Hide', icon: '🧱',
-    type: 'material', stackable: true,
-    description: 'Da troll cứng như đá, tái sinh chậm sau khi tách ra.',
-    sellPrice: 40
-  },
-  dark_wing: {
-    id: 'dark_wing', name: 'Dark Wing', icon: '🖤',
-    type: 'material', stackable: true,
-    description: 'Cánh dơi bóng tối, hấp thụ ánh sáng hoàn toàn.',
-    sellPrice: 45
-  },
-  void_essence: {
-    id: 'void_essence', name: 'Void Essence', icon: '🌑',
-    type: 'material', stackable: true,
-    description: 'Tinh chất hư không, không có hình dạng cố định.',
-    sellPrice: 80
-  },
-  demon_seal: {
-    id: 'demon_seal', name: 'Demon Seal', icon: '🔮',
-    type: 'material', stackable: true,
-    description: 'Con dấu của quỷ Echo, ghi khắc ký ức kẻ khác.',
-    sellPrice: 100
-  },
   shrine_relic: {
     id: 'shrine_relic', name: 'Shrine Relic', icon: '⚱️',
     type: 'key_item', stackable: false,
     description: 'Tàn tích thiêng liêng của đền cổ, tỏa ra hào quang yếu ớt.',
     sellPrice: 200
-  },
-  colossus_core: {
-    id: 'colossus_core', name: 'Colossus Core', icon: '💎',
-    type: 'key_item', stackable: false,
-    description: 'Lõi năng lượng của Colossus, vẫn còn nóng đỏ.',
-    sellPrice: 350
   },
   forgotten_crown: {
     id: 'forgotten_crown', name: 'Forgotten Crown', icon: '👑',
@@ -572,6 +520,122 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'consumable', stackable: false,
     description: 'Khóa **1 item** — item đó không mất khi chết.',
     sellPrice: 250
+  },
+
+  // ── Extra Skill Books ─────────────────────────────────────────────────
+  book_arcane_bolt: {
+    id: 'book_arcane_bolt', name: 'Tome: Arcane Bolt', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Arcane Bolt 🔮**.',
+    teachesSkill: 'arcane_bolt', sellPrice: 35, buyPrice: 85
+  },
+  book_poison_dart: {
+    id: 'book_poison_dart', name: 'Tome: Poison Dart', icon: '📗',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Poison Dart ☠️**.',
+    teachesSkill: 'poison_dart', sellPrice: 45, buyPrice: 110
+  },
+  book_cleave: {
+    id: 'book_cleave', name: 'Tome: Cleave', icon: '📕',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Cleave 🪓**.',
+    teachesSkill: 'cleave', sellPrice: 50, buyPrice: 125
+  },
+  book_battle_cry: {
+    id: 'book_battle_cry', name: 'Tome: Battle Cry', icon: '📕',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Battle Cry 📣**.',
+    teachesSkill: 'battle_cry', sellPrice: 55, buyPrice: 135
+  },
+  book_guardian_wall: {
+    id: 'book_guardian_wall', name: 'Tome: Guardian Wall', icon: '📗',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Guardian Wall 🧱**.',
+    teachesSkill: 'guardian_wall', sellPrice: 60, buyPrice: 150
+  },
+  book_purify: {
+    id: 'book_purify', name: 'Tome: Purify', icon: '📒',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Purify ✨**.',
+    teachesSkill: 'purify', sellPrice: 55, buyPrice: 140
+  },
+  book_blood_siphon: {
+    id: 'book_blood_siphon', name: 'Tome: Blood Siphon', icon: '📕',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Blood Siphon 🩸**.',
+    teachesSkill: 'blood_siphon', sellPrice: 70, buyPrice: 180
+  },
+  book_mana_surge: {
+    id: 'book_mana_surge', name: 'Tome: Mana Surge', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Mana Surge 🌊**.',
+    teachesSkill: 'mana_surge', sellPrice: 65, buyPrice: 165
+  },
+  book_frost_nova: {
+    id: 'book_frost_nova', name: 'Tome: Frost Nova', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Frost Nova ❄️**.',
+    teachesSkill: 'frost_nova', sellPrice: 75, buyPrice: 190
+  },
+  book_whirlwind: {
+    id: 'book_whirlwind', name: 'Tome: Whirlwind', icon: '📕',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Whirlwind 🌪️**.',
+    teachesSkill: 'whirlwind', sellPrice: 80, buyPrice: 210
+  },
+  book_radiant_smite: {
+    id: 'book_radiant_smite', name: 'Tome: Radiant Smite', icon: '📒',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Radiant Smite 🌟**.',
+    teachesSkill: 'radiant_smite', sellPrice: 80, buyPrice: 220
+  },
+  book_venom_cloud: {
+    id: 'book_venom_cloud', name: 'Tome: Venom Cloud', icon: '📗',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Venom Cloud 🟢**.',
+    teachesSkill: 'venom_cloud', sellPrice: 85, buyPrice: 230
+  },
+  book_execute: {
+    id: 'book_execute', name: 'Tome: Execute', icon: '📕',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Execute 🗡️**.',
+    teachesSkill: 'execute', sellPrice: 90, buyPrice: 250
+  },
+  book_meteor_shower: {
+    id: 'book_meteor_shower', name: 'Tome: Meteor Shower', icon: '📙',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Meteor Shower ☄️**.',
+    teachesSkill: 'meteor_shower', sellPrice: 120, buyPrice: 360
+  },
+  book_blade_mastery: {
+    id: 'book_blade_mastery', name: 'Tome: Blade Mastery', icon: '📕',
+    type: 'skill_book', stackable: false,
+    description: 'Học passive **Blade Mastery ⚔️**.',
+    teachesSkill: 'blade_mastery', sellPrice: 70, buyPrice: 180
+  },
+  book_arcane_mind: {
+    id: 'book_arcane_mind', name: 'Tome: Arcane Mind', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học passive **Arcane Mind 🧠**.',
+    teachesSkill: 'arcane_mind', sellPrice: 75, buyPrice: 190
+  },
+  book_survival_instinct: {
+    id: 'book_survival_instinct', name: 'Tome: Survival Instinct', icon: '📓',
+    type: 'skill_book', stackable: false,
+    description: 'Học passive **Survival Instinct 🦊**.',
+    teachesSkill: 'survival_instinct', sellPrice: 70, buyPrice: 180
+  },
+  book_blood_hunger: {
+    id: 'book_blood_hunger', name: 'Tome: Blood Hunger', icon: '📗',
+    type: 'skill_book', stackable: false,
+    description: 'Học passive **Blood Hunger 🩸**.',
+    teachesSkill: 'blood_hunger', sellPrice: 85, buyPrice: 230
+  },
+  book_void_rift: {
+    id: 'book_void_rift', name: 'Tome: Void Rift', icon: '📓',
+    type: 'skill_book', stackable: false,
+    description: 'Học soul skill **Void Rift 🕳️**.',
+    teachesSkill: 'void_rift', sellPrice: 220
   },
 
   book_soul_offering: {

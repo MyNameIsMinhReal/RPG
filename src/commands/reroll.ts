@@ -15,15 +15,18 @@ const REROLL_COST = 2; // Soul Shards
 export const BOOK_TIERS: Record<string, string[]> = {
   active: [
     'book_fireball','book_ice_lance','book_shield_bash',
-    'book_shadow_step','book_mend_wounds','book_thunder_clap'
+    'book_shadow_step','book_mend_wounds','book_thunder_clap',
+    'book_arcane_bolt','book_poison_dart','book_cleave','book_battle_cry','book_guardian_wall','book_purify',
+    'book_blood_siphon','book_mana_surge','book_frost_nova','book_whirlwind','book_radiant_smite',
+    'book_venom_cloud','book_execute','book_meteor_shower'
   ],
   passive: [
     'book_iron_skin','book_berserker','book_mana_flow',
-    'book_vampiric','book_tough_body'
+    'book_vampiric','book_tough_body','book_blade_mastery','book_arcane_mind','book_survival_instinct','book_blood_hunger'
   ],
   reaction: ['book_counter','book_last_stand'],
   world:    ['book_mark_zone','book_soul_offering'],
-  soul:     ['book_soul_strike','book_soul_guard','book_soul_drain'],
+  soul:     ['book_soul_strike','book_soul_guard','book_soul_drain','book_void_rift'],
 };
 
 export function getBookTier(bookId: string): string | null {

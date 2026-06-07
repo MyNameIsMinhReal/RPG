@@ -115,6 +115,7 @@ interface Passives {
   hasLastStand: boolean;
   hpRegenPerTurn: number;
   mpRegenPerTurn: number;
+  lifestealBonus: number;
 }
 
 function getPassives(userId: string, guildId: string): Passives {
@@ -122,7 +123,7 @@ function getPassives(userId: string, guildId: string): Passives {
   const p: Passives = {
     hasBerserker: false, hasVampiric: false,
     hasCounter: false, hasLastStand: false,
-    hpRegenPerTurn: 0, mpRegenPerTurn: 0
+    hpRegenPerTurn: 0, mpRegenPerTurn: 0, lifestealBonus: 0
   };
   for (const entry of loadout) {
     const sk = getSkill(entry.skill_id);
@@ -132,8 +133,12 @@ function getPassives(userId: string, guildId: string): Passives {
       case 'vampiric':   p.hasVampiric   = true; break;
       case 'counter':    p.hasCounter    = true; break;
       case 'last_stand': p.hasLastStand  = true; break;
-      case 'tough_body': p.hpRegenPerTurn += sk.passiveBonus?.hpRegen ?? 0; break;
-      case 'mana_flow':  p.mpRegenPerTurn += sk.passiveBonus?.mpRegen ?? 0; break;
+    }
+    if (sk.type === 'passive' && sk.passiveBonus) {
+      p.hpRegenPerTurn += sk.passiveBonus.hpRegen ?? 0;
+      p.mpRegenPerTurn += sk.passiveBonus.mpRegen ?? 0;
+      p.lifestealBonus += sk.passiveBonus.lifesteal ?? 0;
+      p.hasVampiric = p.hasVampiric || ((sk.passiveBonus.lifesteal ?? 0) > 0);
     }
   }
   return p;
@@ -313,7 +318,8 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
 
   const oilBoost = (effects.find(e => e.name === 'weapon_oil')?.value ?? 0) +
     (effects.find(e => e.name === 'rage_elixir')?.value ?? 0) +
-    (effects.find(e => e.name === 'blood_vial')?.value ?? 0);
+    (effects.find(e => e.name === 'blood_vial')?.value ?? 0) +
+    (effects.find(e => e.name === 'battle_cry')?.value ?? 0);
   if (oilBoost > 0) {
     effectiveAtk = Math.floor(effectiveAtk * (1 + oilBoost / 100));
     logs.push(`🧪 Consumable buff: ATK +${oilBoost}%.`);
@@ -322,7 +328,7 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
   // Equipment stats
   const eqStats = getEquipmentStats(state.user_id, state.guild_id);
   const totalCrit    = (eqStats.critChance   ?? 0);
-  const totalLifesteal = (eqStats.lifesteal  ?? 0) + (passives.hasVampiric ? 15 : 0);
+  const totalLifesteal = (eqStats.lifesteal  ?? 0) + passives.lifestealBonus;
   if (eqStats.effects.includes('low_hp_atk') && player_hp / state.player_max_hp < 0.30) {
     effectiveAtk = Math.floor(effectiveAtk * 1.15);
     logs.push('🔥 Low HP ATK: HP thấp, ATK +15%.');
@@ -408,7 +414,7 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
 // ── processSkill ──────────────────────────────────────────────────────────
 export function processSkill(
   state: CombatState, skillId: string, playerAtk: number,
-  _hpRegen: number, _mpRegen: number
+  _hpRegen: number, _mpRegen: number, targetIdx = 0
 ): ActionResult {
   const skill = getSkill(skillId);
   if (!skill) {
@@ -452,12 +458,119 @@ export function processSkill(
   player_mp -= realMpCost;
   if (focusDiscount > 0 && (skill.mpCost ?? 0) > 0) logs.push(`💠 Focus Tonic: MP cost giảm còn **${realMpCost}**.`);
 
+  let skipGenericDamage = false;
+  let skipGenericEffect = false;
+
+  const calcSkillDamage = (rawDamage: number, targetDef: number, targetId: string): number => {
+    const defPierce = (skill as any).soulCost ? 0.3 : 0.5;
+    const clsSkill = getClassPassives(state.user_id, state.guild_id);
+    const eqStatsSkill = getEquipmentStats(state.user_id, state.guild_id);
+    let skillMult = clsSkill.skillDmgMult;
+    if (eqStatsSkill.effects.includes('low_hp_atk') && player_hp / state.player_max_hp < 0.30) {
+      skillMult *= 1.15;
+      logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
+    }
+    let out = Math.max(1, Math.round((rawDamage - targetDef * defPierce) * skillMult));
+    return applyOutgoingDamageModifiers(state.user_id, state.guild_id, out, targetIsBoss(targetId), logs);
+  };
+
+  // ── New special active skills ───────────────────────────────────────────
+  if (skill.id === 'battle_cry') {
+    addEffect(effects, 'battle_cry', 3, 15, 'player');
+    logs.push(`${skill.icon} **${skill.name}**! ATK +15% trong **3 lượt**.`);
+    skipGenericEffect = true;
+  }
+
+  if (skill.id === 'guardian_wall') {
+    addEffect(effects, 'stone_skin', 2, 20, 'player');
+    addEffect(effects, 'shield', 1, undefined, 'player');
+    logs.push(`${skill.icon} **${skill.name}**! Giảm sát thương nhận **20%** trong 2 lượt và dựng 1 lớp chắn.`);
+    skipGenericEffect = true;
+  }
+
+  if (skill.id === 'mana_surge') {
+    const mpGain = Math.min(35, state.player_max_mp - player_mp);
+    player_mp = Math.min(state.player_max_mp, player_mp + 35);
+    logs.push(`${skill.icon} **${skill.name}**! Hồi **${mpGain} MP**. (${player_mp}/${state.player_max_mp})`);
+  }
+
+  if (skill.id === 'purify') {
+    const before = effects.length;
+    const removable = new Set(['burn', 'poison', 'curse', 'incoming_damage_up']);
+    const kept = effects.filter(e => e.target === 'enemy' || !removable.has(e.name));
+    effects.splice(0, effects.length, ...kept);
+    if (effects.length < before) logs.push(`${skill.icon} **${skill.name}** — đã xóa hiệu ứng bất lợi khỏi bạn.`);
+  }
+
+  if (skill.targetType === 'all' && skill.damage) {
+    const group = getGroupEnemies(state);
+    if (group) {
+      let total = 0;
+      const names: string[] = [];
+      for (let i = 0; i < group.length; i++) {
+        if (group[i].hp <= 0) continue;
+        const dmg = calcSkillDamage(skill.damage, group[i].def, group[i].id);
+        group[i] = { ...group[i], hp: Math.max(0, group[i].hp - dmg) };
+        total += dmg;
+        names.push(`${group[i].icon ?? '👹'} ${group[i].name} −${dmg}`);
+      }
+      enemy_hp = group.find(e => e.hp > 0)?.hp ?? 0;
+      state = { ...state, enemy_hp, enemies_json: JSON.stringify(group) };
+      logs.push(`${skill.icon} **${skill.name}** đánh diện rộng: ${names.join(', ')}. Tổng **${total}** sát thương.`);
+    } else {
+      const dmg = calcSkillDamage(skill.damage, state.enemy_def, state.enemy_id);
+      enemy_hp = Math.max(0, enemy_hp - dmg);
+      logs.push(`${skill.icon} **${skill.name}** gây **${dmg}** sát thương lên **${state.enemy_name}**. (${enemy_hp}/${state.enemy_max_hp} HP còn lại)`);
+    }
+    skipGenericDamage = true;
+  }
+
+  if (skill.id === 'execute' && skill.damage && !skipGenericDamage) {
+    const group = getGroupEnemies(state);
+    let idx = 0;
+    if (group) {
+      idx = Number.isFinite(targetIdx) ? Math.floor(targetIdx) : 0;
+      if (idx < 0 || idx >= group.length || group[idx].hp <= 0) idx = group.findIndex(e => e.hp > 0);
+    }
+    const target = group ? group[idx] : null;
+    const hpRatio = target ? target.hp / target.max_hp : enemy_hp / state.enemy_max_hp;
+    const rawDamage = hpRatio <= 0.35 ? Math.floor(skill.damage * 1.85) : skill.damage;
+    const dmg = calcSkillDamage(rawDamage, target ? target.def : state.enemy_def, target ? target.id : state.enemy_id);
+    if (group && target && idx >= 0) {
+      group[idx] = { ...group[idx], hp: Math.max(0, group[idx].hp - dmg) };
+      enemy_hp = group[idx].hp;
+      state = { ...state, enemy_hp, enemies_json: JSON.stringify(group) };
+      logs.push(`${skill.icon} **${skill.name}** chém ${target.icon ?? '👹'} **${target.name}** gây **${dmg}** sát thương${hpRatio <= 0.35 ? ' — KẾT LIỄU!' : ''}. (${enemy_hp}/${target.max_hp} HP còn lại)`);
+    } else {
+      enemy_hp = Math.max(0, enemy_hp - dmg);
+      logs.push(`${skill.icon} **${skill.name}** gây **${dmg}** sát thương${hpRatio <= 0.35 ? ' — KẾT LIỄU!' : ''}. (${enemy_hp}/${state.enemy_max_hp} HP còn lại)`);
+    }
+    skipGenericDamage = true;
+  }
+
   // ── Damage skills ────────────────────────────────────────────────────────
-  if (skill.damage) {
+  if (skill.damage && !skipGenericDamage) {
     const skillGroupEnemies = getGroupEnemies(state);
-    const skillTargetDef = skillGroupEnemies
-      ? (skillGroupEnemies.find(e => e.hp > 0)?.def ?? state.enemy_def)
-      : state.enemy_def;
+    let actualTargetIdx = 0;
+    if (skillGroupEnemies) {
+      let idx = Number.isFinite(targetIdx) ? Math.floor(targetIdx) : 0;
+      if (idx < 0 || idx >= skillGroupEnemies.length || skillGroupEnemies[idx].hp <= 0) {
+        idx = skillGroupEnemies.findIndex(e => e.hp > 0);
+      }
+      if (idx < 0) {
+        logs.push('✅ Tất cả kẻ thù đã bị tiêu diệt!');
+        return makeResult(state, state, player_hp, player_mp, effects, logs, false, true, false);
+      }
+      actualTargetIdx = idx;
+    }
+
+    const targetEnemy = skillGroupEnemies ? skillGroupEnemies[actualTargetIdx] : null;
+    const skillTargetDef = targetEnemy ? targetEnemy.def : state.enemy_def;
+    const targetId = targetEnemy ? targetEnemy.id : state.enemy_id;
+    const targetName = targetEnemy ? targetEnemy.name : state.enemy_name;
+    const targetIcon = targetEnemy ? targetEnemy.icon : '⚔️';
+    const targetMaxHp = targetEnemy ? targetEnemy.max_hp : state.enemy_max_hp;
+
     const defPierce = (skill as any).soulCost ? 0.3 : 0.5;
     const clsSkill  = getClassPassives(state.user_id, state.guild_id);
     const eqStatsSkill = getEquipmentStats(state.user_id, state.guild_id);
@@ -467,19 +580,18 @@ export function processSkill(
       logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
     }
     let finalDmg  = Math.max(1, Math.round((skill.damage - skillTargetDef * defPierce) * skillMult));
-    const targetId = skillGroupEnemies ? (skillGroupEnemies.find(e => e.hp > 0)?.id ?? state.enemy_id) : state.enemy_id;
     finalDmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, finalDmg, targetIsBoss(targetId), logs);
     if (skillGroupEnemies) {
-      const firstAlive = skillGroupEnemies.findIndex(e => e.hp > 0);
-      if (firstAlive >= 0) {
-        skillGroupEnemies[firstAlive] = { ...skillGroupEnemies[firstAlive], hp: Math.max(0, skillGroupEnemies[firstAlive].hp - finalDmg) };
-        enemy_hp = skillGroupEnemies[firstAlive].hp;
-        state = { ...state, enemies_json: JSON.stringify(skillGroupEnemies) };
-      }
+      skillGroupEnemies[actualTargetIdx] = {
+        ...skillGroupEnemies[actualTargetIdx],
+        hp: Math.max(0, skillGroupEnemies[actualTargetIdx].hp - finalDmg)
+      };
+      enemy_hp = skillGroupEnemies[actualTargetIdx].hp;
+      state = { ...state, enemies_json: JSON.stringify(skillGroupEnemies) };
     } else {
       enemy_hp = Math.max(0, enemy_hp - finalDmg);
     }
-    logs.push(`${skill.icon} **${skill.name}**! Gây **${finalDmg}** sát thương.`);
+    logs.push(`${skill.icon} **${skill.name}** đánh ${targetIcon} **${targetName}** gây **${finalDmg}** sát thương. (${enemy_hp}/${targetMaxHp} HP còn lại)`);
   }
 
   // ── Heal skills ──────────────────────────────────────────────────────────
@@ -496,13 +608,20 @@ export function processSkill(
   }
 
   // ── Effects — applied REGARDLESS of damage (fixes Shadow Step!) ──────────
-  if (skill.effect && skill.effectDuration) {
-    const val = skill.effect === 'burn' ? 5 : undefined;
-    const effectTarget = skill.effect === 'burn' ? 'enemy' as const : undefined;
+  if (skill.effect && skill.effectDuration && !skipGenericEffect) {
+    const val = skill.effect === 'burn' ? 5
+      : skill.effect === 'poison' ? 4
+      : skill.effect === 'battle_cry' ? 15
+      : skill.effect === 'stone_skin' ? 20
+      : undefined;
+    const effectTarget = (skill.effect === 'burn' || skill.effect === 'poison' || skill.effect === 'slow' || skill.effect === 'stun')
+      ? 'enemy' as const
+      : 'player' as const;
     addEffect(effects, skill.effect, skill.effectDuration, val, effectTarget);
     const effectLabels: Record<string, string> = {
-      burn: '🔥 Đốt cháy', slow: '🧊 Làm chậm', stun: '💫 Choáng',
-      dodge: '🌑 Shadow Step — sẽ né đòn tấn công tiếp theo'
+      burn: '🔥 Đốt cháy', poison: '☠️ Trúng độc', slow: '🧊 Làm chậm', stun: '💫 Choáng',
+      dodge: '🌑 Shadow Step — sẽ né đòn tấn công tiếp theo',
+      battle_cry: '📣 ATK tăng', stone_skin: '🛡️ Giảm sát thương', shield: '🛡️ Chắn đòn'
     };
     if (!skill.damage && !skill.heal) {
       // Pure-effect skills get their own log line

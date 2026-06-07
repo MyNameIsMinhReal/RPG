@@ -69,6 +69,7 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
   for (const entry of loadout) {
     const sk = getSkill(entry.skill_id);
     if (!sk || sk.type !== 'passive' || !sk.passiveBonus) continue;
+    bonusAtk   += sk.passiveBonus.atk    ?? 0;
     bonusDef   += sk.passiveBonus.def    ?? 0;
     bonusMaxHp += sk.passiveBonus.maxHp  ?? 0;
     bonusMaxMp += sk.passiveBonus.maxMp  ?? 0;
