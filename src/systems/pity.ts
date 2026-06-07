@@ -9,7 +9,7 @@ export const PITY_EVENTS = new Set<ExploreEventType>([
   'wandering_healer', 'nameless_grave', 'memory_seller', 'stranger_campfire',
   'cracked_shrine', 'wanted_merchant', 'rebirth_rift', 'talking_corpse', 'fate_coin',
   'black_cat', 'dice_gambler', 'glowing_mushroom', 'chained_prisoner', 'magic_fountain',
-  'laughing_bones', 'missing_child_chain', 'black_eclipse', 'injured_traveler',
+  'laughing_bones', 'missing_child_chain', 'black_eclipse',
 ]);
 
 // After PITY_THRESHOLD explores without seeing event X, weight increases by 1 per explore.

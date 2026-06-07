@@ -26,6 +26,7 @@ export type EquipEffect  =
   | 'celestial_revive'  // revive once per combat with 20% HP
   | 'blood_kill_regen'  // restore 20% HP on kill but potions -50%
   | 'worldbreaker'      // -10 DEF (high risk)
+  | 'debt_on_death'     // lose extra gold penalty on death
   | 'set_bonus_2'       // set bonus 2-piece active
   | 'set_bonus_3';      // set bonus 3-piece active
 
@@ -136,6 +137,31 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     stats: { atk: 3 }, effects: ['dodge_on_crit'],
     sellPrice: 15, buyPrice: 40, minZone: 'forest'
   },
+  training_sword: {
+    id: 'training_sword', name: 'Training Sword', icon: '⚔️', slot: 'weapon', rarity: 'common',
+    description: 'Kiếm tập luyện. Mạnh hơn kiếm cũ, dễ cầm tay.',
+    stats: { atk: 4 }, sellPrice: 20, buyPrice: 60, minZone: 'village'
+  },
+  woodcutter_axe: {
+    id: 'woodcutter_axe', name: 'Woodcutter Axe', icon: '🪓', slot: 'weapon', rarity: 'common',
+    description: 'Rìu đốn củi nặng. Sát thương cao đầu game nhưng khó phòng thủ.',
+    stats: { atk: 5, def: -1 }, sellPrice: 20, buyPrice: 75, minZone: 'village'
+  },
+  apprentice_wand: {
+    id: 'apprentice_wand', name: 'Apprentice Wand', icon: '🪄', slot: 'weapon', rarity: 'common',
+    description: 'Gậy phép cho mage mới bắt đầu. ATK và MP.',
+    stats: { atk: 3, maxMp: 10 }, sellPrice: 20, buyPrice: 70, minZone: 'village'
+  },
+  short_bow: {
+    id: 'short_bow', name: 'Short Bow', icon: '🏹', slot: 'weapon', rarity: 'common',
+    description: 'Cung ngắn linh hoạt. ATK và crit cho ranger/rogue.',
+    stats: { atk: 4, critChance: 3 }, sellPrice: 20, buyPrice: 75, minZone: 'forest'
+  },
+  guard_spear: {
+    id: 'guard_spear', name: 'Guard Spear', icon: '🔱', slot: 'weapon', rarity: 'common',
+    description: 'Giáo phòng vệ. Cân bằng tấn công và phòng thủ.',
+    stats: { atk: 4, def: 2 }, sellPrice: 25, buyPrice: 90, minZone: 'village'
+  },
 
   // ── Rare weapons ──────────────────────────────────
   iron_sword: {
@@ -168,6 +194,39 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     stats: { atk: 6, critChance: 5 }, effects: ['extra_hit'],
     sellPrice: 80, dropFrom: ['skeleton_archer'], dropChance: 10, minZone: 'shrine'
   },
+  steel_longsword: {
+    id: 'steel_longsword', name: 'Steel Longsword', icon: '⚔️', slot: 'weapon', rarity: 'rare',
+    description: 'Kiếm dài thép. Ổn định và đáng tin cậy, không có tác dụng phụ.',
+    stats: { atk: 9 }, sellPrice: 90, buyPrice: 260, minZone: 'forest'
+  },
+  battle_axe: {
+    id: 'battle_axe', name: 'Battle Axe', icon: '🪓', slot: 'weapon', rarity: 'rare',
+    description: 'Rìu chiến mạnh mẽ. Sát thương cao, nhưng khó phòng thủ.',
+    stats: { atk: 11, def: -2 }, sellPrice: 100, buyPrice: 320, minZone: 'mines'
+  },
+  runic_wand: {
+    id: 'runic_wand', name: 'Runic Wand', icon: '🔮', slot: 'weapon', rarity: 'rare',
+    description: 'Gậy khắc rune cổ đại. ATK, MP cao và tự hồi mana.',
+    stats: { atk: 6, maxMp: 25 }, effects: ['mp_regen_3t'],
+    sellPrice: 100, buyPrice: 300, minZone: 'shrine'
+  },
+  twin_daggers: {
+    id: 'twin_daggers', name: 'Twin Daggers', icon: '🔪', slot: 'weapon', rarity: 'rare',
+    description: 'Hai dao song song — tối ưu cho build crit.',
+    stats: { atk: 7, critChance: 10 }, sellPrice: 100, buyPrice: 310, minZone: 'shrine'
+  },
+  guardian_spear: {
+    id: 'guardian_spear', name: 'Guardian Spear', icon: '🔱', slot: 'weapon', rarity: 'rare',
+    description: 'Giáo hộ vệ — chặn 1 đòn chí mạng mỗi combat.',
+    stats: { atk: 7, def: 5 }, effects: ['block_one_crit'],
+    sellPrice: 110, buyPrice: 340, minZone: 'mines'
+  },
+  hunter_crossbow: {
+    id: 'hunter_crossbow', name: 'Hunter Crossbow', icon: '🏹', slot: 'weapon', rarity: 'rare',
+    description: 'Nỏ thợ săn. 10% bắn thêm 1 mũi tên nhỏ.',
+    stats: { atk: 8, critChance: 5 }, effects: ['extra_hit'],
+    sellPrice: 100, buyPrice: 330, minZone: 'forest'
+  },
 
   // ── Epic weapons ──────────────────────────────────
   flameblade: {
@@ -199,6 +258,42 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     description: 'Khi dùng potion, hồi thêm 10%.',
     stats: { atk: 8, maxHp: 10 }, effects: ['potion_bonus'],
     sellPrice: 180, dropFrom: ['shrine_guardian'], dropChance: 12, minZone: 'shrine'
+  },
+  ember_sabre: {
+    id: 'ember_sabre', name: 'Ember Sabre', icon: '🔥', slot: 'weapon', rarity: 'epic',
+    description: '20% gây Burn 2 lượt khi đánh thường.',
+    stats: { atk: 13 }, effects: ['burn_on_hit'],
+    sellPrice: 300, buyPrice: 900, minZone: 'mines'
+  },
+  frost_pike: {
+    id: 'frost_pike', name: 'Frost Pike', icon: '🧊', slot: 'weapon', rarity: 'epic',
+    description: 'Skill có 15% làm chậm enemy. ATK và MP.',
+    stats: { atk: 11, maxMp: 10 }, effects: ['slow_on_skill'],
+    sellPrice: 300, buyPrice: 950, minZone: 'mines'
+  },
+  executioner_axe: {
+    id: 'executioner_axe', name: 'Executioner Axe', icon: '🪓', slot: 'weapon', rarity: 'epic',
+    description: 'Búa xử tử. ATK rất cao, DEF giảm. Khi HP < 35%, ATK +10%.',
+    stats: { atk: 18, def: -5 }, effects: ['low_hp_atk'],
+    sellPrice: 380, buyPrice: 1100, minZone: 'wastes'
+  },
+  moonlit_bow: {
+    id: 'moonlit_bow', name: 'Moonlit Bow', icon: '🌙', slot: 'weapon', rarity: 'epic',
+    description: 'Cung ánh trăng. Crit cao và 10% bắn thêm phát.',
+    stats: { atk: 12, critChance: 10 }, effects: ['extra_hit'],
+    sellPrice: 350, buyPrice: 1000, minZone: 'wastes'
+  },
+  priest_bell_mace: {
+    id: 'priest_bell_mace', name: 'Priest Bell Mace', icon: '🔔', slot: 'weapon', rarity: 'epic',
+    description: 'Chùy chuông linh mục. Potion hồi thêm 10~30%.',
+    stats: { atk: 9, maxHp: 20 }, effects: ['potion_bonus'],
+    sellPrice: 280, buyPrice: 850, minZone: 'shrine'
+  },
+  shadow_kris: {
+    id: 'shadow_kris', name: 'Shadow Kris', icon: '🌑', slot: 'weapon', rarity: 'epic',
+    description: 'Dao cong bóng tối. Crit cao, khi crit 20% né đòn tiếp theo.',
+    stats: { atk: 10, critChance: 15 }, effects: ['dodge_on_crit'],
+    sellPrice: 320, buyPrice: 1050, minZone: 'mines'
   },
 
   // ── Legendary weapons ─────────────────────────────
@@ -290,6 +385,36 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     stats: { atk: 40, maxHp: -30 }, effects: ['broken_evolve'],
     sellPrice: 1200, dropFrom: ['the_forgotten'], dropChance: 3, minZone: 'wastes'
   },
+  debt_blade: {
+    id: 'debt_blade', name: 'Debt Blade', icon: '💸', slot: 'weapon', rarity: 'cursed',
+    description: 'ATK rất cao. Mỗi lần chết mất thêm gold phạt.',
+    stats: { atk: 22 }, effects: ['debt_on_death'],
+    sellPrice: 600, dropFrom: ['the_forgotten'], dropChance: 4, minZone: 'wastes'
+  },
+  bloodletter_knife: {
+    id: 'bloodletter_knife', name: 'Bloodletter Knife', icon: '🩸', slot: 'weapon', rarity: 'cursed',
+    description: 'Lifesteal cao. Hồi máu khi giết, nhưng potion hồi ít hơn 50%.',
+    stats: { atk: 15, lifesteal: 8 }, effects: ['blood_kill_regen'],
+    sellPrice: 600, dropFrom: ['void_wraith'], dropChance: 4, minZone: 'wastes'
+  },
+  cursed_cleaver: {
+    id: 'cursed_cleaver', name: 'Cursed Cleaver', icon: '🔴', slot: 'weapon', rarity: 'cursed',
+    description: 'ATK khổng lồ. Mỗi lượt trong combat mất 2% max HP.',
+    stats: { atk: 28 }, effects: ['curse_hp_drain'],
+    sellPrice: 700, dropFrom: ['the_forgotten'], dropChance: 3, minZone: 'wastes'
+  },
+  greed_spear: {
+    id: 'greed_spear', name: 'Greed Spear', icon: '💰', slot: 'weapon', rarity: 'cursed',
+    description: '+15% Gold nhận được. Nhưng -10% EXP.',
+    stats: { atk: 18, goldBonus: 15, expBonus: -10 },
+    sellPrice: 650, dropFrom: ['echo_demon'], dropChance: 4, minZone: 'wastes'
+  },
+  hollow_staff: {
+    id: 'hollow_staff', name: 'Hollow Staff', icon: '👻', slot: 'weapon', rarity: 'cursed',
+    description: 'MP rất cao, không thể dùng Health Potion.',
+    stats: { atk: 14, maxMp: 80 }, effects: ['no_healing'],
+    sellPrice: 650, dropFrom: ['void_wraith', 'echo_demon'], dropChance: 4, minZone: 'wastes'
+  },
 
   // ════════════════════════════════════════════════════
   //  ARMOR
@@ -310,6 +435,31 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     description: '5% giảm một nửa sát thương nhận vào.',
     stats: { def: 2 }, effects: ['block_one_crit'],
     sellPrice: 15, buyPrice: 40, minZone: 'village'
+  },
+  padded_vest: {
+    id: 'padded_vest', name: 'Padded Vest', icon: '🥼', slot: 'armor', rarity: 'common',
+    description: 'Áo đệm lót. HP cơ bản cho người mới.',
+    stats: { maxHp: 20 }, sellPrice: 15, buyPrice: 55, minZone: 'village'
+  },
+  traveler_coat: {
+    id: 'traveler_coat', name: 'Traveler Coat', icon: '🧥', slot: 'armor', rarity: 'common',
+    description: 'Áo choàng lữ hành. HP và chút né đòn.',
+    stats: { maxHp: 15, dodgeChance: 2 }, sellPrice: 18, buyPrice: 70, minZone: 'village'
+  },
+  wooden_buckler: {
+    id: 'wooden_buckler', name: 'Wooden Buckler', icon: '🛡️', slot: 'armor', rarity: 'common',
+    description: 'Khiên gỗ thô sơ nhưng đáng tin cậy.',
+    stats: { def: 3 }, sellPrice: 18, buyPrice: 80, minZone: 'village'
+  },
+  apprentice_robe: {
+    id: 'apprentice_robe', name: 'Apprentice Robe', icon: '👘', slot: 'armor', rarity: 'common',
+    description: 'Áo choàng học viên. HP và MP đầu game.',
+    stats: { maxHp: 10, maxMp: 15 }, sellPrice: 18, buyPrice: 75, minZone: 'village'
+  },
+  hunter_jacket: {
+    id: 'hunter_jacket', name: 'Hunter Jacket', icon: '🥋', slot: 'armor', rarity: 'common',
+    description: 'Áo khoác thợ săn. HP, DEF và chút crit.',
+    stats: { maxHp: 15, def: 1, critChance: 3 }, sellPrice: 22, buyPrice: 90, minZone: 'forest'
   },
   iron_armor: {
     id: 'iron_armor', name: 'Iron Armor', icon: '🪖', slot: 'armor', rarity: 'rare',
@@ -334,6 +484,37 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     description: 'Khi HP dưới 40%, giảm thêm 5% damage nhận vào.',
     stats: { def: 6 }, effects: ['block_one_crit'], setId: 'iron_set',
     sellPrice: 75, dropFrom: ['vine_golem'], dropChance: 10, minZone: 'forest'
+  },
+  steel_armor: {
+    id: 'steel_armor', name: 'Steel Armor', icon: '🪖', slot: 'armor', rarity: 'rare',
+    description: 'Giáp thép cứng cáp, cơ bản cho tank.',
+    stats: { maxHp: 45, def: 7 }, sellPrice: 100, buyPrice: 320, minZone: 'mines'
+  },
+  knight_plate: {
+    id: 'knight_plate', name: 'Knight Plate', icon: '⚔️', slot: 'armor', rarity: 'rare',
+    description: 'Giáp hiệp sĩ nặng. Trâu nhưng ATK giảm nhẹ.',
+    stats: { maxHp: 60, def: 10, atk: -2 }, sellPrice: 120, buyPrice: 420, minZone: 'mines'
+  },
+  runic_robe: {
+    id: 'runic_robe', name: 'Runic Robe', icon: '🔮', slot: 'armor', rarity: 'rare',
+    description: 'Áo rune cho mage. HP và MP.',
+    stats: { maxHp: 25, maxMp: 45 }, sellPrice: 110, buyPrice: 380, minZone: 'shrine'
+  },
+  ranger_cloak: {
+    id: 'ranger_cloak', name: 'Ranger Cloak', icon: '🧥', slot: 'armor', rarity: 'rare',
+    description: 'Áo choàng kiểm lâm. HP, DEF và né đòn.',
+    stats: { maxHp: 30, def: 5, dodgeChance: 7 }, sellPrice: 110, buyPrice: 360, minZone: 'forest'
+  },
+  medic_garb: {
+    id: 'medic_garb', name: 'Medic Garb', icon: '➕', slot: 'armor', rarity: 'rare',
+    description: 'Áo bào y tá. Potion hồi thêm hiệu quả.',
+    stats: { maxHp: 35, def: 3 }, effects: ['potion_bonus'],
+    sellPrice: 110, buyPrice: 340, minZone: 'shrine'
+  },
+  spiked_armor: {
+    id: 'spiked_armor', name: 'Spiked Armor', icon: '⚙️', slot: 'armor', rarity: 'rare',
+    description: 'Giáp gai — tấn công lẫn phòng thủ đều tốt.',
+    stats: { maxHp: 40, def: 5, atk: 4 }, sellPrice: 120, buyPrice: 430, minZone: 'mines'
   },
   flameguard_armor: {
     id: 'flameguard_armor', name: 'Flameguard Armor', icon: '🔥', slot: 'armor', rarity: 'epic',
@@ -364,6 +545,40 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     description: 'Khi HP dưới 35%, ATK +12%.',
     stats: { maxHp: 50, def: 3 }, effects: ['low_hp_atk'],
     sellPrice: 220, dropFrom: ['mine_colossus'], dropChance: 8, minZone: 'mines'
+  },
+  emberguard_coat: {
+    id: 'emberguard_coat', name: 'Emberguard Coat', icon: '🔥', slot: 'armor', rarity: 'epic',
+    description: 'Áo lửa bảo vệ. HP và DEF chắc chắn.',
+    stats: { maxHp: 65, def: 9 }, sellPrice: 250, buyPrice: 950, minZone: 'wastes'
+  },
+  frost_knight_plate: {
+    id: 'frost_knight_plate', name: 'Frost Knight Plate', icon: '❄️', slot: 'armor', rarity: 'epic',
+    description: 'Giáp hiệp sĩ băng. Giảm damage từ boss.',
+    stats: { maxHp: 75, def: 12 }, effects: ['boss_dmg_redux'],
+    sellPrice: 280, buyPrice: 1100, minZone: 'wastes'
+  },
+  shadow_mantle: {
+    id: 'shadow_mantle', name: 'Shadow Mantle', icon: '🌑', slot: 'armor', rarity: 'epic',
+    description: 'Áo choàng bóng tối. Né đòn cao vượt trội.',
+    stats: { maxHp: 50, def: 6, dodgeChance: 12 }, sellPrice: 260, buyPrice: 1050, minZone: 'wastes'
+  },
+  archon_robe: {
+    id: 'archon_robe', name: 'Archon Robe', icon: '🌀', slot: 'armor', rarity: 'epic',
+    description: 'Áo pháp sư tối thượng. MP tái sinh theo lượt.',
+    stats: { maxHp: 40, maxMp: 80 }, effects: ['mp_regen_3t'],
+    sellPrice: 270, buyPrice: 1150, minZone: 'wastes'
+  },
+  berserker_harness: {
+    id: 'berserker_harness', name: 'Berserker Harness', icon: '💢', slot: 'armor', rarity: 'epic',
+    description: 'Dây đai berserker. Tấn công mạnh hơn khi gần chết.',
+    stats: { maxHp: 55, def: 4 }, effects: ['low_hp_atk'],
+    sellPrice: 270, buyPrice: 1200, minZone: 'wastes'
+  },
+  saint_guard_armor: {
+    id: 'saint_guard_armor', name: 'Saint Guard Armor', icon: '✝️', slot: 'armor', rarity: 'epic',
+    description: 'Giáp thánh. Chặn được một đòn chí mạng mỗi combat.',
+    stats: { maxHp: 60, def: 11 }, effects: ['block_one_crit'],
+    sellPrice: 290, buyPrice: 1300, minZone: 'wastes'
   },
   dragon_scale_armor: {
     id: 'dragon_scale_armor', name: 'Dragon Scale Armor', icon: '🐉', slot: 'armor', rarity: 'legendary',
@@ -449,6 +664,36 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     stats: { maxHp: 200 }, effects: ['armor_of_regret'],
     sellPrice: 1000, dropFrom: ['the_forgotten'], dropChance: 3, minZone: 'wastes'
   },
+  armor_of_debt: {
+    id: 'armor_of_debt', name: 'Armor of Debt', icon: '💸', slot: 'armor', rarity: 'cursed',
+    description: 'DEF khủng khiếp nhưng khi chết mất 20% vàng trong kho.',
+    stats: { maxHp: 100, def: 22 }, effects: ['debt_on_death'],
+    sellPrice: 550, dropFrom: ['the_forgotten', 'void_wraith'], dropChance: 3, minZone: 'wastes'
+  },
+  blood_pact_armor: {
+    id: 'blood_pact_armor', name: 'Blood Pact Armor', icon: '🩸', slot: 'armor', rarity: 'cursed',
+    description: 'Mỗi lần giết hồi nhiều HP, nhưng không dùng được potion.',
+    stats: { maxHp: 80, def: 12 }, effects: ['blood_kill_regen', 'no_healing'],
+    sellPrice: 650, dropFrom: ['echo_demon', 'void_wraith'], dropChance: 3, minZone: 'wastes'
+  },
+  hollow_plate: {
+    id: 'hollow_plate', name: 'Hollow Plate', icon: '🪨', slot: 'armor', rarity: 'cursed',
+    description: 'DEF cực cao nhưng ATK giảm và không thể chạy.',
+    stats: { maxHp: 60, def: 30, atk: -8 }, effects: ['armor_of_regret'],
+    sellPrice: 700, dropFrom: ['the_forgotten'], dropChance: 3, minZone: 'wastes'
+  },
+  robe_of_empty_moon: {
+    id: 'robe_of_empty_moon', name: 'Robe of Empty Moon', icon: '🌚', slot: 'armor', rarity: 'cursed',
+    description: 'MP rất cao nhưng hoàn toàn không thể hồi HP.',
+    stats: { maxHp: 30, maxMp: 120 }, effects: ['no_healing'],
+    sellPrice: 600, dropFrom: ['echo_demon'], dropChance: 4, minZone: 'wastes'
+  },
+  thorned_regret_armor: {
+    id: 'thorned_regret_armor', name: 'Thorned Regret Armor', icon: '🥀', slot: 'armor', rarity: 'cursed',
+    description: 'Mỗi lượt mất 3% HP. Khi HP cạn dần, ATK tăng mạnh.',
+    stats: { maxHp: 120, def: 15 }, effects: ['curse_hp_drain', 'low_hp_atk'],
+    sellPrice: 800, dropFrom: ['the_forgotten', 'echo_demon'], dropChance: 3, minZone: 'wastes'
+  },
 
   // ════════════════════════════════════════════════════
   //  ACCESSORIES
@@ -480,6 +725,71 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     description: '+2 DEF.',
     stats: { def: 2 }, sellPrice: 8, buyPrice: 20, minZone: 'village'
   },
+  bronze_charm: {
+    id: 'bronze_charm', name: 'Bronze Charm', icon: '🟫', slot: 'accessory1', rarity: 'common',
+    description: '+3 ATK nhỏ.',
+    stats: { atk: 3 }, sellPrice: 12, buyPrice: 45, minZone: 'village'
+  },
+  tiny_mana_stone: {
+    id: 'tiny_mana_stone', name: 'Tiny Mana Stone', icon: '💎', slot: 'accessory1', rarity: 'common',
+    description: '+15 MP.',
+    stats: { maxMp: 15 }, sellPrice: 13, buyPrice: 50, minZone: 'village'
+  },
+  rabbit_foot: {
+    id: 'rabbit_foot', name: "Rabbit's Foot", icon: '🐾', slot: 'accessory1', rarity: 'common',
+    description: '+4% Dodge.',
+    stats: { dodgeChance: 4 }, sellPrice: 16, buyPrice: 65, minZone: 'village'
+  },
+  cracked_fang_ring: {
+    id: 'cracked_fang_ring', name: 'Cracked Fang Ring', icon: '🦷', slot: 'accessory1', rarity: 'common',
+    description: '+3% Crit, +2 ATK.',
+    stats: { critChance: 3, atk: 2 }, sellPrice: 18, buyPrice: 70, minZone: 'village'
+  },
+  worker_badge: {
+    id: 'worker_badge', name: 'Worker Badge', icon: '📛', slot: 'accessory1', rarity: 'common',
+    description: '+5% EXP nhận được.',
+    stats: { expBonus: 5 }, sellPrice: 20, buyPrice: 80, minZone: 'village'
+  },
+  adventurer_medal: {
+    id: 'adventurer_medal', name: 'Adventurer Medal', icon: '🏅', slot: 'accessory1', rarity: 'rare',
+    description: '+5 ATK, +10 HP.',
+    stats: { atk: 5, maxHp: 10 }, sellPrice: 60, buyPrice: 220, minZone: 'forest'
+  },
+  ring_of_sharpness: {
+    id: 'ring_of_sharpness', name: 'Ring of Sharpness', icon: '💍', slot: 'accessory1', rarity: 'rare',
+    description: '+7 ATK.',
+    stats: { atk: 7 }, sellPrice: 70, buyPrice: 260, minZone: 'forest'
+  },
+  scholar_pendant: {
+    id: 'scholar_pendant', name: 'Scholar Pendant', icon: '📖', slot: 'accessory1', rarity: 'rare',
+    description: '+40 MP, +5% EXP.',
+    stats: { maxMp: 40, expBonus: 5 }, sellPrice: 75, buyPrice: 280, minZone: 'shrine'
+  },
+  lucky_silver_coin: {
+    id: 'lucky_silver_coin', name: 'Lucky Silver Coin', icon: '🪙', slot: 'accessory1', rarity: 'rare',
+    description: '+6% Gold, +5% EXP.',
+    stats: { goldBonus: 6, expBonus: 5 }, sellPrice: 80, buyPrice: 300, minZone: 'village'
+  },
+  hunter_mark: {
+    id: 'hunter_mark', name: 'Hunter Mark', icon: '🎯', slot: 'accessory1', rarity: 'rare',
+    description: '+6% Crit, +3 ATK.',
+    stats: { critChance: 6, atk: 3 }, sellPrice: 85, buyPrice: 320, minZone: 'forest'
+  },
+  evasion_charm: {
+    id: 'evasion_charm', name: 'Evasion Charm', icon: '💨', slot: 'accessory1', rarity: 'rare',
+    description: '+8% Dodge.',
+    stats: { dodgeChance: 8 }, sellPrice: 88, buyPrice: 330, minZone: 'forest'
+  },
+  potion_belt: {
+    id: 'potion_belt', name: 'Potion Belt', icon: '⚗️', slot: 'accessory1', rarity: 'rare',
+    description: 'Potion hồi thêm 15%.',
+    stats: { maxHp: 15 }, effects: ['potion_bonus'], sellPrice: 90, buyPrice: 350, minZone: 'shrine'
+  },
+  guard_emblem: {
+    id: 'guard_emblem', name: 'Guard Emblem', icon: '🛡️', slot: 'accessory1', rarity: 'rare',
+    description: '+4 DEF, +20 HP.',
+    stats: { def: 4, maxHp: 20 }, sellPrice: 95, buyPrice: 360, minZone: 'mines'
+  },
   ring_of_focus: {
     id: 'ring_of_focus', name: 'Ring of Focus', icon: '💫', slot: 'accessory1', rarity: 'epic',
     description: '+20 MP. Skill damage +5%.',
@@ -510,6 +820,49 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     stats: {}, setId: 'shadow_set',
     sellPrice: 180, dropFrom: ['phantom', 'shadow_bat'], dropChance: 8, minZone: 'shrine'
   },
+  ring_of_second_breath: {
+    id: 'ring_of_second_breath', name: 'Ring of Second Breath', icon: '💫', slot: 'accessory1', rarity: 'epic',
+    description: 'Mỗi lần giết quái, hồi 5% HP.',
+    stats: { maxHp: 30 }, effects: ['kill_hp_regen'],
+    sellPrice: 220, buyPrice: 850, minZone: 'mines'
+  },
+  mana_loop: {
+    id: 'mana_loop', name: 'Mana Loop', icon: '🔄', slot: 'accessory1', rarity: 'epic',
+    description: '+50 MP. Tái sinh MP mỗi 3 lượt.',
+    stats: { maxMp: 50 }, effects: ['mp_regen_3t'],
+    sellPrice: 230, buyPrice: 900, minZone: 'shrine'
+  },
+  golden_scarab: {
+    id: 'golden_scarab', name: 'Golden Scarab', icon: '🪲', slot: 'accessory1', rarity: 'epic',
+    description: '+15% Gold nhận được.',
+    stats: { goldBonus: 15 }, sellPrice: 240, buyPrice: 1000, minZone: 'mines'
+  },
+  crown_of_practice: {
+    id: 'crown_of_practice', name: 'Crown of Practice', icon: '👑', slot: 'accessory1', rarity: 'epic',
+    description: '+15% EXP nhận được.',
+    stats: { expBonus: 15 }, sellPrice: 240, buyPrice: 1000, minZone: 'mines'
+  },
+  assassin_earring: {
+    id: 'assassin_earring', name: 'Assassin Earring', icon: '💀', slot: 'accessory1', rarity: 'epic',
+    description: '+10% Crit, +5 ATK.',
+    stats: { critChance: 10, atk: 5 }, sellPrice: 250, buyPrice: 1100, minZone: 'wastes'
+  },
+  mist_charm: {
+    id: 'mist_charm', name: 'Mist Charm', icon: '🌫️', slot: 'accessory1', rarity: 'epic',
+    description: '+12% Dodge.',
+    stats: { dodgeChance: 12 }, sellPrice: 245, buyPrice: 1050, minZone: 'wastes'
+  },
+  boss_hunter_badge: {
+    id: 'boss_hunter_badge', name: 'Boss Hunter Badge', icon: '🏆', slot: 'accessory1', rarity: 'epic',
+    description: 'Tăng damage lên boss.',
+    stats: { atk: 6 }, effects: ['boss_damage'],
+    sellPrice: 260, buyPrice: 1200, minZone: 'wastes'
+  },
+  dragonbone_talisman: {
+    id: 'dragonbone_talisman', name: 'Dragonbone Talisman', icon: '🦴', slot: 'accessory1', rarity: 'epic',
+    description: '+50 HP, +5 DEF.',
+    stats: { maxHp: 50, def: 5 }, sellPrice: 270, buyPrice: 1300, minZone: 'wastes'
+  },
   phoenix_feather: {
     id: 'phoenix_feather', name: 'Phoenix Feather', icon: '🔥', slot: 'accessory1', rarity: 'legendary',
     description: 'Mỗi ngày có 1 lần sống sót với 1 HP.',
@@ -539,6 +892,38 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     description: 'EXP +10%. Tăng cơ hội nhận skill book.',
     stats: { expBonus: 10 },
     sellPrice: 600, dropFrom: ['the_forgotten'], dropChance: 8, minZone: 'wastes'
+  },
+  phoenix_pin: {
+    id: 'phoenix_pin', name: 'Phoenix Pin', icon: '🔥', slot: 'accessory1', rarity: 'legendary',
+    description: 'Sống sót một lần mỗi ngày với 1 HP. +20 HP.',
+    stats: { maxHp: 20 }, effects: ['revive_once'],
+    sellPrice: 800, buyPrice: 3000, minZone: 'wastes'
+  },
+  royal_tax_seal: {
+    id: 'royal_tax_seal', name: 'Royal Tax Seal', icon: '📜', slot: 'accessory1', rarity: 'legendary',
+    description: '+20% Gold. Nhưng mọi giao dịch mua bị tính thêm 5% phí.',
+    stats: { goldBonus: 20 }, sellPrice: 750, buyPrice: 2800, minZone: 'wastes'
+  },
+  soul_merchant_coin: {
+    id: 'soul_merchant_coin', name: 'Soul Merchant Coin', icon: '💰', slot: 'accessory1', rarity: 'legendary',
+    description: '+25% Gold, +10% EXP.',
+    stats: { goldBonus: 25, expBonus: 10 }, sellPrice: 900, buyPrice: 3500, minZone: 'wastes'
+  },
+  bell_of_silence: {
+    id: 'bell_of_silence', name: 'Bell of Silence', icon: '🔔', slot: 'accessory1', rarity: 'legendary',
+    description: 'Tăng khả năng chặn debuff. +30 MP.',
+    stats: { maxMp: 30, maxHp: 30 }, sellPrice: 850, buyPrice: 3200, minZone: 'wastes'
+  },
+  eye_of_observer: {
+    id: 'eye_of_observer', name: 'Eye of Observer', icon: '👁️', slot: 'accessory1', rarity: 'legendary',
+    description: '+8% Crit, +8% Dodge. Nhìn thấu kẻ thù.',
+    stats: { critChance: 8, dodgeChance: 8 }, sellPrice: 1000, buyPrice: 4000, minZone: 'wastes'
+  },
+  broken_crown_fragment: {
+    id: 'broken_crown_fragment', name: 'Broken Crown Fragment', icon: '👑', slot: 'accessory1', rarity: 'legendary',
+    description: '+20% EXP. Hồi HP khi giết quái boss.',
+    stats: { expBonus: 20 }, effects: ['kill_hp_regen'],
+    sellPrice: 1100, buyPrice: 4500, minZone: 'wastes'
   },
   soul_crown: {
     id: 'soul_crown', name: 'Soul Crown', icon: '💀', slot: 'accessory1', rarity: 'mythic',

@@ -29,6 +29,7 @@ import {
 import { getZone, ZONES, ZONE_ORDER } from '../data/zones';
 import { ENEMIES, getEnemiesForZone, getBossForZone, getEnemy } from '../data/enemies';
 import { getItem, ITEMS } from '../data/items';
+import { getMaterial } from '../data/materials';
 import { getEquipment, getZoneEquipment } from '../data/equipment';
 import { incrementDaily } from './daily';
 import { wearEquipment } from '../systems/equipment';
@@ -37,7 +38,6 @@ import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { pickExploreEvent, runExploreEvent } from './exploreEvents';
 import { updatePityCounters } from '../systems/pity';
-import { incrementChapterObjective } from '../systems/chapter';
 import { consumeBuff } from '../systems/consumables';
 import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
 import { doGather } from './gather';
@@ -342,7 +342,7 @@ async function handleZonePicker(
     new StringSelectMenuBuilder()
       .setCustomId(`ex_zonemenu_${userId}`)
       .setPlaceholder('Chọn khu vực muốn đến...')
-      .addOptions(options)
+      .addOptions(options.slice(0, 25))
   );
 
   const reply = await interaction.editReply({
@@ -526,7 +526,6 @@ async function handleSearch(
 
   const event = pickExploreEvent({ player, guildId, hasCombat, hasLegacy });
   updatePityCounters(userId, guildId, event);
-  incrementChapterObjective(userId, guildId, 'explore_zone', { zoneId: zone.id });
 
   setExploreCooldown(userId, guildId);
 
@@ -682,7 +681,7 @@ async function showLootFind(
     ...(zoneMats[player.zone_id] ?? ['healing_herb', 'wood']),
   ];
   const itemId    = pick(lootPool);
-  const item      = getItem(itemId) ?? { icon: '⚙️', name: itemId, description: '' } as any;
+  const item      = getItem(itemId) ?? getMaterial(itemId) ?? { icon: '⚙️', name: itemId, description: '' } as any;
   addItem(userId, guildId, itemId, 1);
 
   const lootReply = await interaction.editReply({
@@ -710,9 +709,9 @@ async function showAbandonedCamp(
     desc += `🪙 Bạn lục được **${gold} Gold** dưới lớp tro.`;
   } else if (roll <= 70) {
     const itemId = pick(['health_potion', 'mana_potion', 'herb', 'antidote']);
-    const item = getItem(itemId)!;
+    const item = getItem(itemId) ?? getMaterial(itemId);
     addItem(userId, guildId, itemId, 1);
-    desc += `${item.icon} Bạn tìm thấy **${item.name}** trong một túi đồ cũ.`;
+    desc += `${item?.icon ?? '⚙️'} Bạn tìm thấy **${item?.name ?? itemId}** trong một túi đồ cũ.`;
   } else {
     const heal = Math.floor(player.max_hp * 0.18);
     const newHp = Math.min(player.max_hp, player.hp + heal);
@@ -1015,8 +1014,12 @@ function buildRandomMerchantStock(zoneId: string): MerchantStock {
 
   const equipmentPool = getZoneEquipment(zoneId)
     .filter(eq => Boolean(eq.buyPrice))
-    // Chặn đồ quá mạnh trong merchant thường. Epic/legendary/mythic nên để boss/drop/soul shop.
-    .filter(eq => eq.rarity === 'common' || eq.rarity === 'rare');
+    .filter(eq => {
+      if (eq.rarity === 'common' || eq.rarity === 'rare') return true;
+      if (eq.rarity === 'epic' && zoneIdx >= 3) return true;
+      if (eq.rarity === 'legendary' && zoneIdx >= 4) return true;
+      return false;
+    });
 
   const equipmentCount = Math.min(
     equipmentPool.length,
@@ -1233,8 +1236,8 @@ async function renderMerchantSell(
   const player    = getPlayer(userId, guildId)!;
   const inventory = getInventory(userId, guildId);
   const sellable  = inventory
-    .map(e => ({ entry: e, item: getItem(e.item_id) }))
-    .filter(({ item }) => item?.sellPrice && item.type !== 'key_item');
+    .map(e => ({ entry: e, item: getItem(e.item_id) ?? getMaterial(e.item_id) }))
+    .filter(({ item }) => item?.sellPrice && (item as any).type !== 'key_item');
 
   if (!sellable.length) {
     await interaction.editReply({
@@ -1284,7 +1287,7 @@ async function renderMerchantSell(
       new StringSelectMenuBuilder()
         .setCustomId(`merch_sellitem_${userId}`)
         .setPlaceholder('Chọn vật phẩm để bán...')
-        .addOptions(options)
+        .addOptions(options.slice(0, 25))
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId(`merch_sellback_${userId}`).setLabel('Quay lại shop').setEmoji('↩️').setStyle(ButtonStyle.Secondary),
@@ -1316,7 +1319,7 @@ async function renderMerchantSell(
     } else if (cid === `merch_sellitem_${userId}`) {
       const sel    = compInt as StringSelectMenuInteraction;
       const itemId = sel.values[0].replace('sell_', '');
-      const item   = getItem(itemId);
+      const item   = getItem(itemId) ?? getMaterial(itemId);
       if (!item?.sellPrice) return;
 
       const qty = getItemQty(userId, guildId, itemId);
@@ -1337,7 +1340,7 @@ async function renderMerchantSell(
                   const currentQty = entry.item_id === itemId ? qty - 1 : entry.quantity;
                   return currentQty > 0 ? { name: `${it!.icon} ${it!.name} ×${currentQty}`, value: `${it!.sellPrice} 🪙/cái`, inline: true } : null;
                 })
-                .filter(Boolean) as any[]
+                .filter(Boolean).slice(0, 25) as any[]
             )
         ]
       });
@@ -1609,18 +1612,6 @@ async function handleVictory(
   const achievementMessages = awardAchievements(userId, guildId);
   if (achievementMessages.length) {
     embed.addFields({ name: '🏆 Thành tựu mới', value: achievementMessages.join('\n'), inline: false });
-  }
-
-  // Chapter objective hooks
-  const killEnemy = groupEnemies ? null : enemy;
-  if (killEnemy) {
-    if (killEnemy.boss) incrementChapterObjective(userId, guildId, 'kill_boss', { enemyId: killEnemy.id });
-    if (killEnemy.id === 'bandit') incrementChapterObjective(userId, guildId, 'rescue_villager', {});
-    incrementChapterObjective(userId, guildId, 'kill_in_zone', { zoneId: player.zone_id });
-  } else if (groupEnemies) {
-    for (let i = 0; i < groupEnemies.length; i++) {
-      incrementChapterObjective(userId, guildId, 'kill_in_zone', { zoneId: player.zone_id });
-    }
   }
 
   const { embed: victoryImg, files: victoryFiles } = withImage(embed, 'victory');
@@ -2277,7 +2268,7 @@ async function showSoulShop(
       new StringSelectMenuBuilder()
         .setCustomId(`soul_buy_${userId}`)
         .setPlaceholder('Mua với Soul Shard...')
-        .addOptions(options)
+        .addOptions(options.slice(0, 25))
     ));
   }
 
