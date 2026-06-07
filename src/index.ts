@@ -163,26 +163,39 @@ const prefixAliases = new Map<string, string>([
 ]);
 
 const PREFIX_HELP = [
-  '**Prefix commands:**',
+  '**RPG prefix help:**',
+  '',
+  '**Cơ bản**',
   '`rpg s` / `rpg start` — tạo nhân vật hoặc hồi sinh',
   '`rpg p` / `rpg profile` — xem profile của bạn',
   '`rpg p @user` — xem profile người khác',
   '`rpg e` / `rpg explore` — khám phá',
   '`rpg i` / `rpg inv` — túi đồ',
   '`rpg u <item_id>` — dùng vật phẩm, ví dụ `rpg u healing_potion`',
-  '`rpg t @user <gold>` — chuyển gold, ví dụ `rpg t @Minh 100`',
-  '`rpg c` / `rpg craft` — chế tạo',
   '`rpg d` / `rpg daily` — daily quest',
   '`rpg a` / `rpg ach` — thành tựu',
-  '`rpg w` / `rpg world` — trạng thái thế giới',
-  '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
-  '`rpg wb` / `rpg boss` — world boss',
-  '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
-  '`rpg party` / `rpg pt` — party khám phá',
   '`rpg ch` / `rpg chapter` — cốt truyện chính',
+  '',
+  '**Farm / nâng cấp**',
+  '`rpg c` / `rpg craft` — chế tạo',
   '`rpg g` / `rpg gather` — thu thập nguyên liệu',
   '`rpg f` / `rpg fish` — câu cá',
   '`rpg rr` / `rpg reroll` — reroll skill book',
+  '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
+  '',
+  '**Xã hội / combat**',
+  '`rpg t @user <gold>` — chuyển gold, ví dụ `rpg t @Minh 100`',
+  '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
+  '`rpg wb` / `rpg boss` — world boss',
+  '`rpg w` / `rpg world` — trạng thái thế giới',
+  '',
+  '**Party**',
+  '`rpg party` / `rpg pt` — xem party hiện tại',
+  '`rpg pt create` — tạo party',
+  '`rpg pt invite @user` — mời người vào party',
+  '`rpg pt leave` — rời party',
+  '`rpg pt kick @user` — đuổi thành viên',
+  '`rpg pt disband` — giải tán party',
 ].join('\n');
 
 function stripInteractionOnlyOptions(options: any): any {
@@ -289,6 +302,7 @@ class PrefixCommandOptions {
       worldboss: 'status',
       pet:       'list',
       guild:     'info',
+      party:     'info',
     };
     const def = defaults[this.commandName];
     if (def) return def;
@@ -410,9 +424,23 @@ function getPrefixUsage(commandName: string): string | null {
       return 'Cách dùng: `rpg t @user <gold>`\nVí dụ: `rpg t @Minh 100`';
     case 'duel':
       return 'Cách dùng: `rpg duel @user`\nVí dụ: `rpg duel @Minh`';
+    case 'party':
+      return [
+        'Cách dùng party:',
+        '`rpg party` / `rpg pt` — xem party hiện tại',
+        '`rpg pt create` — tạo party',
+        '`rpg pt invite @user` — mời người vào party',
+        '`rpg pt leave` — rời party',
+        '`rpg pt kick @user` — đuổi thành viên',
+        '`rpg pt disband` — giải tán party',
+      ].join('\n');
     default:
       return null;
   }
+}
+
+function hasPrefixUserArg(message: Message, args: string): boolean {
+  return message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
 }
 
 function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): string | null {
@@ -423,14 +451,22 @@ function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): s
   }
 
   if (parsed.commandName === 'trade') {
-    const hasUser = message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
+    const hasUser = hasPrefixUserArg(message, args);
     const hasAmount = /(?:^|\s)\d+(?:\s|$)/.test(args);
     if (!hasUser || !hasAmount) return getPrefixUsage('trade');
   }
 
   if (parsed.commandName === 'duel') {
-    const hasUser = message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
-    if (!hasUser) return getPrefixUsage('duel');
+    if (!hasPrefixUserArg(message, args)) return getPrefixUsage('duel');
+  }
+
+  if (parsed.commandName === 'party') {
+    const sub = args.split(/\s+/).filter(Boolean)[0]?.toLowerCase() ?? 'info';
+    const validSubs = new Set(['create', 'invite', 'leave', 'kick', 'disband', 'info']);
+    if (!validSubs.has(sub)) return getPrefixUsage('party');
+    if ((sub === 'invite' || sub === 'kick') && !hasPrefixUserArg(message, args)) {
+      return getPrefixUsage('party');
+    }
   }
 
   return null;
