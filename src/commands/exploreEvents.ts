@@ -39,7 +39,19 @@ import { startFishingMiniGame } from './fish';
 import { onlyUser } from '../utils/collectors';
 import { incrementChapterObjective } from '../systems/chapter';
 import { getPityCounters, getPityBonus, PITY_EVENTS } from '../systems/pity';
-import { showForestWhisperingTree, showForestWolfDen, showForestHerbalistHut, showForestMoonlitClearing } from './exploreEvents.forest';
+import {
+  showForestWhisperingTree, showForestWolfDen, showForestHerbalistHut, showForestMoonlitClearing,
+  showForestBanditAmbush, showForestGiantSpider, showForestCursedScarecrow, showForestSnakePit, showForestPoacherCamp,
+  showForestCorruptedTreant, showForestWildBoar, showForestPoisonSpores, showForestRabidFox, showForestBanditWatchtower,
+  showForestHollowLog, showForestBuriedChest, showForestEagleNest, showForestMushroomRing, showForestAmberSap,
+  showForestForgottenPack, showForestBeehive, showForestFruitGrove, showForestSilkCocoon, showForestBogPearl,
+  showForestLostMerchant, showForestHermitCave, showForestWoundedKnight, showForestFairyCircle, showForestPilgrimGroup,
+  showForestMadTrapper, showForestChildRunaway, showForestDryadBlessing, showForestTravelingBard, showForestBeastTamer,
+  showForestAncientRuins, showForestMagicSpring, showForestStoneCircle, showForestSpiritLantern, showForestCursedStatue,
+  showForestMemoryTree, showForestDreamFlower, showForestEchoGrove, showForestTimeAnomaly, showForestLostRelic,
+  showForestHerbForaging, showForestAnimalTracks, showForestRiverCrossing, showForestTreeClimbing, showForestFogMaze,
+  showForestWaterfallCave, showForestDeadTreeOracle, showForestFlowerField, showForestCrowMessenger, showForestCampfireStranger,
+} from './exploreEvents.forest';
 import { showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp } from './exploreEvents.shrine';
 import { showMineCollapse, showMineRichOreVein, showMineEchoTunnel, showMineRustedLift } from './exploreEvents.mines';
 import { showWastesAshStorm, showWastesBoneCaravan, showWastesGlassMirage, showWastesFallenBanner } from './exploreEvents.wastes';
@@ -56,6 +68,13 @@ import {
   showRepForestRangers, showRepShrinePilgrims, showRepMineRescueCrew, showRepWastesRefugees,
   showRepDawnProcession, showRepDayPublicThanks, showRepDuskSafeLodging, showRepNightWatchSignal
 } from './exploreEvents.reputation';
+import {
+  showWorldPlaguesSpreads, showWorldBanditCoalition, showWorldConvoyAttacked, showWorldMagicSurge, showWorldDarkOmen,
+  showWorldPriceGouger, showWorldTaxCollector, showWorldSupplyShortage, showWorldMerchantGuildJob,
+  showWorldAncientInscription, showWorldSpyLetter, showWorldMissingPersons, showWorldOldChronicle,
+  showWorldPropheticVision, showWorldSecretMeeting,
+  showWorldFactionStandoff, showWorldChurchInquisition, showWorldShadowOffer, showWorldHuntersMission, showWorldVillagerDispute,
+} from './exploreEvents.world';
 
 export type ExploreEventType =
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -67,6 +86,16 @@ export type ExploreEventType =
   | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'nothing'
   // Zone-specific events (separate files)
   | 'forest_tree' | 'forest_wolf_den' | 'forest_herbalist_hut' | 'forest_moonlit_clearing'
+  | 'forest_bandit_ambush' | 'forest_giant_spider' | 'forest_cursed_scarecrow' | 'forest_snake_pit' | 'forest_poacher_camp'
+  | 'forest_corrupted_treant' | 'forest_wild_boar' | 'forest_poison_spores' | 'forest_rabid_fox' | 'forest_bandit_watchtower'
+  | 'forest_hollow_log' | 'forest_buried_chest' | 'forest_eagle_nest' | 'forest_mushroom_ring' | 'forest_amber_sap'
+  | 'forest_forgotten_pack' | 'forest_beehive' | 'forest_fruit_grove' | 'forest_silk_cocoon' | 'forest_bog_pearl'
+  | 'forest_lost_merchant' | 'forest_hermit_cave' | 'forest_wounded_knight' | 'forest_fairy_circle' | 'forest_pilgrim_group'
+  | 'forest_mad_trapper' | 'forest_child_runaway' | 'forest_dryad_blessing' | 'forest_traveling_bard' | 'forest_beast_tamer'
+  | 'forest_ancient_ruins' | 'forest_magic_spring' | 'forest_stone_circle' | 'forest_spirit_lantern' | 'forest_cursed_statue'
+  | 'forest_memory_tree' | 'forest_dream_flower' | 'forest_echo_grove' | 'forest_time_anomaly' | 'forest_lost_relic'
+  | 'forest_herb_foraging' | 'forest_animal_tracks' | 'forest_river_crossing' | 'forest_tree_climbing' | 'forest_fog_maze'
+  | 'forest_waterfall_cave' | 'forest_dead_tree_oracle' | 'forest_flower_field' | 'forest_crow_messenger' | 'forest_campfire_stranger'
   | 'shrine_bell' | 'shrine_prayer_beads' | 'shrine_seal_door' | 'shrine_spirit_lamp'
   | 'mine_collapse' | 'mine_ore_vein' | 'mine_echo_tunnel' | 'mine_rusted_lift'
   | 'wastes_storm' | 'wastes_bone_caravan' | 'wastes_glass_mirage' | 'wastes_fallen_banner'
@@ -79,7 +108,12 @@ export type ExploreEventType =
   | 'rep_honored_patrol' | 'rep_grateful_villagers' | 'rep_supply_cache' | 'rep_church_blessing'
   | 'rep_young_squire' | 'rep_hero_statue' | 'rep_royal_messenger' | 'rep_champion_challenge'
   | 'rep_forest_rangers' | 'rep_shrine_pilgrims' | 'rep_mine_rescue_crew' | 'rep_wastes_refugees'
-  | 'rep_dawn_procession' | 'rep_day_public_thanks' | 'rep_dusk_safe_lodging' | 'rep_night_watch_signal';
+  | 'rep_dawn_procession' | 'rep_day_public_thanks' | 'rep_dusk_safe_lodging' | 'rep_night_watch_signal'
+  // World-affecting events (all zones)
+  | 'world_plague_spreads' | 'world_bandit_coalition' | 'world_convoy_attacked' | 'world_magic_surge' | 'world_dark_omen'
+  | 'world_price_gouger' | 'world_tax_collector' | 'world_supply_shortage' | 'world_merchant_guild_job'
+  | 'world_ancient_inscription' | 'world_spy_letter' | 'world_missing_persons' | 'world_old_chronicle' | 'world_prophetic_vision' | 'world_secret_meeting'
+  | 'world_faction_standoff' | 'world_church_inquisition' | 'world_shadow_offer' | 'world_hunters_mission' | 'world_villager_dispute';
 
 export interface PickExploreEventInput {
   player: PlayerRow;
@@ -231,6 +265,57 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['forest_wolf_den',          player.zone_id === 'forest' ? 3 : 0],
     ['forest_herbalist_hut',     player.zone_id === 'forest' ? 3 : 0],
     ['forest_moonlit_clearing',  player.zone_id === 'forest' ? (time === 'night' || time === 'dusk' ? 4 : 2) : 0],
+    // New forest events
+    ['forest_bandit_ambush',     player.zone_id === 'forest' && hasCombat ? 3 : 0],
+    ['forest_giant_spider',      player.zone_id === 'forest' && hasCombat ? 3 : 0],
+    ['forest_cursed_scarecrow',  player.zone_id === 'forest' ? 2 : 0],
+    ['forest_snake_pit',         player.zone_id === 'forest' ? 3 : 0],
+    ['forest_poacher_camp',      player.zone_id === 'forest' ? 3 : 0],
+    ['forest_corrupted_treant',  player.zone_id === 'forest' && hasCombat ? 2 : 0],
+    ['forest_wild_boar',         player.zone_id === 'forest' ? 3 : 0],
+    ['forest_poison_spores',     player.zone_id === 'forest' ? 3 : 0],
+    ['forest_rabid_fox',         player.zone_id === 'forest' ? 2 : 0],
+    ['forest_bandit_watchtower', player.zone_id === 'forest' ? 2 : 0],
+    ['forest_hollow_log',        player.zone_id === 'forest' ? 4 : 0],
+    ['forest_buried_chest',      player.zone_id === 'forest' ? 3 : 0],
+    ['forest_eagle_nest',        player.zone_id === 'forest' ? 2 : 0],
+    ['forest_mushroom_ring',     player.zone_id === 'forest' ? 3 : 0],
+    ['forest_amber_sap',         player.zone_id === 'forest' ? 2 : 0],
+    ['forest_forgotten_pack',    player.zone_id === 'forest' ? 4 : 0],
+    ['forest_beehive',           player.zone_id === 'forest' ? 3 : 0],
+    ['forest_fruit_grove',       player.zone_id === 'forest' ? 4 : 0],
+    ['forest_silk_cocoon',       player.zone_id === 'forest' ? 2 : 0],
+    ['forest_bog_pearl',         player.zone_id === 'forest' ? 2 : 0],
+    ['forest_lost_merchant',     player.zone_id === 'forest' ? 3 : 0],
+    ['forest_hermit_cave',       player.zone_id === 'forest' ? 3 : 0],
+    ['forest_wounded_knight',    player.zone_id === 'forest' ? 3 : 0],
+    ['forest_fairy_circle',      player.zone_id === 'forest' ? (time === 'night' || time === 'dusk' ? 4 : 2) : 0],
+    ['forest_pilgrim_group',     player.zone_id === 'forest' ? 3 : 0],
+    ['forest_mad_trapper',       player.zone_id === 'forest' ? 3 : 0],
+    ['forest_child_runaway',     player.zone_id === 'forest' ? 2 : 0],
+    ['forest_dryad_blessing',    player.zone_id === 'forest' ? 2 : 0],
+    ['forest_traveling_bard',    player.zone_id === 'forest' ? 3 : 0],
+    ['forest_beast_tamer',       player.zone_id === 'forest' ? 2 : 0],
+    ['forest_ancient_ruins',     player.zone_id === 'forest' ? 3 : 0],
+    ['forest_magic_spring',      player.zone_id === 'forest' ? 3 : 0],
+    ['forest_stone_circle',      player.zone_id === 'forest' ? 3 : 0],
+    ['forest_spirit_lantern',    player.zone_id === 'forest' ? (time === 'night' ? 4 : 1) : 0],
+    ['forest_cursed_statue',     player.zone_id === 'forest' ? 2 : 0],
+    ['forest_memory_tree',       player.zone_id === 'forest' ? 2 : 0],
+    ['forest_dream_flower',      player.zone_id === 'forest' ? (time === 'night' || time === 'dusk' ? 3 : 1) : 0],
+    ['forest_echo_grove',        player.zone_id === 'forest' ? 3 : 0],
+    ['forest_time_anomaly',      player.zone_id === 'forest' ? 1 : 0],
+    ['forest_lost_relic',        player.zone_id === 'forest' ? 2 : 0],
+    ['forest_herb_foraging',     player.zone_id === 'forest' ? 4 : 0],
+    ['forest_animal_tracks',     player.zone_id === 'forest' ? 4 : 0],
+    ['forest_river_crossing',    player.zone_id === 'forest' ? 3 : 0],
+    ['forest_tree_climbing',     player.zone_id === 'forest' ? 3 : 0],
+    ['forest_fog_maze',          player.zone_id === 'forest' ? (time === 'dawn' || time === 'dusk' ? 4 : 2) : 0],
+    ['forest_waterfall_cave',    player.zone_id === 'forest' ? 2 : 0],
+    ['forest_dead_tree_oracle',  player.zone_id === 'forest' ? 2 : 0],
+    ['forest_flower_field',      player.zone_id === 'forest' ? 3 : 0],
+    ['forest_crow_messenger',    player.zone_id === 'forest' ? 3 : 0],
+    ['forest_campfire_stranger', player.zone_id === 'forest' ? 3 : 0],
     ['shrine_bell',              player.zone_id === 'shrine' ? 4 : 0],
     ['shrine_prayer_beads',      player.zone_id === 'shrine' ? 3 : 0],
     ['shrine_seal_door',         player.zone_id === 'shrine' ? 3 : 0],
@@ -261,6 +346,28 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['midnight_wanderer',  time === 'night' ? 3 : 0],
     ['night_ghost_lantern',time === 'night' ? 3 : 0],
     ['night_grave_robbers',time === 'night' ? 3 : 0],
+
+    // World-affecting events (universal — all zones, all times)
+    ['world_plague_spreads',      2],
+    ['world_bandit_coalition',    2],
+    ['world_convoy_attacked',     2],
+    ['world_magic_surge',         2],
+    ['world_dark_omen',           2],
+    ['world_price_gouger',        3],
+    ['world_tax_collector',       3],
+    ['world_supply_shortage',     2],
+    ['world_merchant_guild_job',  2],
+    ['world_ancient_inscription', 2],
+    ['world_spy_letter',          1],
+    ['world_missing_persons',     2],
+    ['world_old_chronicle',       2],
+    ['world_prophetic_vision',    1],
+    ['world_secret_meeting',      1],
+    ['world_faction_standoff',    2],
+    ['world_church_inquisition',  2],
+    ['world_shadow_offer',        2],
+    ['world_hunters_mission',     2],
+    ['world_villager_dispute',    2],
   ];
 
   // Apply pity bonus to unconditional events that haven't appeared in a while.
@@ -350,10 +457,80 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'rep_day_public_thanks':    return showRepDayPublicThanks(ctx);
     case 'rep_dusk_safe_lodging':    return showRepDuskSafeLodging(ctx);
     case 'rep_night_watch_signal':   return showRepNightWatchSignal(ctx);
+    case 'world_plague_spreads':       return showWorldPlaguesSpreads(ctx);
+    case 'world_bandit_coalition':     return showWorldBanditCoalition(ctx);
+    case 'world_convoy_attacked':      return showWorldConvoyAttacked(ctx);
+    case 'world_magic_surge':          return showWorldMagicSurge(ctx);
+    case 'world_dark_omen':            return showWorldDarkOmen(ctx);
+    case 'world_price_gouger':         return showWorldPriceGouger(ctx);
+    case 'world_tax_collector':        return showWorldTaxCollector(ctx);
+    case 'world_supply_shortage':      return showWorldSupplyShortage(ctx);
+    case 'world_merchant_guild_job':   return showWorldMerchantGuildJob(ctx);
+    case 'world_ancient_inscription':  return showWorldAncientInscription(ctx);
+    case 'world_spy_letter':           return showWorldSpyLetter(ctx);
+    case 'world_missing_persons':      return showWorldMissingPersons(ctx);
+    case 'world_old_chronicle':        return showWorldOldChronicle(ctx);
+    case 'world_prophetic_vision':     return showWorldPropheticVision(ctx);
+    case 'world_secret_meeting':       return showWorldSecretMeeting(ctx);
+    case 'world_faction_standoff':     return showWorldFactionStandoff(ctx);
+    case 'world_church_inquisition':   return showWorldChurchInquisition(ctx);
+    case 'world_shadow_offer':         return showWorldShadowOffer(ctx);
+    case 'world_hunters_mission':      return showWorldHuntersMission(ctx);
+    case 'world_villager_dispute':     return showWorldVillagerDispute(ctx);
     case 'forest_tree':              return showForestWhisperingTree(ctx);
     case 'forest_wolf_den':          return showForestWolfDen(ctx);
     case 'forest_herbalist_hut':     return showForestHerbalistHut(ctx);
     case 'forest_moonlit_clearing':  return showForestMoonlitClearing(ctx);
+    case 'forest_bandit_ambush':     return showForestBanditAmbush(ctx);
+    case 'forest_giant_spider':      return showForestGiantSpider(ctx);
+    case 'forest_cursed_scarecrow':  return showForestCursedScarecrow(ctx);
+    case 'forest_snake_pit':         return showForestSnakePit(ctx);
+    case 'forest_poacher_camp':      return showForestPoacherCamp(ctx);
+    case 'forest_corrupted_treant':  return showForestCorruptedTreant(ctx);
+    case 'forest_wild_boar':         return showForestWildBoar(ctx);
+    case 'forest_poison_spores':     return showForestPoisonSpores(ctx);
+    case 'forest_rabid_fox':         return showForestRabidFox(ctx);
+    case 'forest_bandit_watchtower': return showForestBanditWatchtower(ctx);
+    case 'forest_hollow_log':        return showForestHollowLog(ctx);
+    case 'forest_buried_chest':      return showForestBuriedChest(ctx);
+    case 'forest_eagle_nest':        return showForestEagleNest(ctx);
+    case 'forest_mushroom_ring':     return showForestMushroomRing(ctx);
+    case 'forest_amber_sap':         return showForestAmberSap(ctx);
+    case 'forest_forgotten_pack':    return showForestForgottenPack(ctx);
+    case 'forest_beehive':           return showForestBeehive(ctx);
+    case 'forest_fruit_grove':       return showForestFruitGrove(ctx);
+    case 'forest_silk_cocoon':       return showForestSilkCocoon(ctx);
+    case 'forest_bog_pearl':         return showForestBogPearl(ctx);
+    case 'forest_lost_merchant':     return showForestLostMerchant(ctx);
+    case 'forest_hermit_cave':       return showForestHermitCave(ctx);
+    case 'forest_wounded_knight':    return showForestWoundedKnight(ctx);
+    case 'forest_fairy_circle':      return showForestFairyCircle(ctx);
+    case 'forest_pilgrim_group':     return showForestPilgrimGroup(ctx);
+    case 'forest_mad_trapper':       return showForestMadTrapper(ctx);
+    case 'forest_child_runaway':     return showForestChildRunaway(ctx);
+    case 'forest_dryad_blessing':    return showForestDryadBlessing(ctx);
+    case 'forest_traveling_bard':    return showForestTravelingBard(ctx);
+    case 'forest_beast_tamer':       return showForestBeastTamer(ctx);
+    case 'forest_ancient_ruins':     return showForestAncientRuins(ctx);
+    case 'forest_magic_spring':      return showForestMagicSpring(ctx);
+    case 'forest_stone_circle':      return showForestStoneCircle(ctx);
+    case 'forest_spirit_lantern':    return showForestSpiritLantern(ctx);
+    case 'forest_cursed_statue':     return showForestCursedStatue(ctx);
+    case 'forest_memory_tree':       return showForestMemoryTree(ctx);
+    case 'forest_dream_flower':      return showForestDreamFlower(ctx);
+    case 'forest_echo_grove':        return showForestEchoGrove(ctx);
+    case 'forest_time_anomaly':      return showForestTimeAnomaly(ctx);
+    case 'forest_lost_relic':        return showForestLostRelic(ctx);
+    case 'forest_herb_foraging':     return showForestHerbForaging(ctx);
+    case 'forest_animal_tracks':     return showForestAnimalTracks(ctx);
+    case 'forest_river_crossing':    return showForestRiverCrossing(ctx);
+    case 'forest_tree_climbing':     return showForestTreeClimbing(ctx);
+    case 'forest_fog_maze':          return showForestFogMaze(ctx);
+    case 'forest_waterfall_cave':    return showForestWaterfallCave(ctx);
+    case 'forest_dead_tree_oracle':  return showForestDeadTreeOracle(ctx);
+    case 'forest_flower_field':      return showForestFlowerField(ctx);
+    case 'forest_crow_messenger':    return showForestCrowMessenger(ctx);
+    case 'forest_campfire_stranger': return showForestCampfireStranger(ctx);
     case 'shrine_bell':              return showShrineSilentBell(ctx);
     case 'shrine_prayer_beads':      return showShrinePrayerBeads(ctx);
     case 'shrine_seal_door':         return showShrineSealDoor(ctx);

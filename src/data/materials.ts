@@ -214,6 +214,58 @@ export const MATERIALS: Record<string, MaterialDef> = {
     sellPrice: 55, dropZones: ['wastes'], dropChance: 7
   },
 
+  // ── Forest zone materials ───────────────────────────────────────────────
+  spider_silk: {
+    id: 'spider_silk', name: 'Spider Silk', icon: '🕸️', rarity: 'common',
+    description: 'Tơ nhện rừng, dẻo và dai. Dùng để craft đồ may mặc và bẫy.',
+    sellPrice: 8, dropZones: ['forest'], dropChance: 20
+  },
+  eagle_feather: {
+    id: 'eagle_feather', name: 'Eagle Feather', icon: '🪶', rarity: 'rare',
+    description: 'Lông đại bàng lấy từ tổ trên cây cao. Nhẹ và sắc bén.',
+    sellPrice: 30, dropZones: ['forest'], dropChance: 10
+  },
+  beeswax: {
+    id: 'beeswax', name: 'Beeswax', icon: '🕯️', rarity: 'common',
+    description: 'Sáp ong rừng. Dùng để craft nến, thuốc bôi và đồ thủ công.',
+    sellPrice: 7, dropZones: ['forest'], dropChance: 15
+  },
+  dream_petal: {
+    id: 'dream_petal', name: 'Dream Petal', icon: '🌸', rarity: 'rare',
+    description: 'Cánh hoa giấc mộng chỉ nở vào ban đêm, tỏa hương thôi miên nhẹ.',
+    sellPrice: 35, dropZones: ['forest'], dropChance: 8
+  },
+  poison_venom: {
+    id: 'poison_venom', name: 'Poison Venom', icon: '☠️', rarity: 'rare',
+    description: 'Nọc độc thu thập từ rắn rừng và cáo điên. Nguyên liệu craft độc tố.',
+    sellPrice: 25, dropZones: ['forest'], dropChance: 12
+  },
+  amber_sap: {
+    id: 'amber_sap', name: 'Amber Sap', icon: '🟡', rarity: 'rare',
+    description: 'Nhựa hổ phách từ cây cổ thụ, cứng lại theo thời gian. Đôi khi chứa vật cổ đại bên trong.',
+    sellPrice: 40, dropZones: ['forest'], dropChance: 7
+  },
+  bog_pearl: {
+    id: 'bog_pearl', name: 'Bog Pearl', icon: '🔮', rarity: 'rare',
+    description: 'Viên ngọc hình thành trong đầm lầy rừng sâu, mang năng lượng tối của nước đen.',
+    sellPrice: 50, dropZones: ['forest'], dropChance: 6
+  },
+  spirit_essence: {
+    id: 'spirit_essence', name: 'Spirit Essence', icon: '✨', rarity: 'epic',
+    description: 'Tinh chất thu từ đèn ma trơi và linh hồn rừng. Rực sáng khi đêm về.',
+    sellPrice: 90, dropZones: ['forest'], dropChance: 4
+  },
+  time_fragment: {
+    id: 'time_fragment', name: 'Time Fragment', icon: '⌛', rarity: 'epic',
+    description: 'Mảnh vỡ của thời gian thu được từ dị thường không gian. Không rõ nguồn gốc.',
+    sellPrice: 150, dropZones: ['forest'], dropChance: 2
+  },
+  ancient_rune: {
+    id: 'ancient_rune', name: 'Ancient Rune', icon: '📜', rarity: 'epic',
+    description: 'Rune cổ đại từ thời trước khi chữ viết tồn tại. Ký hiệu khắc trên đây vẫn còn hiệu lực.',
+    sellPrice: 120, dropZones: ['forest', 'shrine'], dropChance: 3
+  },
+
 };
 
 export function getMaterial(id: string): MaterialDef | undefined {

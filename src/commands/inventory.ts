@@ -13,7 +13,7 @@ import { awardAchievements } from '../systems/achievements';
 import { COLORS } from '../utils/embeds';
 import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
-import { getSkill, SKILLS, type SkillType } from '../data/skills';
+import { getSkill, SKILLS, SKILL_TIER_POOLS, type SkillType } from '../data/skills';
 import { getEquipment, EQUIPMENT, RARITY_COLORS, RARITY_LABELS, SLOT_ICONS, getZoneEquipment } from '../data/equipment';
 import { getWornEquipment, wearEquipment, removeEquipment, getOwnedEquipment, formatWornGear } from '../systems/equipment';
 import { getUnlockedTitles, getSelectedTitle, selectTitle } from '../systems/titles';
@@ -507,10 +507,54 @@ async function handleLearnSkill(
   const qty = getItemQty(userId, guildId, bookId);
   if (qty <= 0) { await renderTab(interaction, userId, guildId, 'books'); return; }
 
+  // ── Random sealed tomes ────────────────────────────────────────────────
+  const randomTier = item.teachesSkill as string;
+  if (randomTier === 'random_t1' || randomTier === 'random_t2' || randomTier === 'random_t3') {
+    const tier = randomTier.split('_')[1] as 't1' | 't2' | 't3';
+    const pool = SKILL_TIER_POOLS[tier].filter(sid => !hasSkillInPool(userId, guildId, sid));
+
+    if (pool.length === 0) {
+      const embed = new EmbedBuilder().setColor(COLORS.warning)
+        .setTitle('📖 Đã Học Hết!')
+        .setDescription(
+          `Bạn đã biết tất cả **${SKILL_TIER_POOLS[tier].length} kỹ năng** của tier này.\n` +
+          `Tome được hoàn trả — hãy dùng cho nhân vật khác hoặc bán đi.`
+        );
+      await interaction.editReply({ embeds: [embed], components: [] });
+      setTimeout(() => renderTab(interaction, userId, guildId, 'books'), 2500);
+      return;
+    }
+
+    const pickedId = pool[Math.floor(Math.random() * pool.length)];
+    const skill = getSkill(pickedId)!;
+    removeItem(userId, guildId, bookId, 1);
+    addSkillToPool(userId, guildId, skill.id);
+    const achievementMessages = awardAchievements(userId, guildId);
+
+    const tierLabel: Record<string, string> = { t1: 'Common', t2: 'Rare', t3: 'Legendary' };
+    const embed = new EmbedBuilder().setColor(COLORS.magic)
+      .setTitle('🎲 Sealed Tome Mở Ra!')
+      .setDescription(
+        `**${item.icon} ${item.name}** (Tier ${tierLabel[tier]}) vỡ ra thành ánh sáng...\n\n` +
+        `✨ Kỹ năng ngẫu nhiên: ${skill.icon} **${skill.name}**!\n\n` +
+        skill.description + `\n\n*(Còn **${pool.length - 1}** kỹ năng tier này bạn chưa biết)*`
+      )
+      .addFields({ name: 'Loại', value: { active: '⚔️ Active', passive: '✨ Passive', reaction: '⚡ Reaction', world: '🌍 World' }[skill.type], inline: true })
+      .setFooter({ text: 'Chuyển sang tab 📌 Loadout để trang bị.' });
+
+    if (achievementMessages.length) {
+      embed.addFields({ name: '🏆 Thành tựu mới', value: achievementMessages.join('\n'), inline: false });
+    }
+
+    await interaction.editReply({ embeds: [embed], components: [] });
+    setTimeout(() => renderTab(interaction, userId, guildId, 'books'), 2500);
+    return;
+  }
+
+  // ── Normal skill book ──────────────────────────────────────────────────
   const skill = getSkill(item.teachesSkill)!;
 
   if (hasSkillInPool(userId, guildId, skill.id)) {
-    // Already known — just show updated tab
     await renderTab(interaction, userId, guildId, 'books');
     return;
   }
@@ -519,14 +563,13 @@ async function handleLearnSkill(
   addSkillToPool(userId, guildId, skill.id);
   const achievementMessages = awardAchievements(userId, guildId);
 
-  // Show success then re-render books tab
   const embed = new EmbedBuilder().setColor(COLORS.magic)
     .setTitle('📖 Học Kỹ Năng Mới!')
     .setDescription(
       `**${item.icon} ${item.name}** tan biến thành ánh sáng...\n\n` +
       `${skill.icon} **${skill.name}** thêm vào Skill Pool!\n\n` + skill.description
     )
-    .addFields({ name: 'Loại', value: {active:'⚔️ Active', passive:'✨ Passive', reaction:'⚡ Reaction', world:'🌍 World'}[skill.type], inline: true })
+    .addFields({ name: 'Loại', value: { active: '⚔️ Active', passive: '✨ Passive', reaction: '⚡ Reaction', world: '🌍 World' }[skill.type], inline: true })
     .setFooter({ text: 'Chuyển sang tab 📌 Loadout để trang bị.' });
 
   if (achievementMessages.length) {
@@ -534,8 +577,6 @@ async function handleLearnSkill(
   }
 
   await interaction.editReply({ embeds: [embed], components: [] });
-
-  // Auto switch to books tab after 3s
   setTimeout(() => renderTab(interaction, userId, guildId, 'books'), 2500);
 }
 

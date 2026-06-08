@@ -437,6 +437,65 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     unlockedBy: 'default'
   },
 
+  // ════════════ SPELL FRAGMENTS ════════════════════════════════════════════
+
+  {
+    id: 'craft_spell_fragment',
+    resultItemId: 'spell_fragment', resultAmount: 1,
+    category: 'material', resultRarity: 'common',
+    goldCost: 10, levelRequired: 1, successRate: 100, craftingExp: 6,
+    ingredients: [
+      { itemId: 'healing_herb', amount: 5 },
+      { itemId: 'beeswax', amount: 2 },
+    ],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_rare_spell_fragment',
+    resultItemId: 'rare_spell_fragment', resultAmount: 1,
+    category: 'material', resultRarity: 'rare',
+    goldCost: 40, levelRequired: 3, successRate: 85, craftingExp: 20,
+    ingredients: [
+      { itemId: 'dream_petal', amount: 2 },
+      { itemId: 'spirit_essence', amount: 1 },
+      { itemId: 'rare_herb', amount: 2 },
+    ],
+    unlockedBy: 'default'
+  },
+
+  // ════════════ SEALED TOMES (fragment combining) ══════════════════════════
+
+  {
+    id: 'craft_sealed_tome_t1',
+    resultItemId: 'sealed_tome_t1', resultAmount: 1,
+    category: 'potion', resultRarity: 'common',
+    goldCost: 30, levelRequired: 1, successRate: 100, craftingExp: 15,
+    ingredients: [
+      { itemId: 'spell_fragment', amount: 5 },
+    ],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_sealed_tome_t2',
+    resultItemId: 'sealed_tome_t2', resultAmount: 1,
+    category: 'potion', resultRarity: 'rare',
+    goldCost: 80, levelRequired: 3, successRate: 100, craftingExp: 35,
+    ingredients: [
+      { itemId: 'rare_spell_fragment', amount: 3 },
+    ],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_sealed_tome_t3',
+    resultItemId: 'sealed_tome_t3', resultAmount: 1,
+    category: 'potion', resultRarity: 'epic',
+    goldCost: 150, levelRequired: 5, successRate: 100, craftingExp: 80,
+    ingredients: [
+      { itemId: 'legendary_spell_fragment', amount: 1 },
+    ],
+    unlockedBy: 'default'
+  },
+
 ];
 
 export function getRecipe(id: string): CraftRecipe | undefined {

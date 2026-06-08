@@ -24,225 +24,381 @@ export interface ItemDef {
 }
 
 export const ITEMS: Record<string, ItemDef> = {
-  // ── CONSUMABLES ─────────────────────────────────────────────────
-  health_potion: {
-    id: 'health_potion', name: 'Health Potion', icon: '🧪',
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  CONSUMABLES — Tier 1: Early game, rẻ, dễ kiếm
+  // ══════════════════════════════════════════════════════════════════════
+  bread: {
+    id: 'bread', name: 'Bread', icon: '🍞',
     type: 'consumable', stackable: true,
-    description: 'Hồi phục **45% HP tối đa**.',
-    effect: { hpPercent: 0.45 }, sellPrice: 18, buyPrice: 45
+    description: 'Ổ bánh mì đơn giản. Hồi **15% HP tối đa**.',
+    effect: { hpPercent: 0.15 }, sellPrice: 6, buyPrice: 18
+  },
+  minor_healing_potion: {
+    id: 'minor_healing_potion', name: 'Minor Healing Potion', icon: '🩺',
+    type: 'consumable', stackable: true,
+    description: 'Thuốc hồi máu nhỏ. Hồi **25% HP tối đa**.',
+    effect: { hpPercent: 0.25 }, sellPrice: 8, buyPrice: 20
   },
   mana_potion: {
     id: 'mana_potion', name: 'Mana Potion', icon: '🔵',
     type: 'consumable', stackable: true,
-    description: 'Hồi phục **30% MP tối đa**.',
+    description: 'Bình mana cơ bản. Hồi **30% MP tối đa**.',
     effect: { mpPercent: 0.30 }, sellPrice: 14, buyPrice: 35
-  },
-  elixir: {
-    id: 'elixir', name: 'Elixir', icon: '✨',
-    type: 'consumable', stackable: true,
-    description: 'Hồi phục **100 HP** và **60 MP**.',
-    effect: { hp: 100, mp: 60 }, sellPrice: 60
   },
   antidote: {
     id: 'antidote', name: 'Antidote', icon: '💊',
     type: 'consumable', stackable: true,
-    description: 'Giải trừ hiệu ứng **poison**.',
+    description: 'Giải trừ **poison** ngay lập tức trong combat.',
     effect: { removeEffect: 'poison', combatOnly: true }, sellPrice: 10, buyPrice: 20
   },
-  fate_coin: {
-    id: 'fate_coin', name: 'Fate Coin', icon: '🪙',
-    type: 'key_item', stackable: true,
-    description: 'Đồng xu kỳ lạ có một mặt sáng và một mặt tối. Dùng cho các event định mệnh sau này.',
-    sellPrice: 25
-  },
-  blood_vial: {
-    id: 'blood_vial', name: 'Blood Vial', icon: '🩸',
+  cooling_salve: {
+    id: 'cooling_salve', name: 'Cooling Salve', icon: '🧊',
     type: 'consumable', stackable: true,
-    description: 'Hồi **35 HP**. Một món hàng cấm của chợ đen.',
-    effect: { hp: 35 }, sellPrice: 35, buyPrice: 90
+    description: 'Thuốc bôi lạnh. Xóa **burn** trong combat.',
+    effect: { removeEffect: 'burn', combatOnly: true }, sellPrice: 10, buyPrice: 25
   },
-  assassins_smoke: {
-    id: 'assassins_smoke', name: "Assassin's Smoke", icon: '💨',
+  quick_salve: {
+    id: 'quick_salve', name: 'Quick Salve', icon: '🩹',
     type: 'consumable', stackable: true,
-    description: 'Khói ám sát dùng trong các cuộc cướp shopkeeper. Có thể mở rộng thành debuff trước combat.',
-    sellPrice: 60, buyPrice: 180
+    description: 'Băng cấp tốc — dùng giữa combat. Hồi **20% HP tối đa** ngay lập tức.',
+    effect: { hpPercent: 0.20, combatOnly: true }, sellPrice: 15, buyPrice: 38
   },
-  black_market_token: {
-    id: 'black_market_token', name: 'Black Market Token', icon: '🌑',
+  shadow_mana_vial: {
+    id: 'shadow_mana_vial', name: 'Shadow Mana Vial', icon: '🫧',
     type: 'consumable', stackable: true,
-    description: 'Mở đường vào **Chợ Đen** một lần.',
-    sellPrice: 75, buyPrice: 220
+    description: 'Lọ mana đen. Hồi **15% MP tối đa** ngay trong combat.',
+    effect: { mpPercent: 0.15, combatOnly: true }, sellPrice: 12, buyPrice: 30
   },
 
-  minor_healing_potion: {
-    id: 'minor_healing_potion', name: 'Minor Healing Potion', icon: '🧪',
+  // ══════════════════════════════════════════════════════════════════════
+  //  CONSUMABLES — Tier 2: Mid game, cân bằng
+  // ══════════════════════════════════════════════════════════════════════
+  health_potion: {
+    id: 'health_potion', name: 'Health Potion', icon: '🧪',
     type: 'consumable', stackable: true,
-    description: 'Hồi **25% HP tối đa**. Rẻ và ổn cho early game.',
-    effect: { hpPercent: 0.25 }, sellPrice: 8, buyPrice: 20
-  },
-  healing_potion: {
-    id: 'healing_potion', name: 'Healing Potion', icon: '🍶',
-    type: 'consumable', stackable: true,
-    description: 'Hồi **65% HP tối đa**. Phiên bản mạnh hơn Health Potion.',
-    effect: { hpPercent: 0.65 }, sellPrice: 30, buyPrice: 75
-  },
-  emergency_potion: {
-    id: 'emergency_potion', name: 'Emergency Potion', icon: '🚨',
-    type: 'consumable', stackable: true,
-    description: 'Chỉ dùng khi HP dưới **30%**. Hồi **35% HP tối đa**.',
-    effect: { hpPercent: 0.35, hpBelowPct: 0.30 }, sellPrice: 28, buyPrice: 75
+    description: 'Thuốc hồi máu tiêu chuẩn. Hồi **45% HP tối đa**.',
+    effect: { hpPercent: 0.45 }, sellPrice: 18, buyPrice: 45
   },
   mana_flask: {
     id: 'mana_flask', name: 'Mana Flask', icon: '🫙',
     type: 'consumable', stackable: true,
-    description: 'Hồi **50% MP tối đa**. Phiên bản mạnh hơn Mana Potion.',
+    description: 'Bình mana phổ thông. Hồi **50% MP tối đa**.',
     effect: { mpPercent: 0.50 }, sellPrice: 22, buyPrice: 55
   },
-  focus_tonic: {
-    id: 'focus_tonic', name: 'Focus Tonic', icon: '💠',
+  emergency_potion: {
+    id: 'emergency_potion', name: 'Emergency Potion', icon: '🚨',
     type: 'consumable', stackable: true,
-    description: 'Trận kế tiếp: dùng skill tập trung hơn, nhưng DEF giảm nhẹ.',
-    effect: {}, sellPrice: 35, buyPrice: 90
+    description: 'Chỉ dùng được khi HP dưới **30%**. Hồi **40% HP tối đa**.',
+    effect: { hpPercent: 0.40, hpBelowPct: 0.30 }, sellPrice: 28, buyPrice: 75
   },
   moonwater: {
     id: 'moonwater', name: 'Moonwater', icon: '🌙',
     type: 'consumable', stackable: true,
-    description: 'Hồi **20% MP** và xóa **poison/burn** trong combat.',
-    effect: { mpPercent: 0.20, removeEffects: ['poison','burn'] }, sellPrice: 30, buyPrice: 80
+    description: 'Nước ánh trăng. Hồi **20% MP** + xóa **poison** và **burn** trong combat.',
+    effect: { mpPercent: 0.20, removeEffects: ['poison', 'burn'] }, sellPrice: 30, buyPrice: 80
   },
-  hunter_meal: {
-    id: 'hunter_meal', name: 'Hunter’s Meal', icon: '🥩',
+  purifying_salt: {
+    id: 'purifying_salt', name: 'Purifying Salt', icon: '🧂',
     type: 'consumable', stackable: true,
-    description: 'Dùng trước explore. Trận kế tiếp: **ATK +10%**.',
+    description: 'Muối thanh tẩy. Xóa **curse** trong combat.',
+    effect: { removeEffect: 'curse', combatOnly: true }, sellPrice: 18, buyPrice: 45
+  },
+  blood_vial: {
+    id: 'blood_vial', name: 'Blood Vial', icon: '🩸',
+    type: 'consumable', stackable: true,
+    description: 'Lọ máu nguyền từ chợ đen. Hồi **30% HP tối đa** — tác dụng phụ chưa rõ.',
+    effect: { hpPercent: 0.30 }, sellPrice: 25, buyPrice: 65
+  },
+  vitality_brew: {
+    id: 'vitality_brew', name: 'Vitality Brew', icon: '🍵',
+    type: 'consumable', stackable: true,
+    description: 'Trà thảo mộc cân bằng. Hồi **25% HP** và **25% MP** cùng lúc.',
+    effect: { hpPercent: 0.25, mpPercent: 0.25 }, sellPrice: 30, buyPrice: 80
+  },
+  forest_tonic: {
+    id: 'forest_tonic', name: 'Forest Tonic', icon: '🌿',
+    type: 'consumable', stackable: true,
+    description: 'Tonic rừng thảo mộc. Hồi **30% HP** + xóa **poison**.',
+    effect: { hpPercent: 0.30, removeEffect: 'poison' }, sellPrice: 25, buyPrice: 65
+  },
+  holy_water: {
+    id: 'holy_water', name: 'Holy Water', icon: '💧',
+    type: 'consumable', stackable: true,
+    description: 'Nước thánh từ đền thờ. Hồi **20% HP** + xóa **curse**.',
+    effect: { hpPercent: 0.20, removeEffect: 'curse' }, sellPrice: 22, buyPrice: 55
+  },
+  strange_mushroom: {
+    id: 'strange_mushroom', name: 'Strange Mushroom', icon: '🍄',
+    type: 'consumable', stackable: true,
+    description: 'Nấm lạ hái trong rừng. **50% cơ hội** hồi 35% HP — **50%** gây debuff ngẫu nhiên.',
+    effect: { hpPercent: 0.35 }, sellPrice: 12, buyPrice: 35
+  },
+  suspicious_fish: {
+    id: 'suspicious_fish', name: 'Suspicious Fish', icon: '🐡',
+    type: 'consumable', stackable: true,
+    description: 'Cá trông ngon nhưng khó tin. Hồi **40% HP** — **30%** gây đau bụng (debuff nhẹ).',
+    effect: { hpPercent: 0.40 }, sellPrice: 16, buyPrice: 50
+  },
+  warding_charm: {
+    id: 'warding_charm', name: 'Warding Charm', icon: '🧿',
+    type: 'consumable', stackable: true,
+    description: 'Bùa hộ mệnh. Chặn **1 debuff** tiếp theo trong combat.',
+    effect: { combatOnly: true }, sellPrice: 45, buyPrice: 110
+  },
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  CONSUMABLES — Tier 3: Late game, mạnh, đắt
+  // ══════════════════════════════════════════════════════════════════════
+  healing_potion: {
+    id: 'healing_potion', name: 'Healing Potion', icon: '🍶',
+    type: 'consumable', stackable: true,
+    description: 'Thuốc hồi máu cấp cao. Hồi **65% HP tối đa**.',
+    effect: { hpPercent: 0.65 }, sellPrice: 30, buyPrice: 75
+  },
+  greater_health_potion: {
+    id: 'greater_health_potion', name: 'Greater Health Potion', icon: '⚗️',
+    type: 'consumable', stackable: true,
+    description: 'Thuốc hồi máu tối thượng. Hồi **80% HP tối đa**.',
+    effect: { hpPercent: 0.80 }, sellPrice: 60, buyPrice: 150
+  },
+  mana_vial: {
+    id: 'mana_vial', name: 'Mana Vial', icon: '💜',
+    type: 'consumable', stackable: true,
+    description: 'Lọ tinh chất mana. Hồi **70% MP tối đa**.',
+    effect: { mpPercent: 0.70 }, sellPrice: 35, buyPrice: 88
+  },
+  elixir: {
+    id: 'elixir', name: 'Elixir', icon: '✨',
+    type: 'consumable', stackable: true,
+    description: 'Tinh chất hai nguồn. Hồi **60% HP tối đa** và **40% MP tối đa**.',
+    effect: { hpPercent: 0.60, mpPercent: 0.40 }, sellPrice: 60, buyPrice: 150
+  },
+  grand_restoration: {
+    id: 'grand_restoration', name: 'Grand Restoration', icon: '🔮',
+    type: 'consumable', stackable: true,
+    description: 'Tinh chất phục hồi hoàn toàn. Hồi **50% HP** và **50% MP**.',
+    effect: { hpPercent: 0.50, mpPercent: 0.50 }, sellPrice: 80, buyPrice: 200
+  },
+  supreme_elixir: {
+    id: 'supreme_elixir', name: 'Supreme Elixir', icon: '🌟',
+    type: 'consumable', stackable: true,
+    description: 'Đỉnh cao của thuật bào chế. Hồi **100% HP tối đa** và **80% MP tối đa**.',
+    effect: { hpPercent: 1.0, mpPercent: 0.80 }, sellPrice: 150, buyPrice: 420
+  },
+  berserker_draught: {
+    id: 'berserker_draught', name: 'Berserker Draught', icon: '😤',
+    type: 'consumable', stackable: true,
+    description: 'Chỉ uống được khi HP dưới **20%**. Hồi **50% HP tối đa** — dành cho lúc tuyệt vọng.',
+    effect: { hpPercent: 0.50, hpBelowPct: 0.20 }, sellPrice: 45, buyPrice: 120
+  },
+  crystallized_faith: {
+    id: 'crystallized_faith', name: 'Crystallized Faith', icon: '💠',
+    type: 'consumable', stackable: true,
+    description: 'Tinh thể niềm tin. Hồi **30% HP** + xóa **poison, burn, curse** cùng lúc.',
+    effect: { hpPercent: 0.30, removeEffects: ['poison', 'burn', 'curse'] }, sellPrice: 65, buyPrice: 170
+  },
+  purification_potion: {
+    id: 'purification_potion', name: 'Purification Potion', icon: '🌸',
+    type: 'consumable', stackable: true,
+    description: 'Xóa **tất cả debuff** đang hiện diện trong combat.',
+    effect: { removeEffect: 'all', combatOnly: true }, sellPrice: 55, buyPrice: 150
+  },
+  iron_will_tonic: {
+    id: 'iron_will_tonic', name: 'Iron Will Tonic', icon: '💪',
+    type: 'consumable', stackable: true,
+    description: 'Xóa **stun** và **freeze** trong combat. Hồi **10% HP** sau đó.',
+    effect: { removeEffects: ['stun', 'freeze'], hpPercent: 0.10, combatOnly: true }, sellPrice: 30, buyPrice: 75
+  },
+  void_mana_flask: {
+    id: 'void_mana_flask', name: 'Void Mana Flask', icon: '🌀',
+    type: 'consumable', stackable: true,
+    description: 'Bình mana từ hư không. Hồi **80% MP tối đa** trong combat.',
+    effect: { mpPercent: 0.80, combatOnly: true }, sellPrice: 50, buyPrice: 130
+  },
+  life_crystal_shard: {
+    id: 'life_crystal_shard', name: 'Life Crystal Shard', icon: '💎',
+    type: 'consumable', stackable: true,
+    description: 'Mảnh tinh thể sự sống. Hồi **35% HP** — chỉ dùng được khi HP dưới **50%**.',
+    effect: { hpPercent: 0.35, hpBelowPct: 0.50 }, sellPrice: 35, buyPrice: 90
+  },
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  CONSUMABLES — Combat buffs (hiệu ứng chiến đấu)
+  // ══════════════════════════════════════════════════════════════════════
+  hunter_meal: {
+    id: 'hunter_meal', name: "Hunter's Meal", icon: '🥩',
+    type: 'consumable', stackable: true,
+    description: 'Bữa thịt thú rừng. Trận kế tiếp: **ATK +10%**.',
     effect: {}, sellPrice: 22, buyPrice: 60
+  },
+  bone_broth: {
+    id: 'bone_broth', name: 'Bone Broth', icon: '🦴',
+    type: 'consumable', stackable: true,
+    description: 'Canh xương hầm lâu. Trận kế tiếp: **DEF +10%** + hồi **15% HP**.',
+    effect: { hpPercent: 0.15 }, sellPrice: 20, buyPrice: 50
   },
   stone_skin_draught: {
     id: 'stone_skin_draught', name: 'Stone Skin Draught', icon: '🛡️',
     type: 'consumable', stackable: true,
-    description: 'Trận kế tiếp: **DEF +15%**.',
+    description: 'Da đá. Trận kế tiếp: **DEF +15%**.',
     effect: {}, sellPrice: 32, buyPrice: 85
   },
   quickstep_tea: {
-    id: 'quickstep_tea', name: 'Quickstep Tea', icon: '⚡',
+    id: 'quickstep_tea', name: 'Quickstep Tea', icon: '🍃',
     type: 'consumable', stackable: true,
-    description: 'Trận kế tiếp: né đòn đầu tốt hơn.',
+    description: 'Trà lá gió. Trận kế tiếp: **tốc độ né tăng**, đòn đầu khó trúng hơn.',
     effect: {}, sellPrice: 28, buyPrice: 75
+  },
+  focus_tonic: {
+    id: 'focus_tonic', name: 'Focus Tonic', icon: '🔹',
+    type: 'consumable', stackable: true,
+    description: 'Tonic tập trung. Trận kế tiếp: **độ chính xác skill tăng**, nhưng DEF giảm nhẹ.',
+    effect: { mpPercent: 0.15 }, sellPrice: 35, buyPrice: 90
   },
   rage_elixir: {
     id: 'rage_elixir', name: 'Rage Elixir', icon: '🔥',
     type: 'consumable', stackable: true,
-    description: 'Trận kế tiếp: **ATK +25%**, nhưng nhận thêm sát thương.',
+    description: 'Elixir thịnh nộ. Trận kế tiếp: **ATK +25%** nhưng nhận thêm **15% sát thương**.',
     effect: {}, sellPrice: 50, buyPrice: 140
   },
   weapon_oil: {
     id: 'weapon_oil', name: 'Weapon Oil', icon: '🔩',
     type: 'consumable', stackable: true,
-    description: 'Vũ khí đang cầm: **+10% damage** trong trận kế tiếp.',
+    description: 'Dầu tra vũ khí. Trận kế tiếp: **damage +10%**.',
     effect: {}, sellPrice: 20, buyPrice: 55
   },
   armor_polish: {
     id: 'armor_polish', name: 'Armor Polish', icon: '🧼',
     type: 'consumable', stackable: true,
-    description: 'Giáp đang mặc: **+10% DEF** trong trận kế tiếp.',
+    description: 'Sáp đánh bóng giáp. Trận kế tiếp: **DEF +10%**.',
     effect: {}, sellPrice: 20, buyPrice: 55
   },
+  arson_bottle: {
+    id: 'arson_bottle', name: 'Arson Bottle', icon: '💥',
+    type: 'consumable', stackable: true,
+    description: 'Bom lửa ném tay. Gây **sát thương trực tiếp** trong combat. Không dùng với boss lớn.',
+    effect: { combatOnly: true }, sellPrice: 42, buyPrice: 120
+  },
+  blood_sacrifice_vial: {
+    id: 'blood_sacrifice_vial', name: 'Blood Sacrifice Vial', icon: '⚗️',
+    type: 'consumable', stackable: true,
+    description: 'Tế máu đổi mana. Dùng **10% HP hiện tại** để hồi **40% MP tối đa** trong combat.',
+    effect: { mpPercent: 0.40, combatOnly: true }, sellPrice: 35, buyPrice: 90
+  },
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  CONSUMABLES — Scrolls & special use
+  // ══════════════════════════════════════════════════════════════════════
   scroll_escape: {
     id: 'scroll_escape', name: 'Scroll of Escape', icon: '📜',
     type: 'consumable', stackable: true,
-    description: 'Thoát khỏi combat thường. Không dùng với boss/shopkeeper/bounty đặc biệt.',
+    description: 'Cuộn thoát thân. Thoát khỏi combat thường — không dùng với boss/shopkeeper/bounty.',
     effect: { combatOnly: true }, sellPrice: 45, buyPrice: 130
   },
   scroll_detection: {
-    id: 'scroll_detection', name: 'Scroll of Detection', icon: '📜',
+    id: 'scroll_detection', name: 'Scroll of Detection', icon: '🔎',
     type: 'consumable', stackable: true,
-    description: 'Lượt explore kế tiếp: tăng event tốt, giảm ambush.',
+    description: 'Cuộn trinh sát. Lượt explore kế tiếp: tăng event có lợi, giảm cơ hội bị phục kích.',
     effect: {}, sellPrice: 35, buyPrice: 95
   },
   scroll_greed: {
-    id: 'scroll_greed', name: 'Scroll of Greed', icon: '📜',
+    id: 'scroll_greed', name: 'Scroll of Greed', icon: '💰',
     type: 'consumable', stackable: true,
-    description: 'Trận kế tiếp: **Gold +30%**, nhưng enemy **ATK +15%**.',
+    description: 'Cuộn tham lam. Trận kế tiếp: **Gold thu được +30%** nhưng enemy **ATK +15%**.',
     effect: {}, sellPrice: 45, buyPrice: 125
   },
   scroll_silence: {
-    id: 'scroll_silence', name: 'Scroll of Silence', icon: '📜',
+    id: 'scroll_silence', name: 'Scroll of Silence', icon: '🔇',
     type: 'consumable', stackable: true,
-    description: 'Trong combat: enemy không dùng skill trong **2 lượt**. Không dùng với boss chính.',
+    description: 'Cuộn câm lặng. Enemy không dùng được skill trong **2 lượt**. Không dùng với boss chính.',
     effect: { combatOnly: true }, sellPrice: 50, buyPrice: 140
   },
+  scroll_mirror: {
+    id: 'scroll_mirror', name: 'Scroll of Mirror', icon: '🪞',
+    type: 'consumable', stackable: true,
+    description: 'Cuộn phản chiếu. **1 lần** trong combat: trả lại **50%** đòn tấn công kế tiếp cho enemy.',
+    effect: { combatOnly: true }, sellPrice: 55, buyPrice: 145
+  },
+  scroll_fortune: {
+    id: 'scroll_fortune', name: 'Scroll of Fortune', icon: '🍀',
+    type: 'consumable', stackable: true,
+    description: 'Cuộn may mắn. Lượt explore kế tiếp: **tỉ lệ nhận item tốt tăng 20%**.',
+    effect: {}, sellPrice: 40, buyPrice: 110
+  },
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  CONSUMABLES — Gamble & random
+  // ══════════════════════════════════════════════════════════════════════
   fate_dice: {
     id: 'fate_dice', name: 'Fate Dice', icon: '🎲',
     type: 'consumable', stackable: true,
-    description: 'Random 1 trong 6 hiệu ứng: hồi HP/MP, gold, buff hoặc xui xẻo.',
+    description: 'Xúc xắc số phận. Random **1 trong 6 hiệu ứng**: hồi HP/MP lớn, nhận gold, buff, hoặc xui xẻo.',
     effect: {}, sellPrice: 30, buyPrice: 90
   },
-  strange_mushroom: {
-    id: 'strange_mushroom', name: 'Strange Mushroom', icon: '🍄',
+  chaos_flask: {
+    id: 'chaos_flask', name: 'Chaos Flask', icon: '🌪️',
     type: 'consumable', stackable: true,
-    description: '50% buff, 50% debuff nhẹ.',
-    effect: {}, sellPrice: 12, buyPrice: 35
+    description: 'Bình hỗn loạn. Hiệu ứng **hoàn toàn ngẫu nhiên** — có thể rất tốt hoặc tệ hại.',
+    effect: {}, sellPrice: 50, buyPrice: 130
   },
-  suspicious_fish: {
-    id: 'suspicious_fish', name: 'Suspicious Fish', icon: '🐟',
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  CONSUMABLES — Passive / auto-trigger
+  // ══════════════════════════════════════════════════════════════════════
+  cracked_soul_charm: {
+    id: 'cracked_soul_charm', name: 'Cracked Soul Charm', icon: '💀',
     type: 'consumable', stackable: true,
-    description: 'Hồi nhiều HP, nhưng có 30% tác dụng phụ.',
-    effect: { hpPercent: 0.40 }, sellPrice: 16, buyPrice: 50
+    description: '**Passive:** Khi HP về 0, **25% cơ hội** sống sót với 1 HP. Item vỡ sau khi kích hoạt.',
+    effect: { passiveOnly: true }, sellPrice: 120, buyPrice: 420
   },
-  cooling_salve: {
-    id: 'cooling_salve', name: 'Cooling Salve', icon: '🧊',
+  phoenix_ash_vial: {
+    id: 'phoenix_ash_vial', name: 'Phoenix Ash Vial', icon: '🔥',
     type: 'consumable', stackable: true,
-    description: 'Xóa **burn** trong combat.',
-    effect: { removeEffect: 'burn', combatOnly: true }, sellPrice: 10, buyPrice: 25
+    description: '**Passive:** Khi HP về 0, **45% cơ hội** tự hồi **30% HP** và tiếp tục chiến đấu.',
+    effect: { hpPercent: 0.30, passiveOnly: true }, sellPrice: 150, buyPrice: 380
   },
-  purifying_salt: {
-    id: 'purifying_salt', name: 'Purifying Salt', icon: '✨',
-    type: 'consumable', stackable: true,
-    description: 'Xóa **curse nhẹ** trong combat.',
-    effect: { removeEffect: 'curse', combatOnly: true }, sellPrice: 18, buyPrice: 45
-  },
-  warding_charm: {
-    id: 'warding_charm', name: 'Warding Charm', icon: '🧿',
-    type: 'consumable', stackable: true,
-    description: 'Chặn 1 debuff tiếp theo trong combat.',
-    effect: { combatOnly: true }, sellPrice: 45, buyPrice: 110
-  },
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  CONSUMABLES — Social / utility
+  // ══════════════════════════════════════════════════════════════════════
   fake_identity: {
     id: 'fake_identity', name: 'Fake Identity', icon: '🎭',
     type: 'consumable', stackable: true,
-    description: 'Shop kế tiếp: giảm giá **10%**. Không hiệu quả nếu vừa cướp shopkeeper quá nhiều.',
+    description: 'Giấy tờ giả. Shop kế tiếp: giảm giá **10%** — không hiệu quả nếu vừa cướp shopkeeper.',
     effect: {}, sellPrice: 45, buyPrice: 130
   },
   bribe_coin: {
     id: 'bribe_coin', name: 'Bribe Coin', icon: '🪙',
     type: 'consumable', stackable: true,
-    description: 'Khi gặp **Bounty Hunter**, dùng để né combat/thay tiền hối lộ.',
+    description: 'Đồng tiền hối lộ đặc biệt. Khi gặp **Bounty Hunter**: né combat hoặc thay thế tiền phạt.',
     effect: {}, sellPrice: 55, buyPrice: 150
   },
   apology_letter: {
-    id: 'apology_letter', name: 'Apology Letter', icon: '📜',
+    id: 'apology_letter', name: 'Apology Letter', icon: '✉️',
     type: 'consumable', stackable: true,
-    description: 'Reputation +10, giá shop thế giới -2%.',
+    description: 'Thư xin lỗi thành tâm. **Reputation +10**, giá shop thế giới giảm **2%**.',
     effect: {}, sellPrice: 50, buyPrice: 160
   },
-  arson_bottle: {
-    id: 'arson_bottle', name: 'Arson Bottle', icon: '🔥',
+  assassins_smoke: {
+    id: 'assassins_smoke', name: "Assassin's Smoke", icon: '💨',
     type: 'consumable', stackable: true,
-    description: 'Trong combat: ném bom lửa gây **sát thương trực tiếp**. Không dùng với boss lớn.',
-    effect: { combatOnly: true }, sellPrice: 42, buyPrice: 120
+    description: 'Khói ám sát. Dùng trước combat: enemy bị **blind** lượt đầu — giảm độ chính xác.',
+    effect: { combatOnly: true }, sellPrice: 60, buyPrice: 180
   },
-  cracked_soul_charm: {
-    id: 'cracked_soul_charm', name: 'Cracked Soul Charm', icon: '💀',
+  black_market_token: {
+    id: 'black_market_token', name: 'Black Market Token', icon: '🌑',
     type: 'consumable', stackable: true,
-    description: 'Tự kích hoạt khi HP về 0: **25%** sống sót với 1 HP. Item vỡ sau khi kích hoạt.',
-    effect: { passiveOnly: true }, sellPrice: 120, buyPrice: 420
+    description: 'Thẻ thông hành chợ đen. Mở đường vào **Chợ Đen** một lần.',
+    sellPrice: 75, buyPrice: 220
   },
 
-
-  bread: {
-    id: 'bread', name: 'Bread', icon: '🍞',
-    type: 'consumable', stackable: true,
-    description: 'Ổ bánh mì đơn giản từ xe tiếp tế. Hồi **15% HP tối đa**.',
-    effect: { hpPercent: 0.15 }, sellPrice: 6, buyPrice: 18
+  // ── Fate Coin (key_item, dùng cho events) ────────────────────────────
+  fate_coin: {
+    id: 'fate_coin', name: 'Fate Coin', icon: '🪙',
+    type: 'key_item', stackable: true,
+    description: 'Đồng xu kỳ lạ, một mặt sáng một mặt tối. Dùng cho các event định mệnh đặc biệt.',
+    sellPrice: 25
   },
 
   // ── FISHING MATERIALS ───────────────────────────────────────────
@@ -643,7 +799,167 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'skill_book', stackable: false,
     description: 'Học kỹ năng **Soul Offering 💀**.',
     teachesSkill: 'soul_offering', sellPrice: 100, buyPrice: 250
-  }
+  },
+
+  // ── New skill books (12 new skills) ──────────────────────────────────────
+  book_stone_toss: {
+    id: 'book_stone_toss', name: 'Tome: Stone Toss', icon: '📗',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Stone Toss 🪨** — đánh vật lý rẻ.',
+    teachesSkill: 'stone_toss', sellPrice: 20, buyPrice: 50
+  },
+  book_quick_mend: {
+    id: 'book_quick_mend', name: 'Tome: Quick Mend', icon: '📗',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Quick Mend 💉** — hồi máu nhỏ, chi phí thấp.',
+    teachesSkill: 'quick_mend', sellPrice: 20, buyPrice: 50
+  },
+  book_static_shock: {
+    id: 'book_static_shock', name: 'Tome: Static Shock', icon: '📗',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Static Shock 🌩️** — điện nhẹ + làm chậm.',
+    teachesSkill: 'static_shock', sellPrice: 22, buyPrice: 55
+  },
+  book_spectral_blade: {
+    id: 'book_spectral_blade', name: 'Tome: Spectral Blade', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Spectral Blade 👻** — sát thương đơn mục tiêu cao.',
+    teachesSkill: 'spectral_blade', sellPrice: 55, buyPrice: 140
+  },
+  book_ice_barrier: {
+    id: 'book_ice_barrier', name: 'Tome: Ice Barrier', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Ice Barrier 🧊** — phòng thủ 3 lượt.',
+    teachesSkill: 'ice_barrier', sellPrice: 55, buyPrice: 140
+  },
+  book_chain_lightning: {
+    id: 'book_chain_lightning', name: 'Tome: Chain Lightning', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Chain Lightning ⚡** — sét diện rộng + slow.',
+    teachesSkill: 'chain_lightning', sellPrice: 60, buyPrice: 150
+  },
+  book_dark_pact: {
+    id: 'book_dark_pact', name: 'Tome: Dark Pact', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Dark Pact 🌑** — sát thương đơn mục tiêu rất cao.',
+    teachesSkill: 'dark_pact', sellPrice: 65, buyPrice: 165
+  },
+  book_inferno: {
+    id: 'book_inferno', name: 'Tome: Inferno', icon: '📙',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Inferno 🌋** — lửa diện rộng + burn 3 lượt.',
+    teachesSkill: 'inferno', sellPrice: 90, buyPrice: 220
+  },
+  book_void_step: {
+    id: 'book_void_step', name: 'Tome: Void Step', icon: '📙',
+    type: 'skill_book', stackable: false,
+    description: 'Học kỹ năng **Void Step 🌀** — né 2 lượt + hồi máu.',
+    teachesSkill: 'void_step', sellPrice: 90, buyPrice: 220
+  },
+  book_iron_will: {
+    id: 'book_iron_will', name: 'Tome: Iron Will', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học passive **Iron Will 🦺** — DEF +5, max HP +25.',
+    teachesSkill: 'iron_will', sellPrice: 55, buyPrice: 140
+  },
+  book_elemental_focus: {
+    id: 'book_elemental_focus', name: 'Tome: Elemental Focus', icon: '📘',
+    type: 'skill_book', stackable: false,
+    description: 'Học passive **Elemental Focus 🎯** — max MP +20, hồi 4 MP/lượt.',
+    teachesSkill: 'elemental_focus', sellPrice: 55, buyPrice: 140
+  },
+  book_swift_strike: {
+    id: 'book_swift_strike', name: 'Tome: Swift Strike', icon: '📙',
+    type: 'skill_book', stackable: false,
+    description: 'Học passive **Swift Strike 💨** — ATK +8 vĩnh viễn.',
+    teachesSkill: 'swift_strike', sellPrice: 70, buyPrice: 180
+  },
+
+  // ── Spell Fragments (crafting materials → sealed tomes) ───────────────────
+  spell_fragment: {
+    id: 'spell_fragment', name: 'Spell Fragment', icon: '🔮',
+    type: 'material', stackable: true,
+    description: 'Mảnh ma thuật vỡ vụn. Chế tạo **5 mảnh** → **Sealed Tome T1** (học spell ngẫu nhiên Tier 1).',
+    sellPrice: 8
+  },
+  rare_spell_fragment: {
+    id: 'rare_spell_fragment', name: 'Rare Spell Fragment', icon: '💜',
+    type: 'material', stackable: true,
+    description: 'Mảnh ma thuật hiếm. Chế tạo **3 mảnh** → **Sealed Tome T2** (học spell ngẫu nhiên Tier 2).',
+    sellPrice: 28
+  },
+  legendary_spell_fragment: {
+    id: 'legendary_spell_fragment', name: 'Legendary Spell Fragment', icon: '⭐',
+    type: 'material', stackable: true,
+    description: 'Mảnh ma thuật từ boss cổ đại. Chế tạo **1 mảnh** → **Sealed Tome T3** (học spell ngẫu nhiên Tier 3).',
+    sellPrice: 85
+  },
+
+  // ── Sealed Tomes (random skill books from fragment combining) ─────────────
+  sealed_tome_t1: {
+    id: 'sealed_tome_t1', name: 'Sealed Tome: Common', icon: '📗',
+    type: 'skill_book', stackable: true,
+    description: 'Tome phong ấn. Dùng để học **1 skill ngẫu nhiên Tier 1** mà bạn chưa biết.',
+    teachesSkill: 'random_t1', sellPrice: 40
+  },
+  sealed_tome_t2: {
+    id: 'sealed_tome_t2', name: 'Sealed Tome: Rare', icon: '📘',
+    type: 'skill_book', stackable: true,
+    description: 'Tome phong ấn hiếm. Dùng để học **1 skill ngẫu nhiên Tier 2** mà bạn chưa biết.',
+    teachesSkill: 'random_t2', sellPrice: 95
+  },
+  sealed_tome_t3: {
+    id: 'sealed_tome_t3', name: 'Sealed Tome: Legendary', icon: '📙',
+    type: 'skill_book', stackable: true,
+    description: 'Tome phong ấn huyền thoại. Dùng để học **1 skill ngẫu nhiên Tier 3** mà bạn chưa biết.',
+    teachesSkill: 'random_t3', sellPrice: 190
+  },
+
+  // ── Forest food & consumables ────────────────────────────────────────────
+  honey: {
+    id: 'honey', name: 'Forest Honey', icon: '🍯',
+    type: 'consumable', stackable: true,
+    description: 'Mật ong rừng nguyên chất. Hồi phục **20% HP tối đa**.',
+    effect: { hpPercent: 0.2 }, sellPrice: 12, buyPrice: 30
+  },
+  forest_fruit: {
+    id: 'forest_fruit', name: 'Forest Fruit', icon: '🍒',
+    type: 'consumable', stackable: true,
+    description: 'Trái cây hoang dã từ rừng sâu. Hồi phục **15% HP tối đa**.',
+    effect: { hpPercent: 0.15 }, sellPrice: 6, buyPrice: 15
+  },
+  meat: {
+    id: 'meat', name: 'Raw Meat', icon: '🥩',
+    type: 'material', stackable: true,
+    description: 'Thịt tươi từ thú rừng. Dùng để chế biến thức ăn hoặc bán.',
+    sellPrice: 8
+  },
+  fish: {
+    id: 'fish', name: 'Fresh Fish', icon: '🐟',
+    type: 'material', stackable: true,
+    description: 'Cá tươi từ suối rừng trong sạch.',
+    sellPrice: 6
+  },
+
+  // ── Forest key items ─────────────────────────────────────────────────────
+  flower_crown: {
+    id: 'flower_crown', name: 'Flower Crown', icon: '💐',
+    type: 'key_item', stackable: false,
+    description: 'Vòng hoa kết từ những bông hoa hoang dã. Mang lại sự bình yên lạ thường.',
+    sellPrice: 15
+  },
+  knight_emblem: {
+    id: 'knight_emblem', name: 'Knight Emblem', icon: '🏅',
+    type: 'key_item', stackable: false,
+    description: 'Huy hiệu của một hiệp sĩ. Bằng chứng về ân nghĩa đã để lại.',
+    sellPrice: 80
+  },
+  bard_song: {
+    id: 'bard_song', name: "Bard's Song", icon: '🎵',
+    type: 'key_item', stackable: false,
+    description: 'Cuộn giấy ghi bài hát từ nhạc sĩ lữ hành. Nhạc điệu nghe lại vẫn còn sống.',
+    sellPrice: 40
+  },
 };
 
 export function getItem(id: string): ItemDef | undefined {

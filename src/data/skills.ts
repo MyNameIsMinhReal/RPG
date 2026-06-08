@@ -265,7 +265,108 @@ export const SKILLS: Record<string, SkillDef> = {
     worldEffect: 'soul_drop',
     description: 'Hy sinh **20% HP tối đa**, rải Soul Shards tại zone hiện tại.',
     learnFrom: 'book_soul_offering'
-  }
+  },
+
+  // ── New Skills — Tier 1 (basic, low cost) ────────────────────────────
+  stone_toss: {
+    id: 'stone_toss', name: 'Stone Toss', icon: '🪨', type: 'active',
+    mpCost: 8, damage: 22,
+    description: 'Ném đá vào kẻ thù. Gây **22** sát thương vật lý — rẻ và đáng tin cậy.',
+    learnFrom: 'book_stone_toss'
+  },
+  quick_mend: {
+    id: 'quick_mend', name: 'Quick Mend', icon: '💉', type: 'active',
+    mpCost: 10, heal: 28, targetType: 'self',
+    description: 'Băng bó nhanh trong combat. Hồi **28 HP** với chi phí thấp.',
+    learnFrom: 'book_quick_mend'
+  },
+  static_shock: {
+    id: 'static_shock', name: 'Static Shock', icon: '🌩️', type: 'active',
+    mpCost: 9, damage: 20, effect: 'slow', effectDuration: 1,
+    description: 'Phóng điện nhẹ. Gây **20** sát thương + làm chậm địch **1 lượt**.',
+    learnFrom: 'book_static_shock'
+  },
+
+  // ── New Skills — Tier 2 (mid-range) ──────────────────────────────────
+  spectral_blade: {
+    id: 'spectral_blade', name: 'Spectral Blade', icon: '👻', type: 'active',
+    mpCost: 20, damage: 48,
+    description: 'Lưỡi kiếm ma. Gây **48** sát thương thuần — không bị giảm bởi nhiều buff DEF.',
+    learnFrom: 'book_spectral_blade'
+  },
+  ice_barrier: {
+    id: 'ice_barrier', name: 'Ice Barrier', icon: '🧊', type: 'active',
+    mpCost: 20, targetType: 'self', effect: 'stone_skin', effectDuration: 3,
+    description: 'Tạo vách băng bảo vệ. Giảm **sát thương nhận** trong **3 lượt**. Không gây sát thương.',
+    learnFrom: 'book_ice_barrier'
+  },
+  chain_lightning: {
+    id: 'chain_lightning', name: 'Chain Lightning', icon: '⚡', type: 'active',
+    mpCost: 24, damage: 26, targetType: 'all', effect: 'slow', effectDuration: 1,
+    description: 'Sét dây chuyền. Gây **26** sát thương lên toàn bộ địch + làm chậm **1 lượt**.',
+    learnFrom: 'book_chain_lightning'
+  },
+  dark_pact: {
+    id: 'dark_pact', name: 'Dark Pact', icon: '🌑', type: 'active',
+    mpCost: 26, damage: 58,
+    description: 'Giao kết bóng tối. Gây **58** sát thương mạnh vào một mục tiêu. Không có hiệu ứng phụ.',
+    learnFrom: 'book_dark_pact'
+  },
+
+  // ── New Skills — Tier 3 (powerful) ───────────────────────────────────
+  inferno: {
+    id: 'inferno', name: 'Inferno', icon: '🌋', type: 'active',
+    mpCost: 35, damage: 28, targetType: 'all', effect: 'burn', effectDuration: 3,
+    description: 'Địa ngục lửa. Gây **28** sát thương diện rộng + **burn 3 lượt** (5 dmg/lượt).',
+    learnFrom: 'book_inferno'
+  },
+  void_step: {
+    id: 'void_step', name: 'Void Step', icon: '🌀', type: 'active',
+    mpCost: 28, heal: 20, targetType: 'self', effect: 'dodge', effectDuration: 2,
+    description: 'Bước qua hư không. Né đòn **2 lượt** + hồi **20 HP** khi ẩn.',
+    learnFrom: 'book_void_step'
+  },
+
+  // ── New Passive Skills ────────────────────────────────────────────────
+  iron_will: {
+    id: 'iron_will', name: 'Iron Will', icon: '🦺', type: 'passive',
+    passiveBonus: { def: 5, maxHp: 25 },
+    description: 'Ý chí thép. Tăng **DEF +5** và **max HP +25** vĩnh viễn.',
+    learnFrom: 'book_iron_will'
+  },
+  elemental_focus: {
+    id: 'elemental_focus', name: 'Elemental Focus', icon: '🎯', type: 'passive',
+    passiveBonus: { maxMp: 20, mpRegen: 4 },
+    description: 'Tập trung nguyên tố. Tăng **max MP +20** và hồi **4 MP** mỗi lượt.',
+    learnFrom: 'book_elemental_focus'
+  },
+  swift_strike: {
+    id: 'swift_strike', name: 'Swift Strike', icon: '💨', type: 'passive',
+    passiveBonus: { atk: 8 },
+    description: 'Tấn công nhanh. Tăng **ATK +8** vĩnh viễn.',
+    learnFrom: 'book_swift_strike'
+  },
+};
+
+// ── Tier pools for random sealed tomes ───────────────────────────────────
+export const SKILL_TIER_POOLS: Record<'t1' | 't2' | 't3', string[]> = {
+  t1: [
+    'arcane_bolt', 'mend_wounds', 'ice_lance', 'shield_bash', 'poison_dart',
+    'stone_toss', 'quick_mend', 'static_shock', 'battle_cry', 'blood_siphon',
+  ],
+  t2: [
+    'fireball', 'shadow_step', 'thunder_clap', 'cleave', 'mana_surge', 'purify',
+    'radiant_smite', 'guardian_wall', 'iron_skin', 'tough_body', 'blade_mastery',
+    'blood_hunger', 'iron_will', 'elemental_focus',
+    'spectral_blade', 'ice_barrier', 'chain_lightning', 'dark_pact',
+  ],
+  t3: [
+    'frost_nova', 'whirlwind', 'venom_cloud', 'execute', 'meteor_shower',
+    'inferno', 'void_step', 'swift_strike',
+    'berserker', 'mana_flow', 'vampiric', 'arcane_mind', 'survival_instinct',
+    'counter', 'last_stand', 'mark_zone',
+    'soul_strike', 'soul_guard', 'soul_drain', 'void_rift', 'soul_offering',
+  ],
 };
 
 export function getSkill(id: string): SkillDef | undefined {
