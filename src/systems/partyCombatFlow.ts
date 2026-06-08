@@ -1,7 +1,7 @@
 /**
  * Turn-based party combat.
- * All party members choose actions simultaneously; after 60 s (or all voted) the
- * turn resolves, then the enemy attacks one random alive member.
+ * Each turn, alive members choose actions sequentially (one at a time).
+ * After all members choose, actions resolve, then the enemy attacks one random alive member.
  *
  * Enemy HP is scaled: base × (1 + 0.4 × extraMembers).
  * Enemy ATK is unchanged so individual hits stay dangerous.
@@ -72,18 +72,36 @@ function hpBar(hp: number, max: number): string {
   return '█'.repeat(filled) + '░'.repeat(8 - filled);
 }
 
+const ACTION_LABEL: Record<PartyAction, string> = {
+  attack: '⚔️ Tấn công',
+  defend: '🛡️ Phòng thủ',
+  potion: '🧪 Potion',
+  flee: '🏃 Bỏ chạy',
+};
+
 function buildCombatEmbed(
   members: PartyMember[],
   enemy: PartyCombatEnemy,
   turn: number,
   log: string[],
-  pendingVoters: string[]
+  currentMemberId: string | null,
+  decidedActions: Map<string, PartyAction>
 ): EmbedBuilder {
   const memberLines = members.map(m => {
     if (!m.alive) return `💀 ~~**${m.name}**~~ — KO'd`;
     const staWarn = m.stamina <= 10 ? '  ⚠️ *kiệt sức!*' : '';
+
+    let statusTag: string;
+    if (decidedActions.has(m.user_id)) {
+      statusTag = `✅ ${ACTION_LABEL[decidedActions.get(m.user_id)!]}`;
+    } else if (m.user_id === currentMemberId) {
+      statusTag = `🎯 **Đến lượt bạn!**`;
+    } else {
+      statusTag = `⏳ Chờ đến lượt...`;
+    }
+
     return [
-      `**${m.name}**`,
+      `**${m.name}** — ${statusTag}`,
       `❤️ \`${bar(m.hp, m.max_hp, 8)}\` **${m.hp}**/${m.max_hp} HP`,
       `💧 \`${bar(m.mp, m.max_mp, 8)}\` **${m.mp}**/${m.max_mp} MP`,
       `⚡ \`${bar(m.stamina, m.max_stamina, 8)}\` **${m.stamina}**/${m.max_stamina} Stamina${staWarn}`
@@ -91,20 +109,19 @@ function buildCombatEmbed(
   }).join('\n\n');
 
   const eBar = hpBar(enemy.hp, enemy.max_hp);
-  const waitingStr = pendingVoters.length
-    ? `\n⏳ Đang chờ: ${pendingVoters.join(', ')}`
-    : '';
+  const currentName = currentMemberId
+    ? members.find(m => m.user_id === currentMemberId)?.name ?? null
+    : null;
 
   return new EmbedBuilder()
     .setColor(COLORS.danger)
     .setTitle(`⚔️ Party Combat — Lượt ${turn}`)
     .setDescription(
       `${enemy.icon} **${enemy.name}**\n${eBar} ${enemy.hp}/${enemy.max_hp} HP\n\n` +
-      `**Party:**\n${memberLines}` +
-      waitingStr
+      `**Party:**\n${memberLines}`
     )
     .addFields({ name: '📜 Log', value: log.slice(-4).join('\n') || '*Bắt đầu chiến đấu...*', inline: false })
-    .setFooter({ text: 'Mỗi người chọn hành động · Timeout 60s = Phòng thủ' });
+    .setFooter({ text: currentName ? `🎯 Đến lượt: ${currentName} · Timeout 60s = Phòng thủ` : 'Đang xử lý...' });
 }
 
 function buildActionRow(sessionId: string): ActionRowBuilder<ButtonBuilder> {
@@ -226,8 +243,6 @@ export async function startPartyCombatFlow(
     });
     return;
   }
-  const activeMemberIds = members.map(m => m.user_id);
-
   // ── Load & scale enemy ──────────────────────────────────────────────────────
   const baseDef = getEnemy(enemyId)!;
   const extraMembers = Math.max(0, members.length - 1);
@@ -255,48 +270,38 @@ export async function startPartyCombatFlow(
     if (aliveMembers.length === 0) break;
     if (enemy.hp <= 0) break;
 
-    // Collect actions
+    // Collect actions sequentially — one member at a time
     const actions = new Map<string, PartyAction>();
-    const pendingNames = () => aliveMembers.filter(m => !actions.has(m.user_id)).map(m => m.name);
-
-    const embed = buildCombatEmbed(members, enemy, turn, log, pendingNames());
-    const row   = buildActionRow(sessionId);
+    const row = buildActionRow(sessionId);
 
     let reply: Message<boolean>;
-    if (turn === 1) {
+
+    for (let idx = 0; idx < aliveMembers.length; idx++) {
+      const currentMember = aliveMembers[idx];
+      const embed = buildCombatEmbed(members, enemy, turn, log, currentMember.user_id, actions);
       reply = await interaction.editReply({ embeds: [embed], components: [row] }) as Message<boolean>;
-    } else {
-      reply = await interaction.editReply({ embeds: [embed], components: [row] }) as Message<boolean>;
+
+      const action = await new Promise<PartyAction>(resolve => {
+        const collector = reply!.createMessageComponentCollector({
+          filter: i => i.user.id === currentMember.user_id && i.customId.endsWith(`_${sessionId}`),
+          time: SESSION_TIMEOUT_MS,
+          max: 1
+        });
+        collector.on('collect', async i => {
+          await i.deferUpdate().catch(() => {});
+          const a: PartyAction =
+            i.customId.startsWith('pca_atk') ? 'attack' :
+            i.customId.startsWith('pca_def') ? 'defend' :
+            i.customId.startsWith('pca_pot') ? 'potion' : 'flee';
+          resolve(a);
+        });
+        collector.on('end', (collected) => {
+          if (collected.size === 0) resolve('defend');
+        });
+      });
+
+      actions.set(currentMember.user_id, action);
     }
-
-    await new Promise<void>(resolve => {
-      const collector = reply.createMessageComponentCollector({
-        filter: i => activeMemberIds.includes(i.user.id) && i.customId.endsWith(`_${sessionId}`),
-        time: SESSION_TIMEOUT_MS
-      });
-
-      collector.on('collect', async i => {
-        await i.deferUpdate().catch(() => {});
-        const action: PartyAction =
-          i.customId.startsWith('pca_atk') ? 'attack' :
-          i.customId.startsWith('pca_def') ? 'defend' :
-          i.customId.startsWith('pca_pot') ? 'potion' : 'flee';
-        actions.set(i.user.id, action);
-
-        const updatedEmbed = buildCombatEmbed(members, enemy, turn, log, pendingNames());
-        await interaction.editReply({ embeds: [updatedEmbed], components: [row] }).catch(() => {});
-
-        if (actions.size >= aliveMembers.length) collector.stop('all_voted');
-      });
-
-      collector.on('end', () => {
-        // Default: missing voters defend
-        for (const m of aliveMembers) {
-          if (!actions.has(m.user_id)) actions.set(m.user_id, 'defend');
-        }
-        resolve();
-      });
-    });
 
     // ── Check flee ─────────────────────────────────────────────────────────────
     const fleeCount = [...actions.values()].filter(a => a === 'flee').length;
