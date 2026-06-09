@@ -58,7 +58,7 @@ export function isOakParticipant(guildId: string, userId: string): boolean {
 
 export function getOakParticipants(guildId: string): OakParticipant[] {
   return db.prepare('SELECT * FROM oak_participants WHERE guild_id = ? ORDER BY damage DESC')
-    .all(guildId) as OakParticipant[];
+    .all(guildId) as unknown as OakParticipant[];
 }
 
 export function addOakDamage(guildId: string, userId: string, damage: number): void {
