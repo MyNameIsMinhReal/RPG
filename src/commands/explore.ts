@@ -636,6 +636,17 @@ async function handleSearch(
 ): Promise<void> {
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
 
+  // Thành viên party không phải leader không được tự explore
+  const _partyCheck = getPartyOf(guildId, userId);
+  if (_partyCheck && _partyCheck.leaderId !== userId && (_partyCheck.memberIds.length ?? 0) > 1) {
+    const leaderName = getPlayer(_partyCheck.leaderId, guildId)?.name ?? 'Leader';
+    await interaction.editReply({
+      embeds: [simpleEmbed(COLORS.warning, `👥 Bạn đang trong party. Chỉ **${leaderName}** (leader) mới có thể khám phá cho cả nhóm.`)],
+      components: []
+    });
+    return;
+  }
+
   const player = getPlayer(userId, guildId)!;
   const currentZone = getZone(player.zone_id)!;
   if (currentZone.safe) {
