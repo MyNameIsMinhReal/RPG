@@ -382,15 +382,10 @@ function buildExploreRows(
     const rows: ActionRowBuilder<ButtonBuilder>[] = [row1];
     if (oakInfo) {
       const oakRow = new ActionRowBuilder<ButtonBuilder>();
-      if (oakInfo.canStartHunt) {
+      if (oakInfo.huntRemaining > 0) {
         oakRow.addComponents(
           new ButtonBuilder().setCustomId(`ex_oak_hunt_${userId}`)
-            .setLabel('Truy Tìm Linh Thú').setEmoji('🔍').setStyle(ButtonStyle.Primary)
-        );
-      } else if (oakInfo.huntRemaining > 0) {
-        oakRow.addComponents(
-          new ButtonBuilder().setCustomId(`ex_oak_hunt_${userId}`)
-            .setLabel(`Đang Truy Tìm (còn ${oakInfo.huntRemaining} explore)`).setEmoji('🐾').setStyle(ButtonStyle.Secondary).setDisabled(true)
+            .setLabel(`Đang Truy Tìm (còn ${oakInfo.huntRemaining})`).setEmoji('🐾').setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
       }
       if (oakInfo.canSummon) {

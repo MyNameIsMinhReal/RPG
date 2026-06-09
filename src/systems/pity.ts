@@ -42,6 +42,8 @@ export const PITY_EVENTS = new Set<ExploreEventType>([
   'wastes_storm', 'wastes_memory_rain', 'wastes_faceless_merchant',
   // Any non-village zone
   'mimic_chest', 'map_seller', 'wandering_blacksmith',
+  // Oak hunt trigger (forest, before prereq)
+  'oak_hunt_start',
   // Time-of-day events
   'dawn_ritual', 'dawn_traveler', 'dawn_dew_blessing', 'dawn_hunter_tracks',
   'noon_rest', 'day_patrol', 'day_training_ground', 'day_supply_cart',

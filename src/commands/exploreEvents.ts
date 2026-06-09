@@ -39,6 +39,7 @@ import { startFishingMiniGame } from './fish';
 import { onlyUser } from '../utils/collectors';
 import { incrementChapterObjective } from '../systems/chapter';
 import { getPityCounters, getPityBonus, PITY_EVENTS } from '../systems/pity';
+import { startOakHunt, isOakHuntActive, hasOakPrereq, OAK_HUNT_EXPLORES } from '../systems/oakEvent';
 import type { DataDrivenExploreEventId } from '../data/exploreEventDefs';
 import { getDataDrivenEventWeights, isDataDrivenExploreEvent, runDataDrivenExploreEvent } from '../systems/eventEngine';
 import {
@@ -85,7 +86,7 @@ export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wande
   | 'wanted_merchant' | 'bounty_hunter' | 'rebirth_rift' | 'failed_legacy' | 'mirror_clone' | 'talking_corpse'
   | 'black_eclipse' | 'fate_coin' | 'merchant_tax' | 'merchant_guard' | 'wanted_notice' | 'shopkeeper_mercy'
   | 'black_cat' | 'dice_gambler' | 'glowing_mushroom' | 'chained_prisoner' | 'magic_fountain' | 'laughing_bones'
-  | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'nothing'
+  | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'oak_hunt_start' | 'nothing'
   // Zone-specific events (separate files)
   | 'forest_tree' | 'forest_wolf_den' | 'forest_herbalist_hut' | 'forest_moonlit_clearing'
   | 'forest_bandit_ambush' | 'forest_giant_spider' | 'forest_cursed_scarecrow' | 'forest_snake_pit' | 'forest_poacher_camp'
@@ -242,6 +243,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['atonement_monk', (wanted > 0 || rep < -15) ? 4 : 0],
     ['conditional_miniboss', hasCombat && (wanted >= 3 || rep <= -60 || deaths >= 3 || robberyCount >= 2) ? 4 : 0],
     ['fishing_spot', player.zone_id ? 5 : 0],
+    ['oak_hunt_start', player.zone_id === 'forest' && !hasOakPrereq(guildId, player.user_id) && !isOakHuntActive(guildId, player.user_id) ? 4 : 0],
 
     // High reputation events — appear more often as reputation climbs.
     ['mimic_chest', player.zone_id ? 4 + goodBoost : 0], ['wandering_blacksmith', tm('wandering_blacksmith', 3 + goodBoost)], ['temporary_arena', hasCombat ? 3 : 0], ['boss_tracks', hasCombat && player.zone_id !== 'village' ? 3 : 0], ['map_seller', player.zone_id ? 3 : 0], ['rep_honored_patrol',      rep >= 25 ? tm('rep_honored_patrol', 3 + highRepBonus) : 0],
@@ -448,6 +450,7 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'atonement_monk': return showAtonementMonk(ctx);
     case 'conditional_miniboss': return showConditionalMiniboss(ctx);
     case 'fishing_spot': return showFishingSpot(ctx);
+    case 'oak_hunt_start': return showOakHuntStart(ctx);
      case 'mimic_chest': return showMimicChest(ctx); case 'wandering_blacksmith': return showWanderingBlacksmith(ctx); case 'temporary_arena': return showTemporaryArena(ctx); case 'boss_tracks': return showBossTracks(ctx); case 'map_seller': return showMapSeller(ctx); case 'rep_honored_patrol':       return showRepHonoredPatrol(ctx);
     case 'rep_grateful_villagers':   return showRepGratefulVillagers(ctx);
     case 'rep_supply_cache':         return showRepSupplyCache(ctx);
@@ -1819,4 +1822,18 @@ async function showMapSeller(ctx: RunExploreEventInput): Promise<void> {
 📉 Reputation: **${rep}** (-8)
 🚨 Wanted **+1**`), 'merchant');
 }
+async function showOakHuntStart(ctx: RunExploreEventInput): Promise<void> {
+  startOakHunt(ctx.guildId, ctx.userId);
+  const embed = new EmbedBuilder()
+    .setColor(0x2D7D46)
+    .setTitle('🔍 Dấu Vết Linh Thú')
+    .setDescription(
+      '*Bạn phát hiện dấu móng khổng lồ in sâu vào bùn đất ẩm, cùng những cành cây gãy vụn theo hướng sâu hơn trong rừng...*\n\n' +
+      `Bản năng mách bảo — **Linh Thú đang ở đâu đó gần đây**.\n\n` +
+      `Sau **${OAK_HUNT_EXPLORES} lần khám phá** tiếp theo, bạn sẽ đối mặt với nó.\n\n` +
+      '*Hãy chuẩn bị kỹ trước khi tiếp tục.*'
+    );
+  return finish(ctx, embed, 'forest');
+}
+
 // EXTRA_EVENTS_COMMON_END
