@@ -1,4 +1,5 @@
 import type { RunExploreEventInput } from './exploreEvents';
+import { awaitVote } from './exploreEvents';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -39,7 +40,7 @@ export async function showForestWhisperingTree(ctx: RunExploreEventInput): Promi
     );
 
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌳 *Cây cổ thụ đứng yên lặng. Bạn tiếp tục hành trình.*'));
   await btn.deferUpdate().catch(() => {});
 
@@ -118,7 +119,7 @@ export async function showForestWolfDen(ctx: RunExploreEventInput): Promise<void
     );
 
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐺 *Bạn lùi khỏi hang trước khi sói mẹ quay lại.*'));
   await btn.deferUpdate().catch(() => {});
 
@@ -168,7 +169,7 @@ export async function showForestHerbalistHut(ctx: RunExploreEventInput): Promise
     .setDescription('Một căn lều phủ đầy dây leo nằm cạnh con suối. Mùi thuốc đắng và lá khô phảng phất trong không khí.');
 
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌿 *Bạn đi qua căn lều mà không làm phiền ai.*'));
   await btn.deferUpdate().catch(() => {});
 
@@ -213,7 +214,7 @@ export async function showForestMoonlitClearing(ctx: RunExploreEventInput): Prom
     .setTitle('🌙 Khoảng Rừng Ánh Trăng')
     .setDescription('Giữa tán cây rậm rạp, một khoảng đất trống ngập ánh sáng xanh bạc. Cỏ mềm, không khí yên tĩnh như đang ngủ.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌙 *Ánh trăng khép lại sau lưng khi bạn rời đi.*'));
   await btn.deferUpdate().catch(() => {});
 
@@ -248,7 +249,7 @@ export async function showForestBanditAmbush(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0x8B0000).setTitle('🗡️ Phục Kích Giữa Rừng')
     .setDescription('Ba tên cướp nhảy ra từ bụi rậm, chặn đường bạn.\n*"Nộp đồ nếu muốn sống!"* — tên cầm đầu hét lên.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🗡️ *Bọn cướp mất kiên nhẫn và bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -283,7 +284,7 @@ export async function showForestGiantSpider(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0x4B0082).setTitle('🕷️ Nhện Rừng Khổng Lồ')
     .setDescription('Giữa mạng nhện chằng chịt, một con nhện to bằng con chó đang nhìn bạn bằng tám cặp mắt.\n*Nó bắt đầu tiến về phía bạn.*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🕷️ *Con nhện bò vào bóng tối.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -317,7 +318,7 @@ export async function showForestCursedScarecrow(ctx: RunExploreEventInput): Prom
   const embed = new EmbedBuilder().setColor(0x556B2F).setTitle('🎃 Bù Nhìn Nguyền Rủa')
     .setDescription('Một bù nhìn rơm mặc áo rách đứng giữa rừng. Không có ruộng nào gần đây cả.\n*Hai mắt nó — được làm bằng đá đen — đang nhìn theo bạn.*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🎃 *Bù nhìn đứng im. Bạn bước tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -349,7 +350,7 @@ export async function showForestSnakePit(ctx: RunExploreEventInput): Promise<voi
   const embed = new EmbedBuilder().setColor(0x2D5016).setTitle('🐍 Hố Rắn')
     .setDescription('Con đường hẹp dẫn qua một hố sâu nổi đầy rắn cuộn lại.\n*Tiếng xì xì và mùi tanh nồng nặc.*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐍 *Bạn đứng quan sát rồi bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -381,7 +382,7 @@ export async function showForestPoacherCamp(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0x8B4513).setTitle('🏕️ Trại Săn Trộm')
     .setDescription('Một trại nhỏ bị bỏ lại — bẫy thú và da thú khắp nơi. Những kẻ săn trộm đang vắng mặt nhưng có thể quay lại bất cứ lúc nào.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🏕️ *Bạn rời khỏi trại.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -415,7 +416,7 @@ export async function showForestCorruptedTreant(ctx: RunExploreEventInput): Prom
   const embed = new EmbedBuilder().setColor(0x1a0a00).setTitle('🌑 Cây Thần Bị Hủy Hoại')
     .setDescription('Một cây cổ thụ khổng lồ đứng trước mặt — nhựa đen chảy từ vỏ cây, cành khô quắt vươn ra như bàn tay.\n*Nó đang di chuyển.*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌑 *Cây thần từ từ khép cành lại. Bạn rút lui.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -452,7 +453,7 @@ export async function showForestWildBoar(ctx: RunExploreEventInput): Promise<voi
   const embed = new EmbedBuilder().setColor(0x8B4513).setTitle('🐗 Lợn Rừng Hung Hăng')
     .setDescription('Một con lợn rừng to lớn đang cúi đầu nhìn bạn. Nanh nhọn, mắt đỏ — nó đang chuẩn bị lao vào.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐗 *Con lợn hừng hừng rồi bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -486,7 +487,7 @@ export async function showForestPoisonSpores(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0x6B8E23).setTitle('🍄 Bào Tử Độc')
     .setDescription('Một đám nấm lớn nổ tung khi bạn đến gần — bào tử màu vàng xanh bay khắp nơi.\n*Ngửi vào thì đầu óc quay cuồng ngay lập tức.*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) {
     const player = getPlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.15));
@@ -522,7 +523,7 @@ export async function showForestRabidFox(ctx: RunExploreEventInput): Promise<voi
   const embed = new EmbedBuilder().setColor(0xD2691E).setTitle('🦊 Cáo Điên')
     .setDescription('Một con cáo lông xù bờm chạy về phía bạn — mắt đục và mồm sùi bọt. Rõ ràng nó đã mắc bệnh.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) {
     const player = getPlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
@@ -560,7 +561,7 @@ export async function showForestBanditWatchtower(ctx: RunExploreEventInput): Pro
   const embed = new EmbedBuilder().setColor(0x5C3317).setTitle('🗼 Tháp Canh Tên Cướp')
     .setDescription('Một tháp canh bằng gỗ ọp ẹp giữa rừng — hai tên cướp đang ngủ gật trên đó.\n*Phía dưới có một chiếc rương khóa.*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🗼 *Bạn đi vòng tránh tháp canh.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -599,7 +600,7 @@ export async function showForestHollowLog(ctx: RunExploreEventInput): Promise<vo
   const embed = new EmbedBuilder().setColor(0x8B5E3C).setTitle('🪵 Thân Cây Mục Rỗng')
     .setDescription('Một thân cây mục nằm ngang đường, bên trong rỗng hoàn toàn. Có gì đó lấp lánh bên trong bóng tối.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🪵 *Bạn bước qua mà không dừng lại.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -631,7 +632,7 @@ export async function showForestBuriedChest(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0xA0522D).setTitle('📦 Rương Chôn Dưới Đất')
     .setDescription('Dưới lớp lá mục, một góc rương gỗ bọc sắt lộ ra. Ai đó đã chôn nó ở đây và không quay lại.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '📦 *Bạn để yên nó và tiếp tục đường.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -662,7 +663,7 @@ export async function showForestEagleNest(ctx: RunExploreEventInput): Promise<vo
   const embed = new EmbedBuilder().setColor(0xDAA520).setTitle('🦅 Tổ Đại Bàng')
     .setDescription('Trên cành cao nhất của cây cổ thụ là một tổ đại bàng khổng lồ. Có gì đó lấp lánh bên trong — đại bàng đang vắng mặt.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🦅 *Bạn nhìn lên tổ rồi bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -700,7 +701,7 @@ export async function showForestMushroomRing(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0x9370DB).setTitle('🍄 Vòng Nấm Huyền Bí')
     .setDescription('Một vòng tròn nấm hoàn hảo mọc giữa bãi cỏ — không một cây nào bên trong, không dấu chân nào. Dân gian gọi đây là "Vòng Tiên".');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🍄 *Bạn nhìn vòng nấm rồi rời đi.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -730,7 +731,7 @@ export async function showForestAmberSap(ctx: RunExploreEventInput): Promise<voi
   const embed = new EmbedBuilder().setColor(0xFFAA00).setTitle('🌳 Nhựa Hổ Phách')
     .setDescription('Một cây cổ thụ tiết ra nhựa vàng óng ánh đặc quánh. Bên trong một giọt nhựa lớn, có thứ gì đó bị kẹt lại từ lâu.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌳 *Bạn để cây yên lặng tiết nhựa.*'));
   await btn.deferUpdate().catch(() => {});
   if (btn.customId === `fas_collect_${ctx.userId}`) {
@@ -766,7 +767,7 @@ export async function showForestBeehive(ctx: RunExploreEventInput): Promise<void
   const embed = new EmbedBuilder().setColor(0xFFD700).setTitle('🐝 Tổ Ong Khổng Lồ')
     .setDescription('Một tổ ong to bằng chiếc thùng treo lủng lẳng trên cành. Mật rỉ ra vàng óng. Tiếng vo ve êm đềm... đang chờ bị khuấy động.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐝 *Bạn nghe tiếng vo ve và đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -798,7 +799,7 @@ export async function showForestFruitGrove(ctx: RunExploreEventInput): Promise<v
   const embed = new EmbedBuilder().setColor(0x228B22).setTitle('🍒 Vườn Trái Cây Rừng')
     .setDescription('Bạn lạc vào một khoảng cây ăn quả hoang dã — trái chín mọng đỏ, vàng, tím. Không biết loại nào ăn được và loại nào độc.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🍒 *Bạn ngắm vườn cây rồi tiếp tục đường.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -831,7 +832,7 @@ export async function showForestSilkCocoon(ctx: RunExploreEventInput): Promise<v
   const embed = new EmbedBuilder().setColor(0xE8E8E8).setTitle('🪱 Kén Tơ Khổng Lồ')
     .setDescription('Một kén tơ to như quả dưa treo trên cành thấp, ánh bạc lấp lánh trong nắng. Bên trong có thứ gì đó đang di chuyển nhẹ nhàng.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🪱 *Bạn nhìn kén rồi để nó yên.*'));
   await btn.deferUpdate().catch(() => {});
   if (btn.customId === `fsc_harvest_${ctx.userId}`) {
@@ -858,7 +859,7 @@ export async function showForestBogPearl(ctx: RunExploreEventInput): Promise<voi
   const embed = new EmbedBuilder().setColor(0x4A7C59).setTitle('💧 Viên Ngọc Đầm Lầy')
     .setDescription('Giữa một vũng nước tối, một viên ngọc trắng sáng nổi lên từ bùn đen.\n*Nước ngang đầu gối — sình lầy bên dưới.*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '💧 *Bạn nhìn viên ngọc chìm xuống bùn và bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -893,7 +894,7 @@ export async function showForestLostMerchant(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0xDAA520).setTitle('🛒 Thương Nhân Lạc Đường')
     .setDescription('Một thương nhân béo tốt đang ngồi ôm đầu cạnh xe hàng bị sa lầy, la bàn vỡ trên tay.\n*"Trời ơi, tôi lạc rồi! Ai giúp tôi với!"*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🛒 *Bạn bỏ mặc ông ta và đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -924,7 +925,7 @@ export async function showForestHermitCave(ctx: RunExploreEventInput): Promise<v
   const embed = new EmbedBuilder().setColor(0x696969).setTitle('🏔️ Hang Ẩn Sĩ')
     .setDescription('Một hang nhỏ ẩn sau thác nước mini — bên trong có người già ngồi thiền, mắt nhắm, bên cạnh là đống sách cũ.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🏔️ *Bạn rời đi mà không làm phiền vị ẩn sĩ.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -957,7 +958,7 @@ export async function showForestWoundedKnight(ctx: RunExploreEventInput): Promis
   const embed = new EmbedBuilder().setColor(0xC0C0C0).setTitle('🛡️ Hiệp Sĩ Bị Thương')
     .setDescription('Một hiệp sĩ trong bộ giáp bạc mang vết thương nặng đang tựa vào cây, thở dốc.\n*"Tôi bị phục kích... cần giúp đỡ..."*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🛡️ *Bạn bỏ đi — hiệp sĩ nhìn theo với ánh mắt thất vọng.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -988,7 +989,7 @@ export async function showForestFairyCircle(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0xFF69B4).setTitle('✨ Vòng Tròn Tiên Nữ')
     .setDescription('Trong ánh hoàng hôn, những sinh linh nhỏ xinh phát sáng đang nhảy múa thành vòng tròn giữa khoảng trống.\n*Tiếng nhạc trong trẻo như pha lê vang lên.*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '✨ *Tiếng nhạc phai dần khi bạn rời đi.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1028,7 +1029,7 @@ export async function showForestPilgrimGroup(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0xF5DEB3).setTitle('🙏 Nhóm Hành Hương')
     .setDescription('Một nhóm người già trẻ lớn bé mang đèn lồng và cờ hiệu đi qua rừng theo con đường hẹp, hát vang bài thánh ca.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🙏 *Nhóm hành hương đi qua, tiếng hát vang xa.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1063,7 +1064,7 @@ export async function showForestMadTrapper(ctx: RunExploreEventInput): Promise<v
   const embed = new EmbedBuilder().setColor(0x8B4513).setTitle('😱 Thợ Bẫy Điên')
     .setDescription('Một người đàn ông mặt mũi xơ xác, áo đầy bùn và máu, nhảy ra từ bụi cây với bẫy sắt trên tay.\n*"ĐỪNG ĐỘNG VÀO BẪY CỦA TÔI!"*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) {
     const player = getPlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
@@ -1104,7 +1105,7 @@ export async function showForestChildRunaway(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0xFFD700).setTitle('👦 Đứa Trẻ Bỏ Nhà')
     .setDescription('Một đứa trẻ chừng 10 tuổi ngồi dưới gốc cây, ôm gối khóc nức nở.\n*"Con không muốn về nhà... ba con đánh con."*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '👦 *Bạn để đứa trẻ yên và đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -1133,7 +1134,7 @@ export async function showForestDryadBlessing(ctx: RunExploreEventInput): Promis
   const embed = new EmbedBuilder().setColor(0x00FF7F).setTitle('🌿 Tiên Cây Xuất Hiện')
     .setDescription('Từ thân cây cổ thụ, một hình bóng xanh trong suốt bước ra — tiên cây, người bảo vệ khu rừng này.\n*"Kẻ lữ hành... ngươi đã đi qua lãnh địa của ta. Ta muốn ban thưởng."*');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌿 *Bóng hình xanh tan biến vào không khí.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1167,7 +1168,7 @@ export async function showForestTravelingBard(ctx: RunExploreEventInput): Promis
   const embed = new EmbedBuilder().setColor(0xFF6347).setTitle('🎸 Nhạc Sĩ Lữ Hành')
     .setDescription('Một nhạc sĩ trẻ mặc áo choàng đỏ đang ngồi trên tảng đá, gảy đàn lute và ca hát một mình giữa rừng.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🎵 *Tiếng đàn vọng theo bạn một lúc rồi tắt.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1199,7 +1200,7 @@ export async function showForestBeastTamer(ctx: RunExploreEventInput): Promise<v
   const embed = new EmbedBuilder().setColor(0x228B22).setTitle('🦁 Người Thuần Hóa Thú')
     .setDescription('Một người phụ nữ khỏe mạnh đang ngồi giữa đám thú nhỏ — cáo, thỏ, và một con linh miêu. Tất cả đều thuần tính lạ thường.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🦁 *Bạn gật đầu chào bà ta rồi đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -1239,7 +1240,7 @@ export async function showForestAncientRuins(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0x8B7355).setTitle('🏛️ Tàn Tích Cổ Đại')
     .setDescription('Giữa tán rừng dày đặc, những cột đá phủ rêu nhô lên từ đất. Chữ khắc cổ đại vẫn còn sắc nét — ngôn ngữ không ai biết nữa.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🏛️ *Bạn nhìn những cột đá im lặng rồi rời đi.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1278,7 +1279,7 @@ export async function showForestMagicSpring(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0x00BFFF).setTitle('💧 Suối Phép Thuật')
     .setDescription('Một con suối nhỏ chảy qua đá rêu — nước trong xanh và phát ra ánh sáng dịu nhẹ. Hoa rừng xung quanh nở rộ bất thường.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '💧 *Bạn lắng nghe tiếng suối rồi tiếp tục đường.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1314,7 +1315,7 @@ export async function showForestStoneCircle(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0x708090).setTitle('🗿 Vòng Đá Bí Ẩn')
     .setDescription('Mười hai tảng đá đứng thành vòng tròn hoàn hảo — không tảng nào giống tảng nào, nhưng chúng đứng đều nhau đến từng centimet.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🗿 *Bạn đi quanh vòng đá rồi tiếp tục.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1350,7 +1351,7 @@ export async function showForestSpiritLantern(ctx: RunExploreEventInput): Promis
   const embed = new EmbedBuilder().setColor(0x90EE90).setTitle('🪔 Đèn Lồng Ma Trơi')
     .setDescription('Một đốm sáng vàng xanh lơ lửng trong không khí, nhấp nhô như đang vẫy gọi bạn đi vào sâu trong rừng.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🪔 *Đèn lồng tắt dần khi bạn không tiếp cận.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1389,7 +1390,7 @@ export async function showForestCursedStatue(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0x2F4F4F).setTitle('🗿 Tượng Đá Nguyền Rủa')
     .setDescription('Một bức tượng nhỏ mắt đỏ ngồi trên tảng đá phủ rêu. Xung quanh là xương chim và hoa khô héo — không thứ gì sống được gần nó.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🗿 *Bạn tránh xa bức tượng và đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1430,7 +1431,7 @@ export async function showForestMemoryTree(ctx: RunExploreEventInput): Promise<v
   const embed = new EmbedBuilder().setColor(0x556B2F).setTitle('🌳 Cây Ký Ức')
     .setDescription('Vỏ cây này không phải vỏ cây — đó là hàng ngàn hàng ngàn hình ảnh nhỏ xíu khắc vào nhau. Mặt người, nơi chốn, thời khắc... kéo dài vô tận.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌳 *Bạn rời đi, mang theo cảm giác kỳ lạ khó tả.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1464,7 +1465,7 @@ export async function showForestDreamFlower(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0xDA70D6).setTitle('🌸 Hoa Giấc Mộng')
     .setDescription('Một bông hoa tím đậm to như chiếc đĩa nở giữa đêm, tỏa mùi hương ngọt ngào đến kỳ lạ. Bướm đêm bay quanh nó như bị thôi miên.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌸 *Hương hoa vẫn còn trong ký ức bạn suốt một lúc.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1497,7 +1498,7 @@ export async function showForestEchoGrove(ctx: RunExploreEventInput): Promise<vo
   const embed = new EmbedBuilder().setColor(0x008080).setTitle('🌿 Khu Rừng Tiếng Vang')
     .setDescription('Khu rừng này bao phủ bởi im lặng kỳ lạ — rồi đột nhiên bạn nghe tiếng bước chân của chính mình vang lại từ mọi hướng, nhưng chậm hơn và... khác đi.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌿 *Tiếng bước chân của bạn vang đi không dứt.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1532,7 +1533,7 @@ export async function showForestTimeAnomaly(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0x7B68EE).setTitle('🌀 Dị Thường Thời Gian')
     .setDescription('Một vùng không gian trước mặt bạn nhấp nháy — lá rơi ngược, ánh sáng xoáy theo chiều kim đồng hồ, và bạn có thể nghe tiếng bước chân của chính mình... từ phía trước.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌀 *Vùng dị thường từ từ tan biến.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1570,7 +1571,7 @@ export async function showForestLostRelic(ctx: RunExploreEventInput): Promise<vo
   const embed = new EmbedBuilder().setColor(0xFFD700).setTitle('🏺 Di Vật Bị Lãng Quên')
     .setDescription('Dưới lớp lá mục, bạn vô tình đạp vào một vật cứng — một bình đồng khắc hoa văn tinh xảo, vẫn còn nguyên vẹn sau bao nhiêu năm tháng.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🏺 *Bạn đẩy lá mục lại che bình và tiếp tục.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -1603,7 +1604,7 @@ export async function showForestHerbForaging(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0x228B22).setTitle('🌿 Vùng Thảo Dược')
     .setDescription('Bạn bước vào một khoảng rừng đầy thảo dược — lá xanh, lá tía, lá có hoa, lá không có hoa. Một số là thuốc quý, một số là độc.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌿 *Bạn rời vùng thảo dược tay trắng.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1637,7 +1638,7 @@ export async function showForestAnimalTracks(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0x8B4513).setTitle('🐾 Dấu Vết Thú Rừng')
     .setDescription('Trên nền đất ẩm là những dấu chân rõ nét — thú lớn, mới đi qua, còn tươi. Hướng về sâu trong rừng.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐾 *Bạn nhìn dấu chân rồi bước tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -1676,7 +1677,7 @@ export async function showForestRiverCrossing(ctx: RunExploreEventInput): Promis
   const embed = new EmbedBuilder().setColor(0x4169E1).setTitle('🌊 Vượt Sông Rừng')
     .setDescription('Con đường chặn bởi con suối chảy xiết — nước trong nhưng nhanh, đá trơn dưới đáy. Bờ bên kia có gì đó lấp lánh.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌊 *Bạn dừng lại trước sông rồi quay đầu.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1714,7 +1715,7 @@ export async function showForestTreeClimbing(ctx: RunExploreEventInput): Promise
   const embed = new EmbedBuilder().setColor(0x228B22).setTitle('🌲 Cây Cổ Thụ Cao Vút')
     .setDescription('Một cây to thẳng tắp với cành thấp vừa tầm với. Từ ngọn chắc có thể nhìn thấy cả khu rừng — hoặc tìm được thứ gì đó trên cao.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌲 *Bạn nhìn lên cây rồi đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1748,7 +1749,7 @@ export async function showForestFogMaze(ctx: RunExploreEventInput): Promise<void
   const embed = new EmbedBuilder().setColor(0xC0C0C0).setTitle('🌫️ Mê Cung Sương Mù')
     .setDescription('Sương dày đặc bao phủ hoàn toàn — tầm nhìn chưa đầy một mét. Bạn không thể thấy hướng đi và nghe thấy tiếng lạ từ nhiều phía.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) {
     const player = getPlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.12));
@@ -1788,7 +1789,7 @@ export async function showForestWaterfallCave(ctx: RunExploreEventInput): Promis
   const embed = new EmbedBuilder().setColor(0x00CED1).setTitle('💦 Thác Nước Và Hang Đá')
     .setDescription('Một thác nước nhỏ đổ xuống hồ trong veo — và sau màn nước, bóng tối của một cái hang. Đáy hồ lấp lánh như có gì ở bên dưới.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '💦 *Tiếng thác nước theo bạn suốt quãng đường dài.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1825,7 +1826,7 @@ export async function showForestDeadTreeOracle(ctx: RunExploreEventInput): Promi
   const embed = new EmbedBuilder().setColor(0x1C1C1C).setTitle('💀 Cây Chết Tiên Tri')
     .setDescription('Một cây khô trụi cành đứng trơ trọi giữa rừng xanh — không sâu bọ, không chim chóc. Ai đó đã khắc mắt lên thân cây, và bạn thề chúng đang di chuyển.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '💀 *Đôi mắt khắc trên cây nhìn theo bạn cho đến khi khuất tầm.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1861,7 +1862,7 @@ export async function showForestFlowerField(ctx: RunExploreEventInput): Promise<
   const embed = new EmbedBuilder().setColor(0xFF69B4).setTitle('🌼 Đồng Hoa Hoang Dã')
     .setDescription('Bỗng nhiên rừng mở ra thành một đồng hoa rực rỡ — vàng, hồng, trắng, tím, đỏ. Gió thổi nhẹ làm hoa rung rinh như sóng.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌼 *Bạn đứng ở rìa đồng hoa nhìn ngắm rồi đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1892,7 +1893,7 @@ export async function showForestCrowMessenger(ctx: RunExploreEventInput): Promis
   const embed = new EmbedBuilder().setColor(0x1C1C1C).setTitle('🐦‍⬛ Quạ Đưa Thư Bí Ẩn')
     .setDescription('Một con quạ lớn đậu xuống trước mặt bạn — ở chân nó có buộc một cuộn thư nhỏ và một miếng da với dấu niêm phong lạ. Nó nhìn bạn chằm chằm rồi kêu một tiếng.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐦‍⬛ *Con quạ chờ một lúc rồi bay đi.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
@@ -1928,7 +1929,7 @@ export async function showForestCampfireStranger(ctx: RunExploreEventInput): Pro
   const embed = new EmbedBuilder().setColor(0xFF4500).setTitle('🔥 Người Lạ Bên Lửa Trại')
     .setDescription('Giữa rừng tối, ánh lửa lộ ra bóng một người đang ngồi một mình. Họ nhìn bạn khi bạn đến gần — không sợ, không cảnh giác. Chỉ gật đầu mời bạn ngồi.');
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🔥 *Bạn đi qua lửa trại. Người lạ vẫn im lặng nhìn theo.*'));
   await btn.deferUpdate().catch(() => {});
   const player = getPlayer(ctx.userId, ctx.guildId)!;

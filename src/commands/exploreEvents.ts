@@ -655,6 +655,58 @@ async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
   });
 }
 
+export type VoteResult = { customId: string; deferUpdate(): Promise<void>; isButton(): boolean };
+
+export async function awaitVote(
+  ctx: RunExploreEventInput,
+  reply: Awaited<ReturnType<typeof ctx.interaction.editReply>>,
+  time = 30_000
+): Promise<VoteResult | null> {
+  const memberIds = ctx.partyMemberIds;
+
+  // Solo path
+  if (!memberIds || memberIds.length <= 1) {
+    const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time }).catch(() => null);
+    if (!btn || !btn.isButton()) return null;
+    await btn.deferUpdate().catch(() => {});
+    return btn as unknown as VoteResult;
+  }
+
+  // Party voting path
+  return new Promise<VoteResult | null>(resolve => {
+    const votes = new Map<string, string>();
+    const collector = reply.createMessageComponentCollector({
+      filter: (i) => memberIds.includes(i.user.id) && i.isButton(),
+      time
+    });
+    const updateDisplay = async () => {
+      const total = memberIds.length;
+      const voted = votes.size;
+      const statusLine = `🗳️ Đã vote: **${voted}/${total}**` + (voted < total ? ' — đang chờ...' : '');
+      const cur = reply.embeds[0];
+      if (cur) {
+        await ctx.interaction.editReply({
+          embeds: [new EmbedBuilder(cur.toJSON()).setFooter({ text: statusLine })]
+        }).catch(() => {});
+      }
+    };
+    collector.on('collect', async (i) => {
+      votes.set(i.user.id, i.customId);
+      await i.deferUpdate().catch(() => {});
+      await updateDisplay();
+      if (votes.size >= memberIds.length) collector.stop('all_voted');
+    });
+    collector.on('end', () => {
+      if (!votes.size) { resolve(null); return; }
+      const tally = new Map<string, number>();
+      for (const cid of votes.values()) tally.set(cid, (tally.get(cid) ?? 0) + 1);
+      let winner = '', maxV = 0;
+      for (const [cid, count] of tally) { if (count > maxV) { maxV = count; winner = cid; } }
+      resolve(winner ? { customId: winner, deferUpdate: async () => {}, isButton: () => true } : null);
+    });
+  });
+}
+
 async function awaitButton(ctx: RunExploreEventInput, row: ActionRowBuilder<ButtonBuilder>, embed: EmbedBuilder, imageKey?: string, time = 30_000): Promise<string | null> {
   const payload = imageKey ? withImage(embed, imageKey) : { embed, files: [] as any[] };
   const reply = await ctx.interaction.editReply({ embeds: [payload.embed], files: payload.files, components: [row] });
