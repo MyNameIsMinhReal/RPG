@@ -52,9 +52,9 @@ import {
   showForestHerbForaging, showForestAnimalTracks, showForestRiverCrossing, showForestTreeClimbing, showForestFogMaze,
   showForestWaterfallCave, showForestDeadTreeOracle, showForestFlowerField, showForestCrowMessenger, showForestCampfireStranger,
 } from './exploreEvents.forest';
-import { showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp } from './exploreEvents.shrine';
-import { showMineCollapse, showMineRichOreVein, showMineEchoTunnel, showMineRustedLift } from './exploreEvents.mines';
-import { showWastesAshStorm, showWastesBoneCaravan, showWastesGlassMirage, showWastesFallenBanner } from './exploreEvents.wastes';
+import { showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp, showShrineWeepingStatue, showShrineForbiddenOffering, showShrineSealedReliquary } from './exploreEvents.shrine';
+import { showMineCollapse, showMineRichOreVein, showMineEchoTunnel, showMineRustedLift, showMineRunawayCart, showMineLivingOre, showMineTrappedMiner } from './exploreEvents.mines';
+import { showWastesAshStorm, showWastesBoneCaravan, showWastesGlassMirage, showWastesFallenBanner, showWastesMirrorSelf, showWastesMemoryRain, showWastesFacelessMerchant } from './exploreEvents.wastes';
 import {
   getTimeOfDay, getTimeWeightMultipliers,
   showDawnRitual, showDawnTraveler, showDawnDewBlessing, showDawnHunterTracks,
@@ -76,7 +76,7 @@ import {
   showWorldFactionStandoff, showWorldChurchInquisition, showWorldShadowOffer, showWorldHuntersMission, showWorldVillagerDispute,
 } from './exploreEvents.world';
 
-export type ExploreEventType =
+export type ExploreEventType = | 'mimic_chest' | 'wandering_blacksmith' | 'temporary_arena' | 'boss_tracks' | 'map_seller' | 'shrine_weeping_statue' | 'shrine_forbidden_offering' | 'shrine_sealed_reliquary' | 'mine_runaway_cart' | 'mine_living_ore' | 'mine_trapped_miner' | 'wastes_mirror_self' | 'wastes_memory_rain' | 'wastes_faceless_merchant' 
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
   | 'soul_shop' | 'abandoned_camp' | 'lost_pouch' | 'rune_stone' | 'treasure_chest' | 'wandering_healer' | 'spirit_trial'
   | 'blood_trail' | 'nameless_grave' | 'memory_seller' | 'stranger_campfire' | 'cracked_shrine' | 'injured_monster'
@@ -241,7 +241,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['fishing_spot', player.zone_id ? 5 : 0],
 
     // High reputation events — appear more often as reputation climbs.
-    ['rep_honored_patrol',      rep >= 25 ? tm('rep_honored_patrol', 3 + highRepBonus) : 0],
+    ['mimic_chest', player.zone_id ? 4 + goodBoost : 0], ['wandering_blacksmith', tm('wandering_blacksmith', 3 + goodBoost)], ['temporary_arena', hasCombat ? 3 : 0], ['boss_tracks', hasCombat && player.zone_id !== 'village' ? 3 : 0], ['map_seller', player.zone_id ? 3 : 0], ['rep_honored_patrol',      rep >= 25 ? tm('rep_honored_patrol', 3 + highRepBonus) : 0],
     ['rep_grateful_villagers',  rep >= 30 ? tm('rep_grateful_villagers', 3 + highRepBonus) : 0],
     ['rep_supply_cache',        rep >= 40 ? tm('rep_supply_cache', 3 + highRepBonus) : 0],
     ['rep_church_blessing',     rep >= 45 ? tm('rep_church_blessing', 2 + highRepBonus) : 0],
@@ -322,17 +322,17 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['shrine_prayer_beads',      player.zone_id === 'shrine' ? 3 : 0],
     ['shrine_seal_door',         player.zone_id === 'shrine' ? 3 : 0],
     ['shrine_spirit_lamp',       player.zone_id === 'shrine' ? (time === 'night' ? 4 : 2) : 0],
-    ['mine_collapse',            player.zone_id === 'mines'  ? 4 : 0],
+    ['shrine_weeping_statue', player.zone_id === 'shrine' ? 3 : 0], ['shrine_forbidden_offering', player.zone_id === 'shrine' ? 2 : 0], ['shrine_sealed_reliquary', player.zone_id === 'shrine' ? 3 : 0], ['mine_collapse',            player.zone_id === 'mines'  ? 4 : 0],
     ['mine_ore_vein',            player.zone_id === 'mines'  ? 4 : 0],
     ['mine_echo_tunnel',         player.zone_id === 'mines'  ? 3 : 0],
     ['mine_rusted_lift',         player.zone_id === 'mines'  ? 3 : 0],
-    ['wastes_storm',             player.zone_id === 'wastes' ? 4 : 0],
+    ['mine_runaway_cart', player.zone_id === 'mines' ? 3 : 0], ['mine_living_ore', player.zone_id === 'mines' ? 3 : 0], ['mine_trapped_miner', player.zone_id === 'mines' ? 3 : 0], ['wastes_storm',             player.zone_id === 'wastes' ? 4 : 0],
     ['wastes_bone_caravan',      player.zone_id === 'wastes' ? 3 : 0],
     ['wastes_glass_mirage',      player.zone_id === 'wastes' ? 3 : 0],
     ['wastes_fallen_banner',     player.zone_id === 'wastes' ? 3 : 0],
 
     // Time-of-day events
-    ['dawn_ritual',        time === 'dawn'  ? 4 : 0],
+    ['wastes_mirror_self', player.zone_id === 'wastes' && hasCombat ? 3 : 0], ['wastes_memory_rain', player.zone_id === 'wastes' ? 3 : 0], ['wastes_faceless_merchant', player.zone_id === 'wastes' ? 3 : 0], ['dawn_ritual',        time === 'dawn'  ? 4 : 0],
     ['dawn_traveler',      time === 'dawn'  ? 3 : 0],
     ['dawn_dew_blessing',  time === 'dawn'  ? 3 : 0],
     ['dawn_hunter_tracks', time === 'dawn'  ? 3 : 0],
@@ -443,7 +443,7 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'atonement_monk': return showAtonementMonk(ctx);
     case 'conditional_miniboss': return showConditionalMiniboss(ctx);
     case 'fishing_spot': return showFishingSpot(ctx);
-    case 'rep_honored_patrol':       return showRepHonoredPatrol(ctx);
+     case 'mimic_chest': return showMimicChest(ctx); case 'wandering_blacksmith': return showWanderingBlacksmith(ctx); case 'temporary_arena': return showTemporaryArena(ctx); case 'boss_tracks': return showBossTracks(ctx); case 'map_seller': return showMapSeller(ctx); case 'rep_honored_patrol':       return showRepHonoredPatrol(ctx);
     case 'rep_grateful_villagers':   return showRepGratefulVillagers(ctx);
     case 'rep_supply_cache':         return showRepSupplyCache(ctx);
     case 'rep_church_blessing':      return showRepChurchBlessing(ctx);
@@ -537,15 +537,15 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'shrine_prayer_beads':      return showShrinePrayerBeads(ctx);
     case 'shrine_seal_door':         return showShrineSealDoor(ctx);
     case 'shrine_spirit_lamp':       return showShrineSpiritLamp(ctx);
-    case 'mine_collapse':            return showMineCollapse(ctx);
+     case 'shrine_weeping_statue': return showShrineWeepingStatue(ctx); case 'shrine_forbidden_offering': return showShrineForbiddenOffering(ctx); case 'shrine_sealed_reliquary': return showShrineSealedReliquary(ctx); case 'mine_collapse':            return showMineCollapse(ctx);
     case 'mine_ore_vein':            return showMineRichOreVein(ctx);
     case 'mine_echo_tunnel':         return showMineEchoTunnel(ctx);
     case 'mine_rusted_lift':         return showMineRustedLift(ctx);
-    case 'wastes_storm':             return showWastesAshStorm(ctx);
+     case 'mine_runaway_cart': return showMineRunawayCart(ctx); case 'mine_living_ore': return showMineLivingOre(ctx); case 'mine_trapped_miner': return showMineTrappedMiner(ctx); case 'wastes_storm':             return showWastesAshStorm(ctx);
     case 'wastes_bone_caravan':      return showWastesBoneCaravan(ctx);
     case 'wastes_glass_mirage':      return showWastesGlassMirage(ctx);
     case 'wastes_fallen_banner':     return showWastesFallenBanner(ctx);
-    case 'dawn_ritual':          return showDawnRitual(ctx);
+     case 'wastes_mirror_self': return showWastesMirrorSelf(ctx); case 'wastes_memory_rain': return showWastesMemoryRain(ctx); case 'wastes_faceless_merchant': return showWastesFacelessMerchant(ctx); case 'dawn_ritual':          return showDawnRitual(ctx);
     case 'dawn_traveler':        return showDawnTraveler(ctx);
     case 'dawn_dew_blessing':    return showDawnDewBlessing(ctx);
     case 'dawn_hunter_tracks':   return showDawnHunterTracks(ctx);
@@ -1671,3 +1671,142 @@ async function showConditionalMiniboss(ctx: RunExploreEventInput): Promise<void>
     ctx.callbacks.handleDeath
   );
 }
+
+// EXTRA_EVENTS_COMMON_START
+async function showMimicChest(ctx: RunExploreEventInput): Promise<void> {
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.gold)
+    .setTitle('🎁 Rương Cũ Run Nhẹ')
+    .setDescription('Một chiếc rương gỗ nằm giữa đường. Nắp rương khẽ hé ra như đang... thở.');
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`mimic_open_${ctx.userId}`).setLabel('Mở ngay').setEmoji('🗝️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`mimic_check_${ctx.userId}`).setLabel('Kiểm tra bẫy').setEmoji('🔎').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`mimic_leave_${ctx.userId}`).setLabel('Bỏ qua').setStyle(ButtonStyle.Secondary),
+  );
+
+  const cid = await awaitButton(ctx, row, embed, 'chest');
+  if (cid === `mimic_leave_${ctx.userId}` || !cid) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn bỏ qua chiếc rương khả nghi. Có lẽ đó là lựa chọn khôn ngoan.'), 'chest');
+
+  const careful = cid === `mimic_check_${ctx.userId}`;
+  const mimicChance = careful ? 18 : 42;
+  if (randInt(1, 100) <= mimicChance && ctx.enemies.length) {
+    const base = pick(ctx.enemies);
+    const enemy = eventEnemy(ctx, base, {
+      id: 'mimic_chest', name: 'Mimic Rương Cũ', icon: '🎁',
+      hp: Math.floor((base.hp ?? 60) * 1.25),
+      atk: Math.floor((base.atk ?? ctx.player.atk) * 1.1),
+      def: Math.floor((base.def ?? ctx.player.def) * 1.05),
+      expReward: Math.floor(ctx.player.exp_next * 0.18), goldMin: 30, goldMax: 90,
+      drops: [{ itemId: pick(['mysterious_shard', 'mana_crystal', 'iron_ore']), chance: 45 }],
+      lore: 'Một chiếc rương sống chuyên nuốt những kẻ tham lam.',
+    });
+    return startCombatFlowWithEnemy(
+      ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+      async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
+        title: '🎁 Mimic Bị Hạ',
+        description: 'Bạn phá vỡ lớp gỗ sống của Mimic và gom được phần lõi bên trong.',
+        exp: Math.floor(ctx.player.exp_next * 0.2), gold: randInt(45, 120),
+        items: [pick(['mysterious_shard', 'mana_crystal', 'iron_ore'])],
+      }),
+      nonLethalLoss as any,
+      ctx.callbacks.handleFlee,
+    );
+  }
+
+  if (careful) grantExp(ctx.userId, ctx.guildId, randInt(12, 24));
+  const gold = careful ? randInt(25, 70) : randInt(40, 110);
+  grantGold(ctx.userId, ctx.guildId, gold);
+  if (randInt(1, 100) <= (careful ? 45 : 25)) addItem(ctx.userId, ctx.guildId, pick(['health_potion', 'mana_potion', 'antidote']), 1);
+  return finish(ctx, simpleEmbed(COLORS.gold, `🎁 Chiếc rương là thật!
+💰 +**${gold} Gold**${careful ? '\n⭐ +EXP nhỏ từ việc kiểm tra bẫy' : ''}`), 'chest');
+}
+
+async function showWanderingBlacksmith(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const embed = new EmbedBuilder().setColor(0x9b7653).setTitle('🔥 Thợ Rèn Lang Thang').setDescription('Một lò rèn nhỏ cháy đỏ bên vệ đường. Người thợ rèn già nhìn vũ khí của bạn rồi gật đầu.');
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`smith_weapon_${ctx.userId}`).setLabel('Mua Weapon Oil - 60G').setEmoji('⚔️').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 60),
+    new ButtonBuilder().setCustomId(`smith_armor_${ctx.userId}`).setLabel('Mua Armor Polish - 55G').setEmoji('🛡️').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 55),
+    new ButtonBuilder().setCustomId(`smith_rare_${ctx.userId}`).setLabel('Đặt hàng hiếm - 120G').setEmoji('⚒️').setStyle(ButtonStyle.Success).setDisabled(player.gold < 120),
+    new ButtonBuilder().setCustomId(`smith_leave_${ctx.userId}`).setLabel('Rời đi').setStyle(ButtonStyle.Secondary),
+  );
+  const cid = await awaitButton(ctx, row, embed, 'merchant');
+  if (!cid || cid === `smith_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🔥 Thợ rèn gật đầu chào bạn rồi tiếp tục nhóm lửa.'), 'merchant');
+  if (cid === `smith_weapon_${ctx.userId}`) { spendGold(ctx.userId, ctx.guildId, 60); addItem(ctx.userId, ctx.guildId, 'weapon_oil', 1); return finish(ctx, simpleEmbed(COLORS.success, '⚔️ Bạn mua **Weapon Oil**.\n💰 -**60 Gold**'), 'merchant'); }
+  if (cid === `smith_armor_${ctx.userId}`) { spendGold(ctx.userId, ctx.guildId, 55); addItem(ctx.userId, ctx.guildId, 'armor_polish', 1); return finish(ctx, simpleEmbed(COLORS.success, '🛡️ Bạn mua **Armor Polish**.\n💰 -**55 Gold**'), 'merchant'); }
+  spendGold(ctx.userId, ctx.guildId, 120);
+  const rare = pick(['black_iron', 'mana_crystal', 'mysterious_shard', 'silver_ore']);
+  addItem(ctx.userId, ctx.guildId, rare, 1);
+  grantExp(ctx.userId, ctx.guildId, 25);
+  return finish(ctx, simpleEmbed(COLORS.gold, `⚒️ Thợ rèn mở hộp hàng dưới gầm xe.
+💰 -**120 Gold**
+📦 +**1× ${rare}**
+⭐ +**25 EXP**`), 'merchant');
+}
+
+async function showTemporaryArena(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const bet = Math.min(player.gold, Math.max(30, 30 + player.level * 10));
+  const embed = new EmbedBuilder().setColor(0xb35c00).setTitle('⚔️ Đấu Trường Tạm Thời').setDescription('Một vòng tròn đá được dựng vội. Khán giả hò reo khi thấy bạn bước đến.');
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`arena_fight_${ctx.userId}`).setLabel('Đấu thường').setEmoji('⚔️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`arena_bet_${ctx.userId}`).setLabel(`Đấu cược ${bet}G`).setEmoji('💰').setStyle(ButtonStyle.Danger).setDisabled(bet <= 0),
+    new ButtonBuilder().setCustomId(`arena_leave_${ctx.userId}`).setLabel('Rời đi').setStyle(ButtonStyle.Secondary),
+  );
+  const cid = await awaitButton(ctx, row, embed, 'combat');
+  if (!cid || cid === `arena_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn rời khỏi đấu trường trước khi bị kéo vào trận.'), 'combat');
+  if (!ctx.enemies.length) return finish(ctx, simpleEmbed(COLORS.info, '⚔️ Đấu trường trống. Không có đối thủ phù hợp.'), 'combat');
+  const base = pick(ctx.enemies);
+  const enemy = eventEnemy(ctx, base, { id: 'arena_challenger', name: `Đấu Sĩ ${base.name}`, icon: '⚔️', hp: Math.floor((base.hp ?? 60) * 1.1), atk: Math.floor((base.atk ?? ctx.player.atk) * 1.05), def: base.def ?? ctx.player.def, lore: 'Một đấu sĩ nhận kèo từ đấu trường tạm thời.' });
+  const isBet = cid === `arena_bet_${ctx.userId}`;
+  if (isBet) spendGold(ctx.userId, ctx.guildId, bet);
+  return startCombatFlowWithEnemy(
+    ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+    async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
+      title: isBet ? '💰 Bạn Thắng Kèo Đấu!' : '🏆 Chiến Thắng Đấu Trường',
+      description: isBet ? 'Khán giả ném tiền vào vòng đấu khi bạn hạ đối thủ.' : 'Bạn thắng trận và được đám đông công nhận.',
+      exp: Math.floor(ctx.player.exp_next * (isBet ? 0.2 : 0.14)), gold: isBet ? bet * 2 + randInt(20, 60) : randInt(25, 70), rep: isBet ? 1 : 2,
+    }),
+    nonLethalLoss as any,
+    ctx.callbacks.handleFlee,
+  );
+}
+
+async function showBossTracks(ctx: RunExploreEventInput): Promise<void> {
+  const embed = new EmbedBuilder().setColor(COLORS.danger).setTitle('🐾 Dấu Vết Boss').setDescription('Mặt đất bị cày nát bởi dấu chân khổng lồ. Không khí nặng như trước một trận chiến lớn.');
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`bt_follow_${ctx.userId}`).setLabel('Lần theo dấu vết').setEmoji('🐾').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`bt_collect_${ctx.userId}`).setLabel('Thu thập mẫu vật').setEmoji('🧪').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`bt_destroy_${ctx.userId}`).setLabel('Xóa dấu vết').setEmoji('🛡️').setStyle(ButtonStyle.Secondary),
+  );
+  const cid = await awaitButton(ctx, row, embed, 'boss');
+  if (cid === `bt_collect_${ctx.userId}`) { const item = pick(['mysterious_shard', 'ancient_bone', 'cursed_blood', 'mana_crystal']); addItem(ctx.userId, ctx.guildId, item, 1); grantExp(ctx.userId, ctx.guildId, randInt(25, 55)); return finish(ctx, simpleEmbed(COLORS.success, `🧪 Bạn thu được mẫu vật từ dấu vết.
+📦 +**1× ${item}**
+⭐ +EXP thăm dò`), 'boss'); }
+  if (cid === `bt_destroy_${ctx.userId}`) { adjustWorldDanger(ctx.guildId, -2); return finish(ctx, simpleEmbed(COLORS.info, '🛡️ Bạn xóa dấu vết để quái vật khó lần về khu dân cư.\n⚠️ World Danger **-2**'), 'boss'); }
+  if (!cid || !ctx.enemies.length) return finish(ctx, simpleEmbed(COLORS.info, '🐾 Dấu vết mất hút trong sương mù.'), 'boss');
+  const base = pick(ctx.enemies);
+  const enemy = eventEnemy(ctx, base, { id: 'boss_track_guardian', name: `Hộ Vệ Dấu Vết ${base.name}`, icon: '🐾', hp: Math.floor((base.hp ?? 70) * 1.35), atk: Math.floor((base.atk ?? ctx.player.atk) * 1.18), def: Math.floor((base.def ?? ctx.player.def) * 1.1), expReward: Math.floor(ctx.player.exp_next * 0.25), goldMin: 60, goldMax: 140, lore: 'Kẻ canh giữ lãnh địa boss.' });
+  return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined, async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🐾 Dấu Vết Được Mở Đường', description: 'Bạn hạ hộ vệ và hiểu rõ hơn về con boss đang ẩn trong khu vực.', exp: Math.floor(ctx.player.exp_next * 0.24), gold: randInt(70, 160), soulShards: randInt(1, 100) <= 45 ? 1 : 0 }), nonLethalLoss as any, ctx.callbacks.handleFlee);
+}
+
+async function showMapSeller(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const embed = new EmbedBuilder().setColor(0x6b4f2a).setTitle('🗺️ Người Bán Bản Đồ').setDescription('Một người bán bản đồ trải giấy da trên thùng gỗ. Một số tuyến đường được đánh dấu bằng mực đỏ.');
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`map_safe_${ctx.userId}`).setLabel('Mua bản đồ an toàn - 45G').setEmoji('🛡️').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 45),
+    new ButtonBuilder().setCustomId(`map_ancient_${ctx.userId}`).setLabel('Mua bản đồ cổ - 120G').setEmoji('🗺️').setStyle(ButtonStyle.Success).setDisabled(player.gold < 120),
+    new ButtonBuilder().setCustomId(`map_rob_${ctx.userId}`).setLabel('Cướp bản đồ').setEmoji('🗡️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`map_leave_${ctx.userId}`).setLabel('Bỏ qua').setStyle(ButtonStyle.Secondary),
+  );
+  const cid = await awaitButton(ctx, row, embed, 'merchant');
+  if (!cid || cid === `map_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🗺️ Bạn không mua gì và rời đi.'), 'merchant');
+  if (cid === `map_safe_${ctx.userId}`) { spendGold(ctx.userId, ctx.guildId, 45); setFlag(ctx.guildId, `zone_marked_${ctx.player.zone_id}`, '20', 1800); return finish(ctx, simpleEmbed(COLORS.success, '🗺️ Bạn mua bản đồ tuyến an toàn.\n💰 -**45 Gold**\n📍 Zone hiện tại được đánh dấu trong **30 phút**.'), 'merchant'); }
+  if (cid === `map_ancient_${ctx.userId}`) { spendGold(ctx.userId, ctx.guildId, 120); setFlag(ctx.guildId, `treasure_hint_${ctx.userId}`, ctx.player.zone_id ?? 'unknown', 3600); addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1); return finish(ctx, simpleEmbed(COLORS.gold, '🗺️ Bạn mua một bản đồ cổ.\n💰 -**120 Gold**\n📦 +**1× Mysterious Shard**'), 'merchant'); }
+  const rep = adjustReputation(ctx.userId, ctx.guildId, -8); adjustWanted(ctx.userId, ctx.guildId, 1); setFlag(ctx.guildId, `zone_marked_${ctx.player.zone_id}`, '10', 1200);
+  return finish(ctx, simpleEmbed(COLORS.warning, `🗡️ Bạn cướp được bản đồ rồi lẩn vào đám đông.
+📉 Reputation: **${rep}** (-8)
+🚨 Wanted **+1**`), 'merchant');
+}
+// EXTRA_EVENTS_COMMON_END

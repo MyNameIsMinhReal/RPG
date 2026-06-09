@@ -236,3 +236,71 @@ export async function showWastesFallenBanner(ctx: RunExploreEventInput): Promise
   setBuff(ctx.userId, ctx.guildId, 'rage_elixir', 10, 1, 3600);
   return finish(ctx, simpleEmbed(COLORS.warning, '🔥 Lá cờ cháy lên ngọn lửa xanh đen. Có thứ gì đó trong bạn cũng bùng cháy theo.\n💀 +**1 Soul Shard**\n🔥 Trận kế tiếp: **ATK +10%**, nhưng nguy hiểm hơn.'));
 }
+
+// EXTRA_EVENTS_WASTES_START
+export async function showWastesMirrorSelf(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`wms_talk_${ctx.userId}`).setLabel('Nói chuyện').setEmoji('💬').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`wms_fight_${ctx.userId}`).setLabel('Chiến đấu').setEmoji('⚔️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`wms_touch_${ctx.userId}`).setLabel('Chạm vào ảo ảnh').setEmoji('🪞').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder().setColor(0x9b59b6).setTitle('🪞 Ảo Ảnh Của Chính Mình').setDescription('Một phiên bản khác của bạn đứng giữa hoang nguyên. Nó cười như đã biết trước mọi lựa chọn.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🪞 Ảo ảnh tan vào gió nóng.'));
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `wms_talk_${ctx.userId}`) { const exp = randInt(45, 90); grantExp(ctx.userId, ctx.guildId, exp); setBuff(ctx.userId, ctx.guildId, 'luck', 10, 1, 1800); return finish(ctx, simpleEmbed(COLORS.magic, `💬 Ảo ảnh thì thầm về một sai lầm bạn chưa phạm phải.
+⭐ +**${exp} EXP**
+✨ Nhận **Luck** cho lần khám phá sau.`)); }
+  if (btn.customId === `wms_touch_${ctx.userId}`) { if (randInt(1, 100) <= 45) { const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.5)); updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp); grantSoulShards(ctx.userId, ctx.guildId, 1); return finish(ctx, simpleEmbed(COLORS.success, `🪞 Bạn chạm vào chính mình ở một tương lai khác.
+🔮 MP: **${mp}/${player.max_mp}**
+💠 +**1 Soul Shard**`)); } const dmg = Math.max(1, Math.floor(player.max_hp * 0.14)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); return finish(ctx, simpleEmbed(COLORS.warning, `🪞 Ký ức không thuộc về bạn tràn vào đầu.
+❤️ HP mất **${dmg}**`)); }
+  if (!ctx.enemies.length) return finish(ctx, simpleEmbed(COLORS.info, '🪞 Ảo ảnh biến mất trước khi trận đấu bắt đầu.'));
+  await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '⚔️ Bạn rút vũ khí. Ảo ảnh cũng làm y hệt.\n\n*Chiến đấu bắt đầu...*')], components: [] });
+  await new Promise(r => setTimeout(r, 600));
+  return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+}
+
+export async function showWastesMemoryRain(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`wmr_stand_${ctx.userId}`).setLabel('Đứng dưới mưa').setEmoji('🌧️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`wmr_collect_${ctx.userId}`).setLabel('Hứng nước mưa').setEmoji('🧪').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`wmr_run_${ctx.userId}`).setLabel('Chạy khỏi mưa').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder().setColor(0x708090).setTitle('🌧️ Cơn Mưa Ký Ức').setDescription('Những giọt mưa rơi xuống tro bụi, mỗi giọt phản chiếu một ký ức không rõ là của ai.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton() || btn.customId === `wmr_run_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🏃 Bạn chạy khỏi cơn mưa trước khi ký ức bám vào da.'));
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `wmr_collect_${ctx.userId}`) { addItem(ctx.userId, ctx.guildId, 'void_fragment', 1); if (randInt(1, 100) <= 40) addItem(ctx.userId, ctx.guildId, 'fallen_star_fragment', 1); return finish(ctx, simpleEmbed(COLORS.success, '🧪 Bạn hứng được nước mưa trong một mảnh kính vỡ.\n📦 +**1× Void Fragment**\n⭐ Có thể nhận **Fallen Star Fragment**.')); }
+  const exp = randInt(70, 130); grantExp(ctx.userId, ctx.guildId, exp); const dmg = Math.max(1, Math.floor(player.max_hp * 0.08)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); return finish(ctx, simpleEmbed(COLORS.magic, `🌧️ Bạn để ký ức ngấm vào mình. Có đau, nhưng cũng có hiểu biết.
+⭐ +**${exp} EXP**
+❤️ HP mất **${dmg}**`));
+}
+
+export async function showWastesFacelessMerchant(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`wfm_gold_${ctx.userId}`).setLabel('Mua bằng 180G').setEmoji('💰').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 180),
+    new ButtonBuilder().setCustomId(`wfm_soul_${ctx.userId}`).setLabel('Trả 1 Soul Shard').setEmoji('💠').setStyle(ButtonStyle.Danger).setDisabled((player.soul_shards ?? 0) < 1),
+    new ButtonBuilder().setCustomId(`wfm_name_${ctx.userId}`).setLabel('Hỏi tên hắn').setEmoji('❔').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder().setColor(0x111111).setTitle('🕳️ Người Buôn Không Có Mặt').setDescription('Một thương nhân trùm khăn đen đứng cạnh xe hàng. Dưới mũ không có mắt, mũi hay miệng.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🕳️ Người buôn không mặt biến mất khi bạn chớp mắt.'));
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `wfm_gold_${ctx.userId}`) { spendGold(ctx.userId, ctx.guildId, 180); const item = pick(['black_iron', 'void_fragment', 'fallen_star_fragment', 'cursed_blood']); addItem(ctx.userId, ctx.guildId, item, 1); return finish(ctx, simpleEmbed(COLORS.gold, `💰 Bạn mua một món hàng được bọc bằng vải không đổ bóng.
+💰 -**180 Gold**
+📦 +**1× ${item}**`)); }
+  if (btn.customId === `wfm_soul_${ctx.userId}`) { grantSoulShards(ctx.userId, ctx.guildId, -1); const item = pick(['fallen_star_fragment', 'void_fragment', 'black_iron']); addItem(ctx.userId, ctx.guildId, item, 2); return finish(ctx, simpleEmbed(COLORS.warning, `💠 Bạn đặt Soul Shard lên bàn. Người buôn gật đầu dù không có mặt.
+💠 -**1 Soul Shard**
+📦 +**2× ${item}**`)); }
+  if (randInt(1, 100) <= 50) { setBuff(ctx.userId, ctx.guildId, 'black_market_access', 1, 1, 3600); return finish(ctx, simpleEmbed(COLORS.magic, '❔ Khi bạn hỏi tên, hắn viết một ký hiệu lên tay bạn.\n🕳️ Mở quyền vào **Black Market** trong 1 giờ.')); }
+  const dmg = Math.max(1, Math.floor(player.max_hp * 0.12)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); return finish(ctx, simpleEmbed(COLORS.danger, `❔ Bạn hỏi tên hắn. Trong đầu bạn vang lên một tiếng không nên được nghe.
+❤️ HP mất **${dmg}**`));
+}
+// EXTRA_EVENTS_WASTES_END

@@ -421,6 +421,10 @@ function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): s
     return getPrefixUsage('use');
   }
 
+  if (parsed.commandName === 'code' && !args) {
+    return 'Cách dùng: `rpg code <mã_code>`';
+  }
+
   if (parsed.commandName === 'trade') {
     const hasUser = message.mentions.users.size > 0 || args.split(/\s+/).some(t => Boolean(stripUserMentionToken(t)));
     const hasAmount = /(?:^|\s)\d+(?:\s|$)/.test(args);

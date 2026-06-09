@@ -235,3 +235,73 @@ export async function showMineRustedLift(ctx: RunExploreEventInput): Promise<voi
   ];
   return finish(ctx, simpleEmbed(COLORS.warning, `🛗 Thang rơi nửa chừng rồi kẹt lại. Bạn sống sót, nhưng không nguyên vẹn.\n❤️ HP mất **${dmg}**\n${pick(rewards)()}`));
 }
+
+// EXTRA_EVENTS_MINES_START
+export async function showMineRunawayCart(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`mrc_dodge_${ctx.userId}`).setLabel('Né sang bên').setEmoji('🏃').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`mrc_jump_${ctx.userId}`).setLabel('Nhảy lên xe').setEmoji('🛒').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`mrc_break_${ctx.userId}`).setLabel('Phá bánh xe').setEmoji('⚒️').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder().setColor(0x8b6f47).setTitle('🛒 Xe Mỏ Mất Kiểm Soát').setDescription('Một xe mỏ đầy đá lao xuống đường ray, tia lửa bắn tung tóe trong bóng tối.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton()) { const dmg = Math.max(1, Math.floor(player.max_hp * 0.1)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); return finish(ctx, simpleEmbed(COLORS.warning, `💥 Bạn phản ứng quá chậm và bị xe quệt trúng.
+❤️ HP mất **${dmg}**`)); }
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `mrc_dodge_${ctx.userId}`) { grantExp(ctx.userId, ctx.guildId, 20); return finish(ctx, simpleEmbed(COLORS.info, `🏃 Bạn né sát vách đá. Xe mỏ lao qua trong gang tấc.\n⭐ +**20 EXP**`)); }
+  if (btn.customId === `mrc_break_${ctx.userId}`) { addItem(ctx.userId, ctx.guildId, 'rusty_gear', randInt(2, 4)); grantExp(ctx.userId, ctx.guildId, 30); return finish(ctx, simpleEmbed(COLORS.success, '⚒️ Bạn phá bánh xe và gom được phụ tùng.\n⚙️ +**2–4× Rusty Gear**\n⭐ +**30 EXP**')); }
+  const dmg = Math.max(1, Math.floor(player.max_hp * randInt(8, 18) / 100)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); const gold = randInt(80, 170); grantGold(ctx.userId, ctx.guildId, gold); if (randInt(1, 100) <= 35) addItem(ctx.userId, ctx.guildId, 'silver_ore', 1);
+  return finish(ctx, simpleEmbed(COLORS.gold, `🛒 Bạn nhảy lên xe và bị kéo tới một khoang mỏ bí mật.
+❤️ HP mất **${dmg}**
+💰 +**${gold} Gold**
+⛏️ Có thể tìm thấy **Silver Ore**.`));
+}
+
+export async function showMineLivingOre(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`mlo_light_${ctx.userId}`).setLabel('Khai thác nhẹ').setEmoji('⛏️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`mlo_deep_${ctx.userId}`).setLabel('Đào sâu').setEmoji('💎').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`mlo_listen_${ctx.userId}`).setLabel('Lắng nghe nhịp quặng').setEmoji('👂').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder().setColor(0x49796b).setTitle('💎 Vỉa Quặng Sống').setDescription('Một vỉa quặng xanh nhạt phập phồng như đang thở. Mỗi nhát cuốc làm cả vách đá run lên.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn không chạm vào vỉa quặng sống.'));
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `mlo_light_${ctx.userId}`) { addItem(ctx.userId, ctx.guildId, 'iron_ore', randInt(2, 5)); if (randInt(1, 100) <= 30) addItem(ctx.userId, ctx.guildId, 'mana_crystal', 1); return finish(ctx, simpleEmbed(COLORS.success, '⛏️ Bạn khai thác vừa đủ trước khi vỉa quặng khép lại.\n📦 +**2–5× Iron Ore**\n🔮 Có thể nhận **Mana Crystal**.')); }
+  if (btn.customId === `mlo_listen_${ctx.userId}`) { const exp = randInt(35, 75); grantExp(ctx.userId, ctx.guildId, exp); addItem(ctx.userId, ctx.guildId, 'mana_crystal', 1); return finish(ctx, simpleEmbed(COLORS.magic, `👂 Bạn nghe được nhịp của vỉa quặng và tách đúng tinh thể sống.
+🔮 +**1× Mana Crystal**
+⭐ +**${exp} EXP**`)); }
+  const dmg = Math.max(1, Math.floor(player.max_hp * 0.14)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); addItem(ctx.userId, ctx.guildId, 'black_iron', 1); addItem(ctx.userId, ctx.guildId, 'mana_crystal', 1);
+  return finish(ctx, simpleEmbed(COLORS.warning, `💎 Bạn đào quá sâu. Vỉa quặng co giật, đá sắc cắt vào tay.
+❤️ HP mất **${dmg}**
+⬛ +**1× Black Iron**
+🔮 +**1× Mana Crystal**`));
+}
+
+export async function showMineTrappedMiner(ctx: RunExploreEventInput): Promise<void> {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`mtm_rescue_${ctx.userId}`).setLabel('Cứu thợ mỏ').setEmoji('🧑‍🏭').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`mtm_take_${ctx.userId}`).setLabel('Lấy túi đồ trước').setEmoji('🎒').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`mtm_call_${ctx.userId}`).setLabel('Gọi đội cứu hộ').setEmoji('📣').setStyle(ButtonStyle.Primary),
+  );
+  const embed = new EmbedBuilder().setColor(0x8b4513).setTitle('🧑‍🏭 Thợ Mỏ Bị Kẹt').setDescription('Một cánh tay thò ra dưới đống đá. Bên cạnh là túi dụng cụ còn nguyên vẹn.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Tiếng gọi yếu dần phía sau khi bạn rời đi.'));
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `mtm_rescue_${ctx.userId}`) { const rep = adjustReputation(ctx.userId, ctx.guildId, 9); const exp = randInt(35, 70); grantExp(ctx.userId, ctx.guildId, exp); addItem(ctx.userId, ctx.guildId, pick(['iron_ore', 'copper_ore', 'rusty_gear']), 2); return finish(ctx, simpleEmbed(COLORS.success, `🧑‍🏭 Bạn kéo thợ mỏ ra khỏi đống đá.
+⭐ +**${exp} EXP**
+📦 +**2 vật liệu mỏ**
+📈 Reputation: **${rep}** (+9)`)); }
+  if (btn.customId === `mtm_call_${ctx.userId}`) { const rep = adjustReputation(ctx.userId, ctx.guildId, 4); grantExp(ctx.userId, ctx.guildId, 25); return finish(ctx, simpleEmbed(COLORS.info, `📣 Bạn đánh dấu vị trí và gọi đội cứu hộ.
+⭐ +**25 EXP**
+📈 Reputation: **${rep}** (+4)`)); }
+  const gold = randInt(60, 130); grantGold(ctx.userId, ctx.guildId, gold); const rep = adjustReputation(ctx.userId, ctx.guildId, -10); return finish(ctx, simpleEmbed(COLORS.warning, `🎒 Bạn lấy túi đồ rồi rời đi trước khi hầm sập tiếp.
+💰 +**${gold} Gold**
+📉 Reputation: **${rep}** (-10)`));
+}
+// EXTRA_EVENTS_MINES_END

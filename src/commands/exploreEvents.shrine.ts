@@ -215,3 +215,79 @@ export async function showShrineSpiritLamp(ctx: RunExploreEventInput): Promise<v
   updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
   return finish(ctx, simpleEmbed(COLORS.warning, `🪄 Bạn lấy tim đèn. Nó hóa thành mực rune trong tay, nhưng hơi lạnh cắn vào máu.\n🪄 +**1× Rune Ink**\n❤️ HP mất **${dmg}**`));
 }
+
+// EXTRA_EVENTS_SHRINE_START
+export async function showShrineWeepingStatue(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`sws_wipe_${ctx.userId}`).setLabel('Lau vết máu').setEmoji('🩸').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`sws_collect_${ctx.userId}`).setLabel('Hứng máu tượng').setEmoji('🧪').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`sws_pray_${ctx.userId}`).setLabel('Cầu nguyện').setEmoji('🙏').setStyle(ButtonStyle.Primary),
+  );
+  const embed = new EmbedBuilder().setColor(0x8b0000).setTitle('🩸 Tượng Đá Khóc Máu').setDescription('Một pho tượng cổ rỉ xuống những giọt đỏ sẫm. Cả căn đền lạnh đi khi bạn đến gần.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn lùi khỏi pho tượng trước khi tiếng thì thầm vang rõ hơn.'));
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `sws_wipe_${ctx.userId}`) { const exp = randInt(30, 65); const rep = adjustReputation(ctx.userId, ctx.guildId, 7); grantExp(ctx.userId, ctx.guildId, exp); return finish(ctx, simpleEmbed(COLORS.success, `🩸 Bạn lau sạch vết máu. Tượng đá khẽ ấm lên.
+⭐ +**${exp} EXP**
+📈 Reputation: **${rep}** (+7)`)); }
+  if (btn.customId === `sws_collect_${ctx.userId}`) { addItem(ctx.userId, ctx.guildId, 'cursed_blood', 1); grantSoulShards(ctx.userId, ctx.guildId, 1); const dmg = Math.max(1, Math.floor(player.max_hp * 0.12)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); const rep = adjustReputation(ctx.userId, ctx.guildId, -5); return finish(ctx, simpleEmbed(COLORS.warning, `🧪 Bạn hứng lấy thứ máu lạnh như băng.
+📦 +**1× Cursed Blood**
+💠 +**1 Soul Shard**
+❤️ HP mất **${dmg}**
+📉 Reputation: **${rep}** (-5)`)); }
+  const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.45));
+  updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp); grantExp(ctx.userId, ctx.guildId, 25);
+  return finish(ctx, simpleEmbed(COLORS.magic, `🙏 Bạn cầu nguyện trước tượng. Tiếng khóc nhỏ dần.
+🔮 MP: **${mp}/${player.max_mp}**
+⭐ +**25 EXP**`));
+}
+
+export async function showShrineForbiddenOffering(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`sfo_gold_${ctx.userId}`).setLabel('Dâng 80 Gold').setEmoji('💰').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 80),
+    new ButtonBuilder().setCustomId(`sfo_hp_${ctx.userId}`).setLabel('Dâng máu').setEmoji('❤️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`sfo_refuse_${ctx.userId}`).setLabel('Từ chối').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder().setColor(0x4b0082).setTitle('🕯️ Lễ Vật Cấm').setDescription('Một bàn thờ phụ bị che bởi vải đen. Dòng chữ cổ yêu cầu một lễ vật để đổi lấy sức mạnh.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton() || btn.customId === `sfo_refuse_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn phủ lại tấm vải đen và rời khỏi bàn thờ.'));
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `sfo_gold_${ctx.userId}`) { spendGold(ctx.userId, ctx.guildId, 80); const exp = randInt(45, 85); grantExp(ctx.userId, ctx.guildId, exp); if (randInt(1, 100) <= 35) addItem(ctx.userId, ctx.guildId, 'mana_crystal', 1); return finish(ctx, simpleEmbed(COLORS.magic, `💰 Vàng tan thành bụi sáng.
+💰 -**80 Gold**
+⭐ +**${exp} EXP**
+🔮 Có thể nhận thêm **Mana Crystal**.`)); }
+  const dmg = Math.max(1, Math.floor(player.max_hp * 0.18)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); grantSoulShards(ctx.userId, ctx.guildId, 1); addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
+  return finish(ctx, simpleEmbed(COLORS.warning, `❤️ Bạn nhỏ máu lên bàn thờ. Cái bóng sau lưng bạn dài ra bất thường.
+❤️ HP mất **${dmg}**
+💠 +**1 Soul Shard**
+📦 +**1× Mysterious Shard**`));
+}
+
+export async function showShrineSealedReliquary(ctx: RunExploreEventInput): Promise<void> {
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`ssr_open_${ctx.userId}`).setLabel('Phá phong ấn').setEmoji('🔓').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`ssr_read_${ctx.userId}`).setLabel('Đọc chú văn').setEmoji('📜').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`ssr_leave_${ctx.userId}`).setLabel('Không chạm vào').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder().setColor(0xc0a060).setTitle('📦 Hộp Thánh Tích Niêm Phong').setDescription('Một hộp đá nhỏ bị quấn dây bùa. Bên trong phát ra tiếng gõ rất nhẹ.');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton() || btn.customId === `ssr_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '📦 Bạn để hộp thánh tích ngủ yên.'));
+  await btn.deferUpdate().catch(() => {});
+  if (btn.customId === `ssr_read_${ctx.userId}`) { const exp = randInt(35, 70); grantExp(ctx.userId, ctx.guildId, exp); const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.35)); updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp); return finish(ctx, simpleEmbed(COLORS.success, `📜 Bạn đọc đúng chú văn. Phong ấn dịu lại.
+⭐ +**${exp} EXP**
+🔮 MP: **${mp}/${player.max_mp}**`)); }
+  if (randInt(1, 100) <= 55) { const gold = randInt(70, 150); grantGold(ctx.userId, ctx.guildId, gold); addItem(ctx.userId, ctx.guildId, pick(['mana_crystal', 'mysterious_shard']), 1); return finish(ctx, simpleEmbed(COLORS.gold, `🔓 Bạn phá phong ấn và lấy được thánh tích bên trong.
+💰 +**${gold} Gold**
+📦 +**1 vật liệu hiếm**`)); }
+  const dmg = Math.max(1, Math.floor(player.max_hp * 0.16)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
+  return finish(ctx, simpleEmbed(COLORS.danger, `💥 Phong ấn phản phệ!
+❤️ HP mất **${dmg}**
+Nhưng bạn vẫn kịp đóng hộp lại.`));
+}
+// EXTRA_EVENTS_SHRINE_END
