@@ -183,7 +183,9 @@ export function addEffect(effects: Effect[], name: string, duration: number, val
 
 // ── Damage calc ───────────────────────────────────────────────────────────
 function calcDamage(atk: number, def: number, variance = 0.15): number {
-  const base = Math.max(1, atk - def);
+  // Percentage mitigation: DEF reduces damage by def/(def+50).
+  // Prevents high-DEF players from making all enemies deal 1 damage.
+  const base = Math.max(1, Math.round(atk * 50 / (def + 50)));
   const v = base * variance;
   return Math.max(1, Math.round(base + randInt(-v, v)));
 }
@@ -424,8 +426,11 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
     logs.push(`🔥 Flameblade — Đốt cháy 2 lượt!`);
   }
   if (eqStats.effects.includes('stun_on_hit') && randInt(1, 100) <= 15) {
-    addEffect(effects, 'stun', 1);
-    logs.push(`💫 Hammer — Choáng 1 lượt!`);
+    const hitEnemy = getEnemy(state.enemy_id);
+    if (!((hitEnemy?.boss || hitEnemy?.miniboss) && hasEffect(effects, 'stun_immune'))) {
+      addEffect(effects, 'stun', 1);
+      logs.push(`💫 Hammer — Choáng 1 lượt!`);
+    }
   }
   if (eqStats.effects.includes('extra_hit') && randInt(1, 100) <= 10) {
     const bonusDmg = Math.max(1, Math.floor(effectiveAtk * 0.3));
@@ -535,7 +540,7 @@ export function processSkill(
       skillMult *= 1.15;
       logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
     }
-    let out = Math.max(1, Math.round((rawDamage - targetDef * defPierce) * skillMult));
+    let out = Math.max(1, Math.round(rawDamage * 50 / (targetDef * defPierce + 50) * skillMult));
     return applyOutgoingDamageModifiers(state.user_id, state.guild_id, out, targetIsBoss(targetId), logs, effects);
   };
 
@@ -644,7 +649,7 @@ export function processSkill(
       skillMult *= 1.15;
       logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
     }
-    let finalDmg  = Math.max(1, Math.round((skill.damage - skillTargetDef * defPierce) * skillMult));
+    let finalDmg  = Math.max(1, Math.round(skill.damage * 50 / (skillTargetDef * defPierce + 50) * skillMult));
     finalDmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, finalDmg, targetIsBoss(targetId), logs, effects);
     if (skillGroupEnemies) {
       skillGroupEnemies[actualTargetIdx] = {
@@ -682,17 +687,27 @@ export function processSkill(
     const effectTarget = (skill.effect === 'burn' || skill.effect === 'poison' || skill.effect === 'slow' || skill.effect === 'stun')
       ? 'enemy' as const
       : 'player' as const;
-    addEffect(effects, skill.effect, skill.effectDuration, val, effectTarget);
+    // Boss/miniboss stun immunity: block stun if immune
+    const isEnemyStun = skill.effect === 'stun' && effectTarget === 'enemy';
+    const stunBlocked = isEnemyStun && (() => {
+      const eData = getEnemy(state.enemy_id);
+      return (eData?.boss || eData?.miniboss) && hasEffect(effects, 'stun_immune');
+    })();
+    if (!stunBlocked) {
+      addEffect(effects, skill.effect, skill.effectDuration, val, effectTarget);
+    }
     const effectLabels: Record<string, string> = {
       burn: '🔥 Đốt cháy', poison: '☠️ Trúng độc', slow: '🧊 Làm chậm', stun: '💫 Choáng',
       dodge: '🌑 Shadow Step — sẽ né đòn tấn công tiếp theo',
       battle_cry: '📣 ATK tăng', stone_skin: '🛡️ Giảm sát thương', shield: '🛡️ Chắn đòn'
     };
+    const effectLabel = stunBlocked
+      ? `💫 **${state.enemy_name}** kháng choáng!`
+      : (effectLabels[skill.effect] ?? skill.effect) + (stunBlocked ? '' : ` ×${skill.effectDuration} lượt`);
     if (!skill.damage && !skill.heal) {
-      // Pure-effect skills get their own log line
-      logs.push(`${skill.icon} **${skill.name}**! ${effectLabels[skill.effect] ?? skill.effect} ×${skill.effectDuration} lượt.`);
+      logs.push(`${skill.icon} **${skill.name}**! ${stunBlocked ? `💫 **${state.enemy_name}** kháng choáng!` : `${effectLabels[skill.effect] ?? skill.effect} ×${skill.effectDuration} lượt.`}`);
     } else {
-      logs.push(`  └ ${effectLabels[skill.effect] ?? skill.effect} ×${skill.effectDuration} lượt.`);
+      logs.push(`  └ ${effectLabel}.`);
     }
   }
 
@@ -824,7 +839,13 @@ function enemyTurn(
   // ── Stun: enemy skips turn ─────────────────────────────────────────────
   if (hasEffect(effects, 'stun')) {
     logs.push(`💫 **${enemy.name}** bị choáng — bỏ qua lượt!`);
+    const stunEntry = effects.find(e => e.name === 'stun' && e.duration > 0);
     const nextEffects = effects.map(e => e.name === 'stun' ? { ...e, duration: e.duration - 1 } : e).filter(e => e.duration > 0);
+    // Boss/miniboss gains stun immunity for 3 turns after stun wears off
+    if (stunEntry?.duration === 1 && (enemy.boss || enemy.miniboss)) {
+      addEffect(nextEffects, 'stun_immune', 3, undefined, 'enemy');
+      logs.push(`🛡️ **${enemy.name}** kháng choáng **3 lượt**!`);
+    }
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(nextEffects);
     if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
     if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
@@ -848,7 +869,8 @@ function enemyTurn(
   // ── Shield (Soul Guard): block one massive/lethal hit ──────────────────
   if (hasEffect(effects, 'shield')) {
     // Pre-calc if this would be a fatal/heavy hit
-    const preDmg = Math.max(1, enemy.atk - ((current as any).player_def ?? 0) - defenseBonus);
+    const _effDef1 = ((current as any).player_def ?? 0) + defenseBonus;
+    const preDmg = Math.max(1, Math.round(enemy.atk * 50 / (_effDef1 + 50)));
     const wouldBeHeavy = preDmg >= playerHp || preDmg > current.player_max_hp * 0.5;
     if (wouldBeHeavy) {
       const idx = effects.findIndex(e => e.name === 'shield');
@@ -1216,7 +1238,8 @@ function groupEnemyTurn(
 
     // Shield check (first heavy hit)
     if (hasEffect(effects, 'shield')) {
-      const preDmg = Math.max(1, combatEnemy.atk + enemyAtkMod - (((current as any).player_def ?? 0) + defenseBonus));
+      const _effDef2 = (((current as any).player_def ?? 0) + defenseBonus);
+      const preDmg = Math.max(1, Math.round((combatEnemy.atk + enemyAtkMod) * 50 / (_effDef2 + 50)));
       if (preDmg >= playerHp || preDmg > current.player_max_hp * 0.5) {
         const idx = effects.findIndex(e => e.name === 'shield');
         effects.splice(idx, 1);

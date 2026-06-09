@@ -36,7 +36,7 @@ Mỗi điều kiện thỏa mãn sẽ trigger một event lore riêng vào lần
 
 - **🌿 Rừng Im Lặng Bất Thường** — xuất hiện sau khi hạ Miniboss rừng
 - **⚱️ Relic Rung Lên** — xuất hiện khi đã có đủ 3 Ancient Relic (và đã có prereq)
-
+    
 ---
 
 ### 🌿 Bark Armor — Mechanic Riêng Của Ancient Oak

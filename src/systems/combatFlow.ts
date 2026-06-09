@@ -11,7 +11,7 @@ import {
   processAttack, processSkill, processDefend, processFlee, processItemUse, processIgnite,
   buildGroupCombatState
 } from './combat';
-import { getEnemy, getEnemiesForZone } from '../data/enemies';
+import { getEnemy } from '../data/enemies';
 import { getInventory } from './player';
 import { getItem } from '../data/items';
 import { getSkill } from '../data/skills';
@@ -41,14 +41,29 @@ function normalMobPressure(enemy: any): { hp: number; atk: number; def: number }
   return { hp: m.hp + levelBump, atk: m.atk + levelBump, def: m.def };
 }
 
-function tuneNormalMobForCombat<T extends any>(enemy: T): T {
+function tuneNormalMobForCombat<T extends any>(enemy: T, playerLevel: number = 1): T {
   const m = normalMobPressure(enemy);
-  if (m.hp === 1 && m.atk === 1 && m.def === 1) return { ...(enemy as any) };
+  const isBoss = (enemy as any).boss || (enemy as any).miniboss;
+  const isShopkeeper = (enemy as any).isShopkeeper;
+
+  // Player-level scaling: enemies grow stronger as the player levels up.
+  // Normal mobs: +3.5% per player level above 1, capped at 2×.
+  // Bosses/minibosses: +2% per level, capped at 1.5× (they're already hard).
+  // Shopkeepers: no scaling.
+  let levelMult = 1.0;
+  if (!isShopkeeper) {
+    const over = Math.max(0, playerLevel - 1);
+    levelMult = isBoss
+      ? 1.0 + Math.min(1.50, over * 0.040)  // boss: +4%/level, max 2.5×
+      : 1.0 + Math.min(1.00, over * 0.035); // mob:  +3.5%/level, max 2×
+  }
+
+  if (m.hp === 1 && m.atk === 1 && m.def === 1 && levelMult === 1.0) return { ...(enemy as any) };
   return {
     ...(enemy as any),
-    hp: Math.max(1, Math.floor((enemy as any).hp * m.hp)),
-    atk: Math.max(1, Math.floor((enemy as any).atk * m.atk)),
-    def: Math.max(0, Math.floor((enemy as any).def * m.def)),
+    hp:  Math.max(1, Math.floor((enemy as any).hp  * m.hp  * levelMult)),
+    atk: Math.max(1, Math.floor((enemy as any).atk * m.atk * levelMult)),
+    def: Math.max(0, Math.floor((enemy as any).def * m.def * levelMult)),
     _normalMobTuned: true,
   };
 }
@@ -435,7 +450,7 @@ export async function startCombatFlow(
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Enemy data lỗi: \`${enemyId}\` không tồn tại.`)], components: [] });
     return;
   }
-  enemy = tuneNormalMobForCombat(enemy);
+  enemy = tuneNormalMobForCombat(enemy, player.level);
   const loadout     = getLoadout(userId, guildId);
   const withPassiveRaw = applyPassiveStats(player);
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
@@ -498,20 +513,20 @@ export async function startCombatFlowWithEnemy(
   onDeath?: CombatDeathHandler,
   onFlee?: CombatFleeHandler
 ): Promise<void> {
+  const player      = getPlayer(userId, guildId)!;
   // Clone enemy trước khi gắn bonus/buff để không sửa object gốc trong data runtime.
   enemy = {
     ...enemy,
     drops: Array.isArray(enemy?.drops) ? [...enemy.drops] : enemy?.drops,
     specialAttacks: Array.isArray(enemy?.specialAttacks) ? [...enemy.specialAttacks] : enemy?.specialAttacks,
   };
-  enemy = tuneNormalMobForCombat(enemy);
+  enemy = tuneNormalMobForCombat(enemy, player.level);
   if (bonus) enemy.combatBonus = bonus;
   if (enemy.id && !getEnemy(enemy.id)) {
     // register inline definition into the map for the duration of combat
     const { ENEMIES } = await import('../data/enemies');
     if (enemy.id && !ENEMIES[enemy.id]) ENEMIES[enemy.id] = enemy;
   }
-  const player      = getPlayer(userId, guildId)!;
   const loadout     = getLoadout(userId, guildId);
   const withPassiveRaw = applyPassiveStats(player);
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
@@ -578,7 +593,7 @@ export async function startGroupCombatFlow(
   const atkBonus       = getEnemyAtkBonus(guildId);
 
   const rawEnemies = enemyIds.map(id => getEnemy(id)!).filter(Boolean);
-  const tunedEnemies = rawEnemies.map(e => tuneNormalMobForCombat(e));
+  const tunedEnemies = rawEnemies.map(e => tuneNormalMobForCombat(e, player.level));
   const combatEnemies: CombatEnemy[] = tunedEnemies.map(e => ({
     id: e.id, name: e.name, icon: e.icon,
     hp: e.hp, max_hp: e.hp,

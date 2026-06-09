@@ -312,7 +312,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['forest_dream_flower',      player.zone_id === 'forest' ? (time === 'night' || time === 'dusk' ? 3 : 1) : 0],
     ['forest_echo_grove',        player.zone_id === 'forest' ? 3 : 0],
     ['forest_time_anomaly',      player.zone_id === 'forest' ? 1 : 0],
-    ['forest_lost_relic',        player.zone_id === 'forest' ? 2 : 0],
+    ['forest_lost_relic',        player.zone_id === 'forest' ? 5 : 0],
     ['forest_herb_foraging',     player.zone_id === 'forest' ? 4 : 0],
     ['forest_animal_tracks',     player.zone_id === 'forest' ? 4 : 0],
     ['forest_river_crossing',    player.zone_id === 'forest' ? 3 : 0],
