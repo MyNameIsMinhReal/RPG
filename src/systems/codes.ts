@@ -2,6 +2,7 @@ import db from '../database/index';
 import { addItem, grantExp, grantGold, grantSoulShards } from './player';
 import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
+import { getEquipment } from '../data/equipment';
 
 export interface CodeRewards {
   gold?: number;
@@ -18,6 +19,7 @@ export interface CodeDef {
   active: number;
   expires_at: number | null;
   created_at: number;
+  allowed_user_id: string | null;
 }
 
 export type RedeemResult =
@@ -58,6 +60,7 @@ export function redeemCode(code: string, userId: string, guildId: string): Redee
   if (!row.active) return { ok: false, reason: 'inactive' };
   if (row.expires_at && Date.now() / 1000 > row.expires_at) return { ok: false, reason: 'expired' };
   if (row.max_uses > 0 && row.uses >= row.max_uses) return { ok: false, reason: 'max_uses' };
+  if (row.allowed_user_id && row.allowed_user_id !== userId) return { ok: false, reason: 'not_found' };
 
   const alreadyUsed = db.prepare(
     'SELECT 1 FROM used_codes WHERE code = ? AND user_id = ? AND guild_id = ?'
@@ -88,7 +91,7 @@ export function redeemCode(code: string, userId: string, guildId: string): Redee
   if (Array.isArray(rewards.items)) {
     for (const { id, qty } of rewards.items) {
       addItem(userId, guildId, id, qty);
-      const meta = getItem(id) ?? getMaterial(id);
+      const meta = getItem(id) ?? getMaterial(id) ?? getEquipment(id);
       const icon = meta?.icon ?? '🎁';
       const name = meta?.name ?? id;
       rewardLines.push(`${icon} **${name}**${qty > 1 ? ` ×${qty}` : ''}`);
