@@ -1779,7 +1779,7 @@ async function renderMerchantSell(
     .setTitle('💰 Bán Đồ')
     .setDescription(`🪙 Gold hiện tại: **${player.gold}**\nChọn vật phẩm muốn bán:`)
     .addFields(
-      sellable.map(({ entry, item }) => ({
+      sellable.slice(0, 25).map(({ entry, item }) => ({
         name: `${item!.icon} ${item!.name} ×${entry.quantity}`,
         value: `${item!.sellPrice} 🪙/cái`,
         inline: true
