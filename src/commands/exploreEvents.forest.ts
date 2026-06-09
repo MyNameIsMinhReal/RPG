@@ -148,12 +148,12 @@ export async function showForestWolfDen(ctx: RunExploreEventInput): Promise<void
     }
     await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '🐺 Tiếng động làm sói mẹ lao về hang!\n\n*Chiến đấu bắt đầu...*')], components: [] });
     await new Promise(r => setTimeout(r, 600));
-    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+    return ctx.callbacks.startCombat('cursed_wolf');
   }
 
   await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '⚔️ Bạn đứng chắn trước cửa hang. Sói mẹ gầm lên và lao tới!')], components: [] });
   await new Promise(r => setTimeout(r, 600));
-  return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+  return ctx.callbacks.startCombat('cursed_wolf');
 }
 
 export async function showForestHerbalistHut(ctx: RunExploreEventInput): Promise<void> {
@@ -291,7 +291,7 @@ export async function showForestGiantSpider(ctx: RunExploreEventInput): Promise<
   if (id === `fgs_fight_${ctx.userId}`) {
     await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '⚔️ Bạn lao vào tiêu diệt con nhện!')], components: [] });
     await new Promise(r => setTimeout(r, 600));
-    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+    return ctx.callbacks.startCombat('spore_kin');
   }
   if (id === `fgs_fire_${ctx.userId}`) {
     const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -423,7 +423,7 @@ export async function showForestCorruptedTreant(ctx: RunExploreEventInput): Prom
   if (id === `fct_fight_${ctx.userId}`) {
     await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '⚔️ Bạn xông vào tiêu diệt cây thần tà ác!')], components: [] });
     await new Promise(r => setTimeout(r, 600));
-    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+    return ctx.callbacks.startCombat('cursed_treant');
   }
   if (id === `fct_purify_${ctx.userId}`) {
     const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -470,7 +470,7 @@ export async function showForestWildBoar(ctx: RunExploreEventInput): Promise<voi
   if (id === `fwb_fight_${ctx.userId}`) {
     await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '⚔️ Bạn đón đầu con lợn — chiến đấu bắt đầu!')], components: [] });
     await new Promise(r => setTimeout(r, 600));
-    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+    return ctx.callbacks.startCombat('thornhound');
   }
   addItem(ctx.userId, ctx.guildId, 'meat', 2);
   const dmg = Math.max(1, Math.floor(player.max_hp * 0.05));
@@ -1767,7 +1767,7 @@ export async function showForestFogMaze(ctx: RunExploreEventInput): Promise<void
     }
     await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '👂 Âm thanh là tiếng gọi mồi — thú tấn công!')], components: [] });
     await new Promise(r => setTimeout(r, 600));
-    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+    return ctx.callbacks.startCombat('will_o_wisp');
   }
   if (id === `ffm_marks_${ctx.userId}`) {
     const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
@@ -1799,7 +1799,7 @@ export async function showForestWaterfallCave(ctx: RunExploreEventInput): Promis
     if (roll <= 20) {
       await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '🕳️ Hang không trống — có thú bên trong!')], components: [] });
       await new Promise(r => setTimeout(r, 600));
-      return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+      return ctx.callbacks.startCombat('vine_golem');
     }
     const gold = randInt(18, 49); grantGold(ctx.userId, ctx.guildId, gold);
     addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);

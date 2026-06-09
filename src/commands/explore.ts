@@ -120,10 +120,19 @@ async function clearStaleCombat(
 
   try {
     const channel = await interaction.client.channels.fetch(current.channel_id);
-    if (!channel || !('messages' in channel)) throw new Error('Invalid combat channel');
+    if (!channel || !('messages' in channel)) {
+      // Channel gone — safe to delete
+      deleteCombat(current.message_id);
+      return;
+    }
     await (channel as any).messages.fetch(current.message_id);
-  } catch {
-    deleteCombat(current.message_id);
+  } catch (e: any) {
+    // Only delete if message is actually gone (404 Unknown Message / Unknown Channel).
+    // Don't delete on rate limits, network errors, or other transient failures.
+    const code = e?.code ?? e?.status;
+    if (code === 10008 || code === 10003 || code === 404) {
+      deleteCombat(current.message_id);
+    }
   }
 }
 
@@ -816,7 +825,8 @@ async function handleSearch(
   }
 
   const event = pickExploreEvent({ player, guildId, hasCombat, hasLegacy });
-  updatePityCounters(userId, guildId, event);
+  const pityTargets = partyMemberIds ?? [userId];
+  for (const mid of pityTargets) updatePityCounters(mid, guildId, event);
 
   setExploreCooldown(userId, guildId);
 

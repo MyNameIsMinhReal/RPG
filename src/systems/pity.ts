@@ -3,48 +3,28 @@ import type { ExploreEventType } from '../commands/exploreEvents';
 
 // Events eligible for pity: always have weight > 0, regardless of player state.
 // Conditional events (combat, ambush, bounty_hunter, etc.) are excluded.
+// Only events with weight > 0 regardless of zone/state belong here.
+// Zone-specific events (forest_*, shrine_*, mine_*, wastes_*) are excluded — their
+// counters would accumulate while the player is in other zones, causing inflated pity
+// when they eventually enter that zone.
 export const PITY_EVENTS = new Set<ExploreEventType>([
+  // General events — always available
   'merchant', 'spring', 'trap', 'altar', 'mysterious', 'villager', 'caravan',
   'loot', 'soul_shop', 'abandoned_camp', 'lost_pouch', 'rune_stone', 'treasure_chest',
   'wandering_healer', 'nameless_grave', 'memory_seller', 'stranger_campfire',
   'cracked_shrine', 'wanted_merchant', 'rebirth_rift', 'talking_corpse', 'fate_coin',
   'black_cat', 'dice_gambler', 'glowing_mushroom', 'chained_prisoner', 'magic_fountain',
   'laughing_bones', 'missing_child_chain', 'black_eclipse',
-  // Zone-specific & rare events
   'fishing_spot',
-  'forest_wolf_den', 'forest_herbalist_hut', 'forest_moonlit_clearing',
-  'shrine_prayer_beads', 'shrine_seal_door', 'shrine_spirit_lamp',
-  'mine_ore_vein', 'mine_echo_tunnel', 'mine_rusted_lift',
-  'wastes_bone_caravan', 'wastes_glass_mirage', 'wastes_fallen_banner',
-  // World-affecting events
+  // Available in any non-village zone
+  'mimic_chest', 'map_seller', 'wandering_blacksmith',
+  // World events — always available
   'world_plague_spreads', 'world_bandit_coalition', 'world_convoy_attacked', 'world_magic_surge', 'world_dark_omen',
   'world_price_gouger', 'world_tax_collector', 'world_supply_shortage', 'world_merchant_guild_job',
   'world_ancient_inscription', 'world_spy_letter', 'world_missing_persons', 'world_old_chronicle',
   'world_prophetic_vision', 'world_secret_meeting',
   'world_faction_standoff', 'world_church_inquisition', 'world_shadow_offer', 'world_hunters_mission', 'world_villager_dispute',
-  // New forest events
-  'forest_tree',
-  'forest_bandit_ambush', 'forest_giant_spider', 'forest_cursed_scarecrow', 'forest_snake_pit', 'forest_poacher_camp',
-  'forest_corrupted_treant', 'forest_wild_boar', 'forest_poison_spores', 'forest_rabid_fox', 'forest_bandit_watchtower',
-  'forest_hollow_log', 'forest_buried_chest', 'forest_eagle_nest', 'forest_mushroom_ring', 'forest_amber_sap',
-  'forest_forgotten_pack', 'forest_beehive', 'forest_fruit_grove', 'forest_silk_cocoon', 'forest_bog_pearl',
-  'forest_lost_merchant', 'forest_hermit_cave', 'forest_wounded_knight', 'forest_fairy_circle', 'forest_pilgrim_group',
-  'forest_mad_trapper', 'forest_child_runaway', 'forest_dryad_blessing', 'forest_traveling_bard', 'forest_beast_tamer',
-  'forest_ancient_ruins', 'forest_magic_spring', 'forest_stone_circle', 'forest_spirit_lantern', 'forest_cursed_statue',
-  'forest_memory_tree', 'forest_dream_flower', 'forest_echo_grove', 'forest_time_anomaly', 'forest_lost_relic',
-  'forest_herb_foraging', 'forest_animal_tracks', 'forest_river_crossing', 'forest_tree_climbing', 'forest_fog_maze',
-  'forest_waterfall_cave', 'forest_dead_tree_oracle', 'forest_flower_field', 'forest_crow_messenger', 'forest_campfire_stranger',
-  // Shrine events
-  'shrine_bell', 'shrine_weeping_statue', 'shrine_forbidden_offering', 'shrine_sealed_reliquary',
-  // Mine events
-  'mine_collapse', 'mine_runaway_cart', 'mine_living_ore', 'mine_trapped_miner',
-  // Wastes events
-  'wastes_storm', 'wastes_memory_rain', 'wastes_faceless_merchant',
-  // Any non-village zone
-  'mimic_chest', 'map_seller', 'wandering_blacksmith',
-  // Oak hunt trigger (forest, before prereq)
-  'oak_hunt_start',
-  // Time-of-day events
+  // Time-of-day events — fire based on time, not zone
   'dawn_ritual', 'dawn_traveler', 'dawn_dew_blessing', 'dawn_hunter_tracks',
   'noon_rest', 'day_patrol', 'day_training_ground', 'day_supply_cart',
   'dusk_trader', 'dusk_omen', 'dusk_crow_omen', 'dusk_card_dealer',

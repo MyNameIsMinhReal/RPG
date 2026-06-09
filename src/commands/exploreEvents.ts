@@ -697,6 +697,7 @@ export async function awaitVote(
       if (votes.size >= memberIds.length) collector.stop('all_voted');
     });
     collector.on('end', () => {
+      ctx.interaction.editReply({ components: [] }).catch(() => {});
       if (!votes.size) { resolve(null); return; }
       const tally = new Map<string, number>();
       for (const cid of votes.values()) tally.set(cid, (tally.get(cid) ?? 0) + 1);
@@ -746,6 +747,7 @@ async function awaitButton(ctx: RunExploreEventInput, row: ActionRowBuilder<Butt
     });
 
     collector.on('end', () => {
+      ctx.interaction.editReply({ components: [] }).catch(() => {});
       if (votes.size === 0) { resolve(null); return; }
       // Tally votes, pick winner (ties broken by first vote cast)
       const tally = new Map<string, number>();
