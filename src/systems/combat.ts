@@ -422,7 +422,7 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
 
   // Equipment effects on hit
   if (eqStats.effects.includes('burn_on_hit') && randInt(1, 100) <= 20) {
-    addEffect(effects, 'burn', 2, 5, 'enemy');
+    addEffect(effects, 'burn', 2, Math.max(5, Math.floor(effectiveAtk * 0.12)), 'enemy');
     logs.push(`🔥 Flameblade — Đốt cháy 2 lượt!`);
   }
   if (eqStats.effects.includes('stun_on_hit') && randInt(1, 100) <= 15) {
@@ -679,8 +679,8 @@ export function processSkill(
 
   // ── Effects — applied REGARDLESS of damage (fixes Shadow Step!) ──────────
   if (skill.effect && skill.effectDuration && !skipGenericEffect) {
-    const val = skill.effect === 'burn' ? 5
-      : skill.effect === 'poison' ? 4
+    const val = skill.effect === 'burn' ? Math.max(5, Math.floor(playerAtk * 0.12))
+      : skill.effect === 'poison' ? Math.max(4, Math.floor(playerAtk * 0.10))
       : skill.effect === 'battle_cry' ? 15
       : skill.effect === 'stone_skin' ? 20
       : undefined;
@@ -696,10 +696,11 @@ export function processSkill(
     if (!stunBlocked) {
       addEffect(effects, skill.effect, skill.effectDuration, val, effectTarget);
     }
+    const dotVal = val !== undefined && (skill.effect === 'burn' || skill.effect === 'poison') ? `(${val}/lượt)` : '';
     const effectLabels: Record<string, string> = {
-      burn: '🔥 Đốt cháy', poison: '☠️ Trúng độc', slow: '🧊 Làm chậm', stun: '💫 Choáng',
+      burn: `🔥 Đốt cháy ${dotVal}`, poison: `☠️ Trúng độc ${dotVal}`, slow: '🧊 Làm chậm −25% ATK', stun: '💫 Choáng',
       dodge: '🌑 Shadow Step — sẽ né đòn tấn công tiếp theo',
-      battle_cry: '📣 ATK tăng', stone_skin: '🛡️ Giảm sát thương', shield: '🛡️ Chắn đòn'
+      battle_cry: '📣 ATK tăng +15%', stone_skin: '🛡️ Giảm sát thương −20%', shield: '🛡️ Chắn đòn'
     };
     const effectLabel = stunBlocked
       ? `💫 **${state.enemy_name}** kháng choáng!`
@@ -841,14 +842,14 @@ function enemyTurn(
     logs.push(`💫 **${enemy.name}** bị choáng — bỏ qua lượt!`);
     const stunEntry = effects.find(e => e.name === 'stun' && e.duration > 0);
     const nextEffects = effects.map(e => e.name === 'stun' ? { ...e, duration: e.duration - 1 } : e).filter(e => e.duration > 0);
-    // Boss/miniboss gains stun immunity for 3 turns after stun wears off
-    if (stunEntry?.duration === 1 && (enemy.boss || enemy.miniboss)) {
-      addEffect(nextEffects, 'stun_immune', 3, undefined, 'enemy');
-      logs.push(`🛡️ **${enemy.name}** kháng choáng **3 lượt**!`);
-    }
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(nextEffects);
     if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
-    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }
+    // Boss/miniboss gains stun immunity for 3 turns after stun wears off (add AFTER tick so full 3 turns)
+    if (stunEntry?.duration === 1 && (enemy.boss || enemy.miniboss)) {
+      addEffect(ticked, 'stun_immune', 3, undefined, 'enemy');
+      logs.push(`🛡️ **${enemy.name}** kháng choáng **3 lượt**!`);
+    }
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     if (passives.mpRegenPerTurn > 0) logs.push(`💫 Hồi **${passives.mpRegenPerTurn} MP** (Mana Flow).`);
@@ -860,7 +861,7 @@ function enemyTurn(
     logs.push(`🌀 **${current.enemy_name}** đang biến đổi — không thể hành động lượt này!`);
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
     if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
-    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
@@ -875,10 +876,10 @@ function enemyTurn(
     if (wouldBeHeavy) {
       const idx = effects.findIndex(e => e.name === 'shield');
       effects.splice(idx, 1);
-      logs.push(`🛡️💀 **Soul Guard** bloqueou o golpe! O ataque foi absorvido!`);
+      logs.push(`🛡️💀 **Soul Guard** chặn đòn! Tấn công bị hấp thụ hoàn toàn!`);
       const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
-      if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); }
-      if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
+      if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
+      if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }
       playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
       playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
       return makeResult(original, current, playerHp, playerMp, ticked, logs, false, false, false);
@@ -892,8 +893,8 @@ function enemyTurn(
   if (passiveDodge > 0 && !hasEffect(effects, 'dodge') && randInt(1, 100) <= passiveDodge) {
     logs.push(`💨 **Dodge pasif (${passiveDodge}%)** — Tránh đòn!`);
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
-    if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); }
-    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
+    if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     return makeResult(original, current, playerHp, playerMp, ticked, logs, false, false, false);
@@ -904,10 +905,9 @@ function enemyTurn(
     const idx = effects.findIndex(e => e.name === 'dodge');
     effects.splice(idx, 1);
     logs.push(`🌑 **Shadow Step!** Bạn né hoàn toàn đòn tấn công của **${enemy.name}**!`);
-    // Tick remaining effects
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
     if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
-    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
@@ -916,8 +916,8 @@ function enemyTurn(
   // ── Slow: reduce enemy ATK ─────────────────────────────────────────────
   let enemyAtk = current.enemy_atk;
   if (hasEffect(effects, 'slow')) {
-    enemyAtk = Math.max(1, enemyAtk - 5);
-    logs.push(`🧊 Địch bị làm chậm (−5 ATK).`);
+    enemyAtk = Math.max(1, Math.floor(enemyAtk * 0.75));
+    logs.push(`🧊 Địch bị làm chậm (ATK −25%).`);
   }
 
   // ── Enemy attacks ──────────────────────────────────────────────────────
@@ -996,7 +996,7 @@ function enemyTurn(
     // Boss-specific after-effects
     if (special === 'oak_root_slam')  addEffect(effects, 'rooted', 1);
     if (special === 'vine_whip')      addEffect(effects, 'rooted', 2);
-    if (special === 'thorn_burst')    addEffect(effects, 'poison', 3, 4);
+    if (special === 'thorn_burst')    addEffect(effects, 'poison', 3, Math.max(4, Math.floor(current.enemy_atk * 0.10)));
     if (special === 'oak_bark_armor') addEffect(effects, 'bark_armor', 2, 60, 'enemy');
   } else {
     dealDmg  = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));

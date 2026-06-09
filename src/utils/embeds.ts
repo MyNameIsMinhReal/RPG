@@ -152,13 +152,15 @@ export function buildCombatEmbed(
     'last_stand_used', 'flee_attempts', 'flee_penalty',
     'boss_phase', 'boss_phase_immune', 'boss_charging',
   ]);
-  const effects: Array<{ name: string; duration: number }> = JSON.parse(state.active_effects || '[]')
+  const effects: Array<{ name: string; duration: number; value?: number; target?: string }> = JSON.parse(state.active_effects || '[]')
     .filter((e: any) => !HIDDEN_EFFECTS.has(e.name));
 
   const effectIcons: Record<string, string> = {
     burn: '🔥', slow: '🧊', stun: '💫', dodge: '🌑',
     berserk: '😤', poison: '☠️', shield: '🛡️', shadow_step: '👤',
-    focus_tonic: '🎯', rooted: '🌿',
+    focus_tonic: '🎯', rooted: '🌿', stun_immune: '🛡️',
+    battle_cry: '📣', stone_skin: '🪨', weapon_oil: '🔩', rage_elixir: '🔥',
+    blood_vial: '🩸', armor_polish: '🧼', silence: '📜', ward: '🧿',
   };
 
   // Parse group enemies
@@ -229,7 +231,18 @@ export function buildCombatEmbed(
 
   // Effects — only shown when non-empty
   if (effects.length) {
-    const effectStr = effects.map((e: any) => `${effectIcons[e.name] ?? '✨'} **${e.name}** ×${e.duration}`).join('  ');
+    const effectNames: Record<string, string> = {
+      burn: 'Đốt', poison: 'Độc', slow: 'Chậm', stun: 'Choáng', dodge: 'Né',
+      berserk: 'Berserk', shield: 'Chắn', rooted: 'Trói', stun_immune: 'Kháng choáng',
+      battle_cry: 'ATK↑', stone_skin: 'Giáp↑', silence: 'Silence', ward: 'Bùa',
+      weapon_oil: 'ATK↑', rage_elixir: 'Bạo loạn', blood_vial: 'ATK↑', armor_polish: 'DEF↑',
+      focus_tonic: 'Focus', bark_armor: 'Vỏ cây', oak_vulnerable: 'Yếu điểm', boss_charging: 'Đang tích',
+    };
+    const targetTag = (e: any) => e.target === 'enemy' ? ' 👹' : e.target === 'player' ? ' 🧑' : '';
+    const valTag = (e: any) => (e.value && (e.name === 'burn' || e.name === 'poison')) ? `(${e.value}/t)` : '';
+    const effectStr = effects.map((e: any) =>
+      `${effectIcons[e.name] ?? '✨'} **${effectNames[e.name] ?? e.name}**${valTag(e)} ×${e.duration}${targetTag(e)}`
+    ).join('  ');
     embed.addFields({ name: '✨ Hiệu ứng', value: effectStr, inline: false });
   }
 
