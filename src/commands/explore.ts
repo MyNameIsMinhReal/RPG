@@ -437,12 +437,35 @@ async function handleZonePicker(
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
 
   const player = getPlayer(userId, guildId)!;
+  const currentIdx = ZONE_ORDER.indexOf(player.zone_id);
   const options = Object.values(ZONES).map(z => {
-    const locked = player.level < z.minLevel;
     const current = z.id === player.zone_id;
+    const targetIdx = ZONE_ORDER.indexOf(z.id);
+
+    let desc: string;
+    if (current) {
+      desc = '📍 Đang ở đây';
+    } else if (player.level < z.minLevel) {
+      desc = `🔒 Cần Lv.${z.minLevel}`;
+    } else if (targetIdx > currentIdx) {
+      // Check boss gate: first uncleared boss between current and target
+      let blockingBoss: string | null = null;
+      for (let i = currentIdx; i < targetIdx; i++) {
+        const gz = ZONES[ZONE_ORDER[i]];
+        if (gz?.bossId && !hasPlayerClearedBoss(guildId, userId, gz.bossId)) {
+          const b = getEnemy(gz.bossId);
+          blockingBoss = `${b?.icon ?? '🔒'} ${b?.name ?? gz.bossId}`;
+          break;
+        }
+      }
+      desc = blockingBoss ? `🔒 Hạ ${blockingBoss}` : z.travelCost > 0 ? `Chi phí: ${z.travelCost} 🪙` : 'Miễn phí';
+    } else {
+      desc = z.travelCost > 0 ? `Chi phí: ${z.travelCost} 🪙` : 'Miễn phí';
+    }
+
     return new StringSelectMenuOptionBuilder()
       .setLabel(`${z.icon} ${z.name}`)
-      .setDescription(locked ? `🔒 Cần Lv.${z.minLevel}` : current ? '📍 Đang ở đây' : z.travelCost > 0 ? `Chi phí: ${z.travelCost} 🪙` : 'Miễn phí')
+      .setDescription(desc)
       .setValue(`ex_travel_${userId}_${z.id}`)
       .setDefault(current);
   });
