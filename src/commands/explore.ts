@@ -602,7 +602,7 @@ async function handleRest(
 ): Promise<void> {
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
 
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const cost   = player.zone_id === 'village' ? 0 : 15;
 
   if (cost > 0 && player.gold < cost) {
@@ -1230,7 +1230,7 @@ async function showLootFind(
 async function showAbandonedCamp(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const roll = randInt(1, 100);
   let title = '🏕️ Trại Bỏ Hoang';
   let desc = '*Bạn tìm thấy một đống lửa đã tắt và vài chiếc túi rách nằm quanh đó...*\n\n';
@@ -1299,7 +1299,7 @@ async function showLostPouch(
 async function showRuneStone(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const embed = new EmbedBuilder().setColor(COLORS.purple)
     .setTitle('🔮 Phiến Đá Rune')
     .setDescription('*Một phiến đá cổ phát sáng yếu ớt. Những chữ khắc thay đổi theo nhịp thở của bạn.*\n\nBạn có muốn đọc nó không?');
@@ -1336,7 +1336,7 @@ async function showRuneStone(
 async function showTreasureChest(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`chest_open_${userId}`).setLabel('Mở rương').setEmoji('🗝️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`chest_leave_${userId}`).setLabel('Bỏ qua').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
@@ -1376,7 +1376,7 @@ async function showTreasureChest(
 async function showWanderingHealer(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const price = Math.max(10, Math.floor(18 + player.level * 4));
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`healer_pay_${userId}`).setLabel(`Trả ${price} Gold`).setEmoji('💚').setStyle(ButtonStyle.Success).setDisabled(player.gold < price),
@@ -2229,7 +2229,7 @@ async function handleDeath(
 async function showHealingSpring(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const isFullHeal = randInt(1, 100) <= 15; // 15% chance of full restore
 
   const hpGain = isFullHeal ? player.max_hp - player.hp : Math.floor(player.max_hp * 0.5);
@@ -2315,7 +2315,7 @@ async function triggerTrap(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string,
   trapType: string, reduced: boolean
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   let newHp = player.hp, newGold = player.gold;
   let resultDesc = '';
   const mult = reduced ? 0.5 : 1.0;
@@ -2349,7 +2349,7 @@ async function triggerTrap(
 async function showAncientAltar(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const altarFlavors = [
     'Một bàn thờ đá cổ xưa nằm giữa vòng tròn nến đang cháy tự nhiên...',
     'Những ký tự rune khắc trên đá phát sáng yếu ớt khi bạn đến gần...',
@@ -2390,7 +2390,7 @@ async function showAncientAltar(
     return;
   }
 
-  const freshPlayer = getPlayer(userId, guildId)!;
+  const freshPlayer = applyPassiveStats(getPlayer(userId, guildId)!);
   let title = '', resultDesc = '';
 
   if (cid === `altar_gold_${userId}`) {
@@ -2543,7 +2543,7 @@ async function showMysteriousFigure(
 async function showAmbush(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string, enemyId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const enemy  = getEnemy(enemyId)!;
 
   const firstStrikeDmg = Math.max(1, Math.floor(enemy.atk * 0.7) - player.def);
