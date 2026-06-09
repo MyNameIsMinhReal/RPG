@@ -42,7 +42,7 @@ export function processVictoryRewards(
   if (enemy.boss) incrementChapterObjective(userId, guildId, 'kill_boss', { zoneId: player.zone_id, enemyId: enemy.id });
   const lvRes = grantExp(userId, guildId, exp);
 
-  for (const drop of enemy.drops) {
+  for (const drop of (Array.isArray(enemy.drops) ? enemy.drops : [])) {
     if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * dropBonus / 100)) {
       addItem(userId, guildId, drop.itemId, 1);
       const it = getItem(drop.itemId) ?? getMaterial(drop.itemId);

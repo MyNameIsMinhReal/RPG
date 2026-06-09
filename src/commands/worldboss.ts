@@ -46,7 +46,9 @@ function upsertDamage(guildId: string, userId: string, dmg: number): void {
 }
 
 function buildHpBar(current: number, max: number, len = 20): string {
-  const filled = Math.round((current / max) * len);
+  if (!Number.isFinite(max) || max <= 0) max = 1;
+  const ratio  = Math.max(0, Math.min(1, current / max));
+  const filled = Math.max(0, Math.min(len, Math.round(ratio * len)));
   return '█'.repeat(filled) + '░'.repeat(len - filled);
 }
 
@@ -74,7 +76,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   // ── spawn ────────────────────────────────────────────────────────
   if (sub === 'spawn') {
-    const member = interaction.guild?.members.cache.get(userId);
+    const member = await interaction.guild?.members.fetch(userId).catch(() => null);
     if (!member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
       await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.danger).setDescription('❌ Cần quyền **Manage Server** để spawn boss.')] });
       return;

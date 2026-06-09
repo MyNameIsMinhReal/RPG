@@ -10,9 +10,11 @@ spring.png       → Suối Hồi Phục
 trap.png         → Bẫy (cả phát hiện + dính bẫy)
 altar.png        → Bàn Thờ Cổ
 mysterious.png   → Nhân Vật Bí Ẩn
+healer.png       → Tu Sĩ Lang Thang (chữa trị)
 villager.png     → Dân Làng Gặp Nạn
 caravan.png      → Xe Chở Đồ Bị Cướp
-loot.png         → Nhặt Đồ
+loot.png         → Nhặt Đồ ngẫu nhiên
+chest.png        → Rương Cũ (khác với nhặt đồ)
 
 == Combat ==
 boss.png         → Thách Boss
@@ -23,6 +25,7 @@ death.png        → Nhân vật chết
 == UI ==
 rest.png         → Nghỉ ngơi
 explore.png      → Menu khám phá chính
+code_redeem.png  → Nhập code thành công
 
 == Zone ==
 zone_village.png

@@ -12,7 +12,8 @@ import {
   addPermanentStat, addKeepItemCharge, addExtraSkillSlot, improveDeathPenaltyReduction, addRebirthBlessing, addMerchantMercy
 } from '../systems/player';
 import { getCombatByUser, saveCombat, deleteCombat } from '../systems/combat';
-import { startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow } from '../systems/combatFlow';
+import { startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow, hasActiveCombatSkills, hasUsableItems } from '../systems/combatFlow';
+import { registerCombat } from '../systems/combatRegistry';
 import { startPartyCombatFlow } from '../systems/partyCombatFlow';
 import { getPartyOf } from '../systems/party';
 import { canExplore, exploreCooldownRemaining, setExploreCooldown } from '../systems/economy';
@@ -194,21 +195,36 @@ async function resumeCombat(
   interaction: ChatInputCommandInteraction,
   current: NonNullable<ReturnType<typeof getCombatByUser>>
 ): Promise<void> {
-  const link = `https://discord.com/channels/${current.guild_id}/${current.channel_id}/${current.message_id}`;
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setLabel('Quay lại trận chiến')
-      .setStyle(ButtonStyle.Link)
-      .setURL(link)
-  );
+  const userId  = current.user_id;
+  const guildId = current.guild_id;
 
-  await interaction.editReply({
-    embeds: [new EmbedBuilder()
-      .setColor(COLORS.info)
-      .setTitle('⚔️ Trận chiến đang chờ bạn')
-      .setDescription('Bạn đang ở giữa trận đấu. Nhấn nút dưới đây để đi tới màn hình combat hiện tại.')
-    ],
-    components: [row]
+  const enemy = getEnemy(current.enemy_id);
+  if (!enemy && !current.enemies_json) {
+    deleteCombat(current.message_id);
+    await interaction.editReply({ content: '⚠️ Trận combat cũ bị lỗi data và đã được xoá. Hãy explore lại.', embeds: [], components: [] });
+    return;
+  }
+
+  const player = getPlayer(userId, guildId)!;
+  const icon   = enemy?.icon ?? '⚔️';
+  let combatLog: string[] = [];
+  try { combatLog = JSON.parse(current.combat_log ?? '[]'); } catch { combatLog = []; }
+
+  const embed   = buildCombatEmbed(current, player.name, icon, combatLog);
+  const buttons = buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId));
+  const reply   = await interaction.editReply({ embeds: [embed], components: buttons });
+
+  deleteCombat(current.message_id);
+  const newState = { ...current, message_id: reply.id };
+  saveCombat(newState);
+
+  const enemyForCallbacks = enemy ?? { id: current.enemy_id, name: current.enemy_name, icon };
+  registerCombat(userId, guildId, {
+    onVictory: handleVictory,
+    onDeath:   handleDeath,
+    onFlee:    handleFlee,
+    enemy:     enemyForCallbacks,
+    icon,
   });
 }
 
@@ -517,6 +533,13 @@ async function handleSearch(
   const party = getPartyOf(guildId, userId);
   const isPartyLeader = party?.leaderId === userId && (party?.memberIds.length ?? 0) > 1;
   const partyMemberIds = isPartyLeader ? party!.memberIds : undefined;
+  const partyMemberNames: Record<string, string> | undefined = partyMemberIds
+    ? Object.fromEntries(
+        partyMemberIds
+          .filter(id => id !== userId)
+          .map(id => [id, getPlayer(id, guildId)?.name ?? 'Đồng đội'])
+      )
+    : undefined;
 
   if (partyMemberIds?.length) {
     for (const memberId of partyMemberIds) {
@@ -539,14 +562,30 @@ async function handleSearch(
     );
   };
 
-  // 25% chance of group encounter when zone has ≥2 non-boss enemies
-  if (enemies.length >= 2 && Math.random() < 0.25) {
+  // Group encounter chance scales with zone danger
+  const GROUP_CHANCE: Record<string, number> = {
+    village: 0.08,
+    forest:  0.10,
+    shrine:  0.16,
+    mines:   0.20,
+    wastes:  0.26,
+  };
+  const THREE_ENEMY_CHANCE: Record<string, number> = {
+    village: 0.10,
+    forest:  0.15,
+    shrine:  0.25,
+    mines:   0.30,
+    wastes:  0.38,
+  };
+  const groupChance = GROUP_CHANCE[player.zone_id] ?? 0.15;
+  if (enemies.length >= 2 && Math.random() < groupChance) {
     setExploreCooldown(userId, guildId);
     if (isPartyLeader) {
       await startPartyCombat(pick(enemies).id);
     } else {
       const shuffled = [...enemies].sort(() => Math.random() - 0.5);
-      const count = (enemies.length >= 3 && Math.random() < 0.4) ? 3 : 2;
+      const threeChance = THREE_ENEMY_CHANCE[player.zone_id] ?? 0.20;
+      const count = (enemies.length >= 3 && Math.random() < threeChance) ? 3 : 2;
       const groupIds = shuffled.slice(0, count).map(e => e.id);
       await startGroupCombatFlow(interaction, userId, guildId, groupIds, handleVictory, handleDeath, handleFlee);
     }
@@ -570,6 +609,7 @@ async function handleSearch(
     enemies,
     legacies,
     partyMemberIds,
+    partyMemberNames,
     callbacks: {
       startCombat: isPartyLeader
         ? startPartyCombat
@@ -844,7 +884,7 @@ async function showTreasureChest(
     new ButtonBuilder().setCustomId(`chest_open_${userId}`).setLabel('Mở rương').setEmoji('🗝️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`chest_leave_${userId}`).setLabel('Bỏ qua').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
   );
-  const { embed, files } = withImage(new EmbedBuilder().setColor(COLORS.gold).setTitle('🧰 Rương Cũ').setDescription('*Một chiếc rương gỗ bị dây leo phủ kín. Khóa đã rỉ sét...*'), 'loot');
+  const { embed, files } = withImage(new EmbedBuilder().setColor(COLORS.gold).setTitle('🧰 Rương Cũ').setDescription('*Một chiếc rương gỗ bị dây leo phủ kín. Khóa đã rỉ sét...*'), 'chest');
   const reply = await interaction.editReply({ embeds: [embed], files, components: [row] });
   const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
@@ -885,7 +925,7 @@ async function showWanderingHealer(
     new ButtonBuilder().setCustomId(`healer_pay_${userId}`).setLabel(`Trả ${price} Gold`).setEmoji('💚').setStyle(ButtonStyle.Success).setDisabled(player.gold < price),
     new ButtonBuilder().setCustomId(`healer_leave_${userId}`).setLabel('Rời đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
   );
-  const { embed, files } = withImage(new EmbedBuilder().setColor(COLORS.success).setTitle('💚 Tu Sĩ Lang Thang').setDescription(`Một tu sĩ đề nghị chữa trị cho bạn với giá **${price} Gold**.`), 'mysterious');
+  const { embed, files } = withImage(new EmbedBuilder().setColor(COLORS.success).setTitle('💚 Tu Sĩ Lang Thang').setDescription(`Một tu sĩ đề nghị chữa trị cho bạn với giá **${price} Gold**.`), 'healer');
   const reply = await interaction.editReply({ embeds: [embed], files, components: [row] });
   const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
@@ -1621,6 +1661,15 @@ async function handleVictory(
     rewards = combined;
   } else {
     rewards = processVictoryRewards(userId, guildId, player, enemy);
+  }
+
+  // Guaranteed drops (boss-specific items always given on kill)
+  if (Array.isArray((enemy as any).guaranteedDrops)) {
+    for (const itemId of (enemy as any).guaranteedDrops as string[]) {
+      addItem(userId, guildId, itemId, 1);
+      const it = getItem(itemId) ?? getMaterial(itemId);
+      if (it) rewards.drops.push(`${it.icon} **${it.name}** *(guaranteed)*`);
+    }
   }
 
   const bonus = (enemy as any).combatBonus;

@@ -26,6 +26,9 @@ import { execute as execGuild     } from './commands/guild';
 import { execute as execPet       } from './commands/pet';
 import { execute as execParty     } from './commands/party';
 import { execute as execChapter   } from './commands/chapter';
+import { execute as execCode      } from './commands/code';
+import { validateGameData } from './utils/validateData';
+import { dispatchCombatInteraction } from './systems/combatFlow';
 
 const client = new Client({
   intents: [
@@ -54,6 +57,7 @@ commands.set('guild',     execGuild);
 commands.set('pet',       execPet);
 commands.set('party',     execParty);
 commands.set('chapter',   execChapter);
+commands.set('code',      execCode);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive
@@ -147,6 +151,9 @@ const prefixAliases = new Map<string, string>([
   ['chapter', 'chapter'],
   ['ch', 'chapter'],
   ['story', 'chapter'],
+
+  // Code redeem
+  ['code', 'code'],
 ]);
 
 const PREFIX_HELP = [
@@ -171,6 +178,7 @@ const PREFIX_HELP = [
   '`rpg pt leave` — rời party',
   '`rpg pt disband` — giải tán party nếu là leader',
   '`rpg ch` / `rpg chapter` — xem cốt truyện chính',
+  '`rpg code <code>` — nhập code nhận thưởng',
 ].join('\n');
 
 function stripInteractionOnlyOptions(options: any): any {
@@ -220,7 +228,7 @@ class PrefixCommandOptions {
     const group = this.getSubcommandGroup(false);
     const payload = this.payloadTokens();
 
-    if (name === 'item') {
+    if (name === 'item' || (this.commandName === 'code' && name === 'code')) {
       value = this.argsText.trim() || null;
     } else if (this.commandName === 'pet' && name === 'pet_id') {
       value = payload[0] ?? null;
@@ -440,6 +448,23 @@ function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): s
 client.once('ready', (c) => {
   console.log(`✅ Bot ready: ${c.user.tag}`);
   c.user.setActivity('⚔️ Butterfly Effect RPG');
+  validateGameData();
+});
+
+client.on('interactionCreate', async (interaction: Interaction) => {
+  if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+  const cid = interaction.customId;
+  const isCombat = cid.startsWith('rpg_') || cid.startsWith('shopmercy_');
+  if (!isCombat) return;
+
+  const userId  = interaction.user.id;
+  const guildId = interaction.guildId;
+  if (!guildId) return;
+
+  const deferred = await interaction.deferUpdate().then(() => true).catch(() => false);
+  if (!deferred) return;
+
+  await dispatchCombatInteraction(interaction as any, userId, guildId);
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
@@ -564,6 +589,14 @@ client.on('messageCreate', async (message) => {
   } finally {
     if (timeout) clearTimeout(timeout);
   }
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[PROCESS] Unhandled rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[PROCESS] Uncaught exception:', err);
 });
 
 const token = process.env.DISCORD_TOKEN;

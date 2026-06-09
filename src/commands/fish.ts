@@ -11,7 +11,7 @@ import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
 import { getPet } from '../data/pets';
 import { COLORS } from '../utils/embeds';
-import { onlyUser } from '../utils/collectors';
+import { onlyParty, onlyUser } from '../utils/collectors';
 import db from '../database/index';
 
 const COOLDOWN_MS = 60_000;
@@ -56,6 +56,7 @@ export interface FishingMiniGameInput {
   zoneId: string;
   useBait: boolean;
   partyMemberIds?: string[];
+  partyMemberNames?: Record<string, string>;
   buildContinueExploreRow: (userId: string) => ActionRowBuilder<ButtonBuilder>[];
   attachContinueExploreHandler: (
     message: Message<boolean>,
@@ -320,6 +321,10 @@ async function finishFishing(input: FishingMiniGameInput, embed: EmbedBuilder): 
 
 async function waitForHook(input: FishingMiniGameInput): Promise<'hooked' | 'early' | 'late' | 'skip'> {
   const waitMs = randInt(2200, 4200);
+  const partyIds = input.partyMemberIds ?? [];
+  const filter = partyIds.length > 0 ? onlyParty(input.userId, partyIds) : onlyUser(input.userId);
+  const partyNote = partyIds.length > 0 ? '\n👥 *Thành viên party cũng có thể bấm!*' : '';
+
   const waitingEmbed = new EmbedBuilder()
     .setColor(COLORS.info)
     .setTitle('🎣 Bạn đã thả câu...')
@@ -327,10 +332,11 @@ async function waitForHook(input: FishingMiniGameInput): Promise<'hooked' | 'ear
       'Mặt nước yên lặng, cần câu hơi rung nhẹ.',
       '',
       'Đừng kéo quá sớm. Hãy chờ tín hiệu **❗ Cá cắn câu!**',
-    ].join('\n'));
+      partyNote,
+    ].filter(Boolean).join('\n'));
 
   const reply = await input.interaction.editReply({ embeds: [waitingEmbed], components: [reelRow(input.userId, 'Kéo cần!')] });
-  const early = await reply.awaitMessageComponent({ filter: onlyUser(input.userId), time: waitMs }).catch(() => null);
+  const early = await reply.awaitMessageComponent({ filter, time: waitMs }).catch(() => null);
 
   if (early?.isButton()) {
     await early.deferUpdate().catch(() => null);
@@ -341,9 +347,9 @@ async function waitForHook(input: FishingMiniGameInput): Promise<'hooked' | 'ear
   const biteEmbed = new EmbedBuilder()
     .setColor(COLORS.gold)
     .setTitle('❗ Cá cắn câu!')
-    .setDescription(`Dây câu giật mạnh! Bạn có **${Math.round(BITE_WINDOW_MS / 1000)} giây** để kéo cần.`);
+    .setDescription(`Dây câu giật mạnh! Bạn có **${Math.round(BITE_WINDOW_MS / 1000)} giây** để kéo cần.${partyNote}`);
   const biteReply = await input.interaction.editReply({ embeds: [biteEmbed], components: [reelRow(input.userId, 'Kéo ngay!')] });
-  const bite = await biteReply.awaitMessageComponent({ filter: onlyUser(input.userId), time: BITE_WINDOW_MS }).catch(() => null);
+  const bite = await biteReply.awaitMessageComponent({ filter, time: BITE_WINDOW_MS }).catch(() => null);
 
   if (!bite?.isButton()) return 'late';
   await bite.deferUpdate().catch(() => null);
@@ -423,21 +429,29 @@ async function runFishFight(input: FishingMiniGameInput, fish: FishEncounter): P
   let tension = randInt(18, 32);
   let stamina = 100;
   const logs: string[] = [];
+  const partyIds = input.partyMemberIds ?? [];
+  const filter = partyIds.length > 0 ? onlyParty(input.userId, partyIds) : onlyUser(input.userId);
+
+  const actorName = (userId: string): string => {
+    if (userId === input.userId) return input.playerName;
+    return input.partyMemberNames?.[userId] ?? 'Đồng đội';
+  };
 
   for (let turn = 1; turn <= fish.maxTurns; turn++) {
     const move = pickFishMove(fish.rarity);
     const embed = buildFishingEmbed(fish, hp, tension, stamina, turn, move, logs);
     const reply = await input.interaction.editReply({ embeds: [embed], components: [fishingActionRow(input.userId)] });
-    const btn = await reply.awaitMessageComponent({ filter: onlyUser(input.userId), time: 30_000 }).catch(() => null);
+    const btn = await reply.awaitMessageComponent({ filter, time: 30_000 }).catch(() => null);
 
     if (!btn?.isButton()) {
       return finishFishing(input, new EmbedBuilder()
         .setColor(COLORS.warning)
         .setTitle('🎣 Cá thoát mất!')
-        .setDescription(`${fish.icon} **${fish.name}** vùng mạnh rồi biến mất vì bạn phản ứng quá chậm.`));
+        .setDescription(`${fish.icon} **${fish.name}** vùng mạnh rồi biến mất vì không ai phản ứng kịp.`));
     }
     await btn.deferUpdate().catch(() => null);
 
+    const actor = actorName(btn.user.id);
     const action = btn.customId.replace(`fishact_${input.userId}_`, '') as FishAction;
     const correct = move.expected.includes(action);
     const loosenWrong = action === 'loosen' && !correct;
@@ -448,25 +462,25 @@ async function runFishFight(input: FishingMiniGameInput, fish: FishEncounter): P
       hp = Math.max(0, hp - damage);
       tension = Math.min(100, tension + randInt(Math.max(3, fish.tensionBase - 5), fish.tensionBase));
       stamina = Math.max(0, stamina - randInt(Math.max(3, fish.staminaBase - 5), fish.staminaBase));
-      logs.push(`✅ Phản ứng đúng! Cá mất **${damage} HP**.`);
+      logs.push(`✅ **${actor}** phản ứng đúng! Cá mất **${damage} HP**.`);
     } else if (loosenWrong) {
       tension = Math.max(0, tension - randInt(8, 15));
       stamina = Math.max(0, stamina - 5);
       hp = Math.min(fish.maxHp, hp + randInt(2, 5));
-      logs.push('🪢 Bạn thả lỏng dây. Dây bớt căng, nhưng cá lấy lại sức.');
+      logs.push(`🪢 **${actor}** thả lỏng dây. Dây bớt căng, nhưng cá lấy lại sức.`);
     } else if (holdWrong) {
       const damage = randInt(2, 5);
       hp = Math.max(0, hp - damage);
       tension = Math.min(100, tension + randInt(fish.tensionBase + 3, fish.tensionBase + 10));
       stamina = Math.max(0, stamina - randInt(fish.staminaBase + 3, fish.staminaBase + 9));
-      logs.push(`⚠️ Bạn giữ cần không đúng nhịp. Cá chỉ mất **${damage} HP**, dây căng mạnh.`);
+      logs.push(`⚠️ **${actor}** giữ cần không đúng nhịp. Cá chỉ mất **${damage} HP**, dây căng mạnh.`);
     } else {
       const damage = randInt(1, 4);
       hp = Math.max(0, hp - damage);
       tension = Math.min(100, tension + randInt(fish.tensionBase + 10, fish.tensionBase + 22));
       stamina = Math.max(0, stamina - randInt(fish.staminaBase + 9, fish.staminaBase + 17));
       if (Math.random() < 0.35) hp = Math.min(fish.maxHp, hp + randInt(3, 8));
-      logs.push(`❌ Phản ứng sai! Cá chỉ mất **${damage} HP**, dây căng dữ dội.`);
+      logs.push(`❌ **${actor}** phản ứng sai! Cá chỉ mất **${damage} HP**, dây căng dữ dội.`);
     }
 
     if (hp <= 0) {

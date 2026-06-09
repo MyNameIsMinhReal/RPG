@@ -254,6 +254,54 @@ function applyKillEquipmentEffects(current: CombatState, playerHp: number, playe
   return { hp, mp };
 }
 
+// ── Boss phase helpers ────────────────────────────────────────────────────
+function getBossPhase(effects: Effect[]): number {
+  return effects.find(e => e.name === 'boss_phase')?.value ?? 1;
+}
+
+function checkBossPhaseTransition(
+  original: CombatState, current: CombatState,
+  effects: Effect[], logs: string[],
+  playerHp: number, playerMp: number,
+  passives: Passives
+): ActionResult | null {
+  const enemy = getEnemy(current.enemy_id);
+  if (!enemy?.boss || !Array.isArray(enemy.phases) || !enemy.phases.length) return null;
+
+  const currentPhase = getBossPhase(effects);
+  const hpPct        = current.enemy_hp / current.enemy_max_hp;
+
+  // Highest-indexed phase whose threshold is now met and hasn't been entered yet
+  const nextPhase = enemy.phases
+    .filter(p => p.phaseIndex > currentPhase && hpPct <= p.threshold)
+    .sort((a, b) => b.phaseIndex - a.phaseIndex)[0];
+
+  if (!nextPhase) return null;
+
+  logs.push(nextPhase.transitionMsg);
+  logs.push(`> ⚠️ **${current.enemy_name}** biến đổi thành **${nextPhase.name}**!`);
+
+  // Advance boss_phase in effects
+  const pidx = effects.findIndex(e => e.name === 'boss_phase');
+  if (pidx >= 0) effects[pidx].value = nextPhase.phaseIndex;
+  else effects.push({ name: 'boss_phase', value: nextPhase.phaseIndex, duration: 999 });
+
+  // New ATK from this phase
+  const newAtk = Math.floor(enemy.atk * nextPhase.atkMult);
+  let newState: CombatState = { ...current, enemy_name: nextPhase.name, enemy_atk: newAtk };
+
+  if (nextPhase.healOnTransition) {
+    const healAmt = Math.floor(current.enemy_max_hp * nextPhase.healOnTransition);
+    newState = { ...newState, enemy_hp: Math.min(current.enemy_max_hp, newState.enemy_hp + healAmt) };
+    logs.push(`> 💚 **${nextPhase.name}** hồi **${healAmt} HP** trong quá trình biến đổi!`);
+  }
+
+  // Boss immune for 1 turn (skips attacking this round)
+  addEffect(effects, 'boss_phase_immune', 1);
+
+  return makeResult(original, newState, playerHp, playerMp, effects, logs, false, false, false);
+}
+
 // ── Action result ─────────────────────────────────────────────────────────
 export interface ActionResult {
   newState:    CombatState;
@@ -402,6 +450,12 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
   const allDead = groupEnemies ? groupEnemies.every(e => e.hp <= 0) : enemy_hp <= 0;
   if (allDead) {
     return makeResult(state, updatedState, player_hp, player_mp, effects, logs, false, true, false);
+  }
+
+  // Boss phase transition (single-enemy only — group fights don't have phases)
+  if (!groupEnemies) {
+    const transition = checkBossPhaseTransition(state, updatedState, effects, logs, player_hp, player_mp, passives);
+    if (transition) return transition;
   }
 
   // Enemy turn
@@ -674,6 +728,14 @@ export function processFlee(state: CombatState): ActionResult {
   const logs: string[] = JSON.parse(state.combat_log || '[]');
   const effects = parseEffects(state.active_effects);
 
+  // Rooted: cannot flee while this effect is active
+  if (hasEffect(effects, 'rooted')) {
+    logs.push('🌿 Bạn đang bị **Trói Buộc**! Không thể bỏ chạy.');
+    const fleeGroupEnemies = getGroupEnemies(state);
+    if (fleeGroupEnemies) return groupEnemyTurn(state, state, state.player_hp, state.player_mp, effects, logs, 0, passives, fleeGroupEnemies);
+    return enemyTurn(state, state, state.player_hp, state.player_mp, effects, logs, 0, passives);
+  }
+
   const attempts = effects.find(e => e.name === 'flee_attempts')?.value ?? 0;
   const fleeChance = Math.min(90, 45 + attempts * 15);
   const nextChance = Math.min(90, fleeChance + 15);
@@ -727,6 +789,17 @@ function enemyTurn(
     playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
     playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     if (passives.mpRegenPerTurn > 0) logs.push(`💫 Hồi **${passives.mpRegenPerTurn} MP** (Mana Flow).`);
+    return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
+  }
+
+  // ── Boss phase immune: boss is transforming, skips this attack ─────────
+  if (hasEffect(effects, 'boss_phase_immune')) {
+    logs.push(`🌀 **${current.enemy_name}** đang biến đổi — không thể hành động lượt này!`);
+    const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
+    if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
+    playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
+    playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
     return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
   }
 
@@ -784,12 +857,60 @@ function enemyTurn(
   }
 
   // ── Enemy attacks ──────────────────────────────────────────────────────
-  const hpPct      = current.enemy_hp / current.enemy_max_hp;
-  const silenced   = hasEffect(effects, 'silence');
+  const hpPct    = current.enemy_hp / current.enemy_max_hp;
+  const silenced = hasEffect(effects, 'silence');
   if (silenced) logs.push(`📜 **${enemy.name}** bị Silence — không thể dùng kỹ năng đặc biệt.`);
-  const useSpecial = !silenced && ((hpPct < 0.3 && randInt(1, 100) <= 60) || randInt(1, 100) <= 30);
-  const special    = useSpecial && enemy.specialAttacks.length > 0 ? pick(enemy.specialAttacks) : null;
-  let dealDmg      = 0;
+
+  // ── Special attack selection (boss-aware) ──────────────────────────────
+  let special: string | null = null;
+  const chargingEffect = !silenced && enemy.boss ? effects.find(e => e.name === 'boss_charging') : null;
+
+  if (chargingEffect) {
+    // Execute the telegraphed charged attack
+    const bossPhaseNow  = getBossPhase(effects);
+    const chargePhase   = enemy.phases?.find(p => p.phaseIndex === bossPhaseNow);
+    special = chargePhase?.specialAttacks[0] ?? 'oak_ancient_rage';
+    const cidx = effects.findIndex(e => e.name === 'boss_charging');
+    if (cidx >= 0) effects.splice(cidx, 1);
+    logs.push(`☠️ **${current.enemy_name}** giải phóng năng lượng đã tích lũy!`);
+  } else if (enemy.boss && !silenced && getBossPhase(effects) >= 3 && !hasEffect(effects, 'boss_charging') && randInt(1, 100) <= 35) {
+    // Phase 3 telegraph: announce next turn's nuke
+    addEffect(effects, 'boss_charging', 2);
+    const bossPhaseNow = getBossPhase(effects);
+    const chargePhase  = enemy.phases?.find(p => p.phaseIndex === bossPhaseNow);
+    const telegraphName = chargePhase?.specialAttacks[0] ?? 'Ancient Rage';
+    logs.push(`⚠️ **${current.enemy_name}** đang tích tụ năng lượng hủy diệt... ― **${telegraphName}** sẽ bùng phát lượt sau!`);
+    const lightDmg = applyIncomingDamageModifiers(current, effects, logs,
+      Math.max(1, calcDamage(enemyAtk * 0.4, ((current as any).player_def ?? 0) + defenseBonus)),
+      { isBossAttacker: true });
+    playerHp = Math.max(0, playerHp - lightDmg);
+    logs.push(`${enemy.icon} **${current.enemy_name}** vung cành cây nhẹ trong lúc tích tụ! **${lightDmg}** sát thương.`);
+    // Tick and return early — rest of enemy turn skipped
+    const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
+    if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
+    if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; }
+    playerHp = Math.min(current.player_max_hp, playerHp + passives.hpRegenPerTurn);
+    playerMp = Math.min(current.player_max_mp, playerMp + passives.mpRegenPerTurn);
+    const lsThresh = current.player_max_hp * 0.1;
+    if (passives.hasLastStand && playerHp > 0 && playerHp <= lsThresh
+      && !hasEffect(ticked, 'berserk') && !hasEffect(ticked, 'last_stand_used')) {
+      addEffect(ticked, 'berserk', 3, 50);
+      addEffect(ticked, 'last_stand_used', 999);
+      logs.push(`🔱 **Last Stand!** HP cực thấp — ATK +50% trong **3 lượt**!`);
+    }
+    return makeResult(original, current, playerHp, playerMp, ticked, logs, playerHp <= 0, false, false);
+  } else {
+    // Normal selection — use current phase's attack pool for multi-phase bosses
+    const useSpecial    = !silenced && ((hpPct < 0.3 && randInt(1, 100) <= 60) || randInt(1, 100) <= 30);
+    const bossPhaseNow  = getBossPhase(effects);
+    const bossPhaseData = enemy.boss && enemy.phases ? enemy.phases.find(p => p.phaseIndex === bossPhaseNow) : null;
+    const attackPool    = bossPhaseData
+      ? bossPhaseData.specialAttacks
+      : (Array.isArray(enemy.specialAttacks) ? enemy.specialAttacks : []);
+    special = useSpecial && attackPool.length > 0 ? pick(attackPool) : null;
+  }
+
+  let dealDmg = 0;
 
   if (special) {
     const res = applySpecialAttack(special, enemyAtk, enemy, playerHp, playerMp, logs, (current as any).player_def ?? 0);
@@ -804,6 +925,10 @@ function enemyTurn(
     if (res.enemyHeal > 0) {
       current = { ...current, enemy_hp: Math.min(current.enemy_max_hp, current.enemy_hp + res.enemyHeal) };
     }
+    // Boss-specific after-effects
+    if (special === 'oak_root_slam') addEffect(effects, 'rooted', 1);
+    if (special === 'vine_whip')    addEffect(effects, 'rooted', 2);
+    if (special === 'thorn_burst')  addEffect(effects, 'poison', 3, 4);
   } else {
     dealDmg  = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
     dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!enemy.boss });
@@ -1071,7 +1196,7 @@ function groupEnemyTurn(
     const enemyAtk = Math.max(1, combatEnemy.atk + enemyAtkMod);
     const hpPct = combatEnemy.hp / combatEnemy.max_hp;
     const useSpecial = !silenced && ((hpPct < 0.3 && randInt(1, 100) <= 60) || randInt(1, 100) <= 30);
-    const special = useSpecial && combatEnemy.specialAttacks.length > 0 ? pick(combatEnemy.specialAttacks) : null;
+    const special = useSpecial && Array.isArray(combatEnemy.specialAttacks) && combatEnemy.specialAttacks.length > 0 ? pick(combatEnemy.specialAttacks) : null;
 
     let dealDmg = 0;
     if (special) {
@@ -1388,6 +1513,53 @@ function applySpecialAttack(
       dmg = Math.max(1, calcDamage(baseAtk * 1.0, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** trói chặt bằng rễ cây! **${dmg}** sát thương!`); break;
+
+    // ── Ancient Oak boss attacks ──────────────────────────────────────────
+    case 'oak_root_slam':
+      // Phase 1 heavy hit — roots player (no-flee effect applied in caller)
+      dmg = Math.max(1, calcDamage(baseAtk * 1.6, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`🌳 **${n}** đập rễ khổng lồ xuống đất! **${dmg}** sát thương! *(Bạn bị Trói Chặt!)*`); break;
+    case 'oak_regen':
+      // Phase 1 — heal 15% of base HP
+      enemyHeal = Math.floor(enemy.hp * 0.15);
+      logs.push(`🌳 **${n}** hút sinh khí từ đất mẹ, hồi phục **${enemyHeal} HP**!`); break;
+    case 'oak_regen_deep':
+      // Phase 2 — heal 8% of max HP (weaker, uses state max)
+      enemyHeal = Math.floor(enemy.hp * 0.08);
+      logs.push(`🌿 **${n}** hút mạch nước ngầm sâu, hồi phục **${enemyHeal} HP**!`); break;
+    case 'splinter_rain': {
+      // Phase 2 — 3 quick hits, each ignoring 65% of player DEF
+      const sHits = 3;
+      const sDmgEach = Math.max(1, calcDamage(baseAtk * 0.48, Math.floor(def(special) * 0.35)));
+      dmg = sDmgEach * sHits;
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`🌿 **${n}** tung **mưa gai**! ${sHits}×**${sDmgEach}** = **${dmg}** sát thương!`); break;
+    }
+    case 'vine_whip':
+      // Phase 2 — heavy + roots player (rooted effect applied in caller)
+      dmg = Math.max(1, calcDamage(baseAtk * 1.45, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`🌿 **${n}** quật **dây leo** vào người! **${dmg}** sát thương! *(Bạn bị Trói Buộc 2 lượt!)*`); break;
+    case 'oak_ancient_rage':
+      // Phase 3 — telegraphed nuke, pierces ALL defense
+      dmg = Math.max(1, calcDamage(baseAtk * 3.0, 0));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`☠️ **${n}** bùng phát **ANCIENT RAGE**! **${dmg}** sát thương — XUYÊN GIÁP HOÀN TOÀN!`); break;
+    case 'thorn_burst': {
+      // Phase 3 — 2 hits + poisons (poison applied in caller)
+      const tb1 = Math.max(1, calcDamage(baseAtk * 0.9, def(special)));
+      const tb2 = Math.max(1, calcDamage(baseAtk * 0.9, def(special)));
+      dmg = tb1 + tb2;
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`☠️ **${n}** bắn **gai độc**! 2×**${tb1}** = **${dmg}** sát thương! *(Ngộ Độc 3 lượt!)*`); break;
+    }
+    case 'bark_rend':
+      // Phase 3 — heavy crushing blow
+      dmg = Math.max(1, calcDamage(baseAtk * 1.3, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`☠️ **${n}** nghiền nát bằng vỏ cây sắc bén! **${dmg}** sát thương!`); break;
+
     default:
       dmg = Math.max(1, calcDamage(baseAtk * 1.1, def(special)));
       playerHp = Math.max(0, playerHp - dmg);

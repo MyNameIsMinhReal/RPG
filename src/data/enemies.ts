@@ -3,6 +3,17 @@ export interface DropEntry {
   chance: number; // 0-100
 }
 
+export interface BossPhase {
+  threshold: number;       // HP% at which this phase triggers (e.g. 0.60 = 60%)
+  phaseIndex: number;      // phase number (2, 3, ...)
+  name: string;            // display name in combat embed
+  icon: string;            // emoji icon to replace enemy icon
+  atkMult: number;         // multiplier on base enemy.atk
+  specialAttacks: string[]; // pool of attacks available in this phase
+  transitionMsg: string;   // dramatic message shown on transition
+  healOnTransition?: number; // fraction of max HP to restore (e.g. 0.06 = 6%)
+}
+
 export interface EnemyDef {
   id: string;
   name: string;
@@ -21,6 +32,8 @@ export interface EnemyDef {
   miniboss?: boolean;
   deathWorldFlag?: string;
   lore: string;
+  phases?: BossPhase[];         // multi-phase boss behaviour
+  guaranteedDrops?: string[];   // item IDs always given on kill
 }
 
 export const ENEMIES: Record<string, EnemyDef> = {
@@ -131,19 +144,42 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Linh thú già đội vương miện rêu. Nó không ác, nhưng không tha thứ cho kẻ xâm phạm.'
   },
   ancient_oak: {
-    id: 'ancient_oak', name: 'Ancient Oak', icon: '🌳', level: 5,
-    hp: 200, atk: 22, def: 15, expReward: 200, goldMin: 80, goldMax: 120,
+    id: 'ancient_oak', name: 'Ancient Oak', icon: '🌳', level: 6,
+    hp: 260, atk: 22, def: 18, expReward: 450, goldMin: 130, goldMax: 200,
     drops: [
-      { itemId: 'book_tough_body', chance: 40 },
-      { itemId: 'book_mend_wounds', chance: 30 },
-      { itemId: 'elixir', chance: 20 },
-      { itemId: 'ancient_relic', chance: 15 },
-      { itemId: 'wood', chance: 80 }
+      { itemId: 'book_tough_body', chance: 45 },
+      { itemId: 'book_mend_wounds', chance: 35 },
+      { itemId: 'elixir', chance: 25 },
+      { itemId: 'ancient_relic', chance: 20 },
+      { itemId: 'wood', chance: 100 },
     ],
-    specialAttacks: ['root_slam', 'nature_regeneration'],
+    guaranteedDrops: ['ancient_bark'],
+    // Phase 1 (>60% HP): guardian form — heavy root slams, earth regeneration
+    specialAttacks: ['oak_root_slam', 'oak_regen'],
+    phases: [
+      {
+        threshold: 0.60,
+        phaseIndex: 2,
+        name: 'Ancient Oak (Awakened)',
+        icon: '🌿',
+        atkMult: 1.36,   // → atk ~30
+        specialAttacks: ['splinter_rain', 'vine_whip', 'oak_regen_deep'],
+        transitionMsg: '🌿 **Thân cây nứt toác — sức mạnh rừng nguyên thủy bùng phát từ bên trong!**',
+        healOnTransition: 0.06,
+      },
+      {
+        threshold: 0.25,
+        phaseIndex: 3,
+        name: 'Ancient Oak (Dying Fury)',
+        icon: '☠️',
+        atkMult: 1.90,   // → atk ~42
+        specialAttacks: ['oak_ancient_rage', 'thorn_burst', 'bark_rend'],
+        transitionMsg: '☠️ **Rễ cây xé toạc mặt đất — Cổ Mộc quyết kéo tất cả xuống cùng!**',
+      },
+    ],
     zones: ['forest'], boss: true,
     deathWorldFlag: 'ancient_oak_slain',
-    lore: 'Linh hồn thủ hộ của rừng già. Nếu hắn ngã xuống, rừng sẽ không bao giờ như xưa.'
+    lore: 'Linh hồn thủ hộ của rừng già. Nếu hắn ngã xuống, rừng sẽ không bao giờ như xưa.',
   },
 
   // ── SHRINE ──────────────────────────────────────────────────────
@@ -468,11 +504,11 @@ export const ENEMIES: Record<string, EnemyDef> = {
 };
 
 export function getEnemiesForZone(zoneId: string): EnemyDef[] {
-  return Object.values(ENEMIES).filter(e => e.zones.includes(zoneId) && !e.boss);
+  return Object.values(ENEMIES).filter(e => Array.isArray(e.zones) && e.zones.includes(zoneId) && !e.boss);
 }
 
 export function getBossForZone(zoneId: string): EnemyDef | undefined {
-  return Object.values(ENEMIES).find(e => e.zones.includes(zoneId) && e.boss);
+  return Object.values(ENEMIES).find(e => Array.isArray(e.zones) && e.zones.includes(zoneId) && e.boss);
 }
 
 export function getEnemy(id: string): EnemyDef | undefined {

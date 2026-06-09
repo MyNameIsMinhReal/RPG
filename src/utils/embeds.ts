@@ -148,13 +148,17 @@ export function buildCombatEmbed(
   enemyIcon: string,
   logLines: string[]
 ): EmbedBuilder {
+  const HIDDEN_EFFECTS = new Set([
+    'last_stand_used', 'flee_attempts',
+    'boss_phase', 'boss_phase_immune', 'boss_charging',
+  ]);
   const effects: Array<{ name: string; duration: number }> = JSON.parse(state.active_effects || '[]')
-    .filter((e: any) => !['last_stand_used', 'flee_attempts'].includes(e.name));
+    .filter((e: any) => !HIDDEN_EFFECTS.has(e.name));
 
   const effectIcons: Record<string, string> = {
     burn: '🔥', slow: '🧊', stun: '💫', dodge: '🌑',
     berserk: '😤', poison: '☠️', shield: '🛡️', shadow_step: '👤',
-    focus_tonic: '🎯',
+    focus_tonic: '🎯', rooted: '🌿',
   };
 
   // Parse group enemies

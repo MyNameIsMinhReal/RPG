@@ -955,6 +955,15 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     stats: {},
     sellPrice: 1500, dropFrom: ['the_forgotten'], dropChance: 5, minZone: 'wastes'
   },
+
+  // ── Special / Promo-only ─────────────────────────────────────────────────
+  early_access_ring: {
+    id: 'early_access_ring', name: 'Early Access Ring', icon: '💫', slot: 'accessory2', rarity: 'epic',
+    description: 'Nhẫn dành cho những người khai sáng thế giới đầu tiên. **ATK +4, DEF +3, Max HP +25, EXP +8%**. Hồi **15% HP** sau mỗi lần hạ gục kẻ thù. Không thể mua hay đổi.',
+    stats: { atk: 4, def: 3, maxHp: 25, expBonus: 8 },
+    effects: ['kill_hp_regen'],
+    sellPrice: 1,
+  },
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

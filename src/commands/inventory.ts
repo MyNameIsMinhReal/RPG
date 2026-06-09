@@ -87,7 +87,11 @@ async function renderTab(
   });
 
   collector.on('collect', async (compInt) => {
-    await compInt.deferUpdate();
+    const deferred = await compInt.deferUpdate().then(() => true).catch(err => {
+      console.warn('[INVENTORY] deferUpdate failed:', err?.code ?? err);
+      return false;
+    });
+    if (!deferred) return;
     collector.stop('action');
     const cid = (compInt as any).customId as string;
 
@@ -442,7 +446,7 @@ async function handleUseItem(
   );
 
   await interaction.editReply({ embeds: [embed], components: [tabSelect, ...actionRows].slice(0,5) });
-  setTimeout(() => renderTab(interaction, userId, guildId, 'items'), 250);
+  setTimeout(() => { renderTab(interaction, userId, guildId, 'items').catch(err => { console.error('[INVENTORY] delayed renderTab failed:', err); }); }, 250);
 }
 
 // ── Action: Pick slot for equip ────────────────────────────────────────────────
@@ -450,7 +454,12 @@ async function pickSlotForSkill(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string, skillId: string, loadout: any[]
 ): Promise<void> {
-  const sk    = getSkill(skillId)!;
+  const sk = getSkill(skillId);
+  if (!sk) {
+    console.warn(`[INVENTORY] Missing skill: ${skillId}`);
+    await renderTab(interaction, userId, guildId, 'loadout');
+    return;
+  }
   const player = getPlayer(userId, guildId)!;
   const maxSlots = 4 + Math.min(2, player.extra_skill_slots ?? 0);
   const freeSlots = Array.from({ length: maxSlots }, (_, i) => i + 1).filter(s => !loadout.find(l => l.slot === s));
@@ -489,7 +498,8 @@ async function pickSlotForSkill(
   }).catch(() => null);
 
   if (!sel) { await renderTab(interaction, userId, guildId, 'loadout'); return; }
-  await sel.deferUpdate();
+  const ok = await sel.deferUpdate().then(() => true).catch(() => false);
+  if (!ok) return;
 
   const slot = Number(sel.values[0].replace('slot_', ''));
   equipSkill(userId, guildId, slot, skillId);
@@ -521,12 +531,17 @@ async function handleLearnSkill(
           `Tome được hoàn trả — hãy dùng cho nhân vật khác hoặc bán đi.`
         );
       await interaction.editReply({ embeds: [embed], components: [] });
-      setTimeout(() => renderTab(interaction, userId, guildId, 'books'), 2500);
+      setTimeout(() => { renderTab(interaction, userId, guildId, 'books').catch(err => { console.error('[INVENTORY] delayed render books failed:', err); }); }, 2500);
       return;
     }
 
     const pickedId = pool[Math.floor(Math.random() * pool.length)];
-    const skill = getSkill(pickedId)!;
+    const skill = getSkill(pickedId);
+    if (!skill) {
+      console.warn(`[INVENTORY] Missing skill from pool: ${pickedId}`);
+      await renderTab(interaction, userId, guildId, 'books');
+      return;
+    }
     removeItem(userId, guildId, bookId, 1);
     addSkillToPool(userId, guildId, skill.id);
     const achievementMessages = awardAchievements(userId, guildId);
@@ -547,12 +562,19 @@ async function handleLearnSkill(
     }
 
     await interaction.editReply({ embeds: [embed], components: [] });
-    setTimeout(() => renderTab(interaction, userId, guildId, 'books'), 2500);
+    setTimeout(() => { renderTab(interaction, userId, guildId, 'books').catch(err => { console.error('[INVENTORY] delayed render books failed:', err); }); }, 2500);
     return;
   }
 
   // ── Normal skill book ──────────────────────────────────────────────────
-  const skill = getSkill(item.teachesSkill)!;
+  const skill = getSkill(item.teachesSkill);
+  if (!skill) {
+    await interaction.editReply({
+      content: `❌ Skill book này bị lỗi data: \`${item.teachesSkill}\` không tồn tại.`,
+      embeds: [], components: [],
+    });
+    return;
+  }
 
   if (hasSkillInPool(userId, guildId, skill.id)) {
     await renderTab(interaction, userId, guildId, 'books');

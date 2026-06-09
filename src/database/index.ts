@@ -398,6 +398,49 @@ db.exec(`
 
 try { db.exec(`ALTER TABLE players ADD COLUMN active_pet TEXT DEFAULT NULL`); } catch {}
 
+// ── Redeem codes ──────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS redeem_codes (
+    code        TEXT PRIMARY KEY,
+    rewards_json TEXT NOT NULL,
+    max_uses    INTEGER DEFAULT 0,
+    uses        INTEGER DEFAULT 0,
+    active      INTEGER DEFAULT 1,
+    expires_at  INTEGER DEFAULT NULL,
+    created_at  INTEGER DEFAULT (unixepoch())
+  );
+
+  CREATE TABLE IF NOT EXISTS used_codes (
+    code        TEXT NOT NULL,
+    user_id     TEXT NOT NULL,
+    guild_id    TEXT NOT NULL,
+    used_at     INTEGER NOT NULL,
+    PRIMARY KEY (code, user_id, guild_id)
+  );
+`);
+
+// ── Seed: early access welcome code ──────────────────────────────────────────
+{
+  const EARLY_CODE = 'EARLYBIRD';
+  const exists = db.prepare('SELECT 1 FROM redeem_codes WHERE code = ?').get(EARLY_CODE);
+  if (!exists) {
+    db.prepare(
+      'INSERT INTO redeem_codes (code, rewards_json, max_uses) VALUES (?, ?, ?)'
+    ).run(
+      EARLY_CODE,
+      JSON.stringify({
+        gold: 200,
+        soul_shards: 5,
+        items: [
+          { id: 'gear_box',           qty: 1 },
+          { id: 'early_access_ring',  qty: 1 },
+        ],
+      }),
+      0
+    );
+  }
+}
+
 // ── Party system ──────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS parties (

@@ -371,7 +371,7 @@ export async function startPartyCombatFlow(
       let dmg = calcDmg(enemy.atk, effectiveDef);
 
       // Special attack chance
-      if (!enemy.boss && enemy.specialAttacks.length > 0 && randInt(1, 100) <= 25) {
+      if (!enemy.boss && Array.isArray(enemy.specialAttacks) && enemy.specialAttacks.length > 0 && randInt(1, 100) <= 25) {
         dmg = Math.floor(dmg * 1.5);
         log.push(`${enemy.icon} **${enemy.name}** dùng kỹ năng đặc biệt vào **${target.name}**! **${dmg}** sát thương!`);
       } else {

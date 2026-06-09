@@ -1,9 +1,11 @@
 import {
   ChatInputCommandInteraction, ButtonInteraction,
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  ComponentType, StringSelectMenuInteraction
+  StringSelectMenuInteraction,
+  StringSelectMenuBuilder, StringSelectMenuOptionBuilder
 } from 'discord.js';
-import { getPlayer, getLoadout, applyPassiveStats, getItemQty, removeItem, updatePlayerHpMp } from './player';
+import { registerCombat, unregisterCombat, getCombatEntry } from './combatRegistry';
+import { getPlayer, getLoadout, applyPassiveStats, getItemQty, removeItem } from './player';
 import {
   getCombatByUser, saveCombat, deleteCombat,
   processAttack, processSkill, processDefend, processFlee, processItemUse,
@@ -19,6 +21,11 @@ import { withImage } from '../utils/eventImages';
 import { getEnemyAtkBonus } from './world';
 import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumables';
 import { incrementDaily, countsAsPotion } from '../commands/daily';
+
+function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try { return JSON.parse(raw) as T; } catch { return fallback; }
+}
 
 export type CombatVictoryHandler = (
   interaction: ChatInputCommandInteraction,
@@ -57,7 +64,7 @@ const COMBAT_USABLE_ITEM_IDS = new Set([
   'weapon_oil','armor_polish','focus_tonic','stone_skin_draught','quickstep_tea','rage_elixir','blood_vial'
 ]);
 
-function isCombatUsableItem(itemId: string): boolean {
+export function isCombatUsableItem(itemId: string): boolean {
   return COMBAT_USABLE_ITEM_IDS.has(itemId);
 }
 
@@ -115,14 +122,14 @@ function parseTargetIndexFromSelect(compInt: StringSelectMenuInteraction): numbe
   return Number.isFinite(idx) ? idx : 0;
 }
 
-function hasUsableItems(userId: string, guildId: string): boolean {
+export function hasUsableItems(userId: string, guildId: string): boolean {
   return getInventory(userId, guildId).some((e: any) => {
     const it = getItem(e.item_id);
     return it?.type === 'consumable' && isCombatUsableItem(e.item_id);
   });
 }
 
-function hasActiveCombatSkills(userId: string, guildId: string): boolean {
+export function hasActiveCombatSkills(userId: string, guildId: string): boolean {
   return getLoadout(userId, guildId).some(entry => getSkill(entry.skill_id)?.type === 'active');
 }
 
@@ -190,6 +197,194 @@ function applyShopkeeperStockUse(enemy: any, result: any): void {
   state.combat_log = JSON.stringify(logs.slice(-6));
 }
 
+// ── Global combat interaction dispatcher ─────────────────────────────────────
+// Called from the global interactionCreate handler for any rpg_* or shopmercy_* button.
+// Returns true if the interaction was handled (even on error), false if no active registry entry.
+export async function dispatchCombatInteraction(
+  compInt: ButtonInteraction | StringSelectMenuInteraction,
+  userId: string,
+  guildId: string
+): Promise<boolean> {
+  const entry = getCombatEntry(userId, guildId);
+  if (!entry) return false;
+  if (entry.processing) return true;
+  entry.processing = true;
+
+  const cid = compInt.customId;
+
+  try {
+    const current = getCombatByUser(userId, guildId);
+    if (!current) { unregisterCombat(userId, guildId); return false; }
+
+    const fresh        = getPlayer(userId, guildId)!;
+    const freshPassive = applyPassiveStats(fresh);
+    const { enemy } = entry;
+    // Derive current phase icon if boss has phases (phase transitions update active_effects)
+    let icon = entry.icon;
+    if (enemy?.phases?.length && current) {
+      const rawFx: any[] = (() => { try { return JSON.parse(current.active_effects || '[]'); } catch { return []; } })();
+      const phaseNum = rawFx.find((e: any) => e.name === 'boss_phase')?.value;
+      const phaseData = phaseNum ? enemy.phases.find((p: any) => p.phaseIndex === phaseNum) : null;
+      if (phaseData) icon = phaseData.icon;
+    }
+
+    // Shopkeeper mercy (startCombatFlowWithEnemy only)
+    if (enemy?.isShopkeeper && cid.startsWith('shopmercy_') && typeof enemy.onMercy === 'function') {
+      deleteCombat(current.message_id);
+      unregisterCombat(userId, guildId);
+      await enemy.onMercy(compInt, compInt, userId, guildId, fresh, enemy, current, cid);
+      return true;
+    }
+
+    let result;
+
+    if (cid === `rpg_attack_${userId}`) {
+      const sg: any[] | null = current.enemies_json ? safeJsonParse<any[]>(current.enemies_json, []) : null;
+      const alive = sg?.filter((e: any) => e.hp > 0) ?? null;
+      if (alive && alive.length > 1) {
+        const opts = sg!
+          .map((e: any, i: number) => ({ ...e, _idx: i }))
+          .filter((e: any) => e.hp > 0)
+          .map((e: any) => new StringSelectMenuOptionBuilder()
+            .setLabel(`[${e._idx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
+            .setValue(`rpg_attackidx_${userId}_${e._idx}`)
+          );
+        await compInt.editReply({ components: [
+          new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+            new StringSelectMenuBuilder().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu tấn công...').addOptions(opts.slice(0, 25))
+          ),
+          makeBackRow(userId)
+        ]});
+        return true;
+      }
+      result = processAttack(current, freshPassive.atk);
+    }
+    else if (cid === `rpg_atktarget_${userId}` && compInt.isStringSelectMenu()) {
+      const val = (compInt as StringSelectMenuInteraction).values[0];
+      const idx = parseInt(val.replace(`rpg_attackidx_${userId}_`, ''));
+      result = processAttack(current, freshPassive.atk, isNaN(idx) ? 0 : idx);
+    }
+    else if (cid === `rpg_defend_${userId}`)  result = processDefend(current, freshPassive.atk, 0, 0);
+    else if (cid === `rpg_flee_${userId}`)    result = processFlee(current);
+    else if (cid === `rpg_item_${userId}`) {
+      const inv  = getInventory(userId, guildId);
+      const cons = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && e.quantity > 0 && isCombatUsableItem(e.item_id); });
+      if (!cons.length) { await compInt.editReply({ content: '🎒 Không có đồ dùng được!' }); return true; }
+      const opts = cons.map((e: any) => {
+        const it = getItem(e.item_id)!;
+        return new StringSelectMenuOptionBuilder()
+          .setLabel(`${it.name} ×${e.quantity}`)
+          .setDescription((it.description ?? '').replace(/\*\*/g, '').slice(0, 50))
+          .setValue(`useitem_${e.item_id}`)
+          .setEmoji(it.icon);
+      });
+      await compInt.editReply({ components: [
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(new StringSelectMenuBuilder().setCustomId(`rpg_itemsel_${userId}`).setPlaceholder('🎒 Chọn vật phẩm...').addOptions(opts.slice(0, 25))),
+        makeBackRow(userId)
+      ]});
+      return true;
+    }
+    else if (cid === `rpg_itemsel_${userId}`) {
+      const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
+      if (!itemId) return true;
+      result = processItemUse(current, itemId);
+      if (result.itemConsumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
+    }
+    else if (cid === `rpg_skill_${userId}`) {
+      const updatedLoadout = getLoadout(userId, guildId);
+      if (!updatedLoadout.length) return true;
+      await compInt.editReply({ components: [buildSkillSelectMenu(userId, updatedLoadout, current.player_mp), makeBackRow(userId)] }).catch(() => {});
+      return true;
+    }
+    else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
+      const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
+      if (skillNeedsTarget(current, skillId)) {
+        await compInt.editReply({ components: buildSkillTargetRows(userId, current, skillId) }).catch(() => {});
+        return true;
+      }
+      result = processSkill(current, skillId, freshPassive.atk, 0, 0);
+    }
+    else if (cid.startsWith(`rpg_skilltarget_${userId}_`) && compInt.isStringSelectMenu()) {
+      const skillId = cid.replace(`rpg_skilltarget_${userId}_`, '');
+      const targetIdx = parseTargetIndexFromSelect(compInt as StringSelectMenuInteraction);
+      result = processSkill(current, skillId, freshPassive.atk, 0, 0, targetIdx);
+    }
+    else if (cid === `rpg_back_${userId}`) {
+      await compInt.editReply({
+        embeds: [buildCombatEmbed(current, fresh.name, icon, safeJsonParse<string[]>(current.combat_log, []))],
+        components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId))
+      }).catch(() => {});
+      return true;
+    }
+    else return true;
+
+    if (!result) return true;
+
+    if (result.fled) {
+      deleteCombat(current.message_id);
+      unregisterCombat(userId, guildId);
+      if (entry.onFlee) {
+        await entry.onFlee(compInt as any, compInt as any, userId, guildId, fresh, enemy, result.newState, result.logLines);
+      } else {
+        await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
+      }
+      return true;
+    }
+
+    applyShopkeeperStockUse(enemy, result);
+
+    if (enemy?.isShopkeeper && !enemy.shopkeeperMercyOffered && !result.enemyDied && !result.playerDied && result.newState?.enemy_hp <= Math.floor(result.newState.enemy_max_hp * 0.2)) {
+      enemy.shopkeeperMercyOffered = true;
+      saveCombat(result.newState);
+      const mercyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`shopmercy_spare_${userId}`).setLabel('Tha mạng').setEmoji('🙏').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`shopmercy_kill_${userId}`).setLabel('Kết liễu').setEmoji('🗡️').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`shopmercy_take_${userId}`).setLabel('Ép giao nộp hàng').setEmoji('💰').setStyle(ButtonStyle.Primary)
+      );
+      await compInt.editReply({
+        embeds: [buildCombatEmbed(result.newState, fresh.name, icon, [...(result.logLines ?? []), '🧎 **Shopkeeper quỳ xuống van xin.** "Tha cho ta... ta sẽ nhớ ân này."'])],
+        components: [mercyRow]
+      }).catch(() => {});
+      return true;
+    }
+
+    if (result.enemyDied) {
+      deleteCombat(current.message_id);
+      unregisterCombat(userId, guildId);
+      await entry.onVictory(compInt as any, compInt as any, userId, guildId, fresh, enemy, result.newState);
+      return true;
+    }
+
+    if (result.playerDied) {
+      if (tryCrackedSoulCharm(userId, guildId, result)) {
+        saveCombat(result.newState);
+        await compInt.editReply({
+          embeds: [buildCombatEmbed(result.newState, fresh.name, icon, result.logLines)],
+          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, hasUsableItems(userId, guildId))
+        }).catch(() => {});
+        return true;
+      }
+      deleteCombat(current.message_id);
+      unregisterCombat(userId, guildId);
+      await entry.onDeath(compInt as any, compInt as any, userId, guildId, fresh, enemy);
+      return true;
+    }
+
+    saveCombat(result.newState);
+    await compInt.editReply({
+      embeds: [buildCombatEmbed(result.newState, fresh.name, icon, result.logLines)],
+      components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, hasUsableItems(userId, guildId))
+    }).catch(() => {});
+
+    return true;
+  } catch (err) {
+    console.error('[COMBAT] dispatchCombatInteraction error:', err);
+    return true;
+  } finally {
+    entry.processing = false;
+  }
+}
+
 export async function startCombatFlow(
   interaction: ChatInputCommandInteraction,
   userId: string,
@@ -200,7 +395,11 @@ export async function startCombatFlow(
   onFlee?: CombatFleeHandler
 ): Promise<void> {
   const player      = getPlayer(userId, guildId)!;
-  const enemy       = getEnemy(enemyId)!;
+  const enemy       = getEnemy(enemyId);
+  if (!enemy) {
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Enemy data lỗi: \`${enemyId}\` không tồn tại.`)], components: [] });
+    return;
+  }
   const loadout     = getLoadout(userId, guildId);
   const withPassiveRaw = applyPassiveStats(player);
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
@@ -248,189 +447,7 @@ export async function startCombatFlow(
   const state = { ...initState, message_id: reply.id };
   saveCombat(state);
 
-  const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
-    time: 300_000
-  });
-
-  let processing = false;
-
-  collector.on('collect', async (compInt) => {
-    const deferred = await compInt.deferUpdate().then(() => true).catch(() => false);
-    if (!deferred) return;
-
-    if (processing) return;
-    processing = true;
-
-    try {
-      const current = getCombatByUser(userId, guildId);
-      if (!current) {
-        collector.stop();
-        return;
-      }
-
-      const fresh        = getPlayer(userId, guildId)!;
-      const freshPassive = applyPassiveStats(fresh);
-      const cid          = (compInt as any).customId as string;
-
-      let result;
-      if (cid === `rpg_attack_${userId}`) {
-        // Group combat: show target selector if multiple enemies alive
-        const stateGroup: any[] | null = current.enemies_json ? JSON.parse(current.enemies_json) : null;
-        const aliveGroup = stateGroup?.filter((e: any) => e.hp > 0) ?? null;
-        if (aliveGroup && aliveGroup.length > 1) {
-          const { StringSelectMenuBuilder: SMB, StringSelectMenuOptionBuilder: SMOB, ActionRowBuilder: ARB } = require('discord.js');
-          const opts = stateGroup!
-            .map((e: any, i: number) => ({ ...e, _idx: i }))
-            .filter((e: any) => e.hp > 0)
-            .map((e: any) => new SMOB()
-              .setLabel(`[${e._idx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
-              .setValue(`rpg_attackidx_${userId}_${e._idx}`)
-            );
-          await compInt.editReply({ components: [new ARB().addComponents(
-            new SMB().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu tấn công...').addOptions(opts.slice(0, 25))
-          ), makeBackRow(userId)]});
-          return;
-        }
-        result = processAttack(current, freshPassive.atk);
-      }
-      else if (cid === `rpg_atktarget_${userId}` && compInt.isStringSelectMenu()) {
-        const val = (compInt as StringSelectMenuInteraction).values[0];
-        const idx = parseInt(val.replace(`rpg_attackidx_${userId}_`, ''));
-        result = processAttack(current, freshPassive.atk, isNaN(idx) ? 0 : idx);
-      }
-      else if (cid === `rpg_defend_${userId}`)   result = processDefend(current, freshPassive.atk, 0, 0);
-      else if (cid === `rpg_flee_${userId}`)     result = processFlee(current);
-      else if (cid === `rpg_item_${userId}`) {
-        const inv = getInventory(userId, guildId);
-        const consumables = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && e.quantity > 0 && isCombatUsableItem(e.item_id); });
-        if (!consumables.length) { await compInt.editReply({ content: '🎒 Không có đồ dùng được!' }); return; }
-        const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder: ARB2 } = require('discord.js');
-        const opts = consumables.map((e: any) => {
-          const it = getItem(e.item_id)!;
-          return new StringSelectMenuOptionBuilder()
-            .setLabel(`${it.name} ×${e.quantity}`)
-            .setDescription((it.description ?? '').replace(/\*\*/g,'').slice(0,50))
-            .setValue(`useitem_${e.item_id}`)
-            .setEmoji(it.icon);
-        });
-        const menuRow = new ARB2().addComponents(
-          new StringSelectMenuBuilder()
-            .setCustomId(`rpg_itemsel_${userId}`)
-            .setPlaceholder('🎒 Chọn vật phẩm...')
-            .addOptions(opts.slice(0,25))
-        );
-        await compInt.editReply({ components: [menuRow, makeBackRow(userId)] });
-        return;
-      }
-      else if (cid === `rpg_itemsel_${userId}`) {
-        const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
-        if (!itemId) return;
-        result = processItemUse(current, itemId);
-        if (result.itemConsumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
-      }
-      else if (cid === `rpg_skill_${userId}`) {
-        const updatedLoadout = getLoadout(userId, guildId);
-        if (!updatedLoadout.length) return;
-        await compInt.editReply({ components: [buildSkillSelectMenu(userId, updatedLoadout, current.player_mp), makeBackRow(userId)] }).catch(() => {});
-        return;
-      } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
-        const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
-        if (skillNeedsTarget(current, skillId)) {
-          await compInt.editReply({ components: buildSkillTargetRows(userId, current, skillId) }).catch(() => {});
-          return;
-        }
-        result = processSkill(current, skillId, freshPassive.atk, 0, 0);
-      } else if (cid.startsWith(`rpg_skilltarget_${userId}_`) && compInt.isStringSelectMenu()) {
-        const skillId = cid.replace(`rpg_skilltarget_${userId}_`, '');
-        const targetIdx = parseTargetIndexFromSelect(compInt as StringSelectMenuInteraction);
-        result = processSkill(current, skillId, freshPassive.atk, 0, 0, targetIdx);
-      } else if (cid === `rpg_back_${userId}`) {
-        await compInt.editReply({
-          embeds: [buildCombatEmbed(current, fresh.name, enemy.icon, JSON.parse(current.combat_log ?? '[]'))],
-          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId))
-        }).catch(() => {});
-        return;
-      } else return;
-
-      if (!result) return;
-
-      if (result.fled) {
-        deleteCombat(current.message_id);
-        collector.stop('fled');
-        if (onFlee) {
-          await onFlee(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState, result.logLines);
-        } else {
-          await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
-        }
-        return;
-      }
-
-      applyShopkeeperStockUse(enemy, result);
-
-      if ((enemy as any)?.isShopkeeper && !(enemy as any).shopkeeperMercyOffered && !result.enemyDied && !result.playerDied && result.newState?.enemy_hp <= Math.floor(result.newState.enemy_max_hp * 0.2)) {
-        (enemy as any).shopkeeperMercyOffered = true;
-        saveCombat(result.newState);
-        const mercyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId(`shopmercy_spare_${userId}`).setLabel('Tha mạng').setEmoji('🙏').setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`shopmercy_kill_${userId}`).setLabel('Kết liễu').setEmoji('🗡️').setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`shopmercy_take_${userId}`).setLabel('Ép giao nộp hàng').setEmoji('💰').setStyle(ButtonStyle.Primary)
-        );
-        await compInt.editReply({
-          embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, [
-            ...(result.logLines ?? []),
-            '🧎 **Shopkeeper quỳ xuống van xin.** "Tha cho ta... ta sẽ nhớ ân này."'
-          ])],
-          components: [mercyRow]
-        }).catch(() => {});
-        return;
-      }
-
-      if (result.enemyDied) {
-        deleteCombat(current.message_id);
-        collector.stop();
-        if (onVictory) await onVictory(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState);
-        return;
-      }
-
-      if (result.playerDied) {
-        if (tryCrackedSoulCharm(userId, guildId, result)) {
-          saveCombat(result.newState);
-          await compInt.editReply({
-            embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-            components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
-          }).catch(() => {});
-          return;
-        }
-        deleteCombat(current.message_id);
-        collector.stop();
-        if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, enemy);
-        return;
-      }
-
-      saveCombat(result.newState);
-      const updatedLoadout = getLoadout(userId, guildId);
-      await compInt.editReply({
-        embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-        components: buildCombatButtons(userId, updatedLoadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && isCombatUsableItem(e.item_id); }))
-      }).catch(() => {});
-    } catch (err) {
-      console.error('Combat interaction error:', err);
-    } finally {
-      processing = false;
-    }
-  });
-
-  collector.on('end', (_c, reason) => {
-    const cur = getCombatByUser(userId, guildId);
-    if (cur) {
-      updatePlayerHpMp(userId, guildId, cur.player_hp, cur.player_mp);
-      deleteCombat(cur.message_id);
-    }
-    if (reason === 'time') {
-      interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⏰ Trận chiến timeout.')], components: [] }).catch(() => {});
-    }
-  });
+  registerCombat(userId, guildId, { onVictory, onDeath, onFlee, enemy, icon: enemy.icon });
 }
 
 export async function startCombatFlowWithEnemy(
@@ -501,179 +518,7 @@ export async function startCombatFlowWithEnemy(
   const state = { ...initState, message_id: reply.id };
   saveCombat(state);
 
-  const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
-    time: 300_000
-  });
-
-  let processing = false;
-
-  collector.on('collect', async (compInt) => {
-    const deferred = await compInt.deferUpdate().then(() => true).catch(() => false);
-    if (!deferred) return;
-
-    if (processing) return;
-    processing = true;
-
-    try {
-      const current = getCombatByUser(userId, guildId);
-      if (!current) {
-        collector.stop();
-        return;
-      }
-
-      const fresh        = getPlayer(userId, guildId)!;
-      const freshPassive = applyPassiveStats(fresh);
-      const cid          = (compInt as any).customId as string;
-
-      if ((enemy as any)?.isShopkeeper && cid.startsWith(`shopmercy_`) && typeof (enemy as any).onMercy === 'function') {
-        deleteCombat(current.message_id);
-        collector.stop('mercy');
-        await (enemy as any).onMercy(interaction, compInt, userId, guildId, fresh, enemy, current, cid);
-        return;
-      }
-
-      let result;
-      if (cid === `rpg_attack_${userId}`) {
-        const stateGroup: any[] | null = current.enemies_json ? JSON.parse(current.enemies_json) : null;
-        const aliveGroup = stateGroup?.filter((e: any) => e.hp > 0) ?? null;
-        if (aliveGroup && aliveGroup.length > 1) {
-          const { StringSelectMenuBuilder: SMBa, StringSelectMenuOptionBuilder: SMOBa, ActionRowBuilder: ARBa } = require('discord.js');
-          const optsa = stateGroup!
-            .map((e: any, i: number) => ({ ...e, _idx: i }))
-            .filter((e: any) => e.hp > 0)
-            .map((e: any) => new SMOBa()
-              .setLabel(`[${e._idx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
-              .setValue(`rpg_attackidx_${userId}_${e._idx}`)
-            );
-          await compInt.editReply({ components: [new ARBa().addComponents(new SMBa().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu...').addOptions(optsa.slice(0, 25))), makeBackRow(userId)] });
-          return;
-        }
-        result = processAttack(current, freshPassive.atk);
-      }
-      else if (cid === `rpg_atktarget_${userId}` && compInt.isStringSelectMenu()) {
-        const val = (compInt as StringSelectMenuInteraction).values[0];
-        const idx = parseInt(val.replace(`rpg_attackidx_${userId}_`, ''));
-        result = processAttack(current, freshPassive.atk, isNaN(idx) ? 0 : idx);
-      }
-      else if (cid === `rpg_defend_${userId}`)  result = processDefend(current, freshPassive.atk, 0, 0);
-      else if (cid === `rpg_flee_${userId}`)    result = processFlee(current);
-      else if (cid === `rpg_item_${userId}`) {
-        const inv = getInventory(userId, guildId);
-        const cons = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && e.quantity > 0 && isCombatUsableItem(e.item_id); });
-        if (!cons.length) return;
-        const { StringSelectMenuBuilder: SMB2, StringSelectMenuOptionBuilder: SMOB2, ActionRowBuilder: ARB3 } = require('discord.js');
-        const opts2 = cons.map((e: any) => { const it = getItem(e.item_id)!; return new SMOB2().setLabel(`${it.name} ×${e.quantity}`).setValue(`useitem_${e.item_id}`).setEmoji(it.icon); });
-        await compInt.editReply({ components: [new ARB3().addComponents(new SMB2().setCustomId(`rpg_itemsel_${userId}`).setPlaceholder('🎒 Chọn...').addOptions(opts2.slice(0,25))), makeBackRow(userId)] });
-        return;
-      }
-      else if (cid === `rpg_itemsel_${userId}`) {
-        const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
-        if (!itemId) return;
-        result = processItemUse(current, itemId);
-        if (result.itemConsumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
-      }
-      else if (cid === `rpg_skill_${userId}`) {
-        const updatedLoadout = getLoadout(userId, guildId);
-        if (!updatedLoadout.length) return;
-        await compInt.editReply({ components: [buildSkillSelectMenu(userId, updatedLoadout, current.player_mp), makeBackRow(userId)] }).catch(() => {});
-        return;
-      } else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
-        const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
-        if (skillNeedsTarget(current, skillId)) {
-          await compInt.editReply({ components: buildSkillTargetRows(userId, current, skillId) }).catch(() => {});
-          return;
-        }
-        result = processSkill(current, skillId, freshPassive.atk, 0, 0);
-      } else if (cid.startsWith(`rpg_skilltarget_${userId}_`) && compInt.isStringSelectMenu()) {
-        const skillId = cid.replace(`rpg_skilltarget_${userId}_`, '');
-        const targetIdx = parseTargetIndexFromSelect(compInt as StringSelectMenuInteraction);
-        result = processSkill(current, skillId, freshPassive.atk, 0, 0, targetIdx);
-      } else if (cid === `rpg_back_${userId}`) {
-        await compInt.editReply({
-          embeds: [buildCombatEmbed(current, fresh.name, enemy.icon, JSON.parse(current.combat_log ?? '[]'))],
-          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId))
-        }).catch(() => {});
-        return;
-      } else return;
-
-      if (!result) return;
-
-      if (result.fled) {
-        deleteCombat(current.message_id);
-        collector.stop('fled');
-        if (onFlee) {
-          await onFlee(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState, result.logLines);
-        } else {
-          await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
-        }
-        return;
-      }
-
-      applyShopkeeperStockUse(enemy, result);
-
-      if ((enemy as any)?.isShopkeeper && !(enemy as any).shopkeeperMercyOffered && !result.enemyDied && !result.playerDied && result.newState?.enemy_hp <= Math.floor(result.newState.enemy_max_hp * 0.2)) {
-        (enemy as any).shopkeeperMercyOffered = true;
-        saveCombat(result.newState);
-        const mercyRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId(`shopmercy_spare_${userId}`).setLabel('Tha mạng').setEmoji('🙏').setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId(`shopmercy_kill_${userId}`).setLabel('Kết liễu').setEmoji('🗡️').setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId(`shopmercy_take_${userId}`).setLabel('Ép giao nộp hàng').setEmoji('💰').setStyle(ButtonStyle.Primary)
-        );
-        await compInt.editReply({
-          embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, [
-            ...(result.logLines ?? []),
-            '🧎 **Shopkeeper quỳ xuống van xin.** "Tha cho ta... ta sẽ nhớ ân này."'
-          ])],
-          components: [mercyRow]
-        }).catch(() => {});
-        return;
-      }
-
-      if (result.enemyDied) {
-        deleteCombat(current.message_id);
-        collector.stop();
-        if (onVictory) await onVictory(interaction, compInt as any, userId, guildId, fresh, enemy, result.newState);
-        return;
-      }
-
-      if (result.playerDied) {
-        if (tryCrackedSoulCharm(userId, guildId, result)) {
-          saveCombat(result.newState);
-          await compInt.editReply({
-            embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-            components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
-          }).catch(() => {});
-          return;
-        }
-        deleteCombat(current.message_id);
-        collector.stop();
-        if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, enemy);
-        return;
-      }
-
-      saveCombat(result.newState);
-      await compInt.editReply({
-        embeds: [buildCombatEmbed(result.newState, fresh.name, enemy.icon, result.logLines)],
-        components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
-      }).catch(() => {});
-    } catch (err) {
-      console.error('Combat interaction error:', err);
-    } finally {
-      processing = false;
-    }
-  });
-
-  collector.on('end', (_c, reason) => {
-    const cur = getCombatByUser(userId, guildId);
-    if (cur) {
-      updatePlayerHpMp(userId, guildId, cur.player_hp, cur.player_mp);
-      deleteCombat(cur.message_id);
-    }
-    if (reason === 'time') {
-      interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⏰ Trận chiến timeout.')], components: [] }).catch(() => {});
-    }
-  });
+  registerCombat(userId, guildId, { onVictory: onVictory!, onDeath: onDeath!, onFlee, enemy, icon: enemy.icon });
 }
 
 // ── Group Combat Flow ─────────────────────────────────────────────────────
@@ -745,150 +590,5 @@ export async function startGroupCombatFlow(
   const state = { ...initState, message_id: reply.id };
   saveCombat(state);
 
-  const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
-    time: 300_000
-  });
-
-  let processing = false;
-
-  collector.on('collect', async (compInt) => {
-    const deferred = await compInt.deferUpdate().then(() => true).catch(() => false);
-    if (!deferred) return;
-    if (processing) return;
-    processing = true;
-
-    try {
-      const current = getCombatByUser(userId, guildId);
-      if (!current) { collector.stop(); return; }
-
-      const fresh        = getPlayer(userId, guildId)!;
-      const freshPassive = applyPassiveStats(fresh);
-      const cid          = (compInt as any).customId as string;
-
-      let result;
-      if (cid === `rpg_attack_${userId}`) {
-        const sg: any[] | null = current.enemies_json ? JSON.parse(current.enemies_json) : null;
-        const alive = sg?.filter((e: any) => e.hp > 0) ?? null;
-        if (alive && alive.length > 1) {
-          const { StringSelectMenuBuilder: SMB, StringSelectMenuOptionBuilder: SMOB, ActionRowBuilder: ARB } = require('discord.js');
-          const opts = sg!
-            .map((e: any, i: number) => ({ ...e, _idx: i }))
-            .filter((e: any) => e.hp > 0)
-            .map((e: any) => new SMOB()
-              .setLabel(`[${e._idx + 1}] ${e.name} — HP: ${e.hp}/${e.max_hp}`)
-              .setValue(`rpg_attackidx_${userId}_${e._idx}`)
-            );
-          await compInt.editReply({ components: [new ARB().addComponents(new SMB().setCustomId(`rpg_atktarget_${userId}`).setPlaceholder('🎯 Chọn mục tiêu...').addOptions(opts.slice(0, 25))), makeBackRow(userId)] });
-          return;
-        }
-        result = processAttack(current, freshPassive.atk);
-      }
-      else if (cid === `rpg_atktarget_${userId}` && (compInt as any).isStringSelectMenu()) {
-        const val = (compInt as StringSelectMenuInteraction).values[0];
-        const idx = parseInt(val.replace(`rpg_attackidx_${userId}_`, ''));
-        result = processAttack(current, freshPassive.atk, isNaN(idx) ? 0 : idx);
-      }
-      else if (cid === `rpg_defend_${userId}`)   result = processDefend(current, freshPassive.atk, 0, 0);
-      else if (cid === `rpg_flee_${userId}`)     result = processFlee(current);
-      else if (cid === `rpg_item_${userId}`) {
-        const inv = getInventory(userId, guildId);
-        const consumables = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && e.quantity > 0 && isCombatUsableItem(e.item_id); });
-        if (!consumables.length) return;
-        const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder: ARB2 } = require('discord.js');
-        const opts = consumables.map((e: any) => {
-          const it = getItem(e.item_id)!;
-          return new StringSelectMenuOptionBuilder()
-            .setLabel(`${it.name} ×${e.quantity}`)
-            .setDescription((it.description ?? '').replace(/\*\*/g, '').slice(0, 50))
-            .setValue(`useitem_${e.item_id}`)
-            .setEmoji(it.icon);
-        });
-        await compInt.editReply({ components: [new ARB2().addComponents(new StringSelectMenuBuilder().setCustomId(`rpg_itemsel_${userId}`).setPlaceholder('🎒 Chọn vật phẩm...').addOptions(opts.slice(0, 25))), makeBackRow(userId)] });
-        return;
-      }
-      else if (cid === `rpg_itemsel_${userId}`) {
-        const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
-        if (!itemId) return;
-        result = processItemUse(current, itemId);
-        if (result.itemConsumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
-      }
-      else if (cid === `rpg_skill_${userId}`) {
-        const updatedLoadout = getLoadout(userId, guildId);
-        if (!updatedLoadout.length) return;
-        await compInt.editReply({ components: [buildSkillSelectMenu(userId, updatedLoadout, current.player_mp), makeBackRow(userId)] }).catch(() => {});
-        return;
-      } else if (cid === `rpg_skillmenu_${userId}` && (compInt as any).isStringSelectMenu()) {
-        const skillId = (compInt as StringSelectMenuInteraction).values[0].replace(`rpg_useskill_${userId}_`, '');
-        if (skillNeedsTarget(current, skillId)) {
-          await compInt.editReply({ components: buildSkillTargetRows(userId, current, skillId) }).catch(() => {});
-          return;
-        }
-        result = processSkill(current, skillId, freshPassive.atk, 0, 0);
-      } else if (cid.startsWith(`rpg_skilltarget_${userId}_`) && (compInt as any).isStringSelectMenu()) {
-        const skillId = cid.replace(`rpg_skilltarget_${userId}_`, '');
-        const targetIdx = parseTargetIndexFromSelect(compInt as StringSelectMenuInteraction);
-        result = processSkill(current, skillId, freshPassive.atk, 0, 0, targetIdx);
-      } else if (cid === `rpg_back_${userId}`) {
-        await compInt.editReply({
-          embeds: [buildCombatEmbed(current, fresh.name, '⚔️', JSON.parse(current.combat_log ?? '[]'))],
-          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId))
-        }).catch(() => {});
-        return;
-      } else return;
-
-      if (!result) return;
-
-      if (result.fled) {
-        deleteCombat(current.message_id);
-        collector.stop('fled');
-        if (onFlee) await onFlee(interaction, compInt as any, userId, guildId, fresh, groupEnemy, result.newState, result.logLines);
-        else await compInt.editReply({ embeds: [simpleEmbed(COLORS.warning, '🏃 Bạn thoát khỏi trận chiến!')], components: [] }).catch(() => {});
-        return;
-      }
-
-      if (result.enemyDied) {
-        deleteCombat(current.message_id);
-        collector.stop();
-        if (onVictory) await onVictory(interaction, compInt as any, userId, guildId, fresh, groupEnemy, result.newState);
-        return;
-      }
-
-      if (result.playerDied) {
-        if (tryCrackedSoulCharm(userId, guildId, result)) {
-          saveCombat(result.newState);
-          await compInt.editReply({
-            embeds: [buildCombatEmbed(result.newState, fresh.name, '⚔️', result.logLines)],
-            components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
-          }).catch(() => {});
-          return;
-        }
-        deleteCombat(current.message_id);
-        collector.stop();
-        if (onDeath) await onDeath(interaction, compInt as any, userId, guildId, fresh, groupEnemy);
-        return;
-      }
-
-      saveCombat(result.newState);
-      await compInt.editReply({
-        embeds: [buildCombatEmbed(result.newState, fresh.name, '⚔️', result.logLines)],
-        components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, getInventory(userId, guildId).some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); }))
-      }).catch(() => {});
-    } catch (err) {
-      console.error('Group combat interaction error:', err);
-    } finally {
-      processing = false;
-    }
-  });
-
-  collector.on('end', (_c, reason) => {
-    const cur = getCombatByUser(userId, guildId);
-    if (cur) {
-      updatePlayerHpMp(userId, guildId, cur.player_hp, cur.player_mp);
-      deleteCombat(cur.message_id);
-    }
-    if (reason === 'time') {
-      interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⏰ Trận chiến timeout.')], components: [] }).catch(() => {});
-    }
-  });
+  registerCombat(userId, guildId, { onVictory, onDeath, onFlee, enemy: groupEnemy, icon: '⚔️' });
 }

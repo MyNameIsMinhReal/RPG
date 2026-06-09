@@ -164,6 +164,8 @@ export interface RunExploreEventInput {
   callbacks: ExploreEventCallbacks;
   /** When set, explore events use majority voting among all party members */
   partyMemberIds?: string[];
+  /** Display names for party members, keyed by userId — used for fishing minigame logs */
+  partyMemberNames?: Record<string, string>;
 }
 
 export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType {
@@ -639,6 +641,7 @@ async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
     zoneId: ctx.player.zone_id,
     useBait,
     partyMemberIds: ctx.partyMemberIds,
+    partyMemberNames: ctx.partyMemberNames,
     buildContinueExploreRow: ctx.callbacks.buildContinueExploreRow,
     attachContinueExploreHandler: ctx.callbacks.attachContinueExploreHandler,
   });

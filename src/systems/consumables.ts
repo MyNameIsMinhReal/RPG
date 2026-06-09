@@ -274,6 +274,26 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
       lines.push(`📦 Mở rương nhận: ${got.join(', ')}.`);
       break;
     }
+    case 'gear_box': {
+      const rarityWeights = [
+        { rarity: 'common',    weight: 45 },
+        { rarity: 'rare',      weight: 35 },
+        { rarity: 'epic',      weight: 15 },
+        { rarity: 'legendary', weight: 4  },
+        { rarity: 'mythic',    weight: 1  },
+      ];
+      const total = rarityWeights.reduce((s, r) => s + r.weight, 0);
+      let roll = Math.random() * total;
+      const pickedRarity = rarityWeights.find(r => { roll -= r.weight; return roll <= 0; })!.rarity;
+      const isGacha = (e: { rarity: string; id: string }) =>
+        e.rarity !== 'cursed' && e.id !== 'early_access_ring';
+      const pool = Object.values(EQUIPMENT).filter(e => e.rarity === pickedRarity && isGacha(e));
+      const fallback = Object.values(EQUIPMENT).filter(e => isGacha(e));
+      const eq = pick(pool.length ? pool : fallback);
+      addItem(userId, guildId, eq.id, 1);
+      lines.push(`🎰 Gear Box mở ra: ${eq.icon} **${eq.name}** *(${eq.rarity})*!`);
+      break;
+    }
     case 'cursed_equipment_box': {
       const pool = Object.values(EQUIPMENT).filter(e => e.rarity === 'cursed')
         .concat(Object.values(EQUIPMENT).filter(e => ['rare','epic','legendary','mythic'].includes(e.rarity) && e.rarity !== 'cursed').slice(0, 0));

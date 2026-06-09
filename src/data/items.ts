@@ -665,6 +665,12 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Mở để nhận **2–4 material ngẫu nhiên**.',
     sellPrice: 30
   },
+  gear_box: {
+    id: 'gear_box', name: 'Gear Box', icon: '🎰',
+    type: 'consumable', stackable: true,
+    description: 'Mở để nhận **1 trang bị ngẫu nhiên** (Thường→Huyền thoại). Tỉ lệ: Thường 45% · Hiếm 35% · Sử Thi 15% · Huyền Thoại 4% · Thần Thánh 1%. Không bao gồm trang bị Cursed.',
+    sellPrice: 80
+  },
   cursed_equipment_box: {
     id: 'cursed_equipment_box', name: 'Cursed Equipment Box', icon: '🎁',
     type: 'consumable', stackable: false,

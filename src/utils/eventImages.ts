@@ -16,9 +16,11 @@ const KEYS: Record<string, string> = {
   trap:         'trap',
   altar:        'altar',
   mysterious:   'mysterious',
+  healer:       'healer',
   villager:     'villager',
   caravan:      'caravan',
   loot:         'loot',
+  chest:        'chest',
   // Combat outcomes
   boss:         'boss',
   victory:      'victory',
@@ -26,6 +28,7 @@ const KEYS: Record<string, string> = {
   // UI
   rest:         'rest',
   explore:      'explore',
+  code_redeem:  'code_redeem',
   // Zones
   zone_village: 'zone_village',
   zone_forest:  'zone_forest',

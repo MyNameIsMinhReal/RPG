@@ -3,6 +3,7 @@ import {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType
 } from 'discord.js';
 import { getPlayer, createPlayer, resetPlayer, getLoadout, applyPassiveStats } from '../systems/player';
+import { getCombatByUser } from '../systems/combat';
 import { CLASSES } from '../data/classes';
 import { COLORS, buildProfileEmbed } from '../utils/embeds';
 import { showExploreMenu } from './explore';
@@ -73,6 +74,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   await interaction.deferReply();
   const { id: userId, username } = interaction.user;
   const guildId = interaction.guildId!;
+
+  if (getCombatByUser(userId, guildId)) {
+    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription('⚔️ Bạn đang trong trận chiến! Dùng `/explore` để quay lại.')] });
+    return;
+  }
+
   const player  = getPlayer(userId, guildId);
 
   // ── Already alive ─────────────────────────────────────────────────────────
