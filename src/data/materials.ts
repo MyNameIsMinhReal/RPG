@@ -266,6 +266,33 @@ export const MATERIALS: Record<string, MaterialDef> = {
     sellPrice: 120, dropZones: ['forest', 'shrine'], dropChance: 3
   },
 
+  // ── Pet release items ────────────────────────────────────────────────────
+  shadow_shard: {
+    id: 'shadow_shard', name: 'Shadow Shard', icon: '🌑', rarity: 'rare',
+    description: 'Mảnh bóng tối còn lại khi Shadow Cat được thả tự do.',
+    sellPrice: 55, dropZones: [], dropChance: 0
+  },
+  fire_essence: {
+    id: 'fire_essence', name: 'Fire Essence', icon: '🔥', rarity: 'epic',
+    description: 'Tinh chất lửa thoát ra khi Fire Lizard rời đi.',
+    sellPrice: 90, dropZones: [], dropChance: 0
+  },
+  thunder_feather: {
+    id: 'thunder_feather', name: 'Thunder Feather', icon: '⚡', rarity: 'epic',
+    description: 'Lông vũ tích điện rơi lại khi Storm Eagle được giải phóng.',
+    sellPrice: 85, dropZones: [], dropChance: 0
+  },
+  lucky_coin: {
+    id: 'lucky_coin', name: 'Lucky Coin', icon: '🪙', rarity: 'epic',
+    description: 'Đồng xu mang vận may của Gold Fox. Bán được giá cao.',
+    sellPrice: 100, dropZones: [], dropChance: 0
+  },
+  stardust: {
+    id: 'stardust', name: 'Stardust', icon: '✨', rarity: 'legendary',
+    description: 'Bụi tinh tú còn lại khi Celestial Sprite trở về bầu trời.',
+    sellPrice: 200, dropZones: [], dropChance: 0
+  },
+
 };
 
 export function getMaterial(id: string): MaterialDef | undefined {
