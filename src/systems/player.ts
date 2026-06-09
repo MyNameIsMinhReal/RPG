@@ -316,6 +316,18 @@ export function killPlayer(userId: string, guildId: string): void {
   `).run(userId, guildId);
 }
 
+export function revivePlayer(userId: string, guildId: string): boolean {
+  const player = getPlayer(userId, guildId);
+  if (!player) return false;
+  if (player.alive) return false; // already alive
+  const withPassive = applyPassiveStats(player);
+  const reviveHp = Math.max(1, Math.floor(withPassive.max_hp * 0.5));
+  const reviveMp = Math.max(0, Math.floor(withPassive.max_mp * 0.5));
+  db.prepare('UPDATE players SET alive=1, hp=?, mp=? WHERE user_id=? AND guild_id=?')
+    .run(reviveHp, reviveMp, userId, guildId);
+  return true;
+}
+
 // ── Wanted / Factions / Soul perks / Pets ────────────────────────────────
 export type FactionId = 'merchants' | 'hunters' | 'old_church' | 'shadow_court' | 'villagers';
 

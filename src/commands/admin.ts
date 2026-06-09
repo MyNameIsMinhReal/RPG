@@ -2,6 +2,7 @@ import {
   SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder
 } from 'discord.js';
 import { clearPlayerBossProgress, hasPlayerClearedBoss } from '../systems/world';
+import { getPlayer, revivePlayer, applyPassiveStats } from '../systems/player';
 import { ZONES } from '../data/zones';
 
 const BOSS_IDS = Object.values(ZONES)
@@ -29,6 +30,11 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
       .addChoices(...BOSS_IDS.map(b => ({ name: `${b.zone} — ${b.id}`, value: b.id })))
     )
+  )
+  .addSubcommand(sub => sub
+    .setName('revive')
+    .setDescription('Hồi sinh người chơi đã chết (hồi 50% HP/MP, giữ nguyên stats)')
+    .addUserOption(opt => opt.setName('user').setDescription('Người chơi cần hồi sinh').setRequired(true))
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -40,6 +46,38 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   const sub = interaction.options.getSubcommand();
+
+  if (sub === 'revive') {
+    const target = interaction.options.getUser('user', true);
+    const guildId = interaction.guildId!;
+    const player = getPlayer(target.id, guildId);
+
+    if (!player) {
+      await interaction.editReply({ content: `❌ <@${target.id}> chưa có nhân vật.` });
+      return;
+    }
+    if (player.alive) {
+      await interaction.editReply({ content: `ℹ️ <@${target.id}> vẫn đang sống, không cần hồi sinh.` });
+      return;
+    }
+
+    revivePlayer(target.id, guildId);
+    const fresh = applyPassiveStats(getPlayer(target.id, guildId)!);
+
+    await interaction.editReply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x57F287)
+          .setTitle('✨ Hồi Sinh Thành Công')
+          .addFields(
+            { name: 'Người chơi', value: `<@${target.id}> (${player.name})`, inline: true },
+            { name: '❤️ HP', value: `${fresh.hp}/${fresh.max_hp}`, inline: true },
+            { name: '💧 MP', value: `${fresh.mp}/${fresh.max_mp}`, inline: true },
+          )
+      ]
+    });
+    return;
+  }
 
   if (sub === 'resetboss') {
     const target = interaction.options.getUser('user', true);
