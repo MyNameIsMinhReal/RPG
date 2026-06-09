@@ -30,7 +30,7 @@ import { startCombatFlowWithEnemy, type CombatDeathHandler, type CombatVictoryHa
 import { getEquipment } from '../data/equipment';
 import { getItem } from '../data/items';
 import { getZone, ZONES } from '../data/zones';
-import { getFlag, getShopMarkup, getShopkeeperRobberyCount, increaseShopMarkup, logEvent, setFlag, setWorldEvent, getMerchantFear, increaseMerchantFear, adjustWorldDanger } from '../systems/world';
+import { getFlag, deleteFlag, getShopMarkup, getShopkeeperRobberyCount, increaseShopMarkup, logEvent, setFlag, setWorldEvent, getMerchantFear, increaseMerchantFear, adjustWorldDanger } from '../systems/world';
 import { COLORS, simpleEmbed, type PlayerRow } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
@@ -173,6 +173,15 @@ export interface RunExploreEventInput {
 
 export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType {
   const { player, guildId, hasCombat, hasLegacy } = input;
+
+  // Admin-forced event takes priority — consumed immediately
+  const forcedKey = `forced_event_${player.user_id}`;
+  const forcedEvent = getFlag(guildId, forcedKey) as ExploreEventType | null;
+  if (forcedEvent) {
+    deleteFlag(guildId, forcedKey);
+    return forcedEvent;
+  }
+
   const rep = player.reputation ?? 0;
   const wanted = getWantedLevel(player.user_id, guildId);
   const deaths = player.deaths ?? 0;

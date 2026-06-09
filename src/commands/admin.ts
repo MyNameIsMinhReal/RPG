@@ -1,7 +1,7 @@
 import {
   SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder
 } from 'discord.js';
-import { clearPlayerBossProgress, hasPlayerClearedBoss } from '../systems/world';
+import { clearPlayerBossProgress, hasPlayerClearedBoss, setFlag } from '../systems/world';
 import {
   getPlayer, revivePlayer, applyPassiveStats,
   grantGold, grantExp, addItem, updatePlayerHpMp
@@ -83,6 +83,13 @@ export const data = new SlashCommandBuilder()
       )
     )
     .addIntegerOption(opt => opt.setName('value').setDescription('Giá trị mới').setRequired(true).setMinValue(0))
+    .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
+  )
+  .addSubcommand(sub => sub
+    .setName('forceevent')
+    .setDescription('Ép event tiếp theo của người chơi khi /explore')
+    .addUserOption(opt => opt.setName('user').setDescription('Người chơi').setRequired(true))
+    .addStringOption(opt => opt.setName('event_id').setDescription('ID event (vd: forest_lost_relic, loot, treasure_chest...)').setRequired(true))
     .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
   );
 
@@ -252,6 +259,30 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           { name: 'Boss', value: bossLabel, inline: true },
           { name: 'Đã xoá', value: `${cleared} bản ghi`, inline: true },
           { name: 'Trạng thái hiện tại', value: statusLines.join('\n') || '—' }
+        )]
+    });
+  }
+
+  // ── forceevent ────────────────────────────────────────────────────────────
+  if (sub === 'forceevent') {
+    const target  = interaction.options.getUser('user', true);
+    const eventId = interaction.options.getString('event_id', true).trim();
+    const player  = getPlayer(target.id, guildId);
+
+    if (!player) {
+      await interaction.editReply({ content: `❌ <@${target.id}> chưa có nhân vật.` });
+      return;
+    }
+
+    setFlag(guildId, `forced_event_${target.id}`, eventId, 600); // hết hạn sau 10 phút
+    await interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x9B59B6)
+        .setTitle('🎲 Đã Đặt Event Cưỡng Bức')
+        .addFields(
+          { name: 'Người chơi', value: `<@${target.id}> (${player.name})`, inline: true },
+          { name: 'Event tiếp theo', value: `\`${eventId}\``, inline: true },
+          { name: '⏳ Hết hạn', value: 'Sau 10 phút nếu chưa /explore', inline: true },
         )]
     });
   }

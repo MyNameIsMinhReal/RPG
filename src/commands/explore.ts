@@ -266,7 +266,7 @@ export async function showExploreMenu(
 ): Promise<void> {
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
 
-  const player  = getPlayer(userId, guildId)!;
+  const player  = applyPassiveStats(getPlayer(userId, guildId)!);
   const zone    = getZone(player.zone_id)!;
   const bossId  = zone.bossId;
   const bossSlain = bossId ? isBossSlain(guildId, bossId) : true;
