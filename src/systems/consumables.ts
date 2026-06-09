@@ -2,7 +2,8 @@ import db from '../database/index';
 import { getItem } from '../data/items';
 import {
   getPlayer, getItemQty, removeItem, updatePlayerHpMp,
-  adjustReputation, grantGold, grantSoulShards, addItem, addKeepItemCharge
+  adjustReputation, grantGold, grantSoulShards, addItem, addKeepItemCharge,
+  applyPassiveStats
 } from './player';
 import { getFlag, setFlag } from './world';
 import { MATERIALS } from '../data/materials';
@@ -158,10 +159,11 @@ export function getGreedGoldBonusPercent(userId: string, guildId: string): numbe
 }
 
 export function useItemOutsideCombat(userId: string, guildId: string, itemId: string): { ok: boolean; consumed?: boolean; title: string; lines: string[] } {
-  const player = getPlayer(userId, guildId);
+  const rawPlayer = getPlayer(userId, guildId);
+  if (!rawPlayer) return { ok: false, title: '❌ Không có nhân vật', lines: ['Dùng `/start` trước.'] };
+  const player = applyPassiveStats(rawPlayer);
   const item = getItem(itemId);
   const qty = getItemQty(userId, guildId, itemId);
-  if (!player) return { ok: false, title: '❌ Không có nhân vật', lines: ['Dùng `/start` trước.'] };
   if (!item || qty <= 0) return { ok: false, title: '❌ Không có vật phẩm', lines: ['Bạn không có vật phẩm này trong túi.'] };
   if (item.type !== 'consumable') return { ok: false, title: '❌ Không dùng được', lines: ['Vật phẩm này không phải consumable.'] };
 

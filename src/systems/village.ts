@@ -4,7 +4,7 @@ import {
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
   ComponentType
 } from 'discord.js';
-import { getPlayer, addItem, getItemQty, getInventory, removeItem, grantSoulShards } from './player';
+import { getPlayer, addItem, getItemQty, getInventory, removeItem, grantSoulShards, applyPassiveStats } from './player';
 import { getBookTier, pickDifferentBook } from '../commands/reroll';
 import { onlyUser } from '../utils/collectors';
 import { getWornEquipment, UPGRADE_MAX } from './equipment';
@@ -441,7 +441,7 @@ export async function showVillageTavern(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string
 ): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
+  const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const missingHp = player.max_hp - player.hp;
   const missingMp = player.max_mp - player.mp;
   const healCost  = Math.max(20, Math.ceil(missingHp * 0.4 + missingMp * 0.2));
@@ -486,7 +486,7 @@ export async function showVillageTavern(
   }
 
   await btn.deferUpdate();
-  const pNow = getPlayer(userId, guildId)!;
+  const pNow = applyPassiveStats(getPlayer(userId, guildId)!);
   if (pNow.gold < healCost) {
     await interaction.editReply({
       embeds: [simpleEmbed(COLORS.danger, `❌ Không đủ Gold! Cần **${healCost}**, có **${pNow.gold}**.`)],
@@ -495,8 +495,8 @@ export async function showVillageTavern(
     return;
   }
 
-  db.prepare('UPDATE players SET gold=gold-?, hp=max_hp, mp=max_mp WHERE user_id=? AND guild_id=?')
-    .run(healCost, userId, guildId);
+  db.prepare('UPDATE players SET gold=gold-?, hp=?, mp=? WHERE user_id=? AND guild_id=?')
+    .run(healCost, pNow.max_hp, pNow.max_mp, userId, guildId);
 
   await interaction.editReply({
     embeds: [new EmbedBuilder()

@@ -120,12 +120,16 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
     }
   }
 
+  const virtualMaxHp = Math.max(10, player.max_hp + bonusMaxHp);
+  const virtualMaxMp = Math.max(5,  player.max_mp + bonusMaxMp);
   return {
     ...player,
+    hp:     Math.min(player.hp, virtualMaxHp),
+    mp:     Math.min(player.mp, virtualMaxMp),
     atk:    player.atk    + bonusAtk,
     def:    Math.max(0, player.def + bonusDef),
-    max_hp: Math.max(10, player.max_hp + bonusMaxHp),
-    max_mp: Math.max(5,  player.max_mp + bonusMaxMp),
+    max_hp: virtualMaxHp,
+    max_mp: virtualMaxMp,
   };
 }
 
