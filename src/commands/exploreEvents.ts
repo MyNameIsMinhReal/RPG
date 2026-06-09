@@ -1241,7 +1241,8 @@ async function showMerchantGuard(ctx: RunExploreEventInput): Promise<void> {
   const enemy = eventEnemy(ctx, pick(ctx.enemies), { id: 'merchant_guard', name: 'Vệ Sĩ Thương Nhân', icon: '🛡️', hp: Math.floor(ctx.player.max_hp * 1.1), atk: ctx.player.atk + 6, def: ctx.player.def + 8 });
   return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
     async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🛡️ Vệ Sĩ Bị Hạ', description: 'Bạn thắng, nhưng tin này sẽ lan rất nhanh.', exp: Math.floor(ctx.player.exp_next * 0.18), gold: randInt(25, 70), rep: -5 }),
-    ctx.callbacks.handleDeath
+    ctx.callbacks.handleDeath,
+    ctx.callbacks.handleFlee
   );
 }
 
@@ -1676,7 +1677,8 @@ async function showConditionalMiniboss(ctx: RunExploreEventInput): Promise<void>
         color: COLORS.danger
       });
     },
-    ctx.callbacks.handleDeath
+    ctx.callbacks.handleDeath,
+    ctx.callbacks.handleFlee
   );
 }
 

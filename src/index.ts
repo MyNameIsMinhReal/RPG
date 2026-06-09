@@ -28,6 +28,9 @@ import { execute as execParty     } from './commands/party';
 import { execute as execChapter   } from './commands/chapter';
 import { execute as execCode      } from './commands/code';
 import { execute as execHelp      } from './commands/help';
+import { execute as execUpdatelog } from './commands/updatelog';
+import { execute as execAdmin     } from './commands/admin';
+import { sendUnseenLogsDM } from './systems/updateLog';
 import { buildHelpGuideEmbeds } from './commands/help';
 import { validateGameData } from './utils/validateData';
 import { dispatchCombatInteraction } from './systems/combatFlow';
@@ -61,6 +64,8 @@ commands.set('party',     execParty);
 commands.set('chapter',   execChapter);
 commands.set('code',      execCode);
 commands.set('help',      execHelp);
+commands.set('updatelog', execUpdatelog);
+commands.set('admin',     execAdmin);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive
@@ -503,6 +508,9 @@ client.on('interactionCreate', async (interaction: Interaction) => {
     }
   } finally {
     if (timeout) clearTimeout(timeout);
+    if (interaction.guildId) {
+      sendUnseenLogsDM(client, interaction.user.id, interaction.guildId).catch(() => {});
+    }
   }
 });
 

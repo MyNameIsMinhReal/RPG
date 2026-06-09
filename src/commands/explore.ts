@@ -1403,7 +1403,8 @@ async function showSpiritTrial(
       });
       attachContinueExploreHandler(btnInt.message, int, uid, gid);
     },
-    handleDeath
+    handleDeath,
+    handleFlee
   );
 }
 
@@ -2616,7 +2617,7 @@ async function showVillagerRescue(
   await startCombatFlowWithEnemy(interaction, userId, guildId, banditEnemy, {
     bonusGold: goldReward,
     bonusDesc: `👨‍👩‍👧 Dân làng cảm ơn bạn và trao **${goldReward} Gold**!`
-  }, handleVictory, handleDeath);
+  }, handleVictory, handleDeath, handleFlee);
 }
 
 // ── Event: Caravan Robbery ────────────────────────────────────────────────────
@@ -2698,7 +2699,7 @@ async function showCaravanRobbery(
       bonusGold: randInt(80, 150),
       bonusDesc: `🛒 Thương nhân trả ơn với **{gold} Gold** và hàng hóa!`,
       bonusItem: 'elixir'
-    }, handleVictory, handleDeath);
+    }, handleVictory, handleDeath, handleFlee);
   } else {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '😈 Bạn chọn đứng về phía bọn cướp...')], components: [] });
     await new Promise(r => setTimeout(r, 800));
@@ -2706,7 +2707,7 @@ async function showCaravanRobbery(
       bonusGold: randInt(40, 80),
       bonusDesc: `💰 Chia chác chiến lợi phẩm: +**{gold} Gold** + đồ cướp được!`,
       bonusItem: pick(['health_potion','mana_potion','antidote'])
-    }, handleVictory, handleDeath);
+    }, handleVictory, handleDeath, handleFlee);
   }
 }
 

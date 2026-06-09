@@ -496,6 +496,22 @@ db.exec(`
   );
 `);
 
+// ── Update log system ─────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS update_logs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    version    TEXT NOT NULL,
+    content    TEXT NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch())
+  );
+  CREATE TABLE IF NOT EXISTS update_logs_seen (
+    user_id TEXT NOT NULL,
+    guild_id TEXT NOT NULL,
+    log_id  INTEGER NOT NULL,
+    PRIMARY KEY (user_id, guild_id, log_id)
+  );
+`);
+
 // ── Party system ──────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS parties (

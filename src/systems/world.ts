@@ -54,6 +54,17 @@ export function markPlayerClearedBoss(guildId: string, userId: string, bossId: s
   setFlag(guildId, `boss_cleared_${userId}_${bossId}`, '1');
 }
 
+export function clearPlayerBossProgress(guildId: string, userId: string, bossId?: string): number {
+  if (bossId) {
+    return db.prepare(
+      `DELETE FROM world_state WHERE guild_id=? AND flag_key=?`
+    ).run(guildId, `boss_cleared_${userId}_${bossId}`).changes as number;
+  }
+  return db.prepare(
+    `DELETE FROM world_state WHERE guild_id=? AND flag_key LIKE ?`
+  ).run(guildId, `boss_cleared_${userId}_%`).changes as number;
+}
+
 // ── Butterfly effect triggers ─────────────────────────────────────────────
 export function onBossKilled(guildId: string, bossId: string, playerName: string, zoneId: string): string {
   const flagKey = `boss_${bossId}_slain`;

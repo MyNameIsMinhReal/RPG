@@ -23,6 +23,7 @@ export const PITY_EVENTS = new Set<ExploreEventType>([
   'world_prophetic_vision', 'world_secret_meeting',
   'world_faction_standoff', 'world_church_inquisition', 'world_shadow_offer', 'world_hunters_mission', 'world_villager_dispute',
   // New forest events
+  'forest_tree',
   'forest_bandit_ambush', 'forest_giant_spider', 'forest_cursed_scarecrow', 'forest_snake_pit', 'forest_poacher_camp',
   'forest_corrupted_treant', 'forest_wild_boar', 'forest_poison_spores', 'forest_rabid_fox', 'forest_bandit_watchtower',
   'forest_hollow_log', 'forest_buried_chest', 'forest_eagle_nest', 'forest_mushroom_ring', 'forest_amber_sap',
@@ -33,6 +34,19 @@ export const PITY_EVENTS = new Set<ExploreEventType>([
   'forest_memory_tree', 'forest_dream_flower', 'forest_echo_grove', 'forest_time_anomaly', 'forest_lost_relic',
   'forest_herb_foraging', 'forest_animal_tracks', 'forest_river_crossing', 'forest_tree_climbing', 'forest_fog_maze',
   'forest_waterfall_cave', 'forest_dead_tree_oracle', 'forest_flower_field', 'forest_crow_messenger', 'forest_campfire_stranger',
+  // Shrine events
+  'shrine_bell', 'shrine_weeping_statue', 'shrine_forbidden_offering', 'shrine_sealed_reliquary',
+  // Mine events
+  'mine_collapse', 'mine_runaway_cart', 'mine_living_ore', 'mine_trapped_miner',
+  // Wastes events
+  'wastes_storm', 'wastes_memory_rain', 'wastes_faceless_merchant',
+  // Any non-village zone
+  'mimic_chest', 'map_seller', 'wandering_blacksmith',
+  // Time-of-day events
+  'dawn_ritual', 'dawn_traveler', 'dawn_dew_blessing', 'dawn_hunter_tracks',
+  'noon_rest', 'day_patrol', 'day_training_ground', 'day_supply_cart',
+  'dusk_trader', 'dusk_omen', 'dusk_crow_omen', 'dusk_card_dealer',
+  'midnight_wanderer', 'night_ghost_lantern', 'night_grave_robbers',
 ]);
 
 // After PITY_THRESHOLD explores without seeing event X, weight increases by 1 per explore.
