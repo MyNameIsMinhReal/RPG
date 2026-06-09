@@ -430,6 +430,7 @@ async function handleZonePicker(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+  if (await blockIfPartyMember(interaction, userId, guildId)) return;
 
   const player = getPlayer(userId, guildId)!;
   const currentIdx = ZONE_ORDER.indexOf(player.zone_id);
@@ -494,6 +495,7 @@ async function handleTravel(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string, targetId: string
 ): Promise<void> {
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+  if (await blockIfPartyMember(interaction, userId, guildId)) return;
 
   const player = getPlayer(userId, guildId)!;
   const target = ZONES[targetId];
@@ -630,22 +632,28 @@ async function handleGather(
   attachContinueExploreHandler(reply, interaction, userId, guildId);
 }
 
+// Returns true if the player is a non-leader party member (should be blocked from solo actions).
+async function blockIfPartyMember(
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+): Promise<boolean> {
+  const party = getPartyOf(guildId, userId);
+  if (party && party.leaderId !== userId && (party.memberIds.length ?? 0) > 1) {
+    const leaderName = getPlayer(party.leaderId, guildId)?.name ?? 'Leader';
+    await interaction.editReply({
+      embeds: [simpleEmbed(COLORS.warning, `👥 Bạn đang trong party. Chỉ **${leaderName}** (leader) mới có thể khám phá và di chuyển cho cả nhóm.`)],
+      components: []
+    });
+    return true;
+  }
+  return false;
+}
+
 // ── Search: random event ───────────────────────────────────────────────────────
 async function handleSearch(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
 ): Promise<void> {
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
-
-  // Thành viên party không phải leader không được tự explore
-  const _partyCheck = getPartyOf(guildId, userId);
-  if (_partyCheck && _partyCheck.leaderId !== userId && (_partyCheck.memberIds.length ?? 0) > 1) {
-    const leaderName = getPlayer(_partyCheck.leaderId, guildId)?.name ?? 'Leader';
-    await interaction.editReply({
-      embeds: [simpleEmbed(COLORS.warning, `👥 Bạn đang trong party. Chỉ **${leaderName}** (leader) mới có thể khám phá cho cả nhóm.`)],
-      components: []
-    });
-    return;
-  }
+  if (await blockIfPartyMember(interaction, userId, guildId)) return;
 
   const player = getPlayer(userId, guildId)!;
   const currentZone = getZone(player.zone_id)!;
