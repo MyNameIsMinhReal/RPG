@@ -197,13 +197,24 @@ function applyOutgoingDamageModifiers(
   guildId: string,
   dmg: number,
   isBossTarget: boolean,
-  logs: string[]
+  logs: string[],
+  effects?: Effect[]
 ): number {
   const eqStats = getEquipmentStats(userId, guildId);
   let finalDmg = dmg;
   if (isBossTarget && eqStats.effects.includes('boss_damage')) {
     finalDmg = Math.max(1, Math.floor(finalDmg * 1.15));
     logs.push('🐉 Boss Damage: sát thương lên boss +15%.');
+  }
+  if (effects && isBossTarget) {
+    if (hasEffect(effects, 'bark_armor')) {
+      finalDmg = Math.max(1, Math.floor(finalDmg * 0.4));
+      logs.push('🌿 **Bark Armor** hấp thụ phần lớn sát thương! (−60%)');
+    }
+    if (hasEffect(effects, 'oak_vulnerable')) {
+      finalDmg = Math.max(1, Math.floor(finalDmg * 1.5));
+      logs.push('🔥 **Vulnerable!** Vỏ cây đã cháy — sát thương bùng nổ! (+50%)');
+    }
   }
   return finalDmg;
 }
@@ -387,7 +398,7 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
   let dmg = calcDamage(effectiveAtk, targetDef);
   if (isCrit) { dmg = Math.floor(dmg * 1.75); }
   const targetId = groupEnemies ? groupEnemies[actualTargetIdx].id : state.enemy_id;
-  dmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, dmg, targetIsBoss(targetId), logs);
+  dmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, dmg, targetIsBoss(targetId), logs, effects);
 
   // Apply damage
   if (groupEnemies) {
@@ -525,7 +536,7 @@ export function processSkill(
       logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
     }
     let out = Math.max(1, Math.round((rawDamage - targetDef * defPierce) * skillMult));
-    return applyOutgoingDamageModifiers(state.user_id, state.guild_id, out, targetIsBoss(targetId), logs);
+    return applyOutgoingDamageModifiers(state.user_id, state.guild_id, out, targetIsBoss(targetId), logs, effects);
   };
 
   // ── New special active skills ───────────────────────────────────────────
@@ -634,7 +645,7 @@ export function processSkill(
       logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
     }
     let finalDmg  = Math.max(1, Math.round((skill.damage - skillTargetDef * defPierce) * skillMult));
-    finalDmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, finalDmg, targetIsBoss(targetId), logs);
+    finalDmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, finalDmg, targetIsBoss(targetId), logs, effects);
     if (skillGroupEnemies) {
       skillGroupEnemies[actualTargetIdx] = {
         ...skillGroupEnemies[actualTargetIdx],
@@ -720,6 +731,36 @@ export function processDefend(state: CombatState, playerAtk: number, _h: number,
     return groupEnemyTurn(state, defendedState, state.player_hp, state.player_mp, effects, logs, Math.floor(state.enemy_atk * 0.4), passives, defGroupEnemies);
   }
   return enemyTurn(state, defendedState, state.player_hp, state.player_mp, effects, logs, Math.floor(state.enemy_atk * 0.4), passives);
+}
+
+// ── processIgnite (Ancient Oak: Đốt Vỏ Cây) ──────────────────────────────
+export function processIgnite(state: CombatState): ActionResult {
+  const effects = parseEffects(state.active_effects);
+  const passives = getPassives(state.user_id, state.guild_id);
+  const logs: string[] = JSON.parse(state.combat_log || '[]');
+
+  const MP_COST = 25;
+  if (state.player_mp < MP_COST) {
+    logs.push(`❌ Không đủ MP để **Đốt Vỏ Cây**! (cần ${MP_COST} MP, có ${state.player_mp})`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
+
+  const hasBarkArmor = hasEffect(effects, 'bark_armor');
+  if (!hasBarkArmor) {
+    // Race condition fallback — no armor to burn, just waste nothing
+    logs.push(`⚠️ Vỏ cây đã không còn — không cần đốt.`);
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-6)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
+
+  const player_mp = state.player_mp - MP_COST;
+  const barkIdx = effects.findIndex(e => e.name === 'bark_armor');
+  if (barkIdx >= 0) effects.splice(barkIdx, 1);
+  addEffect(effects, 'oak_vulnerable', 3, 50, 'enemy');
+
+  logs.push(`🔥 **Đốt Vỏ Cây!** (−${MP_COST} MP) — Lửa thiêu rụi lớp giáp cứng! **Bark Armor** bị phá vỡ — **${state.enemy_name}** trở nên ⚠️ **Vulnerable** trong **2 lượt** (+50% sát thương nhận vào).`);
+
+  const updatedState = { ...state, player_mp };
+  return enemyTurn(state, updatedState, state.player_hp, player_mp, effects, logs, 0, passives);
 }
 
 // ── processFlee ───────────────────────────────────────────────────────────
@@ -905,9 +946,13 @@ function enemyTurn(
     const useSpecial    = !silenced && ((hpPct < 0.3 && randInt(1, 100) <= 60) || randInt(1, 100) <= 30);
     const bossPhaseNow  = getBossPhase(effects);
     const bossPhaseData = enemy.boss && enemy.phases ? enemy.phases.find(p => p.phaseIndex === bossPhaseNow) : null;
-    const attackPool    = bossPhaseData
+    const rawPool       = bossPhaseData
       ? bossPhaseData.specialAttacks
       : (Array.isArray(enemy.specialAttacks) ? enemy.specialAttacks : []);
+    // Don't re-activate bark_armor if it's already up
+    const attackPool    = hasEffect(effects, 'bark_armor')
+      ? rawPool.filter((a: string) => a !== 'oak_bark_armor')
+      : rawPool;
     special = useSpecial && attackPool.length > 0 ? pick(attackPool) : null;
   }
 
@@ -927,9 +972,10 @@ function enemyTurn(
       current = { ...current, enemy_hp: Math.min(current.enemy_max_hp, current.enemy_hp + res.enemyHeal) };
     }
     // Boss-specific after-effects
-    if (special === 'oak_root_slam') addEffect(effects, 'rooted', 1);
-    if (special === 'vine_whip')    addEffect(effects, 'rooted', 2);
-    if (special === 'thorn_burst')  addEffect(effects, 'poison', 3, 4);
+    if (special === 'oak_root_slam')  addEffect(effects, 'rooted', 1);
+    if (special === 'vine_whip')      addEffect(effects, 'rooted', 2);
+    if (special === 'thorn_burst')    addEffect(effects, 'poison', 3, 4);
+    if (special === 'oak_bark_armor') addEffect(effects, 'bark_armor', 2, 60, 'enemy');
   } else {
     dealDmg  = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
     dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!enemy.boss });
@@ -1516,6 +1562,10 @@ function applySpecialAttack(
       logs.push(`${ic} **${n}** trói chặt bằng rễ cây! **${dmg}** sát thương!`); break;
 
     // ── Ancient Oak boss attacks ──────────────────────────────────────────
+    case 'oak_bark_armor':
+      // Boss hardens its bark — no damage, effect applied by caller
+      logs.push(`🌿 **${n}** cứng hóa vỏ cây thành lớp giáp dày — **Bark Armor** kích hoạt! *(Sát thương nhận vào giảm 60% trong 2 lượt!)*`);
+      break;
     case 'oak_root_slam':
       // Phase 1 heavy hit — roots player (no-flee effect applied in caller)
       dmg = Math.max(1, calcDamage(baseAtk * 1.6, def(special)));

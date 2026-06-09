@@ -7,7 +7,8 @@ import {
 import {
   getPlayer, getInventory, getSkillPool, getLoadout,
   equipSkill, unequipSkill, addSkillToPool, hasSkillInPool,
-  removeItem, getItemQty, updatePlayerHpMp, spendGold, grantSoulShards
+  removeItem, getItemQty, updatePlayerHpMp, spendGold, grantSoulShards,
+  getSkillAttuneCount, incrementSkillAttuneCount
 } from '../systems/player';
 import { awardAchievements } from '../systems/achievements';
 import { COLORS } from '../utils/embeds';
@@ -71,7 +72,7 @@ async function renderTab(
   switch (currentTab) {
     case 'items':   [embed, actionRows] = buildItemsTab(player, inventory, userId);   break;
     case 'skills':  [embed, actionRows] = buildSkillsTab(player, pool, loadout);       break;
-    case 'loadout': [embed, actionRows] = buildLoadoutTab(player, pool, loadout, userId); break;
+    case 'loadout': [embed, actionRows] = buildLoadoutTab(player, pool, loadout, userId, guildId); break;
     case 'books':   [embed, actionRows] = buildBooksTab(player, inventory, userId);   break;
     case 'equip':   [embed, actionRows] = buildEquipTab(player, userId, guildId);      break;
     case 'titles':  [embed, actionRows] = buildTitlesTab(player, userId, guildId);     break;
@@ -194,11 +195,20 @@ function invDef(id: string) {
   return getItem(id) ?? getMaterial(id);
 }
 
-function getSkillAttuneGoldCost(skillId: string): number {
+function getSkillBaseGoldCost(skillId: string): number {
   if (SKILL_TIER_POOLS.t1.includes(skillId)) return 100;
   if (SKILL_TIER_POOLS.t2.includes(skillId)) return 300;
   if (SKILL_TIER_POOLS.t3.includes(skillId)) return 800;
   return 300;
+}
+
+function getSkillAttuneGoldCost(skillId: string, attuneCount: number): number {
+  if (attuneCount === 0) return 0;
+  return getSkillBaseGoldCost(skillId) * Math.min(attuneCount, 3);
+}
+
+function getSkillAttuneSoulCost(attuneCount: number): number {
+  return attuneCount === 0 ? 0 : 1;
 }
 
 function getSkillAttuneTierLabel(skillId: string): string {
@@ -208,8 +218,11 @@ function getSkillAttuneTierLabel(skillId: string): string {
   return 'Special';
 }
 
-function getSkillAttuneCostLine(skillId: string): string {
-  return `${getSkillAttuneGoldCost(skillId)} Gold + 1 Soul Shard`;
+function getSkillAttuneCostLine(skillId: string, attuneCount: number): string {
+  if (attuneCount === 0) return '**FREE** (lần đầu)';
+  const gold = getSkillAttuneGoldCost(skillId, attuneCount);
+  const mult = Math.min(attuneCount, 3);
+  return `${gold} Gold + 1 Soul Shard${mult > 1 ? ` (x${mult})` : ''}`;
 }
 
 async function payAndEquipSkill(
@@ -227,8 +240,9 @@ async function payAndEquipSkill(
     return false;
   }
 
-  const goldCost = getSkillAttuneGoldCost(skillId);
-  const soulCost = 1;
+  const attuneCount = getSkillAttuneCount(userId, guildId, skillId);
+  const goldCost    = getSkillAttuneGoldCost(skillId, attuneCount);
+  const soulCost    = getSkillAttuneSoulCost(attuneCount);
 
   if (player.gold < goldCost || player.soul_shards < soulCost) {
     const missing: string[] = [];
@@ -240,7 +254,7 @@ async function payAndEquipSkill(
         .setColor(COLORS.warning)
         .setTitle('🔒 Không đủ tài nguyên để gắn skill')
         .setDescription(
-          `${sk.icon} **${sk.name}** cần **${getSkillAttuneCostLine(skillId)}** để gắn vào loadout.\n` +
+          `${sk.icon} **${sk.name}** cần **${getSkillAttuneCostLine(skillId, attuneCount)}** để gắn vào loadout.\n` +
           `Hiện tại bạn có: 🪙 **${player.gold} Gold** · 💎 **${player.soul_shards} Soul Shards**\n\n` +
           `Bạn đang ${missing.join(' và ')}.`
         )],
@@ -254,12 +268,13 @@ async function payAndEquipSkill(
     return false;
   }
 
-  if (!spendGold(userId, guildId, goldCost)) {
+  if (goldCost > 0 && !spendGold(userId, guildId, goldCost)) {
     await renderTab(interaction, userId, guildId, 'loadout');
     return false;
   }
 
-  grantSoulShards(userId, guildId, -soulCost);
+  if (soulCost > 0) grantSoulShards(userId, guildId, -soulCost);
+  incrementSkillAttuneCount(userId, guildId, skillId);
   equipSkill(userId, guildId, slot, skillId);
   return true;
 }
@@ -372,7 +387,7 @@ function buildSkillsTab(
 
 // ── Tab: Loadout ───────────────────────────────────────────────────────────────
 function buildLoadoutTab(
-  player: any, pool: any[], loadout: any[], userId: string
+  player: any, pool: any[], loadout: any[], userId: string, guildId: string
 ): [EmbedBuilder, ActionRowBuilder<any>[]] {
   const maxSlots = 4 + Math.min(2, player.extra_skill_slots ?? 0);
   const slotLines = Array.from({ length: maxSlots }, (_, i) => i + 1).map(slot => {
@@ -406,9 +421,11 @@ function buildLoadoutTab(
   if (equipable.length && loadout.length < maxSlots) {
     const opts = equipable.map(p => {
       const sk = getSkill(p.skill_id)!;
+      const cnt = getSkillAttuneCount(userId, guildId, sk.id);
+      const costLabel = cnt === 0 ? 'FREE' : `${getSkillAttuneGoldCost(sk.id, cnt)}G + 1 Soul`;
       return new StringSelectMenuOptionBuilder()
         .setLabel(`${sk.name} [${getSkillAttuneTierLabel(sk.id)}]`)
-        .setDescription(`${getSkillAttuneGoldCost(sk.id)}G + 1 Soul · ${sk.description.replace(/\*\*/g,'').slice(0,60)}`.slice(0, 100))
+        .setDescription(`${costLabel} · ${sk.description.replace(/\*\*/g,'').slice(0,60)}`.slice(0, 100))
         .setValue(`equip_${sk.id}`)
         .setEmoji(sk.icon);
     });
@@ -550,15 +567,16 @@ async function pickSlotForSkill(
     new StringSelectMenuOptionBuilder().setLabel(`Slot ${slot}`).setValue(`slot_${slot}`)
   );
 
+  const attuneCount = getSkillAttuneCount(userId, guildId, skillId);
   const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`inv_slot_pick_${userId}_${skillId}`)
-      .setPlaceholder(`Chọn slot cho ${sk.name} (${getSkillAttuneCostLine(skillId)})...`)
+      .setPlaceholder(`Chọn slot cho ${sk.name} (${getSkillAttuneCostLine(skillId, attuneCount)})...`)
       .addOptions(opts)
   );
 
   const reply = await interaction.editReply({
-    embeds: [new EmbedBuilder().setColor(COLORS.magic).setDescription(`${sk.icon} **${sk.name}** → chọn slot:\n💸 Phí gắn: **${getSkillAttuneCostLine(skillId)}**`)],
+    embeds: [new EmbedBuilder().setColor(COLORS.magic).setDescription(`${sk.icon} **${sk.name}** → chọn slot:\n💸 Phí gắn: **${getSkillAttuneCostLine(skillId, attuneCount)}**`)],
     components: [row]
   });
 

@@ -268,6 +268,15 @@ export function buildCombatButtons(
   const exhausted = stamina <= 10;
   const fleeChance = getFleeChanceFromActiveEffects(activeEffectsRaw);
   const rooted = fleeChance <= 0;
+
+  let hasBarkArmor = false;
+  if (activeEffectsRaw) {
+    try {
+      const fx: any[] = JSON.parse(activeEffectsRaw);
+      hasBarkArmor = fx.some((e: any) => e.name === 'bark_armor' && e.duration > 0);
+    } catch {}
+  }
+
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`rpg_attack_${userId}`)
@@ -299,7 +308,20 @@ export function buildCombatButtons(
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(rooted)
   );
-  return [row1];
+
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [row1];
+
+  if (hasBarkArmor) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`rpg_ignite_${userId}`)
+        .setLabel('Đốt Vỏ Cây (25 MP)')
+        .setEmoji('🔥')
+        .setStyle(ButtonStyle.Primary)
+    ));
+  }
+
+  return rows;
 }
 
 // ── Skill select menu ─────────────────────────────────────────────────────

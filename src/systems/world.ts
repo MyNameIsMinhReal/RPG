@@ -45,6 +45,15 @@ export function getAllFlags(guildId: string): WorldFlag[] {
   `).all(guildId, now) as unknown as WorldFlag[];
 }
 
+// ── Per-player boss progression ───────────────────────────────────────────
+export function hasPlayerClearedBoss(guildId: string, userId: string, bossId: string): boolean {
+  return getFlag(guildId, `boss_cleared_${userId}_${bossId}`) !== null;
+}
+
+export function markPlayerClearedBoss(guildId: string, userId: string, bossId: string): void {
+  setFlag(guildId, `boss_cleared_${userId}_${bossId}`, '1');
+}
+
 // ── Butterfly effect triggers ─────────────────────────────────────────────
 export function onBossKilled(guildId: string, bossId: string, playerName: string, zoneId: string): string {
   const flagKey = `boss_${bossId}_slain`;

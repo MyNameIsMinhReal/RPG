@@ -244,6 +244,17 @@ export function addSkillToPool(userId: string, guildId: string, skillId: string)
   return true;
 }
 
+export function getSkillAttuneCount(userId: string, guildId: string, skillId: string): number {
+  const row = db.prepare('SELECT attune_count FROM skill_pool WHERE user_id=? AND guild_id=? AND skill_id=?')
+    .get(userId, guildId, skillId) as { attune_count: number } | undefined;
+  return row?.attune_count ?? 0;
+}
+
+export function incrementSkillAttuneCount(userId: string, guildId: string, skillId: string): void {
+  db.prepare('UPDATE skill_pool SET attune_count = attune_count + 1 WHERE user_id=? AND guild_id=? AND skill_id=?')
+    .run(userId, guildId, skillId);
+}
+
 // ── Skill Loadout ─────────────────────────────────────────────────────────
 export function getLoadout(userId: string, guildId: string): LoadoutEntry[] {
   return db.prepare('SELECT slot, skill_id FROM skill_loadout WHERE user_id=? AND guild_id=? ORDER BY slot')

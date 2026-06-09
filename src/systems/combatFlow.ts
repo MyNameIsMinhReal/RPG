@@ -8,7 +8,7 @@ import { registerCombat, unregisterCombat, getCombatEntry } from './combatRegist
 import { getPlayer, getLoadout, applyPassiveStats, getItemQty, removeItem } from './player';
 import {
   getCombatByUser, saveCombat, deleteCombat,
-  processAttack, processSkill, processDefend, processFlee, processItemUse,
+  processAttack, processSkill, processDefend, processFlee, processItemUse, processIgnite,
   buildGroupCombatState
 } from './combat';
 import { getEnemy, getEnemiesForZone } from '../data/enemies';
@@ -74,7 +74,8 @@ export type CombatDeathHandler = (
   userId: string,
   guildId: string,
   player: any,
-  enemy: any
+  enemy: any,
+  remainingEnemyHp?: number
 ) => Promise<void>;
 
 export type CombatFleeHandler = (
@@ -297,6 +298,7 @@ export async function dispatchCombatInteraction(
     }
     else if (cid === `rpg_defend_${userId}`)  result = processDefend(current, freshPassive.atk, 0, 0);
     else if (cid === `rpg_flee_${userId}`)    result = processFlee(current);
+    else if (cid === `rpg_ignite_${userId}`)  result = processIgnite(current);
     else if (cid === `rpg_item_${userId}`) {
       const inv  = getInventory(userId, guildId);
       const cons = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && e.quantity > 0 && isCombatUsableItem(e.item_id); });
@@ -395,9 +397,10 @@ export async function dispatchCombatInteraction(
         }).catch(() => {});
         return true;
       }
+      const remainingEnemyHp = result.newState?.enemy_hp ?? 0;
       deleteCombat(current.message_id);
       unregisterCombat(userId, guildId);
-      await entry.onDeath(compInt as any, compInt as any, userId, guildId, fresh, enemy);
+      await entry.onDeath(compInt as any, compInt as any, userId, guildId, fresh, enemy, remainingEnemyHp);
       return true;
     }
 
@@ -423,7 +426,8 @@ export async function startCombatFlow(
   enemyId: string,
   onVictory: CombatVictoryHandler,
   onDeath: CombatDeathHandler,
-  onFlee?: CombatFleeHandler
+  onFlee?: CombatFleeHandler,
+  hpOverride?: { startHp: number; maxHp: number }
 ): Promise<void> {
   const player      = getPlayer(userId, guildId)!;
   let enemy: any    = getEnemy(enemyId);
@@ -452,7 +456,7 @@ export async function startCombatFlow(
     message_id: 'temp', channel_id: interaction.channelId,
     user_id: userId, guild_id: guildId,
     enemy_id: enemy.id, enemy_name: enemy.name,
-    enemy_hp: enemy.hp, enemy_max_hp: enemy.hp,
+    enemy_hp: hpOverride?.startHp ?? enemy.hp, enemy_max_hp: hpOverride?.maxHp ?? enemy.hp,
     enemy_atk: adjustedAtk, enemy_def: enemy.def,
     player_hp: withPassive.hp, player_max_hp: withPassive.max_hp,
     player_mp: withPassive.mp, player_max_mp: withPassive.max_mp,

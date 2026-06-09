@@ -473,6 +473,29 @@ db.exec(`
   }
 }
 
+try { db.exec(`ALTER TABLE skill_pool ADD COLUMN attune_count INTEGER DEFAULT 0`); } catch {}
+
+// ── Ancient Oak event ─────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS oak_event (
+    guild_id         TEXT PRIMARY KEY,
+    phase            TEXT DEFAULT 'summoning',
+    summoner_id      TEXT NOT NULL,
+    spawned_at       INTEGER DEFAULT (unixepoch()),
+    expires_at       INTEGER NOT NULL,
+    boss_hp          INTEGER NOT NULL,
+    boss_max_hp      INTEGER NOT NULL,
+    current_fighter  TEXT DEFAULT NULL
+  );
+  CREATE TABLE IF NOT EXISTS oak_participants (
+    guild_id  TEXT NOT NULL,
+    user_id   TEXT NOT NULL,
+    damage    INTEGER DEFAULT 0,
+    joined_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (guild_id, user_id)
+  );
+`);
+
 // ── Party system ──────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS parties (

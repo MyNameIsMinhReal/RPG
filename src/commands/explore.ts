@@ -12,7 +12,7 @@ import {
   addPermanentStat, addKeepItemCharge, addExtraSkillSlot, improveDeathPenaltyReduction, addRebirthBlessing, addMerchantMercy
 } from '../systems/player';
 import { getCombatByUser, saveCombat, deleteCombat } from '../systems/combat';
-import { startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow, hasActiveCombatSkills, hasUsableItems } from '../systems/combatFlow';
+import { startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow, hasActiveCombatSkills, hasUsableItems, type CombatVictoryHandler, type CombatDeathHandler, type CombatFleeHandler } from '../systems/combatFlow';
 import { registerCombat } from '../systems/combatRegistry';
 import { startPartyCombatFlow } from '../systems/partyCombatFlow';
 import { getPartyOf } from '../systems/party';
@@ -21,8 +21,16 @@ import { processVictoryRewards, processDeathPenalty } from '../systems/rewards';
 import {
   logEvent, onBossKilled, isBossSlain, getDropBonus, getEnemyAtkBonus,
   getShopMarkup, getEffectiveShopMarkup, increaseShopMarkup, getShopkeeperThreatMultiplier, getShopkeeperRobberyCount, recordShopkeeperRobbery,
-  increaseMerchantFear, adjustWorldDanger
+  increaseMerchantFear, adjustWorldDanger, setFlag, getFlag, deleteFlag,
+  hasPlayerClearedBoss, markPlayerClearedBoss
 } from '../systems/world';
+import {
+  getOakEvent, createOakEvent, joinOakEvent, isOakParticipant, getOakParticipants,
+  addOakDamage, updateOakBossHp, setOakCurrentFighter, activateOakEvent,
+  closeOakEvent, clearOakParticipants, hasOakPrereq, markOakPrereq,
+  OAK_RESPAWN_TTL, type OakEvent,
+  startOakHunt, isOakHuntActive, getOakHuntRemaining, tickOakHunt, OAK_HUNT_EXPLORES
+} from '../systems/oakEvent';
 import { awardAchievements } from '../systems/achievements';
 import { createLegacy, pickLegacySkill, getLegaciesInZone, claimLegacy, getLegacy } from '../systems/legacy';
 import {
@@ -51,6 +59,19 @@ import { runPendingChapterExploreEvent } from '../systems/chapterExploreEventEng
 export const data = new SlashCommandBuilder()
   .setName('explore')
   .setDescription('Khám phá khu vực hiện tại');
+
+interface OakButtonInfo {
+  canSummon: boolean;
+  canJoin: boolean;
+  canFight: boolean;
+  canStartHunt: boolean;
+  huntRemaining: number;
+  eventPhase: string | null;
+  bossHp: number;
+  bossMaxHp: number;
+  participantCount: number;
+  currentFighter: string | null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -255,7 +276,35 @@ export async function showExploreMenu(
       { name: '🪙 Gold', value: `${player.gold}`, inline: true }
     );
 
-  const rows = buildExploreRows(userId, zone.safe, !bossSlain, bossId, player.level, zone.minLevel);
+  let oakInfo: OakButtonInfo | null = null;
+  if (player.zone_id === 'forest') {
+    const oakEv = getOakEvent(guildId);
+    if (oakEv) {
+      const isParticipant = isOakParticipant(guildId, userId);
+      oakInfo = {
+        canSummon: false, canStartHunt: false, huntRemaining: 0,
+        canJoin: !isParticipant && oakEv.phase === 'summoning',
+        canFight: isParticipant && oakEv.current_fighter === null,
+        eventPhase: oakEv.phase,
+        bossHp: oakEv.boss_hp,
+        bossMaxHp: oakEv.boss_max_hp,
+        participantCount: getOakParticipants(guildId).length,
+        currentFighter: oakEv.current_fighter,
+      };
+    } else if (!bossSlain) {
+      const hasPrereq = hasOakPrereq(guildId, userId);
+      const relicCount = getItemQty(userId, guildId, 'ancient_relic');
+      const huntRemaining = getOakHuntRemaining(guildId, userId);
+      oakInfo = {
+        canSummon: hasPrereq && relicCount >= 3,
+        canStartHunt: !hasPrereq && !isOakHuntActive(guildId, userId),
+        huntRemaining,
+        canJoin: false, canFight: false, eventPhase: null,
+        bossHp: 0, bossMaxHp: 0, participantCount: 0, currentFighter: null,
+      };
+    }
+  }
+  const rows = buildExploreRows(userId, zone.safe, !bossSlain, bossId, player.level, zone.minLevel, oakInfo);
   const { embed: zoneEmbed, files: zoneFiles } = withImage(embed, `zone_${player.zone_id}`);
   const reply = await interaction.editReply({ embeds: [zoneEmbed], files: zoneFiles, components: rows });
 
@@ -291,6 +340,11 @@ export async function showExploreMenu(
       const zoneId = cid.replace(`ex_travel_${userId}_`, '');
       await handleTravel(interaction, userId, guildId, zoneId);
     }
+    // Oak event
+    else if (cid === `ex_oak_hunt_${userId}`)   await handleOakHuntStart(interaction, userId, guildId);
+    else if (cid === `ex_oak_summon_${userId}`) await handleOakSummon(interaction, userId, guildId);
+    else if (cid === `ex_oak_join_${userId}`)   await handleOakJoin(interaction, userId, guildId);
+    else if (cid === `ex_oak_fight_${userId}`)  await handleOakFight(interaction, userId, guildId);
     // Village services
     else if (cid === `ex_gather_${userId}`)   await handleGather(interaction, userId, guildId);
     else if (cid === `vill_shop_${userId}`)   await handleVillageService(interaction, userId, guildId, 'shop');
@@ -308,24 +362,59 @@ export async function showExploreMenu(
 
 function buildExploreRows(
   userId: string, isSafe: boolean, hasBoss: boolean,
-  bossId: string | undefined, playerLevel: number, zoneMinLevel: number
+  bossId: string | undefined, playerLevel: number, zoneMinLevel: number,
+  oakInfo?: OakButtonInfo | null
 ) {
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`ex_search_${userId}`)
       .setLabel('Khám phá').setEmoji('🗺️').setStyle(ButtonStyle.Primary).setDisabled(isSafe),
     new ButtonBuilder().setCustomId(`ex_boss_${userId}`)
       .setLabel('Thách Boss').setEmoji('👑').setStyle(ButtonStyle.Danger)
-      .setDisabled(isSafe || !hasBoss || playerLevel < zoneMinLevel + 2),
+      .setDisabled(isSafe || !hasBoss || playerLevel < zoneMinLevel + 2 || bossId === 'ancient_oak'),
     new ButtonBuilder().setCustomId(`ex_zone_${userId}`)
       .setLabel('Zone').setEmoji('🗺️').setStyle(ButtonStyle.Secondary)
   );
   if (!isSafe) {
-    // Non-village zones get a gather button
     row1.addComponents(
       new ButtonBuilder().setCustomId(`ex_gather_${userId}`)
         .setLabel('Thu thập').setEmoji('🌿').setStyle(ButtonStyle.Success)
     );
-    return [row1];
+    const rows: ActionRowBuilder<ButtonBuilder>[] = [row1];
+    if (oakInfo) {
+      const oakRow = new ActionRowBuilder<ButtonBuilder>();
+      if (oakInfo.canStartHunt) {
+        oakRow.addComponents(
+          new ButtonBuilder().setCustomId(`ex_oak_hunt_${userId}`)
+            .setLabel('Truy Tìm Linh Thú').setEmoji('🔍').setStyle(ButtonStyle.Primary)
+        );
+      } else if (oakInfo.huntRemaining > 0) {
+        oakRow.addComponents(
+          new ButtonBuilder().setCustomId(`ex_oak_hunt_${userId}`)
+            .setLabel(`Đang Truy Tìm (còn ${oakInfo.huntRemaining} explore)`).setEmoji('🐾').setStyle(ButtonStyle.Secondary).setDisabled(true)
+        );
+      }
+      if (oakInfo.canSummon) {
+        oakRow.addComponents(
+          new ButtonBuilder().setCustomId(`ex_oak_summon_${userId}`)
+            .setLabel('Thức Tỉnh Cổ Mộc').setEmoji('🌳').setStyle(ButtonStyle.Success)
+        );
+      }
+      if (oakInfo.canJoin) {
+        oakRow.addComponents(
+          new ButtonBuilder().setCustomId(`ex_oak_join_${userId}`)
+            .setLabel(`Tham Gia (${oakInfo.participantCount} người)`).setEmoji('🤝').setStyle(ButtonStyle.Primary)
+        );
+      }
+      if (oakInfo.canFight) {
+        const hpPct = oakInfo.bossMaxHp > 0 ? Math.round(oakInfo.bossHp / oakInfo.bossMaxHp * 100) : 100;
+        oakRow.addComponents(
+          new ButtonBuilder().setCustomId(`ex_oak_fight_${userId}`)
+            .setLabel(`Công Kích (${oakInfo.bossHp}/${oakInfo.bossMaxHp} HP · ${hpPct}%)`).setEmoji('⚔️').setStyle(ButtonStyle.Danger)
+        );
+      }
+      if (oakRow.components.length > 0) rows.push(oakRow);
+    }
+    return rows;
   }
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -396,6 +485,26 @@ async function handleTravel(
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, `Bạn đang ở **${target.icon} ${target.name}** rồi!`)], components: [] });
     return;
   }
+
+  // Gate: phải hạ boss zone trước mới qua zone tiếp theo
+  const targetIdx = ZONE_ORDER.indexOf(targetId);
+  const currentIdx = ZONE_ORDER.indexOf(player.zone_id);
+  if (targetIdx > currentIdx) {
+    for (let i = currentIdx; i < targetIdx; i++) {
+      const gateZone = ZONES[ZONE_ORDER[i]];
+      if (gateZone?.bossId && !hasPlayerClearedBoss(guildId, userId, gateZone.bossId)) {
+        const bossZone = gateZone;
+        await interaction.editReply({
+          embeds: [simpleEmbed(COLORS.danger,
+            `🔒 **${target.icon} ${target.name}** bị khóa.\n\nBạn cần hạ gục boss **${bossZone.icon} ${bossZone.name}** trước.`
+          )],
+          components: []
+        });
+        return;
+      }
+    }
+  }
+
   if (player.level < target.minLevel) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `Cần **Lv.${target.minLevel}** để vào **${target.name}**! (Bạn: Lv.${player.level})`)], components: [] });
     return;
@@ -609,6 +718,66 @@ async function handleSearch(
   const hasCombat = enemies.length > 0;
   const hasLegacy = legacies.length > 0;
 
+  // Oak hunt tick — đếm ngược mỗi lần explore trong forest
+  if (player.zone_id === 'forest' && isOakHuntActive(guildId, userId)) {
+    const remaining = tickOakHunt(guildId, userId);
+    if (remaining === 0) {
+      setExploreCooldown(userId, guildId);
+      const minibossId = Math.random() < 0.5 ? 'alpha_thornmaw' : 'moss_crowned_stag';
+      const miniboss = getEnemy(minibossId)!;
+      const embed = new EmbedBuilder()
+        .setColor(COLORS.danger)
+        .setTitle(`${miniboss.icon} Linh Thú Xuất Hiện!`)
+        .setDescription(`*${miniboss.lore}*\n\n⚠️ Bạn không thể bỏ chạy khỏi cuộc đối đầu này.`);
+      await interaction.editReply({ embeds: [embed], components: [] });
+      await new Promise(r => setTimeout(r, 800));
+      await startCombatFlow(interaction, userId, guildId, minibossId, handleVictory, handleDeath, handleFlee);
+      return;
+    }
+  }
+
+  // Oak event lore — mỗi điều kiện thỏa có event riêng
+  if (player.zone_id === 'forest' && !getOakEvent(guildId)) {
+    // Điều kiện 1: vừa hạ miniboss rừng
+    if (getFlag(guildId, `oak_lore_miniboss_${userId}`)) {
+      deleteFlag(guildId, `oak_lore_miniboss_${userId}`);
+      setExploreCooldown(userId, guildId);
+      const embed = new EmbedBuilder()
+        .setColor(0x2D7D46)
+        .setTitle('🌿 Rừng Im Lặng Bất Thường')
+        .setDescription(
+          '*Linh thú ngã xuống. Máu thấm vào đất.*\n\n' +
+          'Không có tiếng chim. Không có gió. Những cây cổ thụ quanh bạn như đang... lắng nghe.\n\n' +
+          '*Một thứ gì đó sâu trong rừng đã nhận ra bạn.*'
+        )
+        .setFooter({ text: '⚱️ Thu thập đủ 3 Ancient Relic để tiếp tục...' });
+      const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+      attachContinueExploreHandler(reply, interaction, userId, guildId);
+      return;
+    }
+    // Điều kiện 2: vừa đủ 3 relic (và đã có prereq)
+    if (
+      hasOakPrereq(guildId, userId) &&
+      getItemQty(userId, guildId, 'ancient_relic') >= 3 &&
+      !getFlag(guildId, `oak_lore_relic_${userId}`)
+    ) {
+      setFlag(guildId, `oak_lore_relic_${userId}`, '1');
+      setExploreCooldown(userId, guildId);
+      const embed = new EmbedBuilder()
+        .setColor(0x2D7D46)
+        .setTitle('⚱️ Relic Rung Lên')
+        .setDescription(
+          '*Ba mảnh vỡ trong túi bạn bắt đầu ấm lên — rồi rung nhẹ, đồng điệu với nhau.*\n\n' +
+          'Ánh sáng xanh lờ mờ rò qua lớp vải. Không phải ma thuật thông thường.\n\n' +
+          '*Đây là tiếng gọi. Cổ thụ đang chờ đủ người.*\n\n' +
+          '**Mọi điều kiện đã hội tụ** — dùng nút 🌳 trong menu để triệu hồi.'
+        );
+      const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+      attachContinueExploreHandler(reply, interaction, userId, guildId);
+      return;
+    }
+  }
+
   const event = pickExploreEvent({ player, guildId, hasCombat, hasLegacy });
   updatePityCounters(userId, guildId, event);
 
@@ -666,6 +835,233 @@ async function handleBoss(
   if (!zone.bossId) return;
   setExploreCooldown(userId, guildId);
   await startCombatFlow(interaction, userId, guildId, zone.bossId, handleVictory, handleDeath);
+}
+
+// ── Oak event ─────────────────────────────────────────────────────────────────
+async function handleOakHuntStart(
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+  if (hasOakPrereq(guildId, userId)) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '✅ Bạn đã hạ Linh Thú rừng rồi.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+  if (isOakHuntActive(guildId, userId)) {
+    const rem = getOakHuntRemaining(guildId, userId);
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🐾 Đang truy tìm — còn **${rem}** lần khám phá nữa.`)], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+  startOakHunt(guildId, userId);
+  const embed = new EmbedBuilder()
+    .setColor(0x2D7D46)
+    .setTitle('🔍 Bắt Đầu Truy Tìm Linh Thú')
+    .setDescription(
+      '*Bạn tìm thấy dấu móng khổng lồ in sâu vào bùn đất ẩm...*\n\n' +
+      `Sau **${OAK_HUNT_EXPLORES} lần khám phá** tiếp theo trong rừng, bạn sẽ đối mặt với Linh Thú.\n\n` +
+      '*Hãy chuẩn bị kỹ trước khi tiếp tục.*'
+    );
+  const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+  attachContinueExploreHandler(reply, interaction, userId, guildId);
+}
+
+async function handleOakSummon(
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+  const player = getPlayer(userId, guildId)!;
+
+  if (!hasOakPrereq(guildId, userId)) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🌳 Bạn chưa đánh bại Miniboss trong rừng — chưa đủ điều kiện triệu hồi.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+  const relicCount = getItemQty(userId, guildId, 'ancient_relic');
+  if (relicCount < 3) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `⚱️ Cần **3 Ancient Relic** để thức tỉnh (bạn có: ${relicCount}).`)], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+  const existing = getOakEvent(guildId);
+  if (existing) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🌳 Server đã có sự kiện Thức Tỉnh đang diễn ra!')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+
+  removeItem(userId, guildId, 'ancient_relic', 3);
+  deleteFlag(guildId, `oak_lore_relic_${userId}`);
+  createOakEvent(guildId, userId);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x2D7D46)
+    .setTitle('🌳 Thức Tỉnh Cổ Mộc!')
+    .setDescription(
+      `**${player.name}** đã cúng tế 3 Ancient Relic...\n` +
+      `*Cổ thụ ngàn năm rùng mình tỉnh giấc!*\n\n` +
+      `⏳ Cửa sổ tham gia: **5 phút**\n` +
+      `Những người khác trong rừng có thể bấm **Tham Gia** trên \`/explore\` để vào trận!`
+    );
+
+  const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+  attachContinueExploreHandler(reply, interaction, userId, guildId);
+}
+
+async function handleOakJoin(
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+  const player = getPlayer(userId, guildId)!;
+
+  const oakEv = getOakEvent(guildId);
+  if (!oakEv || oakEv.phase !== 'summoning') {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🌳 Không có sự kiện Thức Tỉnh đang mở cửa tham gia.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+  if (isOakParticipant(guildId, userId)) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '✅ Bạn đã tham gia sự kiện này rồi.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+
+  joinOakEvent(guildId, userId);
+  const count = getOakParticipants(guildId).length;
+  const reply = await interaction.editReply({
+    embeds: [simpleEmbed(0x2D7D46, `🤝 **${player.name}** đã gia nhập Thức Tỉnh Cổ Mộc! (${count} người tham gia)`)],
+    components: buildContinueExploreRow(userId)
+  });
+  attachContinueExploreHandler(reply, interaction, userId, guildId);
+}
+
+async function handleOakFight(
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+): Promise<void> {
+  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
+
+  const oakEv = getOakEvent(guildId);
+  if (!oakEv || (oakEv.phase !== 'summoning' && oakEv.phase !== 'active')) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🌳 Không có sự kiện Cổ Mộc nào đang hoạt động.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+  if (!isOakParticipant(guildId, userId)) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Bạn chưa tham gia sự kiện này.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+  if (oakEv.current_fighter !== null) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `⚔️ Đang có người chiến đấu. Chờ lượt của bạn!`)], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+
+  // Activate (scale HP) on first fight if still in summoning phase
+  let startHp = oakEv.boss_hp;
+  let maxHp   = oakEv.boss_max_hp;
+  if (oakEv.phase === 'summoning') {
+    const scaled = activateOakEvent(guildId);
+    startHp = scaled.hp;
+    maxHp   = scaled.maxHp;
+  }
+
+  setOakCurrentFighter(guildId, userId);
+  setExploreCooldown(userId, guildId);
+
+  const onVictory: CombatVictoryHandler = async (itr, btnInt, uid, gid, _player, _enemy, state) => {
+    const dmgDealt = maxHp - (state.enemy_hp ?? 0);
+    addOakDamage(gid, uid, Math.max(0, dmgDealt));
+    updateOakBossHp(gid, 0);
+    setOakCurrentFighter(gid, null);
+    closeOakEvent(gid);
+    setFlag(gid, `boss_ancient_oak_slain`, uid, OAK_RESPAWN_TTL);
+    updatePlayerHpMp(uid, gid, state.player_hp, state.player_mp);
+    await distributeOakRewards(itr, btnInt, uid, gid);
+  };
+
+  const onDeath: CombatDeathHandler = async (itr, btnInt, uid, gid, player, enemy, remainingEnemyHp) => {
+    const remaining = remainingEnemyHp ?? startHp;
+    const dmgDealt  = startHp - remaining;
+    addOakDamage(gid, uid, Math.max(0, dmgDealt));
+    updateOakBossHp(gid, remaining);
+    setOakCurrentFighter(gid, null);
+    const penalty = processDeathPenalty(uid, gid, player, enemy);
+    const embed = buildDeathEmbed(player.name, enemy.name, penalty.goldLeft)
+      .addFields(
+        { name: '💀 Soul Shards', value: `+**${penalty.shards}** 💀`, inline: true },
+        { name: '🌳 Cổ Mộc', value: `HP còn: **${remaining}/${maxHp}** — chiến binh tiếp theo tiếp quản!`, inline: false }
+      );
+    const { embed: deathImg, files: deathFiles } = withImage(embed, 'death');
+    await btnInt.editReply({ embeds: [deathImg], files: deathFiles, components: [] });
+  };
+
+  const onFlee: CombatFleeHandler = async (_itr, btnInt, uid, gid, _player, _enemy, state) => {
+    const remaining = state.enemy_hp ?? startHp;
+    const dmgDealt  = startHp - remaining;
+    addOakDamage(gid, uid, Math.max(0, dmgDealt));
+    updateOakBossHp(gid, remaining);
+    setOakCurrentFighter(gid, null);
+    updatePlayerHpMp(uid, gid, state.player_hp, state.player_mp);
+    await btnInt.editReply({
+      embeds: [simpleEmbed(COLORS.warning, `🚶 Bạn rút lui — Cổ Mộc còn **${remaining}/${maxHp} HP**. Đồng đội tiếp tục!`)],
+      files: [], components: buildContinueExploreRow(uid)
+    }).catch(() => {});
+    attachContinueExploreHandler(btnInt.message as any, interaction, uid, gid);
+  };
+
+  await startCombatFlow(
+    interaction, userId, guildId, 'ancient_oak',
+    onVictory, onDeath, onFlee,
+    { startHp, maxHp }
+  );
+}
+
+async function distributeOakRewards(
+  interaction: ChatInputCommandInteraction,
+  btnInt: ButtonInteraction,
+  winnerId: string,
+  guildId: string
+): Promise<void> {
+  const participants = getOakParticipants(guildId);
+  const totalDmg = participants.reduce((s, p) => s + p.damage, 0) || 1;
+
+  const BASE_GOLD = 400;
+  const BASE_EXP  = 500;
+  const BASE_SOUL = 3;
+
+  const lines: string[] = ['## 🌳 Cổ Mộc Đã倒! Phần thưởng:\n'];
+  for (const p of participants) {
+    const share  = p.damage / totalDmg;
+    const gold   = Math.max(50, Math.round(BASE_GOLD * share));
+    const exp    = Math.max(50, Math.round(BASE_EXP  * share));
+    const shards = p.damage > 0 ? BASE_SOUL : 1;
+    grantGold(p.user_id, guildId, gold);
+    grantExp(p.user_id, guildId, exp);
+    grantSoulShards(p.user_id, guildId, shards);
+    const pPlayer = getPlayer(p.user_id, guildId);
+    lines.push(`**${pPlayer?.name ?? p.user_id}** — ${p.damage} dmg (${Math.round(share * 100)}%) → +${gold}🪙 +${exp}EXP +${shards}💀`);
+  }
+
+  // Winner gets a guaranteed relic drop
+  addItem(winnerId, guildId, 'ancient_relic', 1);
+  lines.push(`\n⚱️ **+1 Ancient Relic** dành cho người kết thúc trận!`);
+
+  for (const p of participants) {
+    markPlayerClearedBoss(guildId, p.user_id, 'ancient_oak');
+  }
+  clearOakParticipants(guildId);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x2D7D46)
+    .setTitle('🌳 Thức Tỉnh Cổ Mộc — Kết Thúc!')
+    .setDescription(lines.join('\n'));
+
+  const { embed: victoryImg, files: victoryFiles } = withImage(embed, 'victory');
+  const player = getPlayer(winnerId, guildId)!;
+  await btnInt.editReply({ embeds: [victoryImg], files: victoryFiles, components: buildContinueExploreRow(winnerId) });
+  attachContinueExploreHandler(btnInt.message, interaction, winnerId, guildId);
+  logEvent(guildId, winnerId, player.name, 'boss', '🌳 đã hạ gục **Cổ Mộc Cổ Đại** trong sự kiện Thức Tỉnh!', 'forest');
 }
 
 // ── Legacy find ───────────────────────────────────────────────────────────────
@@ -1536,7 +1932,8 @@ async function startShopkeeperCombat(
     interaction, userId, guildId, enemy,
     undefined,
     handleShopkeeperVictory,
-    handleDeath
+    handleDeath,
+    handleFlee
   );
 }
 
@@ -1714,6 +2111,15 @@ async function handleVictory(
   const achievementMessages = awardAchievements(userId, guildId);
   if (achievementMessages.length) {
     embed.addFields({ name: '🏆 Thành tựu mới', value: achievementMessages.join('\n'), inline: false });
+  }
+
+  if (enemy.miniboss && enemy.zones?.includes('forest')) {
+    markOakPrereq(guildId, userId);
+    setFlag(guildId, `oak_lore_miniboss_${userId}`, '1');
+  }
+
+  if (enemy.boss) {
+    markPlayerClearedBoss(guildId, userId, enemy.id);
   }
 
   const { embed: victoryImg, files: victoryFiles } = withImage(embed, 'victory');

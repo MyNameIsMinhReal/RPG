@@ -145,7 +145,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   ancient_oak: {
     id: 'ancient_oak', name: 'Ancient Oak', icon: '🌳', level: 6,
-    hp: 315, atk: 25, def: 20, expReward: 450, goldMin: 130, goldMax: 200,
+    hp: 550, atk: 44, def: 35, expReward: 450, goldMin: 130, goldMax: 200,
     drops: [
       { itemId: 'book_tough_body', chance: 45 },
       { itemId: 'book_mend_wounds', chance: 35 },
@@ -154,8 +154,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { itemId: 'wood', chance: 100 },
     ],
     guaranteedDrops: ['ancient_bark'],
-    // Phase 1 (>60% HP): guardian form — heavy root slams, earth regeneration
-    specialAttacks: ['oak_root_slam', 'oak_regen'],
+    // Phase 1 (>65% HP): guardian form — heavy root slams, earth regeneration, bark armor
+    specialAttacks: ['oak_root_slam', 'oak_regen', 'oak_bark_armor'],
     phases: [
       {
         threshold: 0.65,
@@ -163,7 +163,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
         name: 'Ancient Oak (Awakened)',
         icon: '🌿',
         atkMult: 1.40,   // boss balance: stronger awakened phase
-        specialAttacks: ['splinter_rain', 'vine_whip', 'oak_regen_deep'],
+        specialAttacks: ['splinter_rain', 'vine_whip', 'oak_regen_deep', 'oak_bark_armor'],
         transitionMsg: '🌿 **Thân cây nứt toác — sức mạnh rừng nguyên thủy bùng phát từ bên trong!**',
         healOnTransition: 0.07,
       },
