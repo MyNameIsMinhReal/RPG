@@ -22,6 +22,37 @@ import { getEnemyAtkBonus } from './world';
 import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumables';
 import { incrementDaily, countsAsPotion } from '../commands/daily';
 
+
+function normalMobPressure(enemy: any): { hp: number; atk: number; def: number } {
+  // Boss/miniboss/shopkeeper keep their handcrafted stats. Normal mobs become scarier mainly by resource pressure.
+  if (!enemy || enemy.boss || enemy.miniboss || enemy.isShopkeeper || !Array.isArray(enemy.zones)) {
+    return { hp: 1, atk: 1, def: 1 };
+  }
+  const zone = enemy.zones[0] ?? 'forest';
+  const base: Record<string, { hp: number; atk: number; def: number }> = {
+    village: { hp: 1.03, atk: 1.15, def: 1.00 },
+    forest:  { hp: 1.06, atk: 1.22, def: 1.04 },
+    shrine:  { hp: 1.08, atk: 1.24, def: 1.06 },
+    mines:   { hp: 1.10, atk: 1.26, def: 1.07 },
+    wastes:  { hp: 1.12, atk: 1.28, def: 1.08 },
+  };
+  const m = base[zone] ?? { hp: 1.08, atk: 1.24, def: 1.05 };
+  const levelBump = Math.min(0.08, Math.floor((enemy.level ?? 1) / 5) * 0.02);
+  return { hp: m.hp + levelBump, atk: m.atk + levelBump, def: m.def };
+}
+
+function tuneNormalMobForCombat<T extends any>(enemy: T): T {
+  const m = normalMobPressure(enemy);
+  if (m.hp === 1 && m.atk === 1 && m.def === 1) return { ...(enemy as any) };
+  return {
+    ...(enemy as any),
+    hp: Math.max(1, Math.floor((enemy as any).hp * m.hp)),
+    atk: Math.max(1, Math.floor((enemy as any).atk * m.atk)),
+    def: Math.max(0, Math.floor((enemy as any).def * m.def)),
+    _normalMobTuned: true,
+  };
+}
+
 function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T {
   if (!raw) return fallback;
   try { return JSON.parse(raw) as T; } catch { return fallback; }
@@ -395,11 +426,12 @@ export async function startCombatFlow(
   onFlee?: CombatFleeHandler
 ): Promise<void> {
   const player      = getPlayer(userId, guildId)!;
-  const enemy       = getEnemy(enemyId);
+  let enemy: any    = getEnemy(enemyId);
   if (!enemy) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Enemy data lỗi: \`${enemyId}\` không tồn tại.`)], components: [] });
     return;
   }
+  enemy = tuneNormalMobForCombat(enemy);
   const loadout     = getLoadout(userId, guildId);
   const withPassiveRaw = applyPassiveStats(player);
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
@@ -430,7 +462,8 @@ export async function startCombatFlow(
       ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
       ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
       ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),
-      ...(buffedStart.logs.some(l => l.includes('Rage Elixir')) ? [{ name: 'incoming_damage_up', duration: 999, value: 15 }] : [])
+      ...(buffedStart.logs.some(l => l.includes('Rage Elixir')) ? [{ name: 'incoming_damage_up', duration: 999, value: 15 }] : []),
+      ...(enemy.boss ? [{ name: 'flee_penalty', duration: 999, value: 25 }] : enemy.miniboss ? [{ name: 'flee_penalty', duration: 999, value: 15 }] : [])
     ]),
     combat_log: JSON.stringify(openingLogs),
     player_stamina: 100, player_max_stamina: 100
@@ -467,6 +500,7 @@ export async function startCombatFlowWithEnemy(
     drops: Array.isArray(enemy?.drops) ? [...enemy.drops] : enemy?.drops,
     specialAttacks: Array.isArray(enemy?.specialAttacks) ? [...enemy.specialAttacks] : enemy?.specialAttacks,
   };
+  enemy = tuneNormalMobForCombat(enemy);
   if (bonus) enemy.combatBonus = bonus;
   if (enemy.id && !getEnemy(enemy.id)) {
     // register inline definition into the map for the duration of combat
@@ -505,7 +539,8 @@ export async function startCombatFlowWithEnemy(
       ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
       ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
       ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),
-      ...(buffedStart.logs.some(l => l.includes('Rage Elixir')) ? [{ name: 'incoming_damage_up', duration: 999, value: 15 }] : [])
+      ...(buffedStart.logs.some(l => l.includes('Rage Elixir')) ? [{ name: 'incoming_damage_up', duration: 999, value: 15 }] : []),
+      ...(enemy.boss ? [{ name: 'flee_penalty', duration: 999, value: 25 }] : enemy.miniboss ? [{ name: 'flee_penalty', duration: 999, value: 15 }] : [])
     ]), combat_log: JSON.stringify(openingLogs),
     player_stamina: 100, player_max_stamina: 100
   };
@@ -539,7 +574,8 @@ export async function startGroupCombatFlow(
   const atkBonus       = getEnemyAtkBonus(guildId);
 
   const rawEnemies = enemyIds.map(id => getEnemy(id)!).filter(Boolean);
-  const combatEnemies: CombatEnemy[] = rawEnemies.map(e => ({
+  const tunedEnemies = rawEnemies.map(e => tuneNormalMobForCombat(e));
+  const combatEnemies: CombatEnemy[] = tunedEnemies.map(e => ({
     id: e.id, name: e.name, icon: e.icon,
     hp: e.hp, max_hp: e.hp,
     atk: e.atk + Math.floor(e.atk * atkBonus / 100),

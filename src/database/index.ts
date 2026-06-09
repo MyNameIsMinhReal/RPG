@@ -398,6 +398,21 @@ db.exec(`
 
 try { db.exec(`ALTER TABLE players ADD COLUMN active_pet TEXT DEFAULT NULL`); } catch {}
 
+
+// ── Chapter explore gate events ───────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chapter_event_state (
+    user_id      TEXT NOT NULL,
+    guild_id     TEXT NOT NULL,
+    chapter_id   INTEGER NOT NULL,
+    event_id     TEXT NOT NULL,
+    status       TEXT DEFAULT 'pending',
+    created_at   INTEGER DEFAULT (unixepoch()),
+    completed_at INTEGER,
+    PRIMARY KEY (user_id, guild_id, chapter_id)
+  );
+`);
+
 // ── Redeem codes ──────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS redeem_codes (

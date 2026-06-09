@@ -45,7 +45,8 @@ import { consumeBuff } from '../systems/consumables';
 import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
 import { doGather } from './gather';
 import { onlyUser } from '../utils/collectors';
-import { incrementChapterObjective } from '../systems/chapter';
+import { ensurePendingChapterExploreEvent, getPendingChapterExploreEvent, incrementChapterObjective } from '../systems/chapter';
+import { runPendingChapterExploreEvent } from '../systems/chapterExploreEventEngine';
 
 export const data = new SlashCommandBuilder()
   .setName('explore')
@@ -211,7 +212,7 @@ async function resumeCombat(
   try { combatLog = JSON.parse(current.combat_log ?? '[]'); } catch { combatLog = []; }
 
   const embed   = buildCombatEmbed(current, player.name, icon, combatLog);
-  const buttons = buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId));
+  const buttons = buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId), current.active_effects);
   const reply   = await interaction.editReply({ embeds: [embed], components: buttons });
 
   deleteCombat(current.message_id);
@@ -564,19 +565,32 @@ async function handleSearch(
 
   // Group encounter chance scales with zone danger
   const GROUP_CHANCE: Record<string, number> = {
-    village: 0.08,
-    forest:  0.10,
-    shrine:  0.16,
-    mines:   0.20,
-    wastes:  0.26,
+    village: 0.12,
+    forest:  0.22,
+    shrine:  0.28,
+    mines:   0.34,
+    wastes:  0.40,
   };
   const THREE_ENEMY_CHANCE: Record<string, number> = {
-    village: 0.10,
-    forest:  0.15,
-    shrine:  0.25,
-    mines:   0.30,
-    wastes:  0.38,
+    village: 0.12,
+    forest:  0.28,
+    shrine:  0.35,
+    mines:   0.42,
+    wastes:  0.50,
   };
+  ensurePendingChapterExploreEvent(userId, guildId);
+  if (getPendingChapterExploreEvent(userId, guildId)) {
+    setExploreCooldown(userId, guildId);
+    const ranChapterEvent = await runPendingChapterExploreEvent({
+      interaction,
+      userId,
+      guildId,
+      buildContinueExploreRow,
+      attachContinueExploreHandler,
+    });
+    if (ranChapterEvent) return;
+  }
+
   const groupChance = GROUP_CHANCE[player.zone_id] ?? 0.15;
   if (enemies.length >= 2 && Math.random() < groupChance) {
     setExploreCooldown(userId, guildId);

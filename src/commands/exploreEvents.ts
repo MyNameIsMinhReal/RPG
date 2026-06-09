@@ -39,6 +39,8 @@ import { startFishingMiniGame } from './fish';
 import { onlyUser } from '../utils/collectors';
 import { incrementChapterObjective } from '../systems/chapter';
 import { getPityCounters, getPityBonus, PITY_EVENTS } from '../systems/pity';
+import type { DataDrivenExploreEventId } from '../data/exploreEventDefs';
+import { getDataDrivenEventWeights, isDataDrivenExploreEvent, runDataDrivenExploreEvent } from '../systems/eventEngine';
 import {
   showForestWhisperingTree, showForestWolfDen, showForestHerbalistHut, showForestMoonlitClearing,
   showForestBanditAmbush, showForestGiantSpider, showForestCursedScarecrow, showForestSnakePit, showForestPoacherCamp,
@@ -76,7 +78,7 @@ import {
   showWorldFactionStandoff, showWorldChurchInquisition, showWorldShadowOffer, showWorldHuntersMission, showWorldVillagerDispute,
 } from './exploreEvents.world';
 
-export type ExploreEventType = | 'mimic_chest' | 'wandering_blacksmith' | 'temporary_arena' | 'boss_tracks' | 'map_seller' | 'shrine_weeping_statue' | 'shrine_forbidden_offering' | 'shrine_sealed_reliquary' | 'mine_runaway_cart' | 'mine_living_ore' | 'mine_trapped_miner' | 'wastes_mirror_self' | 'wastes_memory_rain' | 'wastes_faceless_merchant' 
+export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wandering_blacksmith' | 'temporary_arena' | 'boss_tracks' | 'map_seller' | 'shrine_weeping_statue' | 'shrine_forbidden_offering' | 'shrine_sealed_reliquary' | 'mine_runaway_cart' | 'mine_living_ore' | 'mine_trapped_miner' | 'wastes_mirror_self' | 'wastes_memory_rain' | 'wastes_faceless_merchant' 
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
   | 'soul_shop' | 'abandoned_camp' | 'lost_pouch' | 'rune_stone' | 'treasure_chest' | 'wandering_healer' | 'spirit_trial'
   | 'blood_trail' | 'nameless_grave' | 'memory_seller' | 'stranger_campfire' | 'cracked_shrine' | 'injured_monster'
@@ -190,6 +192,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     base <= 0 ? base : Math.max(1, Math.round(base * (timeMult[event] ?? 1)));
 
   const base: Array<[ExploreEventType, number]> = [
+    ...getDataDrivenEventWeights(input),
     ['combat', hasCombat ? 15 : 0],
     ['ambush', hasCombat ? Math.floor(tm('ambush', 7) * badPenalty) : 0],
     ['legacy', hasLegacy ? 6 : 0],
@@ -393,6 +396,8 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
 export async function runExploreEvent(input: RunExploreEventInput): Promise<void> {
   const ctx = input;
   const cb = ctx.callbacks;
+
+  if (isDataDrivenExploreEvent(ctx.event)) return runDataDrivenExploreEvent(ctx);
 
   switch (ctx.event) {
     case 'combat': return cb.startCombat(pick(ctx.enemies).id);
@@ -697,6 +702,9 @@ async function awaitButton(ctx: RunExploreEventInput, row: ActionRowBuilder<Butt
   });
 }
 
+function scaleEventExp(value: number): number { return Math.max(1, Math.floor(value * 0.72)); }
+function scaleEventGold(value: number): number { return Math.max(0, Math.floor(value * 0.62)); }
+
 function eventEnemy(ctx: RunExploreEventInput, base: any, overrides: Partial<any>) {
   const player = getPlayer(ctx.userId, ctx.guildId)!;
   return {
@@ -732,8 +740,8 @@ async function grantCombatReward(ctx: RunExploreEventInput, btnInt: ButtonIntera
   incrementKills(ctx.userId, ctx.guildId);
   const lines: string[] = [options.description];
 
-  if (options.exp) { grantExp(ctx.userId, ctx.guildId, options.exp); lines.push(`⭐ +**${options.exp} EXP**`); }
-  if (options.gold) { grantGold(ctx.userId, ctx.guildId, options.gold); lines.push(`🪙 +**${options.gold} Gold**`); }
+  if (options.exp) { const exp = scaleEventExp(options.exp); grantExp(ctx.userId, ctx.guildId, exp); lines.push(`⭐ +**${exp} EXP**`); }
+  if (options.gold) { const gold = scaleEventGold(options.gold); grantGold(ctx.userId, ctx.guildId, gold); lines.push(`🪙 +**${gold} Gold**`); }
   if (options.soulShards) { grantSoulShards(ctx.userId, ctx.guildId, options.soulShards); lines.push(`💀 +**${options.soulShards} Soul Shard**`); }
   if (options.items?.length) {
     for (const id of options.items) addItem(ctx.userId, ctx.guildId, id, 1);
@@ -801,7 +809,7 @@ async function showBloodTrail(ctx: RunExploreEventInput): Promise<void> {
   }
   if (cid === `blood_check_${ctx.userId}`) {
     if (randInt(1, 100) <= 65) {
-      const gold = randInt(15, 50);
+      const gold = randInt(9, 31);
       grantGold(ctx.userId, ctx.guildId, gold);
       return finish(ctx, simpleEmbed(COLORS.gold, `🔎 Bạn tìm thấy một túi đồ rơi cạnh vệt máu.\n🪙 +**${gold} Gold**`));
     }
@@ -961,7 +969,7 @@ async function showInjuredMonster(ctx: RunExploreEventInput): Promise<void> {
   const cid = await awaitButton(ctx, row, embed, 'combat');
   if (cid === `inj_kill_${ctx.userId}`) {
     const exp = Math.floor((base.expReward ?? 40) * 0.45);
-    const gold = randInt(8, 30);
+    const gold = randInt(4, 18);
     grantExp(ctx.userId, ctx.guildId, exp);
     grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.gold, `⚔️ Bạn kết liễu con quái không còn sức phản kháng.\n⭐ +**${exp} EXP**\n🪙 +**${gold} Gold**`));
@@ -994,7 +1002,7 @@ async function showWantedMerchant(ctx: RunExploreEventInput): Promise<void> {
   }
   if (cid === `wm_investigate_${ctx.userId}`) {
     if ((ctx.player.reputation ?? 0) < -25 && ctx.enemies.length && randInt(1, 100) <= 45) return showBountyHunter(ctx);
-    const gold = randInt(20, 70);
+    const gold = randInt(12, 43);
     grantGold(ctx.userId, ctx.guildId, gold);
     const rep = adjustReputation(ctx.userId, ctx.guildId, 5);
     return finish(ctx, simpleEmbed(COLORS.gold, `🔎 Bạn phát hiện chứng cứ lừa đảo và được thưởng.\n🪙 +**${gold} Gold**\n🤝 Reputation: **${rep}** (+5)`));
@@ -1084,7 +1092,7 @@ async function showFailedLegacy(ctx: RunExploreEventInput): Promise<void> {
   );
   const cid = await awaitButton(ctx, row, embed, 'legacy');
   if (cid === `fl_claim_${ctx.userId}`) {
-    const gold = randInt(20, 60) + ctx.player.deaths * 5;
+    const gold = randInt(12, 37) + ctx.player.deaths * 5;
     grantGold(ctx.userId, ctx.guildId, gold);
     grantExp(ctx.userId, ctx.guildId, Math.floor(ctx.player.exp_next * 0.12));
     return finish(ctx, simpleEmbed(COLORS.gold, `👑 Bạn gom lại những mảnh vụn ký ức.\n🪙 +**${gold} Gold**\n⭐ Một phần ký ức cũ trở về.`));
@@ -1149,7 +1157,7 @@ async function showTalkingCorpse(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.info, '👂 Bạn ghi nhớ lời cảnh báo. Trong 30 phút tới, bạn sẽ cẩn thận hơn trước phục kích *(flag đã lưu để mở rộng sau).*'));
   }
   if (cid === `corpse_loot_${ctx.userId}`) {
-    const gold = randInt(15, 55);
+    const gold = randInt(9, 34);
     grantGold(ctx.userId, ctx.guildId, gold);
     const rep = adjustReputation(ctx.userId, ctx.guildId, -8);
     return finish(ctx, simpleEmbed(COLORS.warning, `🪙 Bạn lục được **${gold} Gold** từ cái xác.\n🤝 Reputation: **${rep}** (-8)`));
@@ -1180,7 +1188,7 @@ async function showFateCoin(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.gold, `🤲 Bạn giữ lại ${displayItem('fate_coin')}.`));
   }
   if (randInt(1, 2) === 1) {
-    const gold = randInt(25, 90);
+    const gold = randInt(15, 55);
     grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.success, `🪙 Mặt sáng!\n🪙 +**${gold} Gold**`));
   }
@@ -1375,7 +1383,7 @@ async function showChainedPrisoner(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.success, `🗝️ Bạn cứu tù nhân. Người đó hứa sẽ trả ơn vào một ngày khác.\n🤝 Reputation: **${rep}** (+12)`));
   }
   if (cid === `pris_loot_${ctx.userId}`) {
-    const gold = randInt(25, 80);
+    const gold = randInt(15, 49);
     grantGold(ctx.userId, ctx.guildId, gold);
     const rep = adjustReputation(ctx.userId, ctx.guildId, -12);
     return finish(ctx, simpleEmbed(COLORS.warning, `🪙 Bạn lấy túi tiền của tù nhân rồi rời đi.\n🪙 +**${gold} Gold**\n🤝 Reputation: **${rep}** (-12)`));
@@ -1421,7 +1429,7 @@ async function showLaughingBones(ctx: RunExploreEventInput): Promise<void> {
   );
   const cid = await awaitButton(ctx, row, embed, 'mysterious');
   if (cid === `bones_talk_${ctx.userId}`) {
-    const exp = randInt(10, 35);
+    const exp = randInt(7, 25);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info, `💬 Bộ xương kể một câu chuyện tệ đến mức bạn học được điều gì đó.\n⭐ +**${exp} EXP**`));
   }
@@ -1472,7 +1480,7 @@ async function showMissingChildChain(ctx: RunExploreEventInput): Promise<void> {
   }
 
   const rep = adjustReputation(ctx.userId, ctx.guildId, 25);
-  const gold = randInt(80, 160);
+  const gold = randInt(49, 99);
   grantGold(ctx.userId, ctx.guildId, gold);
   grantSoulShards(ctx.userId, ctx.guildId, 1);
   incrementChapterObjective(ctx.userId, ctx.guildId, 'rescue_villager', { zoneId: ctx.player.zone_id });
@@ -1738,11 +1746,11 @@ async function showWanderingBlacksmith(ctx: RunExploreEventInput): Promise<void>
   spendGold(ctx.userId, ctx.guildId, 120);
   const rare = pick(['black_iron', 'mana_crystal', 'mysterious_shard', 'silver_ore']);
   addItem(ctx.userId, ctx.guildId, rare, 1);
-  grantExp(ctx.userId, ctx.guildId, 25);
+  grantExp(ctx.userId, ctx.guildId, 18);
   return finish(ctx, simpleEmbed(COLORS.gold, `⚒️ Thợ rèn mở hộp hàng dưới gầm xe.
 💰 -**120 Gold**
 📦 +**1× ${rare}**
-⭐ +**25 EXP**`), 'merchant');
+⭐ +**18 EXP**`), 'merchant');
 }
 
 async function showTemporaryArena(ctx: RunExploreEventInput): Promise<void> {

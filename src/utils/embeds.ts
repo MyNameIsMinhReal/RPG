@@ -149,7 +149,7 @@ export function buildCombatEmbed(
   logLines: string[]
 ): EmbedBuilder {
   const HIDDEN_EFFECTS = new Set([
-    'last_stand_used', 'flee_attempts',
+    'last_stand_used', 'flee_attempts', 'flee_penalty',
     'boss_phase', 'boss_phase_immune', 'boss_charging',
   ]);
   const effects: Array<{ name: string; duration: number }> = JSON.parse(state.active_effects || '[]')
@@ -252,7 +252,8 @@ function getFleeChanceFromActiveEffects(activeEffectsRaw?: string | null): numbe
     if (!Array.isArray(effects)) return 45;
     if (effects.some((e: any) => e?.name === 'rooted')) return 0;
     const attempts = Number(effects.find((e: any) => e?.name === 'flee_attempts')?.value ?? 0) || 0;
-    return Math.min(90, 45 + attempts * 15);
+    const fleePenalty = Number(effects.find((e: any) => e?.name === 'flee_penalty')?.value ?? 0) || 0;
+    return Math.max(5, Math.min(90, 45 + attempts * 15 - fleePenalty));
   } catch {
     return 45;
   }

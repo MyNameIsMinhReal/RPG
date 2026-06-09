@@ -737,8 +737,9 @@ export function processFlee(state: CombatState): ActionResult {
   }
 
   const attempts = effects.find(e => e.name === 'flee_attempts')?.value ?? 0;
-  const fleeChance = Math.min(90, 45 + attempts * 15);
-  const nextChance = Math.min(90, fleeChance + 15);
+  const fleePenalty = effects.find(e => e.name === 'flee_penalty')?.value ?? 0;
+  const fleeChance = Math.max(5, Math.min(90, 45 + attempts * 15 - fleePenalty));
+  const nextChance = Math.max(5, Math.min(90, 45 + (attempts + 1) * 15 - fleePenalty));
   const roll = randInt(1, 100);
 
   logs.push(`🏃 **Bỏ chạy** — lần ${attempts + 1}, tỉ lệ thành công **${fleeChance}%**.`);

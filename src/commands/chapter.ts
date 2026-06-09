@@ -3,7 +3,7 @@ import {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType
 } from 'discord.js';
 import { getPlayer } from '../systems/player';
-import { getChapterStatus, claimChapterReward } from '../systems/chapter';
+import { ensurePendingChapterExploreEvent, getChapterStatus } from '../systems/chapter';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { onlyUser } from '../utils/collectors';
 import { CHAPTERS } from '../data/chapters';
@@ -69,55 +69,15 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   embed.addFields({ name: '🎁 Phần thưởng', value: rewardLines, inline: false });
 
   if (status.allDone) {
+    const pending = ensurePendingChapterExploreEvent(userId, guildId);
     embed.setColor(COLORS.success);
-    embed.addFields({ name: '✨ Sẵn sàng nhận thưởng!', value: 'Nhấn nút bên dưới để nhận phần thưởng và tiếp tục hành trình.', inline: false });
-
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`chapter_claim_${userId}`)
-        .setLabel('Nhận thưởng & Tiếp tục')
-        .setEmoji('🎁')
-        .setStyle(ButtonStyle.Success)
-    );
-
-    const reply = await interaction.editReply({ embeds: [embed], components: [row] });
-    const btn = await reply.awaitMessageComponent({
-      filter: onlyUser(userId),
-      componentType: ComponentType.Button,
-      time: 30_000
-    }).catch(() => null);
-
-    if (!btn) {
-      await interaction.editReply({ components: [] });
-      return;
-    }
-
-    await btn.deferUpdate();
-    const claimed = claimChapterReward(userId, guildId);
-
-    if (!claimed) {
-      await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, 'Có lỗi xảy ra khi nhận thưởng.')], components: [] });
-      return;
-    }
-
-    const nextStatus = getChapterStatus(userId, guildId);
-    const nextDesc = nextStatus.finished
-      ? '🎉 Bạn đã hoàn thành toàn bộ cốt truyện!'
-      : `➡️ **${nextStatus.chapter?.title}** đã mở khóa!`;
-
-    const claimEmbed = new EmbedBuilder()
-      .setColor(COLORS.success)
-      .setTitle(`✅ Hoàn thành ${chapter.title}`)
-      .setDescription(
-        `🪙 +**${reward.gold} Gold**\n` +
-        `⭐ +**${reward.exp} EXP**\n` +
-        (reward.shards ? `💀 +**${reward.shards} Soul Shards**\n` : '') +
-        (reward.titleId ? `🏷️ Danh hiệu **mới** đã được mở khóa!\n` : '') +
-        `\n${nextDesc}`
-      );
-
-    await interaction.editReply({ embeds: [claimEmbed], components: [] });
-    return;
+    embed.addFields({
+      name: pending ? '✨ Sự kiện cốt truyện đã sẵn sàng!' : '✨ Chương đã hoàn thành!',
+      value: pending
+        ? 'Dùng **/explore** hoặc `rpg e` để kích hoạt lore/event đặc biệt. Sau khi hoàn thành sự kiện đó, chương tiếp theo mới mở khóa.'
+        : 'Chương này đã hoàn thành. Nếu không có sự kiện cốt truyện, hãy báo lại để kiểm tra dữ liệu chapter event.',
+      inline: false
+    });
   }
 
   await interaction.editReply({ embeds: [embed], components: [] });

@@ -27,6 +27,8 @@ import { execute as execPet       } from './commands/pet';
 import { execute as execParty     } from './commands/party';
 import { execute as execChapter   } from './commands/chapter';
 import { execute as execCode      } from './commands/code';
+import { execute as execHelp      } from './commands/help';
+import { buildHelpGuideEmbeds } from './commands/help';
 import { validateGameData } from './utils/validateData';
 import { dispatchCombatInteraction } from './systems/combatFlow';
 
@@ -58,6 +60,7 @@ commands.set('pet',       execPet);
 commands.set('party',     execParty);
 commands.set('chapter',   execChapter);
 commands.set('code',      execCode);
+commands.set('help',      execHelp);
 
 const prefixAliases = new Map<string, string>([
   // Start / revive
@@ -156,30 +159,8 @@ const prefixAliases = new Map<string, string>([
   ['code', 'code'],
 ]);
 
-const PREFIX_HELP = [
-  '**Prefix commands:**',
-  '`rpg s` / `rpg start` — tạo nhân vật hoặc hồi sinh',
-  '`rpg p` / `rpg profile` — xem profile của bạn',
-  '`rpg p @user` — xem profile người khác',
-  '`rpg e` / `rpg explore` — khám phá',
-  '`rpg i` / `rpg inv` — túi đồ',
-  '`rpg u <item_id>` — dùng vật phẩm, ví dụ `rpg u healing_potion`',
-  '`rpg t @user <gold>` — chuyển gold, ví dụ `rpg t @Minh 100`',
-  '`rpg c` / `rpg craft` — chế tạo',
-  '`rpg d` / `rpg daily` — daily quest',
-  '`rpg a` / `rpg ach` — thành tựu',
-  '`rpg w` / `rpg world` — trạng thái thế giới',
-  '`rpg pr` / `rpg prestige` — prestige (Lv.20+)',
-  '`rpg wb` / `rpg boss` — world boss',
-  '`rpg duel @user` / `rpg pvp @user` — thách đấu PvP',
-  '`rpg pt` / `rpg party` — xem party hiện tại',
-  '`rpg pt create` — tạo party',
-  '`rpg pt invite @user` — mời người vào party',
-  '`rpg pt leave` — rời party',
-  '`rpg pt disband` — giải tán party nếu là leader',
-  '`rpg ch` / `rpg chapter` — xem cốt truyện chính',
-  '`rpg code <code>` — nhập code nhận thưởng',
-].join('\n');
+// Prefix help uses the same embed guide as /help.
+
 
 function stripInteractionOnlyOptions(options: any): any {
   if (typeof options === 'string') {
@@ -537,7 +518,7 @@ client.on('messageCreate', async (message) => {
   }
 
   if (parsed.commandName === 'help') {
-    await message.reply({ content: PREFIX_HELP, allowedMentions: { repliedUser: false } }).catch(() => {});
+    await message.reply({ embeds: buildHelpGuideEmbeds(), allowedMentions: { repliedUser: false } }).catch(() => {});
     return;
   }
 

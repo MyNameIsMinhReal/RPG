@@ -18,6 +18,7 @@ import { data as petData          } from './commands/pet';
 import { data as partyData        } from './commands/party';
 import { data as chapterData      } from './commands/chapter';
 import { data as codeData         } from './commands/code';
+import { data as helpData         } from './commands/help';
 
 // Slash commands public cho người chơi.
 // Fishing là event trong explore, không có lệnh riêng.
@@ -40,6 +41,7 @@ const commands = [
   partyData,
   chapterData,
   codeData,
+  helpData,
 ].map(c => c.toJSON());
 
 const token    = process.env.DISCORD_TOKEN!;

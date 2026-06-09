@@ -129,7 +129,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   alpha_thornmaw: {
     id: 'alpha_thornmaw', name: 'Alpha Thornmaw', icon: '🐺', level: 5,
-    hp: 145, atk: 25, def: 12, expReward: 130, goldMin: 45, goldMax: 85,
+    hp: 168, atk: 29, def: 14, expReward: 130, goldMin: 45, goldMax: 85,
     drops: [{ itemId: 'wolf_fang', chance: 75 }, { itemId: 'leather', chance: 60 }, { itemId: 'hunter_mark', chance: 8 }, { itemId: 'book_berserker', chance: 12 }],
     specialAttacks: ['howl', 'double_bite', 'frenzy'],
     zones: ['forest'], miniboss: true,
@@ -137,7 +137,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   moss_crowned_stag: {
     id: 'moss_crowned_stag', name: 'Moss-Crowned Stag', icon: '🦌', level: 5,
-    hp: 155, atk: 22, def: 16, expReward: 140, goldMin: 42, goldMax: 90,
+    hp: 180, atk: 25, def: 18, expReward: 140, goldMin: 42, goldMax: 90,
     drops: [{ itemId: 'ancient_bark', chance: 70 }, { itemId: 'rare_herb', chance: 28 }, { itemId: 'crown_fragment', chance: 10 }, { itemId: 'book_iron_skin', chance: 12 }],
     specialAttacks: ['root_slam', 'nature_regeneration', 'entangle'],
     zones: ['forest'], miniboss: true,
@@ -145,7 +145,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   ancient_oak: {
     id: 'ancient_oak', name: 'Ancient Oak', icon: '🌳', level: 6,
-    hp: 260, atk: 22, def: 18, expReward: 450, goldMin: 130, goldMax: 200,
+    hp: 315, atk: 25, def: 20, expReward: 450, goldMin: 130, goldMax: 200,
     drops: [
       { itemId: 'book_tough_body', chance: 45 },
       { itemId: 'book_mend_wounds', chance: 35 },
@@ -158,21 +158,21 @@ export const ENEMIES: Record<string, EnemyDef> = {
     specialAttacks: ['oak_root_slam', 'oak_regen'],
     phases: [
       {
-        threshold: 0.60,
+        threshold: 0.65,
         phaseIndex: 2,
         name: 'Ancient Oak (Awakened)',
         icon: '🌿',
-        atkMult: 1.36,   // → atk ~30
+        atkMult: 1.40,   // boss balance: stronger awakened phase
         specialAttacks: ['splinter_rain', 'vine_whip', 'oak_regen_deep'],
         transitionMsg: '🌿 **Thân cây nứt toác — sức mạnh rừng nguyên thủy bùng phát từ bên trong!**',
-        healOnTransition: 0.06,
+        healOnTransition: 0.07,
       },
       {
-        threshold: 0.25,
+        threshold: 0.30,
         phaseIndex: 3,
         name: 'Ancient Oak (Dying Fury)',
         icon: '☠️',
-        atkMult: 1.90,   // → atk ~42
+        atkMult: 1.95,   // boss balance: stronger execute phase
         specialAttacks: ['oak_ancient_rage', 'thorn_burst', 'bark_rend'],
         transitionMsg: '☠️ **Rễ cây xé toạc mặt đất — Cổ Mộc quyết kéo tất cả xuống cùng!**',
       },
@@ -258,7 +258,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   pale_confessor: {
     id: 'pale_confessor', name: 'Pale Confessor', icon: '🙏', level: 7,
-    hp: 180, atk: 30, def: 17, expReward: 190, goldMin: 70, goldMax: 130,
+    hp: 212, atk: 35, def: 19, expReward: 190, goldMin: 70, goldMax: 130,
     drops: [{ itemId: 'ancient_bone', chance: 60 }, { itemId: 'purification_stone', chance: 18 }, { itemId: 'shrine_relic', chance: 6 }, { itemId: 'book_last_stand', chance: 10 }],
     specialAttacks: ['divine_judgment', 'death_curse', 'banish'],
     zones: ['shrine'], miniboss: true,
@@ -266,7 +266,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   bell_wraith: {
     id: 'bell_wraith', name: 'Bell Wraith', icon: '🔔', level: 7,
-    hp: 165, atk: 34, def: 13, expReward: 200, goldMin: 65, goldMax: 125,
+    hp: 195, atk: 39, def: 15, expReward: 200, goldMin: 65, goldMax: 125,
     drops: [{ itemId: 'ectoplasm', chance: 70 }, { itemId: 'frost_shard', chance: 30 }, { itemId: 'bell_of_silence', chance: 6 }, { itemId: 'book_thunder_clap', chance: 10 }],
     specialAttacks: ['screech', 'drain_mp', 'shatter_guard'],
     zones: ['shrine'], miniboss: true,
@@ -274,13 +274,34 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   shrine_guardian: {
     id: 'shrine_guardian', name: 'Shrine Guardian', icon: '⛩️', level: 6,
-    hp: 280, atk: 28, def: 20, expReward: 350, goldMin: 120, goldMax: 200,
+    hp: 345, atk: 32, def: 23, expReward: 350, goldMin: 120, goldMax: 200,
     drops: [
       { itemId: 'book_thunder_clap', chance: 35 },
       { itemId: 'book_last_stand', chance: 25 },
       { itemId: 'shrine_relic', chance: 15 }
     ],
     specialAttacks: ['divine_judgment', 'shatter_guard', 'enrage'],
+    phases: [
+      {
+        threshold: 0.55,
+        phaseIndex: 2,
+        name: 'Shrine Guardian (Desecrated)',
+        icon: '🩸',
+        atkMult: 1.28,
+        specialAttacks: ['divine_judgment', 'shatter_guard', 'banish', 'screech'],
+        transitionMsg: '🩸 **Máu đen chảy từ các phù văn — Hộ Vệ Đền Cổ chuyển sang nghi thức trừng phạt!**',
+        healOnTransition: 0.05,
+      },
+      {
+        threshold: 0.22,
+        phaseIndex: 3,
+        name: 'Shrine Guardian (Final Verdict)',
+        icon: '⚖️',
+        atkMult: 1.58,
+        specialAttacks: ['enrage', 'divine_judgment', 'death_curse', 'shatter_guard'],
+        transitionMsg: '⚖️ **Tiếng chuông phán quyết vang lên — đòn đánh tiếp theo sẽ nặng hơn rất nhiều!**',
+      },
+    ],
     zones: ['shrine'], boss: true,
     deathWorldFlag: 'shrine_guardian_slain',
     lore: 'Thần hộ vệ bị tha hoá. Khi hắn ngã xuống, lời nguyền của đền cổ sẽ lan rộng.'
@@ -362,7 +383,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   slag_brute: {
     id: 'slag_brute', name: 'Slag Brute', icon: '🧱', level: 9,
-    hp: 240, atk: 42, def: 22, expReward: 260, goldMin: 90, goldMax: 170,
+    hp: 285, atk: 49, def: 25, expReward: 260, goldMin: 90, goldMax: 170,
     drops: [{ itemId: 'black_iron', chance: 70 }, { itemId: 'troll_hide', chance: 42 }, { itemId: 'colossus_core', chance: 8 }, { itemId: 'book_tough_body', chance: 10 }],
     specialAttacks: ['ground_slam', 'iron_crush', 'fortress_stance'],
     zones: ['mines'], miniboss: true,
@@ -370,7 +391,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   rustbound_foreman: {
     id: 'rustbound_foreman', name: 'Rustbound Foreman', icon: '👷', level: 9,
-    hp: 215, atk: 39, def: 24, expReward: 275, goldMin: 95, goldMax: 180,
+    hp: 258, atk: 45, def: 27, expReward: 275, goldMin: 95, goldMax: 180,
     drops: [{ itemId: 'rusty_gear', chance: 80 }, { itemId: 'black_iron', chance: 55 }, { itemId: 'guard_emblem', chance: 8 }, { itemId: 'book_shield_bash', chance: 12 }],
     specialAttacks: ['rock_throw', 'fortress_stance', 'seismic_slam'],
     zones: ['mines'], miniboss: true,
@@ -378,7 +399,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   mine_colossus: {
     id: 'mine_colossus', name: 'Mine Colossus', icon: '🪨', level: 9,
-    hp: 450, atk: 38, def: 25, expReward: 600, goldMin: 200, goldMax: 350,
+    hp: 565, atk: 44, def: 29, expReward: 600, goldMin: 200, goldMax: 350,
     drops: [
       { itemId: 'book_ice_lance', chance: 30 },
       { itemId: 'book_mana_flow', chance: 25 },
@@ -388,6 +409,27 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { itemId: 'iron_ore', chance: 60 }
     ],
     specialAttacks: ['cave_in', 'seismic_slam', 'magma_core'],
+    phases: [
+      {
+        threshold: 0.55,
+        phaseIndex: 2,
+        name: 'Mine Colossus (Core Exposed)',
+        icon: '🔥',
+        atkMult: 1.25,
+        specialAttacks: ['seismic_slam', 'iron_crush', 'fortress_stance', 'cave_in'],
+        transitionMsg: '🔥 **Lõi dung nham trong ngực Colossus lộ ra — cả hầm mỏ bắt đầu rung chuyển!**',
+        healOnTransition: 0.04,
+      },
+      {
+        threshold: 0.25,
+        phaseIndex: 3,
+        name: 'Mine Colossus (Meltdown)',
+        icon: '🌋',
+        atkMult: 1.55,
+        specialAttacks: ['magma_core', 'seismic_slam', 'iron_crush', 'cave_in'],
+        transitionMsg: '🌋 **Colossus quá tải — đá nóng chảy rơi xuống như mưa!**',
+      },
+    ],
     zones: ['mines'], boss: true,
     deathWorldFlag: 'mine_colossus_slain',
     lore: 'Được tạo nên từ đá và kim loại, hắn là vị thần canh gác mạch quặng cuối cùng.'
@@ -469,7 +511,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   eclipse_reaver: {
     id: 'eclipse_reaver', name: 'Eclipse Reaver', icon: '🌘', level: 13,
-    hp: 320, atk: 56, def: 24, expReward: 520, goldMin: 160, goldMax: 280,
+    hp: 388, atk: 65, def: 27, expReward: 520, goldMin: 160, goldMax: 280,
     drops: [{ itemId: 'abyss_core', chance: 55 }, { itemId: 'void_fragment', chance: 25 }, { itemId: 'eclipse_blade', chance: 4 }, { itemId: 'book_soul_strike', chance: 10 }],
     specialAttacks: ['abyss_strike', 'reality_tear', 'doom_call'],
     zones: ['wastes'], miniboss: true,
@@ -477,7 +519,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   mirror_knight: {
     id: 'mirror_knight', name: 'Mirror Knight', icon: '🪞', level: 13,
-    hp: 340, atk: 52, def: 28, expReward: 540, goldMin: 170, goldMax: 300,
+    hp: 410, atk: 61, def: 31, expReward: 540, goldMin: 170, goldMax: 300,
     drops: [{ itemId: 'lost_memory', chance: 35 }, { itemId: 'broken_crown_fragment', chance: 12 }, { itemId: 'void_core', chance: 12 }, { itemId: 'book_counter', chance: 12 }],
     specialAttacks: ['mirror_split', 'skill_echo', 'forgotten_rage'],
     zones: ['wastes'], miniboss: true,
@@ -485,7 +527,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   the_forgotten: {
     id: 'the_forgotten', name: 'The Forgotten', icon: '❓', level: 14,
-    hp: 700, atk: 52, def: 30, expReward: 1200, goldMin: 400, goldMax: 700,
+    hp: 860, atk: 61, def: 35, expReward: 1200, goldMin: 400, goldMax: 700,
     drops: [
       { itemId: 'forgotten_crown', chance: 100 },
       { itemId: 'book_last_stand', chance: 50 },
@@ -497,6 +539,27 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { itemId: 'abyss_core', chance: 20 }
     ],
     specialAttacks: ['erase', 'butterfly_curse', 'forgotten_rage'],
+    phases: [
+      {
+        threshold: 0.60,
+        phaseIndex: 2,
+        name: 'The Forgotten (Remembered Pain)',
+        icon: '🦋',
+        atkMult: 1.22,
+        specialAttacks: ['butterfly_curse', 'skill_echo', 'mind_crush', 'forgotten_rage'],
+        transitionMsg: '🦋 **Những ký ức bị xoá quay lại thành đàn bướm đen — The Forgotten nhớ ra cách làm bạn đau.**',
+        healOnTransition: 0.04,
+      },
+      {
+        threshold: 0.30,
+        phaseIndex: 3,
+        name: 'The Forgotten (Erasure)',
+        icon: '❌',
+        atkMult: 1.55,
+        specialAttacks: ['erase', 'reality_tear', 'forgotten_rage', 'doom_call'],
+        transitionMsg: '❌ **Tên của bạn bắt đầu mờ đi trong đầu chính bạn — trận chiến bước vào pha xoá bỏ.**',
+      },
+    ],
     zones: ['wastes'], boss: true,
     deathWorldFlag: 'the_forgotten_slain',
     lore: 'Không ai còn nhớ hắn là ai. Mỗi khi bị giết, ký ức về cuộc chiến đó biến mất khỏi thế giới.'
