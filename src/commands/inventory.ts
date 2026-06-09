@@ -8,7 +8,7 @@ import {
   getPlayer, getInventory, getSkillPool, getLoadout,
   equipSkill, unequipSkill, addSkillToPool, hasSkillInPool,
   removeItem, getItemQty, updatePlayerHpMp, spendGold, grantSoulShards,
-  getSkillAttuneCount, incrementSkillAttuneCount
+  getSkillAttuneCount, incrementSkillAttuneCount, applyPassiveStats
 } from '../systems/player';
 import { awardAchievements } from '../systems/achievements';
 import { COLORS } from '../utils/embeds';
@@ -142,7 +142,15 @@ async function renderTab(
       const equipId = sel.values[0].replace('wear_', '');
       const def    = getEquipment(equipId);
       if (def) {
+        const playerBefore = getPlayer(userId, guildId)!;
+        const maxBefore = applyPassiveStats(playerBefore).max_hp;
         wearEquipment(userId, guildId, equipId);
+        const playerAfter = getPlayer(userId, guildId)!;
+        const maxAfter = applyPassiveStats(playerAfter).max_hp;
+        if (maxAfter !== maxBefore) {
+          const newHp = Math.min(maxAfter, Math.max(1, playerAfter.hp + (maxAfter - maxBefore)));
+          updatePlayerHpMp(userId, guildId, newHp, playerAfter.mp);
+        }
         await renderTab(interaction, userId, guildId, 'equip');
       }
       return;
@@ -150,7 +158,14 @@ async function renderTab(
 
     if (cid.startsWith(`inv_unequip_gear_${userId}_`)) {
       const slot = cid.replace(`inv_unequip_gear_${userId}_`, '') as import('../data/equipment').EquipSlot;
+      const playerBefore = getPlayer(userId, guildId)!;
+      const maxBefore = applyPassiveStats(playerBefore).max_hp;
       removeEquipment(userId, guildId, slot);
+      const playerAfter = getPlayer(userId, guildId)!;
+      const maxAfter = applyPassiveStats(playerAfter).max_hp;
+      if (maxAfter < maxBefore && playerAfter.hp > maxAfter) {
+        updatePlayerHpMp(userId, guildId, maxAfter, playerAfter.mp);
+      }
       await renderTab(interaction, userId, guildId, 'equip');
       return;
     }
