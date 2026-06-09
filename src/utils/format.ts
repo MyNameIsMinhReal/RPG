@@ -19,7 +19,8 @@ export function hpLabel(hp: number, maxHp: number): string {
 
 /** Formats EXP needed to level up */
 export function expNext(level: number): number {
-  return Math.floor(100 * Math.pow(1.4, level - 1));
+  // Slower progression curve: early levels still move, but mid/late no longer snowball too fast.
+  return Math.floor(120 + level * 60 + Math.pow(level, 1.8) * 28);
 }
 
 /** Random integer between min and max (inclusive) */

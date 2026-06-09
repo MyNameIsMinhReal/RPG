@@ -79,7 +79,7 @@ export async function showShrineSilentBell(ctx: RunExploreEventInput): Promise<v
   const roll = Math.random();
   if (roll < 0.45) {
     // Phước lành
-    const expGain = randInt(20, 50);
+    const expGain = randInt(14, 36);
     const mpRestore = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.4));
     grantExp(ctx.userId, ctx.guildId, expGain);
     updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mpRestore);
@@ -93,7 +93,7 @@ export async function showShrineSilentBell(ctx: RunExploreEventInput): Promise<v
     );
   } else if (roll < 0.75) {
     // Bình thường
-    const exp = randInt(8, 20);
+    const exp = randInt(5, 14);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info,
       `🔔 Tiếng chuông vang lên trầm đục rồi tắt ngay.\nKhông có gì đặc biệt xảy ra.\n\n⭐ +**${exp} EXP** (kinh nghiệm từ sự kiên nhẫn)`
@@ -134,7 +134,7 @@ export async function showShrinePrayerBeads(ctx: RunExploreEventInput): Promise<
   await btn.deferUpdate().catch(() => {});
 
   if (btn.customId === `pb_repair_${ctx.userId}`) {
-    const exp = randInt(25, 55);
+    const exp = randInt(18, 39);
     const rep = adjustReputation(ctx.userId, ctx.guildId, 6);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `📿 Bạn kiên nhẫn xâu lại từng hạt. Khi hoàn thành, chuỗi hạt tan thành ánh sáng.\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+6)`));
@@ -176,7 +176,7 @@ export async function showShrineSealDoor(ctx: RunExploreEventInput): Promise<voi
     await new Promise(r => setTimeout(r, 600));
     return ctx.callbacks.startCombat(randInt(1, 100) <= 50 ? 'vengeful_spirit' : pick(ctx.enemies).id);
   }
-  const gold = randInt(70, 150);
+  const gold = randInt(43, 93);
   grantGold(ctx.userId, ctx.guildId, gold);
   return finish(ctx, simpleEmbed(COLORS.gold, `🚪 Sau cánh cửa chỉ còn một hộp gỗ cũ.\n🪙 +**${gold} Gold**`));
 }
@@ -200,8 +200,8 @@ export async function showShrineSpiritLamp(ctx: RunExploreEventInput): Promise<v
   if (btn.customId === `sl_light_${ctx.userId}`) {
     const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.6));
     updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp);
-    grantExp(ctx.userId, ctx.guildId, 20);
-    return finish(ctx, simpleEmbed(COLORS.success, `🕯️ Ngọn lửa xanh bừng lên. Những tiếng thì thầm trở nên bình yên.\n🔵 MP: **${mp}/${player.max_mp}**\n⭐ +**20 EXP**`));
+    grantExp(ctx.userId, ctx.guildId, 14);
+    return finish(ctx, simpleEmbed(COLORS.success, `🕯️ Ngọn lửa xanh bừng lên. Những tiếng thì thầm trở nên bình yên.\n🔵 MP: **${mp}/${player.max_mp}**\n⭐ +**14 EXP**`));
   }
   if (btn.customId === `sl_pray_${ctx.userId}`) {
     const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.25));
@@ -229,7 +229,7 @@ export async function showShrineWeepingStatue(ctx: RunExploreEventInput): Promis
   const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn lùi khỏi pho tượng trước khi tiếng thì thầm vang rõ hơn.'));
   await btn.deferUpdate().catch(() => {});
-  if (btn.customId === `sws_wipe_${ctx.userId}`) { const exp = randInt(30, 65); const rep = adjustReputation(ctx.userId, ctx.guildId, 7); grantExp(ctx.userId, ctx.guildId, exp); return finish(ctx, simpleEmbed(COLORS.success, `🩸 Bạn lau sạch vết máu. Tượng đá khẽ ấm lên.
+  if (btn.customId === `sws_wipe_${ctx.userId}`) { const exp = randInt(21, 46); const rep = adjustReputation(ctx.userId, ctx.guildId, 7); grantExp(ctx.userId, ctx.guildId, exp); return finish(ctx, simpleEmbed(COLORS.success, `🩸 Bạn lau sạch vết máu. Tượng đá khẽ ấm lên.
 ⭐ +**${exp} EXP**
 📈 Reputation: **${rep}** (+7)`)); }
   if (btn.customId === `sws_collect_${ctx.userId}`) { addItem(ctx.userId, ctx.guildId, 'cursed_blood', 1); grantSoulShards(ctx.userId, ctx.guildId, 1); const dmg = Math.max(1, Math.floor(player.max_hp * 0.12)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); const rep = adjustReputation(ctx.userId, ctx.guildId, -5); return finish(ctx, simpleEmbed(COLORS.warning, `🧪 Bạn hứng lấy thứ máu lạnh như băng.
@@ -238,10 +238,10 @@ export async function showShrineWeepingStatue(ctx: RunExploreEventInput): Promis
 ❤️ HP mất **${dmg}**
 📉 Reputation: **${rep}** (-5)`)); }
   const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.45));
-  updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp); grantExp(ctx.userId, ctx.guildId, 25);
+  updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp); grantExp(ctx.userId, ctx.guildId, 18);
   return finish(ctx, simpleEmbed(COLORS.magic, `🙏 Bạn cầu nguyện trước tượng. Tiếng khóc nhỏ dần.
 🔮 MP: **${mp}/${player.max_mp}**
-⭐ +**25 EXP**`));
+⭐ +**18 EXP**`));
 }
 
 export async function showShrineForbiddenOffering(ctx: RunExploreEventInput): Promise<void> {
@@ -256,7 +256,7 @@ export async function showShrineForbiddenOffering(ctx: RunExploreEventInput): Pr
   const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
   if (!btn || !btn.isButton() || btn.customId === `sfo_refuse_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn phủ lại tấm vải đen và rời khỏi bàn thờ.'));
   await btn.deferUpdate().catch(() => {});
-  if (btn.customId === `sfo_gold_${ctx.userId}`) { spendGold(ctx.userId, ctx.guildId, 80); const exp = randInt(45, 85); grantExp(ctx.userId, ctx.guildId, exp); if (randInt(1, 100) <= 35) addItem(ctx.userId, ctx.guildId, 'mana_crystal', 1); return finish(ctx, simpleEmbed(COLORS.magic, `💰 Vàng tan thành bụi sáng.
+  if (btn.customId === `sfo_gold_${ctx.userId}`) { spendGold(ctx.userId, ctx.guildId, 80); const exp = randInt(32, 61); grantExp(ctx.userId, ctx.guildId, exp); if (randInt(1, 100) <= 35) addItem(ctx.userId, ctx.guildId, 'mana_crystal', 1); return finish(ctx, simpleEmbed(COLORS.magic, `💰 Vàng tan thành bụi sáng.
 💰 -**80 Gold**
 ⭐ +**${exp} EXP**
 🔮 Có thể nhận thêm **Mana Crystal**.`)); }
@@ -279,10 +279,10 @@ export async function showShrineSealedReliquary(ctx: RunExploreEventInput): Prom
   const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
   if (!btn || !btn.isButton() || btn.customId === `ssr_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '📦 Bạn để hộp thánh tích ngủ yên.'));
   await btn.deferUpdate().catch(() => {});
-  if (btn.customId === `ssr_read_${ctx.userId}`) { const exp = randInt(35, 70); grantExp(ctx.userId, ctx.guildId, exp); const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.35)); updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp); return finish(ctx, simpleEmbed(COLORS.success, `📜 Bạn đọc đúng chú văn. Phong ấn dịu lại.
+  if (btn.customId === `ssr_read_${ctx.userId}`) { const exp = randInt(25, 50); grantExp(ctx.userId, ctx.guildId, exp); const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.35)); updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp); return finish(ctx, simpleEmbed(COLORS.success, `📜 Bạn đọc đúng chú văn. Phong ấn dịu lại.
 ⭐ +**${exp} EXP**
 🔮 MP: **${mp}/${player.max_mp}**`)); }
-  if (randInt(1, 100) <= 55) { const gold = randInt(70, 150); grantGold(ctx.userId, ctx.guildId, gold); addItem(ctx.userId, ctx.guildId, pick(['mana_crystal', 'mysterious_shard']), 1); return finish(ctx, simpleEmbed(COLORS.gold, `🔓 Bạn phá phong ấn và lấy được thánh tích bên trong.
+  if (randInt(1, 100) <= 55) { const gold = randInt(43, 93); grantGold(ctx.userId, ctx.guildId, gold); addItem(ctx.userId, ctx.guildId, pick(['mana_crystal', 'mysterious_shard']), 1); return finish(ctx, simpleEmbed(COLORS.gold, `🔓 Bạn phá phong ấn và lấy được thánh tích bên trong.
 💰 +**${gold} Gold**
 📦 +**1 vật liệu hiếm**`)); }
   const dmg = Math.max(1, Math.floor(player.max_hp * 0.16)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);

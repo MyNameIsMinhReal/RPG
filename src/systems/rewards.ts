@@ -13,6 +13,17 @@ import { incrementChapterObjective } from './chapter';
 import type { PlayerRow } from '../utils/embeds';
 import type { EnemyDef } from '../data/enemies';
 
+
+function combatRewardMultipliers(enemy: EnemyDef): { exp: number; gold: number } {
+  if (enemy.boss) return { exp: 0.85, gold: 0.80 };
+  if (enemy.miniboss) return { exp: 0.78, gold: 0.72 };
+  return { exp: 0.62, gold: 0.45 };
+}
+
+function scaleReward(value: number, mult: number, min = 1): number {
+  return Math.max(min, Math.floor(value * mult));
+}
+
 export interface VictoryRewardResult {
   gold: number;
   exp: number;
@@ -29,10 +40,12 @@ export function processVictoryRewards(
   enemy: EnemyDef
 ): VictoryRewardResult {
   const dropBonus = getDropBonus(guildId, player.zone_id);
-  const baseGold  = randInt(enemy.goldMin, enemy.goldMax);
+  const rewardMult = combatRewardMultipliers(enemy);
+  const rolledGold = randInt(enemy.goldMin, enemy.goldMax);
+  const baseGold  = scaleReward(rolledGold, rewardMult.gold, 0);
   const greedGoldBonus = getGreedGoldBonusPercent(userId, guildId);
   const gold      = Math.max(0, Math.floor(baseGold * (1 + greedGoldBonus / 100)));
-  const exp       = enemy.expReward;
+  const exp       = scaleReward(enemy.expReward, rewardMult.exp, 1);
   const drops: string[] = [];
 
   grantGold(userId, guildId, gold);

@@ -123,14 +123,14 @@ export async function showDawnRitual(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.info, '🌅 *Bạn để nghi lễ lại phía sau và tiếp tục hành trình.*'));
   }
   if (cid === `dr_watch_${ctx.userId}`) {
-    const exp = randInt(10, 25);
+    const exp = randInt(7, 18);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info,
       `🌅 Bạn ngồi yên quan sát. Nghi lễ kết thúc trong thinh lặng.\n⭐ +**${exp} EXP** *(chiêm nghiệm)*`
     ));
   }
   // Tham gia
-  const exp = randInt(25, 55);
+  const exp = randInt(18, 39);
   const mpHeal = Math.min(fresh.max_mp, fresh.mp + Math.floor(fresh.max_mp * 0.5));
   grantExp(ctx.userId, ctx.guildId, exp);
   updatePlayerHpMp(ctx.userId, ctx.guildId, fresh.hp, mpHeal);
@@ -180,12 +180,12 @@ export async function showDawnTraveler(ctx: RunExploreEventInput): Promise<void>
       return `❤️ HP: **${hp}/${fresh.max_hp}** *(nghỉ chân cùng nhau)*`;
     },
     () => {
-      const gold = randInt(15, 40);
+      const gold = randInt(9, 24);
       grantGold(ctx.userId, ctx.guildId, gold);
       return `🪙 +**${gold} Gold** *(người lữ hành trả công giúp đỡ trên đường)*`;
     },
     () => {
-      const exp = randInt(15, 35);
+      const exp = randInt(10, 25);
       grantExp(ctx.userId, ctx.guildId, exp);
       return `⭐ +**${exp} EXP** *(câu chuyện đường dài)*`;
     },
@@ -219,7 +219,7 @@ export async function showNoonRest(ctx: RunExploreEventInput): Promise<void> {
   const fresh = getPlayer(ctx.userId, ctx.guildId)!;
 
   if (!cid || cid === `nr_push_${ctx.userId}`) {
-    const gold = randInt(8, 20);
+    const gold = randInt(4, 12);
     grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.info,
       `☀️ *Bạn tiếp tục đi dưới nắng. Đường vắng — bạn tìm thấy thứ gì đó rơi trên đường.*\n🪙 +**${gold} Gold**`
@@ -400,7 +400,7 @@ export async function showDuskOmen(ctx: RunExploreEventInput): Promise<void> {
   // Điều tra
   const roll = randInt(1, 100);
   if (roll <= 55) {
-    const gold = randInt(20, 50);
+    const gold = randInt(12, 31);
     grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.success,
       `🔎 Bạn theo dấu vết kỳ lạ và tìm thấy... một túi vàng bỏ quên.\n🪙 +**${gold} Gold**`
@@ -503,7 +503,7 @@ export async function showMidnightWanderer(ctx: RunExploreEventInput): Promise<v
     return finish(ctx, simpleEmbed(COLORS.info, '🌑 *Bạn đi vòng tránh và không nhìn lại. Một số thứ tốt hơn là không biết.*'));
   }
   if (cid === `mw_observe_${ctx.userId}`) {
-    const exp = randInt(15, 30);
+    const exp = randInt(10, 21);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info,
       `👁️ Bạn quan sát từ xa. Kẻ kia không động đậy — rồi biến mất khi bạn nhắm mắt chớp.\n\n⭐ +**${exp} EXP** *(một kỷ niệm không thể giải thích)*`
@@ -605,8 +605,8 @@ export async function showDawnHunterTracks(ctx: RunExploreEventInput): Promise<v
     return ctx.callbacks.startCombat(pick(ctx.enemies).id);
   }
   addItem(ctx.userId, ctx.guildId, 'leather', 2);
-  grantExp(ctx.userId, ctx.guildId, 25);
-  return finish(ctx, simpleEmbed(COLORS.success, '👣 Dấu chân dẫn tới một con mồi đã bỏ lại lớp da khi chạy trốn.\n🟫 +**2× Leather**\n⭐ +**25 EXP**'));
+  grantExp(ctx.userId, ctx.guildId, 18);
+  return finish(ctx, simpleEmbed(COLORS.success, '👣 Dấu chân dẫn tới một con mồi đã bỏ lại lớp da khi chạy trốn.\n🟫 +**2× Leather**\n⭐ +**18 EXP**'));
 }
 
 export async function showDayTrainingGround(ctx: RunExploreEventInput): Promise<void> {
@@ -621,10 +621,10 @@ export async function showDayTrainingGround(ctx: RunExploreEventInput): Promise<
     .setTitle('🏋️ Bãi Tập Giữa Ngày')
     .setDescription('Dưới nắng cao, vài cọc gỗ và hình nhân cũ đứng giữa bãi đất. Chúng đủ tốt để tập luyện — hoặc đấu thử thật sự.');
   const cid = await awaitBtn(ctx, embed, row);
-  if (!cid || cid === `tg_rest_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🏋️ *Bạn quan sát cách đặt chân và nhịp thở của những người từng tập ở đây.*\n⭐ +**10 EXP**'));
+  if (!cid || cid === `tg_rest_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🏋️ *Bạn quan sát cách đặt chân và nhịp thở của những người từng tập ở đây.*\n⭐ +**7 EXP**'));
 
   if (cid === `tg_train_${ctx.userId}`) {
-    const exp = randInt(30, 60);
+    const exp = randInt(21, 43);
     const dmg = Math.max(1, Math.floor(fresh.max_hp * 0.06));
     const hp = Math.max(1, fresh.hp - dmg);
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
@@ -664,7 +664,7 @@ export async function showDaySupplyCart(ctx: RunExploreEventInput): Promise<void
   }
 
   const rep = adjustReputation(ctx.userId, ctx.guildId, 4);
-  const gold = randInt(25, 55);
+  const gold = randInt(15, 34);
   grantGold(ctx.userId, ctx.guildId, gold);
   if (randInt(1, 100) <= 35) addItem(ctx.userId, ctx.guildId, 'bread', 1);
   return finish(ctx, simpleEmbed(COLORS.success, `🤝 Bạn giúp đẩy xe khỏi bùn. Chủ xe dúi cho bạn ít tiền cảm ơn.\n🪙 +**${gold} Gold**\n🤝 Reputation: **${rep}** (+4)`));
@@ -719,9 +719,9 @@ export async function showDuskCardDealer(ctx: RunExploreEventInput): Promise<voi
 
   spendGold(ctx.userId, ctx.guildId, 40);
   const roll = randInt(1, 100);
-  if (roll <= 30) { grantGold(ctx.userId, ctx.guildId, 120); return finish(ctx, simpleEmbed(COLORS.gold, '🃏 Lá **Crown**. Bạn thắng lớn.\n🪙 -40 Gold, +**120 Gold**')); }
+  if (roll <= 30) { grantGold(ctx.userId, ctx.guildId, 74); return finish(ctx, simpleEmbed(COLORS.gold, '🃏 Lá **Crown**. Bạn thắng lớn.\n🪙 -40 Gold, +**74 Gold**')); }
   if (roll <= 60) { addItem(ctx.userId, ctx.guildId, 'fate_coin', 1); return finish(ctx, simpleEmbed(COLORS.success, '🃏 Lá **Wheel**. Đồng xu số phận rơi xuống bàn.\n🪙 +**1× Fate Coin**')); }
-  if (roll <= 82) { grantExp(ctx.userId, ctx.guildId, 45); return finish(ctx, simpleEmbed(COLORS.info, '🃏 Lá **Mirror**. Bạn thấy một lựa chọn cũ trong đời mình.\n⭐ +**45 EXP**')); }
+  if (roll <= 82) { grantExp(ctx.userId, ctx.guildId, 32); return finish(ctx, simpleEmbed(COLORS.info, '🃏 Lá **Mirror**. Bạn thấy một lựa chọn cũ trong đời mình.\n⭐ +**32 EXP**')); }
   const dmg = Math.max(1, Math.floor(fresh.max_hp * 0.12));
   updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, fresh.hp - dmg), fresh.mp);
   return finish(ctx, simpleEmbed(COLORS.warning, `🃏 Lá **Knife**. Mép lá bài cứa vào lòng bàn tay.\n❤️ HP mất **${dmg}**`));
@@ -772,13 +772,13 @@ export async function showNightGraveRobbers(ctx: RunExploreEventInput): Promise<
   if (cid === `gr_stop_${ctx.userId}`) {
     const rep = adjustReputation(ctx.userId, ctx.guildId, 6);
     if (ctx.enemies.length && randInt(1, 100) <= 50) { await ctx.interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `🛡️ Bạn bước ra ngăn chúng lại. Chúng rút vũ khí.\n🤝 Reputation: **${rep}** (+6)\n\n*Chiến đấu bắt đầu...*`)], components: [] }); await new Promise(r => setTimeout(r, 600)); return ctx.callbacks.startCombat(pick(ctx.enemies).id); }
-    grantExp(ctx.userId, ctx.guildId, 40);
-    return finish(ctx, simpleEmbed(COLORS.success, `🛡️ Bạn dọa chúng chạy mất.\n🤝 Reputation: **${rep}** (+6)\n⭐ +**40 EXP**`));
+    grantExp(ctx.userId, ctx.guildId, 28);
+    return finish(ctx, simpleEmbed(COLORS.success, `🛡️ Bạn dọa chúng chạy mất.\n🤝 Reputation: **${rep}** (+6)\n⭐ +**28 EXP**`));
   }
 
   if (cid === `gr_join_${ctx.userId}`) {
     const rep = adjustReputation(ctx.userId, ctx.guildId, -8);
-    const gold = randInt(80, 160);
+    const gold = randInt(49, 99);
     grantGold(ctx.userId, ctx.guildId, gold);
     addItem(ctx.userId, ctx.guildId, 'ancient_bone', 1);
     return finish(ctx, simpleEmbed(COLORS.warning, `💰 Bạn nhận phần của mình trong im lặng.\n🪙 +**${gold} Gold**\n💀 +**1× Ancient Bone**\n🤝 Reputation: **${rep}** (-8)`));

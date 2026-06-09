@@ -441,6 +441,23 @@ db.exec(`
   }
 }
 
+
+// ── Seed: apology bug-fix code ───────────────────────────────────────────────
+{
+  const BUG_CODE = 'SORRYFORBUG';
+  const rewards = JSON.stringify({ gold: 1 });
+  const exists = db.prepare('SELECT 1 FROM redeem_codes WHERE code = ?').get(BUG_CODE);
+  if (!exists) {
+    db.prepare(
+      'INSERT INTO redeem_codes (code, rewards_json, max_uses) VALUES (?, ?, ?)'
+    ).run(BUG_CODE, rewards, 0);
+  } else {
+    db.prepare(
+      'UPDATE redeem_codes SET rewards_json = ?, active = 1 WHERE code = ?'
+    ).run(rewards, BUG_CODE);
+  }
+}
+
 // ── Party system ──────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS parties (

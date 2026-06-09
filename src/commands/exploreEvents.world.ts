@@ -107,7 +107,7 @@ export async function showWorldPlaguesSpreads(ctx: RunExploreEventInput): Promis
         '⚠️ Tin tức về **dịch bệnh** bắt đầu lan ra trong vùng.'
       ));
     }
-    const exp = randInt(20, 40);
+    const exp = randInt(14, 28);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success,
       '🤲 May mắn, bệnh chưa lây. Bạn cho người lữ hành nước và thức ăn, họ dần hồi tỉnh.\n' +
@@ -147,7 +147,7 @@ export async function showWorldBanditCoalition(ctx: RunExploreEventInput): Promi
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wbc_report_${ctx.userId}`) {
-    const gold = randInt(60, 120);
+    const gold = randInt(37, 74);
     grantGold(ctx.userId, ctx.guildId, gold);
     adjustWorldDanger(ctx.guildId, -10);
     setWorldEvent(ctx.guildId, 'bandit_coalition_exposed', 'Liên minh cướp bị vạch trần nhờ thám tử ẩn danh', 86400);
@@ -161,7 +161,7 @@ export async function showWorldBanditCoalition(ctx: RunExploreEventInput): Promi
   }
 
   if (cid === `wbc_shadow_${ctx.userId}`) {
-    const gold = randInt(80, 150);
+    const gold = randInt(49, 93);
     grantGold(ctx.userId, ctx.guildId, gold);
     adjustWorldDanger(ctx.guildId, 5);
     return finish(ctx, simpleEmbed(COLORS.warning,
@@ -171,7 +171,7 @@ export async function showWorldBanditCoalition(ctx: RunExploreEventInput): Promi
     ));
   }
 
-  const exp = randInt(10, 25);
+  const exp = randInt(7, 18);
   grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.info,
     `🔥 Bạn đốt tài liệu. Không ai biết bạn từng ở đây.\n⭐ +**${exp} EXP** (mặc dù không chắc đó là quyết định đúng...)`
@@ -195,7 +195,7 @@ export async function showWorldConvoyAttacked(ctx: RunExploreEventInput): Promis
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wca_help_${ctx.userId}`) {
-    const exp = randInt(30, 60);
+    const exp = randInt(21, 43);
     grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'health_potion', 1);
     increaseMerchantFear(ctx.guildId, -10);
@@ -208,7 +208,7 @@ export async function showWorldConvoyAttacked(ctx: RunExploreEventInput): Promis
   }
 
   if (cid === `wca_loot_${ctx.userId}`) {
-    const gold = randInt(40, 90);
+    const gold = randInt(24, 55);
     grantGold(ctx.userId, ctx.guildId, gold);
     adjustWanted(ctx.userId, ctx.guildId, 1);
     increaseMerchantFear(ctx.guildId, 8);
@@ -241,7 +241,7 @@ export async function showWorldMagicSurge(ctx: RunExploreEventInput): Promise<vo
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wms_seal_${ctx.userId}`) {
-    const exp = randInt(35, 70);
+    const exp = randInt(25, 50);
     grantExp(ctx.userId, ctx.guildId, exp);
     setFlag(ctx.guildId, 'world_magic_surge_sealed', '1', 21600);
     logEvent(ctx.guildId, ctx.userId, ctx.player.name ?? 'Unknown', 'world_news', 'Vết nứt ma thuật bị phong ấn thành công.', ctx.player.zone_id ?? null);
@@ -264,7 +264,7 @@ export async function showWorldMagicSurge(ctx: RunExploreEventInput): Promise<vo
     ));
   }
 
-  const exp = randInt(15, 30);
+  const exp = randInt(10, 21);
   grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.info,
     `🔭 Bạn quan sát cẩn thận từ xa, ghi chú mọi chi tiết. Vết nứt tự đóng lại sau vài phút.\n⭐ +**${exp} EXP**`
@@ -299,7 +299,7 @@ export async function showWorldDarkOmen(ctx: RunExploreEventInput): Promise<void
   }
 
   if (cid === `wdo_investigate_${ctx.userId}`) {
-    const exp = randInt(25, 50);
+    const exp = randInt(18, 36);
     grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'ancient_rune', 1);
       return finish(ctx, simpleEmbed(COLORS.info,
@@ -345,7 +345,7 @@ export async function showWorldPriceGouger(ctx: RunExploreEventInput): Promise<v
   }
 
   if (cid === `wpg_rob_${ctx.userId}`) {
-    const gold = randInt(30, 60);
+    const gold = randInt(18, 37);
     grantGold(ctx.userId, ctx.guildId, gold);
     adjustWanted(ctx.userId, ctx.guildId, 1);
     return finish(ctx, simpleEmbed(COLORS.danger,
@@ -424,7 +424,7 @@ export async function showWorldTaxCollector(ctx: RunExploreEventInput): Promise<
   }
 
   if (cid === `wtc_help_${ctx.userId}`) {
-    const gold = randInt(20, 45);
+    const gold = randInt(12, 27);
     grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.success,
       `📋 Bạn giúp viên quan thu thuế cả ngày — làm chứng nhân và ghi chép. Hắn cảm ơn bằng tiền hoa hồng.\n` +
@@ -482,7 +482,7 @@ export async function showWorldSupplyShortage(ctx: RunExploreEventInput): Promis
     if (!hasTradeable) {
       return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không có gì để bán.'));
     }
-    const gold = randInt(50, 100);
+    const gold = randInt(31, 62);
     grantGold(ctx.userId, ctx.guildId, gold);
     removeItem(ctx.userId, ctx.guildId, 'health_potion', 1);
     return finish(ctx, simpleEmbed(COLORS.warning,
@@ -512,9 +512,9 @@ export async function showWorldMerchantGuildJob(ctx: RunExploreEventInput): Prom
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wmgj_accept_${ctx.userId}`) {
-    const gold = randInt(80, 150);
+    const gold = randInt(49, 93);
     grantGold(ctx.userId, ctx.guildId, gold);
-    const exp = randInt(40, 80);
+    const exp = randInt(28, 57);
     grantExp(ctx.userId, ctx.guildId, exp);
     logEvent(ctx.guildId, ctx.userId, ctx.player.name ?? 'Unknown', 'world_news', 'Đoàn hàng Merchants Guild được hộ tống thành công.', ctx.player.zone_id ?? null);
     return finish(ctx, simpleEmbed(COLORS.success,
@@ -555,7 +555,7 @@ export async function showWorldAncientInscription(ctx: RunExploreEventInput): Pr
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wai_decipher_${ctx.userId}`) {
-    const exp = randInt(40, 80);
+    const exp = randInt(28, 57);
     grantExp(ctx.userId, ctx.guildId, exp);
     setFlag(ctx.guildId, `lore_ancient_inscription_${ctx.player.zone_id ?? 'unknown'}`, '1');
       return finish(ctx, simpleEmbed(0x8e44ad,
@@ -567,7 +567,7 @@ export async function showWorldAncientInscription(ctx: RunExploreEventInput): Pr
 
   if (cid === `wai_rubbing_${ctx.userId}`) {
     addItem(ctx.userId, ctx.guildId, 'ancient_rune', 1);
-    const exp = randInt(15, 30);
+    const exp = randInt(10, 21);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info,
       `📄 Bạn rập lại hoa văn lên tờ giấy. Có thể mang đến cho học giả nào đó sau.\n⭐ +**${exp} EXP**\n📜 +**1× Ancient Rune**`
@@ -595,7 +595,7 @@ export async function showWorldSpyLetter(ctx: RunExploreEventInput): Promise<voi
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wsl_church_${ctx.userId}`) {
-    const exp = randInt(30, 60);
+    const exp = randInt(21, 43);
     grantExp(ctx.userId, ctx.guildId, exp);
     adjustWorldDanger(ctx.guildId, -6);
     logEvent(ctx.guildId, ctx.userId, ctx.player.name ?? 'Unknown', 'world_news', 'Âm mưu bị vạch trần bởi Old Church.', ctx.player.zone_id ?? null);
@@ -607,7 +607,7 @@ export async function showWorldSpyLetter(ctx: RunExploreEventInput): Promise<voi
   }
 
   if (cid === `wsl_shadow_${ctx.userId}`) {
-    const gold = randInt(70, 130);
+    const gold = randInt(43, 80);
     grantGold(ctx.userId, ctx.guildId, gold);
     adjustWorldDanger(ctx.guildId, 4);
     return finish(ctx, simpleEmbed(COLORS.warning,
@@ -618,7 +618,7 @@ export async function showWorldSpyLetter(ctx: RunExploreEventInput): Promise<voi
   }
 
   if (cid === `wsl_hunters_${ctx.userId}`) {
-    const exp = randInt(20, 45);
+    const exp = randInt(14, 32);
     grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'scroll_detection', 1);
     return finish(ctx, simpleEmbed(COLORS.info,
@@ -627,7 +627,7 @@ export async function showWorldSpyLetter(ctx: RunExploreEventInput): Promise<voi
     ));
   }
 
-  const exp = randInt(10, 20);
+  const exp = randInt(7, 14);
   grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.info,
     `🔥 Bạn đốt thư. Dù sao cũng không muốn dính vào chuyện chính trị.\n⭐ +**${exp} EXP**`
@@ -652,7 +652,7 @@ export async function showWorldMissingPersons(ctx: RunExploreEventInput): Promis
 
   if (cid === `wmp_investigate_${ctx.userId}`) {
     const roll = randInt(1, 100);
-    const exp = randInt(30, 60);
+    const exp = randInt(21, 43);
     grantExp(ctx.userId, ctx.guildId, exp);
     setFlag(ctx.guildId, 'missing_persons_investigated', '1', 86400);
       if (roll <= 35) {
@@ -670,7 +670,7 @@ export async function showWorldMissingPersons(ctx: RunExploreEventInput): Promis
   }
 
   if (cid === `wmp_hunters_${ctx.userId}`) {
-    const exp = randInt(15, 30);
+    const exp = randInt(10, 21);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success,
       `🏹 Bạn sao chép thông tin và gửi đến Hunters Guild. Họ sẽ điều tra chính thức.\n` +
@@ -698,7 +698,7 @@ export async function showWorldOldChronicle(ctx: RunExploreEventInput): Promise<
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `woc_read_${ctx.userId}`) {
-    const exp = randInt(50, 90);
+    const exp = randInt(36, 64);
     grantExp(ctx.userId, ctx.guildId, exp);
     setFlag(ctx.guildId, 'lore_chronicles_read', '1');
       return finish(ctx, simpleEmbed(0xd4a047,
@@ -708,7 +708,7 @@ export async function showWorldOldChronicle(ctx: RunExploreEventInput): Promise<
   }
 
   if (cid === `woc_sell_${ctx.userId}`) {
-    const gold = randInt(35, 65);
+    const gold = randInt(21, 40);
     grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.info,
       `🪙 Một thương nhân mua sách cũ trả **${gold} Gold** không hỏi thêm.\n🪙 +**${gold} Gold**`
@@ -716,7 +716,7 @@ export async function showWorldOldChronicle(ctx: RunExploreEventInput): Promise<
   }
 
   if (cid === `woc_church_${ctx.userId}`) {
-    const exp = randInt(30, 55);
+    const exp = randInt(21, 39);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success,
       `⛪ Tu sĩ Old Church nhận cuốn sách với ánh mắt hài lòng. *"Chúng ta đã tìm kiếm quyển này từ lâu."*\n` +
@@ -750,7 +750,7 @@ export async function showWorldPropheticVision(ctx: RunExploreEventInput): Promi
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wpv_remember_${ctx.userId}`) {
-    const exp = randInt(20, 40);
+    const exp = randInt(14, 28);
     grantExp(ctx.userId, ctx.guildId, exp);
     setFlag(ctx.guildId, `lore_vision_${ctx.userId}`, vision.slice(0, 50), 604800);
       return finish(ctx, simpleEmbed(0x6c3483,
@@ -787,7 +787,7 @@ export async function showWorldSecretMeeting(ctx: RunExploreEventInput): Promise
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wsm_observe_${ctx.userId}`) {
-    const exp = randInt(30, 60);
+    const exp = randInt(21, 43);
     grantExp(ctx.userId, ctx.guildId, exp);
     setFlag(ctx.guildId, `lore_secret_meeting_${mtg.f1}`, '1', 172800);
       return finish(ctx, simpleEmbed(0x1a1a2e,
@@ -847,7 +847,7 @@ export async function showWorldFactionStandoff(ctx: RunExploreEventInput): Promi
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wfs_side1_${ctx.userId}`) {
-    const exp = randInt(25, 50);
+    const exp = randInt(18, 36);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info,
       `👈 Bạn lên tiếng ủng hộ ${s.f1name}. Họ cảm ơn, phía kia bỏ đi hậm hực.\n` +
@@ -856,7 +856,7 @@ export async function showWorldFactionStandoff(ctx: RunExploreEventInput): Promi
   }
 
   if (cid === `wfs_side2_${ctx.userId}`) {
-    const exp = randInt(25, 50);
+    const exp = randInt(18, 36);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info,
       `👉 Bạn lên tiếng ủng hộ ${s.f2name}. Họ gật đầu hài lòng, phía kia ném cái nhìn lạnh lẽo.\n` +
@@ -864,7 +864,7 @@ export async function showWorldFactionStandoff(ctx: RunExploreEventInput): Promi
     ));
   }
 
-  const exp = randInt(20, 40);
+  const exp = randInt(14, 28);
   grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.success,
     `🤝 Bạn đứng ra trung gian, thuyết phục cả hai bên hạ vũ khí và nói chuyện bình tĩnh.\n` +
@@ -890,7 +890,7 @@ export async function showWorldChurchInquisition(ctx: RunExploreEventInput): Pro
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wci_cooperate_${ctx.userId}`) {
-    const exp = randInt(20, 40);
+    const exp = randInt(14, 28);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success,
       `⛪ Bạn trả lời thành thật và hợp tác hoàn toàn. Vị thẩm phán gật đầu hài lòng.\n` +
@@ -936,7 +936,7 @@ export async function showWorldShadowOffer(ctx: RunExploreEventInput): Promise<v
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wso_accept_${ctx.userId}`) {
-    const gold = randInt(100, 200);
+    const gold = randInt(62, 124);
     grantGold(ctx.userId, ctx.guildId, gold);
     adjustWorldDanger(ctx.guildId, 4);
     return finish(ctx, simpleEmbed(COLORS.warning,
@@ -952,7 +952,7 @@ export async function showWorldShadowOffer(ctx: RunExploreEventInput): Promise<v
     ));
   }
 
-  const exp = randInt(20, 45);
+  const exp = randInt(14, 32);
   grantExp(ctx.userId, ctx.guildId, exp);
   adjustWorldDanger(ctx.guildId, -4);
   return finish(ctx, simpleEmbed(COLORS.success,
@@ -986,7 +986,7 @@ export async function showWorldHuntersMission(ctx: RunExploreEventInput): Promis
 
   if (cid === `whm_accept_${ctx.userId}`) {
     grantGold(ctx.userId, ctx.guildId, mission.gold);
-    const exp = randInt(50, 90);
+    const exp = randInt(36, 64);
     grantExp(ctx.userId, ctx.guildId, exp);
     logEvent(ctx.guildId, ctx.userId, ctx.player.name ?? 'Unknown', 'world_news', `Hunters Guild mission hoàn thành: ${mission.name}.`, mission.zone);
     return finish(ctx, simpleEmbed(0x8b4513,
@@ -1001,7 +1001,7 @@ export async function showWorldHuntersMission(ctx: RunExploreEventInput): Promis
       const bonus = randInt(20, 50);
       const total = mission.gold + bonus;
       grantGold(ctx.userId, ctx.guildId, total);
-      const exp = randInt(40, 70);
+      const exp = randInt(28, 50);
       grantExp(ctx.userId, ctx.guildId, exp);
       return finish(ctx, simpleEmbed(COLORS.success,
         `💰 Bạn mặc cả giỏi! Được thêm **${bonus} Gold** ngoài thù lao cơ bản.\n` +
@@ -1037,7 +1037,7 @@ export async function showWorldVillagerDispute(ctx: RunExploreEventInput): Promi
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wvd_mediate_${ctx.userId}`) {
-    const exp = randInt(30, 60);
+    const exp = randInt(21, 43);
     grantExp(ctx.userId, ctx.guildId, exp);
     setWorldEvent(ctx.guildId, 'village_dispute_resolved', 'Tranh chấp làng được giải quyết công bằng', 43200);
     return finish(ctx, simpleEmbed(COLORS.success,
@@ -1047,7 +1047,7 @@ export async function showWorldVillagerDispute(ctx: RunExploreEventInput): Promi
   }
 
   if (cid === `wvd_side_${ctx.userId}`) {
-    const gold = randInt(30, 70);
+    const gold = randInt(18, 43);
     grantGold(ctx.userId, ctx.guildId, gold);
     adjustWorldDanger(ctx.guildId, 3);
     return finish(ctx, simpleEmbed(COLORS.warning,

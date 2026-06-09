@@ -52,7 +52,7 @@ export async function showForestWhisperingTree(ctx: RunExploreEventInput): Promi
   if (id === `ft_listen_${ctx.userId}`) {
     const outcomes = [
       () => {
-        const exp = randInt(15, 35);
+        const exp = randInt(10, 25);
         grantExp(ctx.userId, ctx.guildId, exp);
         return simpleEmbed(COLORS.success,
           '🌳 **Giọng cây cổ thụ:**\n*"Kẻ lang thang... hãy nhớ lấy con đường mình đi."*\n\n' +
@@ -60,7 +60,7 @@ export async function showForestWhisperingTree(ctx: RunExploreEventInput): Promi
         );
       },
       () => {
-        const gold = randInt(10, 30);
+        const gold = randInt(6, 18);
         grantGold(ctx.userId, ctx.guildId, gold);
         return simpleEmbed(COLORS.success,
           '🌳 *Một cành cây khẽ chỉ xuống gốc rễ — có vật gì chôn vùi ở đó.*\n\n' +
@@ -123,7 +123,7 @@ export async function showForestWolfDen(ctx: RunExploreEventInput): Promise<void
   await btn.deferUpdate().catch(() => {});
 
   if (btn.customId === `fw_rescue_${ctx.userId}`) {
-    const exp = randInt(20, 45);
+    const exp = randInt(14, 32);
     const rep = adjustReputation(ctx.userId, ctx.guildId, 5);
     grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'wolf_fang', 1);
@@ -140,7 +140,7 @@ export async function showForestWolfDen(ctx: RunExploreEventInput): Promise<void
   if (btn.customId === `fw_take_${ctx.userId}`) {
     const roll = randInt(1, 100);
     if (roll <= 55) {
-      const gold = randInt(25, 60);
+      const gold = randInt(15, 37);
       grantGold(ctx.userId, ctx.guildId, gold);
       addItem(ctx.userId, ctx.guildId, 'leather', 1);
       return finish(ctx, simpleEmbed(COLORS.gold, `🎒 Bạn lục được một túi cũ trong hang.\n🪙 +**${gold} Gold**\n🟫 +**1× Leather**`));
@@ -229,7 +229,7 @@ export async function showForestMoonlitClearing(ctx: RunExploreEventInput): Prom
     addItem(ctx.userId, ctx.guildId, 'rare_herb', 1);
     return finish(ctx, simpleEmbed(COLORS.warning, `🌺 Bông hoa phát sáng cắt vào đầu ngón tay như lưỡi dao mỏng.\n🌺 +**1× Rare Herb**\n❤️ HP mất **${dmg}**`));
   }
-  const exp = randInt(25, 55);
+  const exp = randInt(18, 39);
   grantExp(ctx.userId, ctx.guildId, exp);
   if (randInt(1, 100) <= 35) addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
   return finish(ctx, simpleEmbed(COLORS.magic, `✨ Bạn lần theo vệt sáng tới một dấu tích cổ bị rêu phủ.\n⭐ +**${exp} EXP**\n💎 Có thể nhận thêm **Mysterious Shard**.`));
@@ -260,7 +260,7 @@ export async function showForestBanditAmbush(ctx: RunExploreEventInput): Promise
   if (id === `fba_talk_${ctx.userId}`) {
     const roll = randInt(1, 100);
     if (roll <= 50) {
-      const gold = randInt(10, 25);
+      const gold = randInt(6, 15);
       grantGold(ctx.userId, ctx.guildId, gold);
       return finish(ctx, simpleEmbed(COLORS.success, `🗣️ Bạn thuyết phục được chúng — họ để bạn đi và chia sẻ một ít chiến lợi phẩm.\n🪙 +**${gold} Gold**`));
     }
@@ -297,7 +297,7 @@ export async function showForestGiantSpider(ctx: RunExploreEventInput): Promise<
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.06));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     addItem(ctx.userId, ctx.guildId, 'spider_silk', 1);
-    const exp = randInt(20, 40);
+    const exp = randInt(14, 28);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🔥 Lửa Đẩy Lùi Nhện')
       .setDescription(`Bạn đốt mạng nhện — con nhện tháo lui. Tuy nhiên lửa bắn vào tay bạn.\n🕸️ +**1× Spider Silk**\n⭐ +**${exp} EXP**\n❤️ HP mất **${dmg}**`));
@@ -333,7 +333,7 @@ export async function showForestCursedScarecrow(ctx: RunExploreEventInput): Prom
     return finish(ctx, simpleEmbed(COLORS.success, '🎃 Bù nhìn vỡ ra thành tro. Trong lớp rơm có một mảnh rune cũ.\n🔷 +**1× Broken Rune**'));
   }
   if (id === `fcs_examine_${ctx.userId}`) {
-    const exp = randInt(15, 30);
+    const exp = randInt(10, 21);
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info, `🔍 Bạn tìm thấy ký hiệu khắc trên người nó — thuật trừ tà cổ đại.\n⭐ +**${exp} EXP**`));
   }
@@ -356,7 +356,7 @@ export async function showForestSnakePit(ctx: RunExploreEventInput): Promise<voi
   const player = getPlayer(ctx.userId, ctx.guildId)!;
   if (id === `fsp_jump_${ctx.userId}`) {
     if (randInt(1, 100) <= 60) {
-      const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
+      const exp = randInt(7, 18); grantExp(ctx.userId, ctx.guildId, exp);
       return finish(ctx, simpleEmbed(COLORS.success, `🦘 Bạn nhảy qua gọn lẹ!\n⭐ +**${exp} EXP**`));
     }
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.12));
@@ -387,7 +387,7 @@ export async function showForestPoacherCamp(ctx: RunExploreEventInput): Promise<
   const id = btn.customId;
   if (id === `fpc_report_${ctx.userId}`) {
     const rep = adjustReputation(ctx.userId, ctx.guildId, 4);
-    const exp = randInt(20, 40); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(14, 28); grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'leather', 2);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🏕️ Trại Bị Phá')
       .setDescription(`Bạn phá hủy bẫy và giải phóng thú bị giam.\n🟫 +**2× Leather**\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+4)`));
@@ -395,7 +395,7 @@ export async function showForestPoacherCamp(ctx: RunExploreEventInput): Promise<
   if (id === `fpc_steal_${ctx.userId}`) {
     const roll = randInt(1, 100);
     if (roll <= 55) {
-      const gold = randInt(20, 50); grantGold(ctx.userId, ctx.guildId, gold);
+      const gold = randInt(12, 31); grantGold(ctx.userId, ctx.guildId, gold);
       addItem(ctx.userId, ctx.guildId, 'leather', 1);
       return finish(ctx, simpleEmbed(COLORS.gold, `🥷 Bạn lấy đồ và biến mất trước khi chúng quay lại.\n🪙 +**${gold} Gold**\n🟫 +**1× Leather**`));
     }
@@ -431,7 +431,7 @@ export async function showForestCorruptedTreant(ctx: RunExploreEventInput): Prom
       return finish(ctx, simpleEmbed(COLORS.warning, `✨ Bạn không đủ MP để thanh tẩy. (Cần **${mpCost} MP**)`));
     }
     updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, player.mp - mpCost);
-    const exp = randInt(40, 70); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(28, 50); grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
     const rep = adjustReputation(ctx.userId, ctx.guildId, 6);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('✨ Cây Thần Được Giải Thoát')
@@ -459,7 +459,7 @@ export async function showForestWildBoar(ctx: RunExploreEventInput): Promise<voi
   const id = btn.customId;
   if (id === `fwb_dodge_${ctx.userId}`) {
     if (randInt(1, 100) <= 65) {
-      const exp = randInt(10, 20); grantExp(ctx.userId, ctx.guildId, exp);
+      const exp = randInt(7, 14); grantExp(ctx.userId, ctx.guildId, exp);
       return finish(ctx, simpleEmbed(COLORS.success, `🤸 Bạn bước sang một bên đúng lúc — con lợn lao vào gốc cây.\n⭐ +**${exp} EXP**`));
     }
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.12));
@@ -536,7 +536,7 @@ export async function showForestRabidFox(ctx: RunExploreEventInput): Promise<voi
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.08));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     addItem(ctx.userId, ctx.guildId, 'leather', 1);
-    const exp = randInt(15, 30); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(10, 21); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `⚔️ Bạn hạ gục con cáo nhưng bị cắn một phát.\n🟫 +**1× Leather**\n⭐ +**${exp} EXP**\n❤️ HP mất **${dmg}**`));
   }
   if (id === `frf_scare_${ctx.userId}`) {
@@ -566,7 +566,7 @@ export async function showForestBanditWatchtower(ctx: RunExploreEventInput): Pro
   const id = btn.customId;
   if (id === `fbw_sneak_${ctx.userId}`) {
     if (randInt(1, 100) <= 60) {
-      const gold = randInt(30, 70); grantGold(ctx.userId, ctx.guildId, gold);
+      const gold = randInt(18, 43); grantGold(ctx.userId, ctx.guildId, gold);
       addItem(ctx.userId, ctx.guildId, 'leather', 1);
       return finish(ctx, simpleEmbed(COLORS.success, `🥷 Bạn lén mở rương và thoát ra trước khi chúng tỉnh giấc!\n🪙 +**${gold} Gold**\n🟫 +**1× Leather**`));
     }
@@ -583,7 +583,7 @@ export async function showForestBanditWatchtower(ctx: RunExploreEventInput): Pro
   const cost = 30;
   if (player.gold < cost) return finish(ctx, simpleEmbed(COLORS.warning, `🪙 Bạn không đủ **${cost} Gold** để hối lộ.`));
   grantGold(ctx.userId, ctx.guildId, -cost);
-  const gold = randInt(20, 60); grantGold(ctx.userId, ctx.guildId, gold);
+  const gold = randInt(12, 37); grantGold(ctx.userId, ctx.guildId, gold);
   return finish(ctx, simpleEmbed(COLORS.gold, `🪙 Bạn trả **${cost} Gold** — chúng đưa cho bạn chìa khóa rương.\n🪙 +**${gold} Gold** (từ rương)`));
 }
 
@@ -604,7 +604,7 @@ export async function showForestHollowLog(ctx: RunExploreEventInput): Promise<vo
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
   if (id === `fhl_peek_${ctx.userId}`) {
-    const exp = randInt(5, 15); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(3, 10); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info, `👀 Bạn nhìn kỹ — chỉ là một đống nấm và mảnh xương nhỏ. Không có gì giá trị.\n⭐ +**${exp} EXP** (kinh nghiệm nhận biết)`));
   }
   const roll = randInt(1, 100);
@@ -615,7 +615,7 @@ export async function showForestHollowLog(ctx: RunExploreEventInput): Promise<vo
     return finish(ctx, simpleEmbed(COLORS.danger, `🐍 Một con rắn đang ẩn trong đó cắn vào tay bạn!\n❤️ HP mất **${dmg}**`));
   }
   if (roll <= 50) {
-    const gold = randInt(15, 40); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(9, 24); grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.gold, `🤚 Một chiếc túi tiền cũ kỹ nằm sâu bên trong.\n🪙 +**${gold} Gold**`));
   }
   addItem(ctx.userId, ctx.guildId, 'herb', randInt(2, 4));
@@ -644,11 +644,11 @@ export async function showForestBuriedChest(ctx: RunExploreEventInput): Promise<
       addItem(ctx.userId, ctx.guildId, 'broken_rune', 1);
       return finish(ctx, simpleEmbed(COLORS.warning, `⛏️ Bẫy kích hoạt! Một mũi tên bắn từ bên trong rương.\n🔷 +**1× Broken Rune** (rơi ra từ bẫy)\n❤️ HP mất **${dmg}**`));
     }
-    const gold = randInt(40, 100); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(24, 62); grantGold(ctx.userId, ctx.guildId, gold);
     if (randInt(1, 100) <= 40) addItem(ctx.userId, ctx.guildId, 'rune_stone', 1);
     return finish(ctx, simpleEmbed(COLORS.gold, `⛏️ Rương đầy vàng và đá rune!\n🪙 +**${gold} Gold**\n🔮 Có thể thêm **Rune Stone**`));
   }
-  const gold = randInt(25, 70); grantGold(ctx.userId, ctx.guildId, gold);
+  const gold = randInt(15, 43); grantGold(ctx.userId, ctx.guildId, gold);
   addItem(ctx.userId, ctx.guildId, 'herb', 2);
   return finish(ctx, simpleEmbed(COLORS.success, `🔍 Đào cẩn thận, không kích bẫy. Nội dung an toàn hơn nhưng ít hơn.\n🪙 +**${gold} Gold**\n🌿 +**2× Herb**`));
 }
@@ -674,7 +674,7 @@ export async function showForestEagleNest(ctx: RunExploreEventInput): Promise<vo
       updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
       return finish(ctx, simpleEmbed(COLORS.danger, `🦅 Đại bàng quay về và tấn công bạn khi đang leo!\n❤️ HP mất **${dmg}**`));
     }
-    const gold = randInt(20, 50); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(12, 31); grantGold(ctx.userId, ctx.guildId, gold);
     addItem(ctx.userId, ctx.guildId, 'eagle_feather', 1);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🦅 Báu Vật Trong Tổ')
       .setDescription(`Trong tổ có mảnh vàng và một chiếc lông đại bàng hiếm.\n🪙 +**${gold} Gold**\n🪶 +**1× Eagle Feather**`));
@@ -708,7 +708,7 @@ export async function showForestMushroomRing(ctx: RunExploreEventInput): Promise
   if (id === `fmr_step_${ctx.userId}`) {
     const outcomes = [
       () => { const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.5)); updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp); return simpleEmbed(COLORS.success, `✨ Cơ thể bạn tràn ngập ánh sáng dịu — vết thương lành lại.\n❤️ HP: **${hp}/${player.max_hp}**`); },
-      () => { const exp = randInt(40, 80); grantExp(ctx.userId, ctx.guildId, exp); return simpleEmbed(COLORS.magic, `✨ Bạn cảm thấy một luồng tri thức cổ đại chảy qua tâm trí.\n⭐ +**${exp} EXP**`); },
+      () => { const exp = randInt(28, 57); grantExp(ctx.userId, ctx.guildId, exp); return simpleEmbed(COLORS.magic, `✨ Bạn cảm thấy một luồng tri thức cổ đại chảy qua tâm trí.\n⭐ +**${exp} EXP**`); },
       () => { addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1); return simpleEmbed(COLORS.magic, '✨ Một mảnh tinh thể rơi xuống từ không khí khi bạn bước vào.\n💎 +**1× Mysterious Shard**'); },
       () => { const dmg = Math.max(1, Math.floor(player.max_hp * 0.2)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); return simpleEmbed(COLORS.danger, `✨ Không phải tiên — bạn bị cuốn vào một vòng xoáy ma thuật tối!\n❤️ HP mất **${dmg}**`); },
     ];
@@ -718,7 +718,7 @@ export async function showForestMushroomRing(ctx: RunExploreEventInput): Promise
     addItem(ctx.userId, ctx.guildId, 'glowing_mushroom', randInt(2, 4));
     return finish(ctx, simpleEmbed(COLORS.success, '🍄 Bạn hái nấm từ vòng — chúng phát sáng trong bóng tối.\n🍄 +**2–4× Glowing Mushroom**'));
   }
-  const exp = randInt(15, 30); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(10, 21); grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.info, `👁️ Bạn nghiên cứu vòng nấm từ xa — ghi chép lại hình dạng và màu sắc.\n⭐ +**${exp} EXP**`));
 }
 
@@ -737,7 +737,7 @@ export async function showForestAmberSap(ctx: RunExploreEventInput): Promise<voi
     addItem(ctx.userId, ctx.guildId, 'amber_sap', randInt(1, 3));
     return finish(ctx, simpleEmbed(COLORS.gold, '🟡 Bạn cẩn thận cạo nhựa vào lọ.\n🟡 +**1–3× Amber Sap**'));
   }
-  const exp = randInt(20, 40); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(14, 28); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'amber_sap', 1);
   return finish(ctx, simpleEmbed(COLORS.success, `🔬 Nghiên cứu thú vị — thứ bị kẹt trong nhựa là một côn trùng từ thời cổ đại.\n⭐ +**${exp} EXP**\n🟡 +**1× Amber Sap**`));
 }
@@ -746,7 +746,7 @@ export async function showForestForgottenPack(ctx: RunExploreEventInput): Promis
   const player = getPlayer(ctx.userId, ctx.guildId)!;
   const roll = randInt(1, 100);
   const outcomes = [
-    () => { const g = randInt(20, 60); grantGold(ctx.userId, ctx.guildId, g); return `🪙 +**${g} Gold** (trong túi tiền cũ)`; },
+    () => { const g = randInt(12, 37); grantGold(ctx.userId, ctx.guildId, g); return `🪙 +**${g} Gold** (trong túi tiền cũ)`; },
     () => { addItem(ctx.userId, ctx.guildId, 'health_potion', 1); return '🧪 +**1× Health Potion**'; },
     () => { addItem(ctx.userId, ctx.guildId, 'herb', 3); addItem(ctx.userId, ctx.guildId, 'leather', 1); return '🌿 +**3× Herb**\n🟫 +**1× Leather**'; },
     () => { addItem(ctx.userId, ctx.guildId, 'rune_stone', 1); return '🔮 +**1× Rune Stone** (gói kỹ trong vải)'; },
@@ -818,7 +818,7 @@ export async function showForestFruitGrove(ctx: RunExploreEventInput): Promise<v
     addItem(ctx.userId, ctx.guildId, 'forest_fruit', randInt(3, 6));
     return finish(ctx, simpleEmbed(COLORS.success, '🎒 Bạn hái chọn lọc những trái trông lành nhất.\n🍒 +**3–6× Forest Fruit**'));
   }
-  const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(7, 18); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'forest_fruit', 2);
   return finish(ctx, simpleEmbed(COLORS.success, `🔍 Bạn nhận dạng được một số loại an toàn.\n⭐ +**${exp} EXP**\n🍒 +**2× Forest Fruit**`));
 }
@@ -841,7 +841,7 @@ export async function showForestSilkCocoon(ctx: RunExploreEventInput): Promise<v
   const roll = randInt(1, 100);
   if (roll <= 40) {
     addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
-    const exp = randInt(25, 50); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(18, 36); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('🦋 Điều Kỳ Diệu')
       .setDescription(`Kén vỡ ra — không phải côn trùng, mà là một mảnh tinh thể phát sáng rơi xuống tay bạn.\n💎 +**1× Mysterious Shard**\n⭐ +**${exp} EXP**`));
   }
@@ -898,19 +898,19 @@ export async function showForestLostMerchant(ctx: RunExploreEventInput): Promise
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
   if (id === `flm_guide_${ctx.userId}`) {
-    const gold = randInt(40, 80); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(24, 49); grantGold(ctx.userId, ctx.guildId, gold);
     const rep = adjustReputation(ctx.userId, ctx.guildId, 5);
     addItem(ctx.userId, ctx.guildId, 'health_potion', 1);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🗺️ Ân Nhân Của Thương Nhân')
       .setDescription(`Bạn dẫn ông ta ra đường chính. Ông ta tặng bạn tiền và một lọ thuốc hảo hạng.\n🪙 +**${gold} Gold**\n🧪 +**1× Health Potion**\n🤝 Reputation: **${rep}** (+5)`));
   }
   if (id === `flm_trade_${ctx.userId}`) {
-    const gold = randInt(15, 35); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(9, 21); grantGold(ctx.userId, ctx.guildId, gold);
     addItem(ctx.userId, ctx.guildId, 'herb', 2);
     return finish(ctx, simpleEmbed(COLORS.success, `💼 Ông ta bán rẻ hàng để nhẹ gánh.\n🪙 +**${gold} Gold**\n🌿 +**2× Herb**`));
   }
   const rep = adjustReputation(ctx.userId, ctx.guildId, -8);
-  const gold = randInt(40, 90); grantGold(ctx.userId, ctx.guildId, gold);
+  const gold = randInt(24, 55); grantGold(ctx.userId, ctx.guildId, gold);
   return finish(ctx, new EmbedBuilder().setColor(COLORS.warning).setTitle('🥷 Cướp Người Lạc Đường')
     .setDescription(`Bạn lấy đồ rồi bỏ ông ta trong rừng.\n🪙 +**${gold} Gold**\n🤝 Reputation: **${rep}** (-8)`));
 }
@@ -930,7 +930,7 @@ export async function showForestHermitCave(ctx: RunExploreEventInput): Promise<v
   const player = getPlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fhc_talk_${ctx.userId}`) {
-    const exp = randInt(30, 60); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(21, 43); grantExp(ctx.userId, ctx.guildId, exp);
     const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.2));
     const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.2));
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, mp);
@@ -942,7 +942,7 @@ export async function showForestHermitCave(ctx: RunExploreEventInput): Promise<v
     const rep = adjustReputation(ctx.userId, ctx.guildId, 3);
     return finish(ctx, simpleEmbed(COLORS.success, `🍞 Ẩn sĩ cảm ơn và đưa cho bạn vài bó thảo dược quý hiếm ông tự trồng.\n🌺 +**2× Rare Herb**\n🤝 Reputation: **${rep}** (+3)`));
   }
-  const exp = randInt(50, 90); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(36, 64); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'rune_stone', 1);
   return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('📚 Tri Thức Ẩn Sĩ')
     .setDescription(`Ông dạy bạn một điều gì đó về thế giới — một sự thật ít ai biết.\n⭐ +**${exp} EXP**\n🔮 +**1× Rune Stone**`));
@@ -963,17 +963,17 @@ export async function showForestWoundedKnight(ctx: RunExploreEventInput): Promis
   const id = btn.customId;
   if (id === `fwk_heal_${ctx.userId}`) {
     const rep = adjustReputation(ctx.userId, ctx.guildId, 7);
-    const exp = randInt(30, 60); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(21, 43); grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'knight_emblem', 1);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('💊 Ân Nghĩa Hiệp Sĩ')
       .setDescription(`Bạn băng bó vết thương cho anh ta. Trước khi đi, anh ta tặng huy hiệu của mình.\n🏅 +**1× Knight Emblem**\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+7)`));
   }
   if (id === `fwk_quest_${ctx.userId}`) {
-    const exp = randInt(20, 45); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info, `❓ Anh ta kể về một hang quái vật sâu trong rừng và cảnh báo bạn tránh xa.\n⭐ +**${exp} EXP** (thông tin hữu ích)`));
   }
   const rep = adjustReputation(ctx.userId, ctx.guildId, -10);
-  const gold = randInt(30, 70); grantGold(ctx.userId, ctx.guildId, gold);
+  const gold = randInt(18, 43); grantGold(ctx.userId, ctx.guildId, gold);
   addItem(ctx.userId, ctx.guildId, 'leather', 1);
   return finish(ctx, new EmbedBuilder().setColor(COLORS.warning).setTitle('🥷 Cướp Đồ Hiệp Sĩ')
     .setDescription(`Bạn lấy đồ của người đang cần giúp đỡ.\n🪙 +**${gold} Gold**\n🟫 +**1× Leather**\n🤝 Reputation: **${rep}** (-10)`));
@@ -999,7 +999,7 @@ export async function showForestFairyCircle(ctx: RunExploreEventInput): Promise<
       const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.6));
       const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.6));
       updatePlayerHpMp(ctx.userId, ctx.guildId, hp, mp);
-      const exp = randInt(40, 80); grantExp(ctx.userId, ctx.guildId, exp);
+      const exp = randInt(28, 57); grantExp(ctx.userId, ctx.guildId, exp);
       return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('💃 Được Tiên Chào Đón')
         .setDescription(`Bạn nhảy cùng họ đến khi màn đêm buông xuống. Tỉnh dậy thấy người thấy khỏe khoắn lạ thường.\n❤️ HP hồi 60%\n🔵 MP hồi 60%\n⭐ +**${exp} EXP**`));
     }
@@ -1008,7 +1008,7 @@ export async function showForestFairyCircle(ctx: RunExploreEventInput): Promise<
     return finish(ctx, simpleEmbed(COLORS.danger, `💃 Bạn nhảy không dừng được... họ không thả bạn ra cho đến tận nửa đêm, kiệt sức!\n❤️ HP mất **${dmg}**`));
   }
   if (id === `ffc_observe_${ctx.userId}`) {
-    const exp = randInt(25, 50); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(18, 36); grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
     return finish(ctx, simpleEmbed(COLORS.success, `👁️ Bạn ngồi xem và học được điều gì đó kỳ bí.\n⭐ +**${exp} EXP**\n💎 +**1× Mysterious Shard** (rơi ra từ vũ điệu)`));
   }
@@ -1034,7 +1034,7 @@ export async function showForestPilgrimGroup(ctx: RunExploreEventInput): Promise
   const player = getPlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fpg_join_${ctx.userId}`) {
-    const exp = randInt(20, 45); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
     const rep = adjustReputation(ctx.userId, ctx.guildId, 3);
     addItem(ctx.userId, ctx.guildId, 'bread', 2);
     return finish(ctx, simpleEmbed(COLORS.success, `🚶 Bạn đi cùng một đoạn. Họ chia sẻ bánh mì và chuyện phiếm vui vẻ.\n🍞 +**2× Bread**\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+3)`));
@@ -1110,13 +1110,13 @@ export async function showForestChildRunaway(ctx: RunExploreEventInput): Promise
   const id = btn.customId;
   if (id === `fcr_return_${ctx.userId}`) {
     const rep = adjustReputation(ctx.userId, ctx.guildId, 8);
-    const exp = randInt(20, 40); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(14, 28); grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'health_potion', 1);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🏠 Đưa Trẻ Về')
       .setDescription(`Bạn dỗ dành rồi đưa trẻ về làng. Dân làng cảm ơn bạn và tặng quà.\n🧪 +**1× Health Potion**\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+8)`));
   }
   if (id === `fcr_protect_${ctx.userId}`) {
-    const exp = randInt(15, 30); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(10, 21); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info, `🛡️ Bạn ngồi cạnh trẻ một lúc, kể chuyện. Sau đó trẻ tự nguyện quay về.\n⭐ +**${exp} EXP**`));
   }
   addItem(ctx.userId, ctx.guildId, 'bread', 1);
@@ -1150,7 +1150,7 @@ export async function showForestDryadBlessing(ctx: RunExploreEventInput): Promis
   if (id === `fdb_offer_${ctx.userId}`) {
     addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
     addItem(ctx.userId, ctx.guildId, 'rare_herb', 2);
-    const exp = randInt(35, 65); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(25, 46); grantExp(ctx.userId, ctx.guildId, exp);
     const rep = adjustReputation(ctx.userId, ctx.guildId, 6);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('🌺 Lễ Vật Được Đón Nhận')
       .setDescription(`Tiên cây hài lòng với tấm lòng thành của bạn và ban nhiều hơn.\n💎 +**1× Mysterious Shard**\n🌺 +**2× Rare Herb**\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+6)`));
@@ -1175,12 +1175,12 @@ export async function showForestTravelingBard(ctx: RunExploreEventInput): Promis
   if (id === `ftb_listen_${ctx.userId}`) {
     const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.35));
     updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp);
-    const exp = randInt(15, 35); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `🎵 Bài hát về những chuyến phiêu lưu khơi dậy tinh thần chiến đấu trong bạn.\n🔵 MP hồi 35%\n⭐ +**${exp} EXP**`));
   }
   if (id === `ftb_perform_${ctx.userId}`) {
-    const gold = randInt(15, 40); grantGold(ctx.userId, ctx.guildId, gold);
-    const exp = randInt(25, 50); grantExp(ctx.userId, ctx.guildId, exp);
+    const gold = randInt(9, 24); grantGold(ctx.userId, ctx.guildId, gold);
+    const exp = randInt(18, 36); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `🎭 Hai người biểu diễn cùng nhau — thú vị và bất ngờ kiếm được tiền thưởng từ người qua đường!\n🪙 +**${gold} Gold**\n⭐ +**${exp} EXP**`));
   }
   const cost = 25;
@@ -1206,18 +1206,18 @@ export async function showForestBeastTamer(ctx: RunExploreEventInput): Promise<v
   if (id === `fbt_trade_${ctx.userId}`) {
     addItem(ctx.userId, ctx.guildId, 'leather', 2);
     addItem(ctx.userId, ctx.guildId, 'wolf_fang', 1);
-    const gold = randInt(15, 35); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(9, 21); grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.success, `💼 Bà đổi nguyên liệu thú với giá phải chăng.\n🟫 +**2× Leather**\n🦷 +**1× Wolf Fang**\n🪙 +**${gold} Gold**`));
   }
   if (id === `fbt_learn_${ctx.userId}`) {
-    const exp = randInt(40, 80); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(28, 57); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `📖 Bà dạy bạn cách đọc ngôn ngữ cơ thể của thú rừng.\n⭐ +**${exp} EXP**`));
   }
   const roll = randInt(1, 100);
   if (roll <= 60) {
     addItem(ctx.userId, ctx.guildId, 'leather', 3);
     addItem(ctx.userId, ctx.guildId, 'meat', 2);
-    const exp = randInt(25, 50); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(18, 36); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `🦁 Cùng nhau bắt được một con thú hoang!\n🟫 +**3× Leather**\n🥩 +**2× Meat**\n⭐ +**${exp} EXP**`));
   }
   const player = getPlayer(ctx.userId, ctx.guildId)!;
@@ -1245,10 +1245,10 @@ export async function showForestAncientRuins(ctx: RunExploreEventInput): Promise
   const player = getPlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `far_explore_${ctx.userId}`) {
-    const exp = randInt(35, 65); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(25, 46); grantExp(ctx.userId, ctx.guildId, exp);
     const roll = randInt(1, 100);
     if (roll <= 40) { addItem(ctx.userId, ctx.guildId, 'broken_rune', 1); return finish(ctx, simpleEmbed(COLORS.success, `🏛️ Bạn tìm thấy một mảnh rune còn nguyên vẹn trong kẽ đá.\n🔷 +**1× Broken Rune**\n⭐ +**${exp} EXP**`)); }
-    const gold = randInt(20, 50); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(12, 31); grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.success, `🏛️ Khám phá tàn tích, bạn thấy đồng xu cổ rải rác.\n🪙 +**${gold} Gold**\n⭐ +**${exp} EXP**`));
   }
   if (id === `far_rune_${ctx.userId}`) {
@@ -1263,7 +1263,7 @@ export async function showForestAncientRuins(ctx: RunExploreEventInput): Promise
   }
   const dmg = Math.max(1, Math.floor(player.max_hp * 0.08));
   updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
-  const exp = randInt(50, 90); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(36, 64); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
   return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('🩸 Máu Thức Tỉnh Cổ Vật')
     .setDescription(`Đàn đá rung lên và sáng lên một lúc. Một vật gì đó vật chất hóa trong tay bạn.\n💎 +**1× Mysterious Shard**\n⭐ +**${exp} EXP**\n❤️ HP mất **${dmg}**`));
@@ -1298,7 +1298,7 @@ export async function showForestMagicSpring(ctx: RunExploreEventInput): Promise<
   if (id === `fms_bathe_${ctx.userId}`) {
     const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.8));
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
-    const exp = randInt(20, 40); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(14, 28); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `🛁 Bạn ngâm mình trong suối. Vết thương lành như chưa từng có.\n❤️ HP hồi 80%\n⭐ +**${exp} EXP**`));
   }
   addItem(ctx.userId, ctx.guildId, 'moonwater', 2);
@@ -1322,7 +1322,7 @@ export async function showForestStoneCircle(ctx: RunExploreEventInput): Promise<
   if (id === `fsc2_center_${ctx.userId}`) {
     const roll = randInt(1, 100);
     if (roll <= 50) {
-      const exp = randInt(50, 100); grantExp(ctx.userId, ctx.guildId, exp);
+      const exp = randInt(36, 72); grantExp(ctx.userId, ctx.guildId, exp);
       addItem(ctx.userId, ctx.guildId, 'rune_stone', 1);
       return finish(ctx, simpleEmbed(COLORS.magic, `⚡ Một luồng năng lượng cổ đại chạy qua người bạn!\n⭐ +**${exp} EXP**\n🔮 +**1× Rune Stone**`));
     }
@@ -1331,12 +1331,12 @@ export async function showForestStoneCircle(ctx: RunExploreEventInput): Promise<
     return finish(ctx, simpleEmbed(COLORS.danger, `⚡ Sét đánh thẳng xuống trung tâm!\n❤️ HP mất **${dmg}**`));
   }
   if (id === `fsc2_offer_${ctx.userId}`) {
-    const exp = randInt(30, 60); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(21, 43); grantExp(ctx.userId, ctx.guildId, exp);
     const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.3));
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
     return finish(ctx, simpleEmbed(COLORS.success, `🎁 Bạn đặt thứ gì đó lên tảng đá chính. Vòng đá sáng lên xanh lịm.\n❤️ HP hồi 30%\n⭐ +**${exp} EXP**`));
   }
-  const exp = randInt(20, 45); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
   return finish(ctx, simpleEmbed(COLORS.success, `🗺️ Bạn vẽ lại hình dạng vòng đá — có lẽ sẽ hữu ích sau này.\n⭐ +**${exp} EXP**\n💎 +**1× Mysterious Shard**`));
 }
@@ -1358,7 +1358,7 @@ export async function showForestSpiritLantern(ctx: RunExploreEventInput): Promis
   if (id === `fsl_follow_${ctx.userId}`) {
     const roll = randInt(1, 100);
     if (roll <= 60) {
-      const gold = randInt(40, 90); grantGold(ctx.userId, ctx.guildId, gold);
+      const gold = randInt(24, 55); grantGold(ctx.userId, ctx.guildId, gold);
       addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
       return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('🪔 Kho Báu Bí Ẩn')
         .setDescription(`Đèn dẫn bạn đến một gốc cây rỗng với kho báu bên trong!\n🪙 +**${gold} Gold**\n💎 +**1× Mysterious Shard**`));
@@ -1416,7 +1416,7 @@ export async function showForestCursedStatue(ctx: RunExploreEventInput): Promise
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     return finish(ctx, simpleEmbed(COLORS.warning, `🙏 Tượng không chấp nhận lời cầu nguyện của bạn.\n❤️ HP mất **${dmg}**`));
   }
-  const exp = randInt(40, 75); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(28, 54); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'broken_rune', 1);
   return finish(ctx, simpleEmbed(COLORS.success, `📖 Bạn giải mã được một phần nguyền rủa — kiến thức quý giá.\n⭐ +**${exp} EXP**\n🔷 +**1× Broken Rune**`));
 }
@@ -1437,7 +1437,7 @@ export async function showForestMemoryTree(ctx: RunExploreEventInput): Promise<v
   const id = btn.customId;
   if (id === `fmt2_touch_${ctx.userId}`) {
     const outcomes = [
-      () => { const exp = randInt(50, 100); grantExp(ctx.userId, ctx.guildId, exp); return simpleEmbed(COLORS.magic, `✋ Một dòng ký ức của ai đó chảy vào tâm trí bạn — trí thức cổ đại.\n⭐ +**${exp} EXP**`); },
+      () => { const exp = randInt(36, 72); grantExp(ctx.userId, ctx.guildId, exp); return simpleEmbed(COLORS.magic, `✋ Một dòng ký ức của ai đó chảy vào tâm trí bạn — trí thức cổ đại.\n⭐ +**${exp} EXP**`); },
       () => { const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.4)); updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp); return simpleEmbed(COLORS.success, `✋ Cây nhận ra nỗi đau của bạn và chữa lành.\n❤️ HP hồi 40%`); },
       () => { const dmg = Math.max(1, Math.floor(player.max_hp * 0.15)); updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp); return simpleEmbed(COLORS.danger, `✋ Quá nhiều ký ức ùa vào cùng lúc — đầu bạn nhói đau!\n❤️ HP mất **${dmg}**`); },
       () => { addItem(ctx.userId, ctx.guildId, 'ancient_rune', 1); return simpleEmbed(COLORS.magic, '✋ Cây trao cho bạn một mảnh rune cổ đại tự động hiện ra trên lòng bàn tay.\n📜 +**1× Ancient Rune**'); },
@@ -1448,10 +1448,10 @@ export async function showForestMemoryTree(ctx: RunExploreEventInput): Promise<v
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.05));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     const rep = adjustReputation(ctx.userId, ctx.guildId, 2);
-    const exp = randInt(20, 40); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(14, 28); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `🗡️ Bạn khắc một ký ức của mình vào cây — cây rung nhẹ như cảm ơn.\n❤️ HP mất **${dmg}** (máu dính lên vỏ cây)\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+2)`));
   }
-  const exp = randInt(60, 110); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(43, 79); grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.magic, `👂 Bạn ngồi lắng nghe hàng giờ — những câu chuyện về rừng này từ ngàn năm trước.\n⭐ +**${exp} EXP**`));
 }
 
@@ -1505,8 +1505,8 @@ export async function showForestEchoGrove(ctx: RunExploreEventInput): Promise<vo
   if (id === `feg_shout_${ctx.userId}`) {
     const roll = randInt(1, 100);
     if (roll <= 55) {
-      const exp = randInt(15, 30); grantExp(ctx.userId, ctx.guildId, exp);
-      const gold = randInt(10, 25); grantGold(ctx.userId, ctx.guildId, gold);
+      const exp = randInt(10, 21); grantExp(ctx.userId, ctx.guildId, exp);
+      const gold = randInt(6, 15); grantGold(ctx.userId, ctx.guildId, gold);
       return finish(ctx, simpleEmbed(COLORS.success, `📣 Tiếng hét của bạn vang vọng rồi đổi thành tiếng nhạc lạ. Đá bên dưới chân rung nhẹ, phun ra vàng.\n🪙 +**${gold} Gold**\n⭐ +**${exp} EXP**`));
     }
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.07));
@@ -1514,12 +1514,12 @@ export async function showForestEchoGrove(ctx: RunExploreEventInput): Promise<vo
     return finish(ctx, simpleEmbed(COLORS.warning, `📣 Tiếng vang quá lớn làm ù tai và choáng váng!\n❤️ HP mất **${dmg}**`));
   }
   if (id === `feg_listen_${ctx.userId}`) {
-    const exp = randInt(35, 70); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(25, 50); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.magic, `👂 Bạn nghe được tiếng nói từ quá khứ — bí ẩn về khu rừng này đang dần hé lộ.\n⭐ +**${exp} EXP**`));
   }
   const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.5));
   updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp);
-  const exp = randInt(20, 45); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.success, `🤫 Sự im lặng của bạn được rừng đón nhận — tâm trí thanh thản lạ thường.\n🔵 MP hồi 50%\n⭐ +**${exp} EXP**`));
 }
 
@@ -1540,7 +1540,7 @@ export async function showForestTimeAnomaly(ctx: RunExploreEventInput): Promise<
   if (id === `fta_step_${ctx.userId}`) {
     const roll = randInt(1, 100);
     if (roll <= 30) {
-      const exp = randInt(80, 150); grantExp(ctx.userId, ctx.guildId, exp);
+      const exp = randInt(57, 108); grantExp(ctx.userId, ctx.guildId, exp);
       addItem(ctx.userId, ctx.guildId, 'time_fragment', 1);
       return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('🌀 Du Hành Thời Gian')
         .setDescription(`Bạn tỉnh dậy một chỗ khác trong rừng — nhưng trí nhớ rõ hơn và mạnh hơn bao giờ hết.\n⭐ +**${exp} EXP**\n⌛ +**1× Time Fragment**`));
@@ -1555,7 +1555,7 @@ export async function showForestTimeAnomaly(ctx: RunExploreEventInput): Promise<
     return finish(ctx, simpleEmbed(COLORS.danger, `🌀 Thời gian xé toạc một phần cơ thể khi bạn đi qua!\n❤️ HP mất **${dmg}**`));
   }
   if (id === `fta_observe_${ctx.userId}`) {
-    const exp = randInt(50, 90); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(36, 64); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.info, `👁️ Bạn quan sát vùng dị thường cẩn thận — học được nhiều điều về bản chất của thời gian.\n⭐ +**${exp} EXP**`));
   }
   return finish(ctx, simpleEmbed(COLORS.info, '💨 *Bạn chạy khỏi vùng dị thường trước khi nó mở rộng hơn.*'));
@@ -1576,17 +1576,17 @@ export async function showForestLostRelic(ctx: RunExploreEventInput): Promise<vo
   const id = btn.customId;
   if (id === `flr_take_${ctx.userId}`) {
     addItem(ctx.userId, ctx.guildId, 'ancient_relic', 1);
-    const gold = randInt(10, 30); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(6, 18); grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.gold, `💎 Bạn lấy bình đồng — có lẽ ai đó sẽ trả giá cao cho nó.\n🏺 +**1× Ancient Relic**\n🪙 +**${gold} Gold** (đồng xu rơi từ trong bình)`));
   }
   if (id === `flr_examine_${ctx.userId}`) {
-    const exp = randInt(50, 90); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(36, 64); grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'ancient_relic', 1);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🔬 Di Vật Được Giải Mã')
       .setDescription(`Bạn đọc được hoa văn — câu chuyện về một vương quốc đã biến mất.\n⭐ +**${exp} EXP**\n🏺 +**1× Ancient Relic**`));
   }
   const rep = adjustReputation(ctx.userId, ctx.guildId, 4);
-  const exp = randInt(20, 40); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(14, 28); grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.success, `⛏️ Bạn chôn lại cẩn thận — đây không phải của mình.\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+4)`));
 }
 
@@ -1622,7 +1622,7 @@ export async function showForestHerbForaging(ctx: RunExploreEventInput): Promise
     }
     return finish(ctx, simpleEmbed(COLORS.success, '💨 May mắn — hái nhiều không bị gì!\n🌿 +**5–9× Herb**'));
   }
-  const exp = randInt(15, 30); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(10, 21); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'herb', randInt(2, 4));
   addItem(ctx.userId, ctx.guildId, 'rare_herb', 1);
   return finish(ctx, simpleEmbed(COLORS.success, `🐦 Chim rừng dẫn bạn đến đúng chỗ thảo dược tốt nhất.\n🌿 +**2–4× Herb**\n🌺 +**1× Rare Herb**\n⭐ +**${exp} EXP**`));
@@ -1649,13 +1649,13 @@ export async function showForestAnimalTracks(ctx: RunExploreEventInput): Promise
       return ctx.callbacks.startCombat(pick(ctx.enemies).id);
     }
     if (roll <= 70) {
-      const gold = randInt(15, 40); grantGold(ctx.userId, ctx.guildId, gold);
+      const gold = randInt(9, 24); grantGold(ctx.userId, ctx.guildId, gold);
       addItem(ctx.userId, ctx.guildId, 'leather', 1);
       return finish(ctx, simpleEmbed(COLORS.success, `🐾 Dấu dẫn đến hang thú bỏ trống với đồ tích lũy bên trong.\n🪙 +**${gold} Gold**\n🟫 +**1× Leather**`));
     }
     addItem(ctx.userId, ctx.guildId, 'meat', 2);
     addItem(ctx.userId, ctx.guildId, 'leather', 2);
-    const exp = randInt(20, 40); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(14, 28); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `🐾 Bạn tìm thấy con thú đã chết tự nhiên — tận dụng được.\n🥩 +**2× Meat**\n🟫 +**2× Leather**\n⭐ +**${exp} EXP**`));
   }
   if (id === `fat_trap_${ctx.userId}`) {
@@ -1663,7 +1663,7 @@ export async function showForestAnimalTracks(ctx: RunExploreEventInput): Promise
     addItem(ctx.userId, ctx.guildId, 'leather', 1);
     return finish(ctx, simpleEmbed(COLORS.success, '🪤 Bạn đặt bẫy và chờ — bẫy sập, thu hoạch được.\n🥩 +**1–3× Meat**\n🟫 +**1× Leather**'));
   }
-  const exp = randInt(20, 45); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.info, `🗺️ Bạn ghi lại dấu vết và vị trí — kiến thức về địa hình rừng.\n⭐ +**${exp} EXP**`));
 }
 
@@ -1683,7 +1683,7 @@ export async function showForestRiverCrossing(ctx: RunExploreEventInput): Promis
   const id = btn.customId;
   if (id === `frc_wade_${ctx.userId}`) {
     if (randInt(1, 100) <= 60) {
-      const gold = randInt(15, 35); grantGold(ctx.userId, ctx.guildId, gold);
+      const gold = randInt(9, 21); grantGold(ctx.userId, ctx.guildId, gold);
       addItem(ctx.userId, ctx.guildId, 'bog_pearl', 1);
       return finish(ctx, simpleEmbed(COLORS.success, `🌊 Bạn lội qua an toàn — và nhặt được thứ lấp lánh dưới đáy suối.\n🪙 +**${gold} Gold**\n🔮 +**1× Bog Pearl**`));
     }
@@ -1693,14 +1693,14 @@ export async function showForestRiverCrossing(ctx: RunExploreEventInput): Promis
   }
   if (id === `frc_vine_${ctx.userId}`) {
     if (randInt(1, 100) <= 70) {
-      const exp = randInt(15, 30); grantExp(ctx.userId, ctx.guildId, exp);
+      const exp = randInt(10, 21); grantExp(ctx.userId, ctx.guildId, exp);
       return finish(ctx, simpleEmbed(COLORS.success, `🌿 Đu một cái, qua rồi! Cảm giác phiêu lưu thú vị.\n⭐ +**${exp} EXP**`));
     }
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     return finish(ctx, simpleEmbed(COLORS.danger, `🌿 Dây leo đứt phựt — bạn rơi xuống nước!\n❤️ HP mất **${dmg}**`));
   }
-  const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(7, 18); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'herb', 2);
   return finish(ctx, simpleEmbed(COLORS.success, `🌉 Bạn tìm được một cây gỗ mục bắc qua suối — chậm nhưng an toàn.\nDọc đường nhặt thêm thảo dược.\n🌿 +**2× Herb**\n⭐ +**${exp} EXP**`));
 }
@@ -1723,7 +1723,7 @@ export async function showForestTreeClimbing(ctx: RunExploreEventInput): Promise
     if (randInt(1, 100) <= 50) {
       addItem(ctx.userId, ctx.guildId, 'eagle_feather', 1);
       addItem(ctx.userId, ctx.guildId, 'forest_fruit', 3);
-      const exp = randInt(25, 50); grantExp(ctx.userId, ctx.guildId, exp);
+      const exp = randInt(18, 36); grantExp(ctx.userId, ctx.guildId, exp);
       return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🧗 Đỉnh Cây')
         .setDescription(`Từ trên cao bạn thấy toàn cảnh rừng và nhặt được tổ chim bỏ trống với lông đại bàng.\n🪶 +**1× Eagle Feather**\n🍒 +**3× Forest Fruit**\n⭐ +**${exp} EXP**`));
     }
@@ -1733,7 +1733,7 @@ export async function showForestTreeClimbing(ctx: RunExploreEventInput): Promise
   }
   if (id === `ftc_mid_${ctx.userId}`) {
     addItem(ctx.userId, ctx.guildId, 'forest_fruit', 2);
-    const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(7, 18); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `🌲 Leo vừa đủ, hái được hoa quả và nhìn thấy một phần đường đi.\n🍒 +**2× Forest Fruit**\n⭐ +**${exp} EXP**`));
   }
   return finish(ctx, simpleEmbed(COLORS.info, '🌲 *Bạn đứng dưới gốc cây nhìn lên rồi đi tiếp.*'));
@@ -1760,7 +1760,7 @@ export async function showForestFogMaze(ctx: RunExploreEventInput): Promise<void
   const id = btn.customId;
   if (id === `ffm_sound_${ctx.userId}`) {
     if (randInt(1, 100) <= 55) {
-      const exp = randInt(20, 45); grantExp(ctx.userId, ctx.guildId, exp);
+      const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
       addItem(ctx.userId, ctx.guildId, 'herb', 2);
       return finish(ctx, simpleEmbed(COLORS.success, `👂 Bạn theo tiếng suối và thoát ra ngoài, dọc đường nhặt thảo dược.\n🌿 +**2× Herb**\n⭐ +**${exp} EXP**`));
     }
@@ -1769,8 +1769,8 @@ export async function showForestFogMaze(ctx: RunExploreEventInput): Promise<void
     return ctx.callbacks.startCombat(pick(ctx.enemies).id);
   }
   if (id === `ffm_marks_${ctx.userId}`) {
-    const exp = randInt(15, 35); grantExp(ctx.userId, ctx.guildId, exp);
-    const gold = randInt(10, 30); grantGold(ctx.userId, ctx.guildId, gold);
+    const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
+    const gold = randInt(6, 18); grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, simpleEmbed(COLORS.success, `🗡️ Hệ thống đánh dấu giúp bạn tìm được đường ra và khám phá thêm.\n🪙 +**${gold} Gold**\n⭐ +**${exp} EXP**`));
   }
   const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.2));
@@ -1800,7 +1800,7 @@ export async function showForestWaterfallCave(ctx: RunExploreEventInput): Promis
       await new Promise(r => setTimeout(r, 600));
       return ctx.callbacks.startCombat(pick(ctx.enemies).id);
     }
-    const gold = randInt(30, 80); grantGold(ctx.userId, ctx.guildId, gold);
+    const gold = randInt(18, 49); grantGold(ctx.userId, ctx.guildId, gold);
     addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('🕳️ Hang Bí Mật')
       .setDescription(`Trong hang có tranh vẽ cổ đại và một túi vàng ai đó giấu từ lâu.\n🪙 +**${gold} Gold**\n💎 +**1× Mysterious Shard**`));
@@ -1838,13 +1838,13 @@ export async function showForestDeadTreeOracle(ctx: RunExploreEventInput): Promi
       '💀 *"Ngươi mang theo bóng tối chưa nhận ra."*',
       '💀 *"Cái chết không phải điểm cuối — đây là lời hứa, không phải đe dọa."*',
     ];
-    const exp = randInt(25, 55); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(18, 39); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.magic, `${pick(prophecies)}\n⭐ +**${exp} EXP**`));
   }
   if (id === `fdto_blood_${ctx.userId}`) {
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.08));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
-    const exp = randInt(50, 90); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(36, 64); grantExp(ctx.userId, ctx.guildId, exp);
     addItem(ctx.userId, ctx.guildId, 'rune_stone', 1);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('🩸 Tiên Tri Bằng Máu')
       .setDescription(`Khi máu chạm vào cây, nó rung lên và nói thật. Một viên đá rune tự động hiện ra dưới chân bạn.\n❤️ HP mất **${dmg}**\n🔮 +**1× Rune Stone**\n⭐ +**${exp} EXP**`));
@@ -1875,7 +1875,7 @@ export async function showForestFlowerField(ctx: RunExploreEventInput): Promise<
     const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.25));
     const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.25));
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, mp);
-    const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(7, 18); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `😂 Bạn lăn ra giữa đồng hoa như đứa trẻ — tất cả căng thẳng tan biến!\n❤️ HP hồi 25%\n🔵 MP hồi 25%\n⭐ +**${exp} EXP**`));
   }
   addItem(ctx.userId, ctx.guildId, 'flower_crown', 1);
@@ -1897,15 +1897,15 @@ export async function showForestCrowMessenger(ctx: RunExploreEventInput): Promis
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
   if (id === `fcm_take_${ctx.userId}`) {
-    const exp = randInt(20, 45); grantExp(ctx.userId, ctx.guildId, exp);
-    const gold = randInt(15, 40); grantGold(ctx.userId, ctx.guildId, gold);
+    const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
+    const gold = randInt(9, 24); grantGold(ctx.userId, ctx.guildId, gold);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.info).setTitle('📜 Nội Dung Thư')
       .setDescription(`Thư viết về kho báu ẩn ở "nơi hai cây cổ giao nhau" — và một tờ tiền cũ kẹp trong thư.\n🪙 +**${gold} Gold**\n⭐ +**${exp} EXP** (thông tin quý)`));
   }
   if (id === `fcm_follow_${ctx.userId}`) {
     const roll = randInt(1, 100);
     if (roll <= 50) {
-      const gold = randInt(50, 100); grantGold(ctx.userId, ctx.guildId, gold);
+      const gold = randInt(31, 62); grantGold(ctx.userId, ctx.guildId, gold);
       addItem(ctx.userId, ctx.guildId, 'mysterious_shard', 1);
       return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('🐦‍⬛ Quạ Dẫn Đến Kho Báu')
         .setDescription(`Con quạ dẫn bạn đến một gốc cây rỗng — bên trong đầy vàng và một mảnh tinh thể!\n🪙 +**${gold} Gold**\n💎 +**1× Mysterious Shard**`));
@@ -1915,7 +1915,7 @@ export async function showForestCrowMessenger(ctx: RunExploreEventInput): Promis
     return ctx.callbacks.startCombat(pick(ctx.enemies).id);
   }
   const rep = adjustReputation(ctx.userId, ctx.guildId, 4);
-  const exp = randInt(25, 50); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(18, 36); grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.success, `✉️ Bạn buộc một thư ngắn vào chân quạ và thả nó đi. Cảm giác kỳ lạ về một mạng lưới ẩn nào đó.\n⭐ +**${exp} EXP**\n🤝 Reputation: **${rep}** (+4)`));
 }
 
@@ -1937,7 +1937,7 @@ export async function showForestCampfireStranger(ctx: RunExploreEventInput): Pro
     const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.3));
     const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.3));
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, mp);
-    const exp = randInt(20, 45); grantExp(ctx.userId, ctx.guildId, exp);
+    const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🔥 Bên Lửa Ấm')
       .setDescription(`Hai người ngồi im lặng bên lửa — không nói gì cũng được. Hơi ấm làm lành vết thương và khơi dậy tinh thần.\n❤️ HP hồi 30%\n🔵 MP hồi 30%\n⭐ +**${exp} EXP**`));
   }
@@ -1948,7 +1948,7 @@ export async function showForestCampfireStranger(ctx: RunExploreEventInput): Pro
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🍞 Chia Sẻ Lương Thực')
       .setDescription(`Bạn chia đồ ăn — người lạ gật đầu cảm ơn và đưa cho bạn thứ họ đang dùng.\n🌺 +**1× Rare Herb**\n🔵 +**1× Mana Potion**\n🤝 Reputation: **${rep}** (+4)`));
   }
-  const exp = randInt(15, 35); grantExp(ctx.userId, ctx.guildId, exp);
+  const exp = randInt(10, 25); grantExp(ctx.userId, ctx.guildId, exp);
   addItem(ctx.userId, ctx.guildId, 'herb', 2);
   return finish(ctx, simpleEmbed(COLORS.success, `🗺️ Người lạ nói ít nhưng đúng — chỉ bạn đường tắt và cảnh báo nguy hiểm phía trước.\n⭐ +**${exp} EXP**\n🌿 +**2× Herb** (từ túi của họ)`));
 }

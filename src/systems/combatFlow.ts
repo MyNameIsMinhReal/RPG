@@ -312,7 +312,7 @@ export async function dispatchCombatInteraction(
     else if (cid === `rpg_back_${userId}`) {
       await compInt.editReply({
         embeds: [buildCombatEmbed(current, fresh.name, icon, safeJsonParse<string[]>(current.combat_log, []))],
-        components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId))
+        components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), current.player_stamina ?? 100, hasUsableItems(userId, guildId), current.active_effects)
       }).catch(() => {});
       return true;
     }
@@ -360,7 +360,7 @@ export async function dispatchCombatInteraction(
         saveCombat(result.newState);
         await compInt.editReply({
           embeds: [buildCombatEmbed(result.newState, fresh.name, icon, result.logLines)],
-          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, hasUsableItems(userId, guildId))
+          components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, hasUsableItems(userId, guildId), result.newState.active_effects)
         }).catch(() => {});
         return true;
       }
@@ -373,7 +373,7 @@ export async function dispatchCombatInteraction(
     saveCombat(result.newState);
     await compInt.editReply({
       embeds: [buildCombatEmbed(result.newState, fresh.name, icon, result.logLines)],
-      components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, hasUsableItems(userId, guildId))
+      components: buildCombatButtons(userId, hasActiveCombatSkills(userId, guildId), result.newState.player_stamina ?? 100, hasUsableItems(userId, guildId), result.newState.active_effects)
     }).catch(() => {});
 
     return true;
@@ -439,7 +439,7 @@ export async function startCombatFlow(
   const combatEmbed = buildCombatEmbed(initState, player.name, enemy.icon, openingLogs);
   const inventory0  = getInventory(userId, guildId);
   const hasItems0   = inventory0.some(e => { const it = getItem(e.item_id); return it?.type === "consumable" && isCombatUsableItem(e.item_id); });
-  const buttons     = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0);
+  const buttons     = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0, initState.active_effects);
   const imgKey      = enemy.boss ? 'boss' : 'combat';
   const { files: combatFiles, embed: combatEmbedWithImg } = withImage(combatEmbed, imgKey);
   const reply       = await interaction.editReply({ embeds: [combatEmbedWithImg], files: combatFiles, components: buttons });
@@ -512,7 +512,7 @@ export async function startCombatFlowWithEnemy(
   const combatEmbed2 = buildCombatEmbed(initState, player.name, enemy.icon, openingLogs);
   const inventory0   = getInventory(userId, guildId);
   const hasItems0    = inventory0.some((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); });
-  const buttons      = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0);
+  const buttons      = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0, initState.active_effects);
   const reply        = await interaction.editReply({ embeds: [combatEmbed2], components: buttons });
 
   const state = { ...initState, message_id: reply.id };
@@ -583,7 +583,7 @@ export async function startGroupCombatFlow(
   const combatEmbed = buildCombatEmbed(initState, player.name, '⚔️', openingLogs);
   const inventory0  = getInventory(userId, guildId);
   const hasItems0   = inventory0.some(e => { const it = getItem(e.item_id); return it?.type === 'consumable' && isCombatUsableItem(e.item_id); });
-  const buttons     = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0);
+  const buttons     = buildCombatButtons(userId, loadout.some(entry => getSkill(entry.skill_id)?.type === 'active'), 100, hasItems0, initState.active_effects);
   const { files: combatFiles, embed: combatEmbedWithImg } = withImage(combatEmbed, 'combat');
   const reply       = await interaction.editReply({ embeds: [combatEmbedWithImg], files: combatFiles, components: buttons });
 

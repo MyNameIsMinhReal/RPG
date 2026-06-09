@@ -244,12 +244,29 @@ export function buildCombatEmbed(
   return embed;
 }
 
+
+function getFleeChanceFromActiveEffects(activeEffectsRaw?: string | null): number {
+  if (!activeEffectsRaw) return 45;
+  try {
+    const effects = JSON.parse(activeEffectsRaw || '[]');
+    if (!Array.isArray(effects)) return 45;
+    if (effects.some((e: any) => e?.name === 'rooted')) return 0;
+    const attempts = Number(effects.find((e: any) => e?.name === 'flee_attempts')?.value ?? 0) || 0;
+    return Math.min(90, 45 + attempts * 15);
+  } catch {
+    return 45;
+  }
+}
+
 // ── Combat action buttons ─────────────────────────────────────────────────
 export function buildCombatButtons(
   userId: string, hasSkills: boolean,
-  stamina: number = 100, hasItems: boolean = false
+  stamina: number = 100, hasItems: boolean = false,
+  activeEffectsRaw?: string | null
 ): ActionRowBuilder<ButtonBuilder>[] {
   const exhausted = stamina <= 10;
+  const fleeChance = getFleeChanceFromActiveEffects(activeEffectsRaw);
+  const rooted = fleeChance <= 0;
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`rpg_attack_${userId}`)
@@ -276,9 +293,10 @@ export function buildCombatButtons(
       .setDisabled(!hasItems),
     new ButtonBuilder()
       .setCustomId(`rpg_flee_${userId}`)
-      .setLabel('Chạy (60%)')
+      .setLabel(rooted ? 'Không thể chạy' : `Chạy (${fleeChance}%)`)
       .setEmoji('🏃')
       .setStyle(ButtonStyle.Secondary)
+      .setDisabled(rooted)
   );
   return [row1];
 }

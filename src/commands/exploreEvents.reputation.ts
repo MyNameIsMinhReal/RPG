@@ -81,7 +81,7 @@ export async function showRepHonoredPatrol(ctx: RunExploreEventInput): Promise<v
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `rhp_report_${ctx.userId}`) {
-    const exp = randInt(25, 55);
+    const exp = randInt(18, 39);
     grantExp(ctx.userId, ctx.guildId, exp);
     adjustWorldDanger(ctx.guildId, -4);
     const faction = adjustFaction(ctx.userId, ctx.guildId, 'villagers', 5);
@@ -116,7 +116,7 @@ export async function showRepGratefulVillagers(ctx: RunExploreEventInput): Promi
   const fresh = getPlayer(ctx.userId, ctx.guildId)!;
 
   if (cid === `rgv_refuse_${ctx.userId}`) {
-    const exp = randInt(20, 45);
+    const exp = randInt(14, 32);
     grantExp(ctx.userId, ctx.guildId, exp);
     const faction = adjustFaction(ctx.userId, ctx.guildId, 'villagers', 8);
     const line = repLine(ctx, 5);
@@ -137,7 +137,7 @@ export async function showRepGratefulVillagers(ctx: RunExploreEventInput): Promi
     ));
   }
 
-  const gold = randInt(30, 75);
+  const gold = randInt(18, 46);
   grantGold(ctx.userId, ctx.guildId, gold);
   addItem(ctx.userId, ctx.guildId, pick(['herb', 'minor_healing_potion', 'mana_potion']));
   return finish(ctx, simpleEmbed(COLORS.success, `🎁 Bạn nhận món quà giản dị của họ.\n🪙 +**${gold} Gold**\n🎒 +**1 vật phẩm hỗ trợ**`));
@@ -185,7 +185,7 @@ export async function showRepChurchBlessing(ctx: RunExploreEventInput): Promise<
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `rcb_pray_${ctx.userId}`) {
-    const exp = randInt(35, 70);
+    const exp = randInt(25, 50);
     grantExp(ctx.userId, ctx.guildId, exp);
     adjustWorldDanger(ctx.guildId, -4);
     const faction = adjustFaction(ctx.userId, ctx.guildId, 'old_church', 10);
@@ -223,13 +223,13 @@ export async function showRepYoungSquire(ctx: RunExploreEventInput): Promise<voi
     return finish(ctx, simpleEmbed(COLORS.success, `🧪 Bạn đưa cậu ta một lọ thuốc và dặn: “Sống sót trước đã.”\n${line}\n🏘️ Villagers +6`));
   }
   if (cid === `rys_warn_${ctx.userId}`) {
-    const exp = randInt(15, 35);
+    const exp = randInt(10, 25);
     grantExp(ctx.userId, ctx.guildId, exp);
     const line = repLine(ctx, 3);
     return finish(ctx, simpleEmbed(COLORS.info, `Bạn kể cho cậu ta nghe những cái giá thật sự của chiến đấu.\n⭐ +**${exp} EXP**\n${line}`));
   }
 
-  const exp = randInt(55, 100);
+  const exp = randInt(39, 72);
   grantExp(ctx.userId, ctx.guildId, exp);
   setBuff(ctx.userId, ctx.guildId, 'weapon_oil', 0, 1, 3600);
   return finish(ctx, simpleEmbed(COLORS.success, `⚔️ Bạn hướng dẫn cậu ta vài thế cơ bản, rồi chính bạn cũng làm nóng lại kỹ năng.\n⭐ +**${exp} EXP**\n🔩 Trận kế tiếp: **Weapon Oil**`));
@@ -262,7 +262,7 @@ export async function showRepHeroStatue(ctx: RunExploreEventInput): Promise<void
     return finish(ctx, simpleEmbed(COLORS.success, `🧽 Bạn lau sạch bụi bẩn trên tượng. Người qua đường dừng lại nhìn với ánh mắt yên tâm hơn.\n${line}\n🏘️ Villagers: **${faction}** (+6)\n⚠️ World Danger -2`));
   }
 
-  const exp = randInt(35, 80);
+  const exp = randInt(25, 57);
   grantExp(ctx.userId, ctx.guildId, exp);
   return finish(ctx, simpleEmbed(COLORS.info, `📖 Dòng chữ kể lại một chiến công của bạn, nhưng được thêu dệt hơi quá mức.\n⭐ +**${exp} EXP** *(nhìn lại hành trình)*`));
 }
@@ -330,7 +330,7 @@ export async function showRepChampionChallenge(ctx: RunExploreEventInput): Promi
     async (_int, btn, _uid, _gid, _p, e, state) => {
       updatePlayerHpMp(ctx.userId, ctx.guildId, state.player_hp, state.player_mp);
       const exp = Math.max(60, Math.floor(fresh.exp_next * 0.25));
-      const gold = randInt(60, 130);
+      const gold = randInt(37, 80);
       grantExp(ctx.userId, ctx.guildId, exp);
       grantGold(ctx.userId, ctx.guildId, gold);
       addItem(ctx.userId, ctx.guildId, 'rune_ink', 1);
@@ -392,7 +392,7 @@ export async function showRepShrinePilgrims(ctx: RunExploreEventInput): Promise<
     addItem(ctx.userId, ctx.guildId, 'rune_charm', 1);
     return finish(ctx, simpleEmbed(COLORS.success, '🧿 Một cụ già buộc vào tay bạn một lá bùa.\n🧿 +**Rune Charm**'));
   }
-  const gold = randInt(40, 90);
+  const gold = randInt(24, 55);
   grantGold(ctx.userId, ctx.guildId, gold);
   const line = repLine(ctx, 4);
   return finish(ctx, simpleEmbed(COLORS.success, `⛩️ Bạn hộ tống họ qua khu đền an toàn.\n🪙 +**${gold} Gold**\n${line}`));
@@ -412,12 +412,12 @@ export async function showRepMineRescueCrew(ctx: RunExploreEventInput): Promise<
     return finish(ctx, simpleEmbed(COLORS.success, '⚙️ Đội cứu hộ chia cho bạn ít dụng cụ và quặng.\n⚙️ +**2 Rusty Gear**\n⛓️ +**2 Iron Ore**'));
   }
   if (cid === `rmr_order_${ctx.userId}`) {
-    const exp = randInt(55, 100);
+    const exp = randInt(39, 72);
     grantExp(ctx.userId, ctx.guildId, exp);
     adjustWorldDanger(ctx.guildId, -4);
     return finish(ctx, simpleEmbed(COLORS.success, `📣 Bạn giữ mọi người bình tĩnh và chia nhóm đào cứu hộ.\n⭐ +**${exp} EXP**\n⚠️ World Danger -4`));
   }
-  const gold = randInt(50, 110);
+  const gold = randInt(31, 68);
   grantGold(ctx.userId, ctx.guildId, gold);
   const line = repLine(ctx, 5);
   return finish(ctx, simpleEmbed(COLORS.success, `⛏️ Bạn kéo được người mắc kẹt ra khỏi khe đá.\n🪙 +**${gold} Gold**\n${line}`));
@@ -443,7 +443,7 @@ export async function showRepWastesRefugees(ctx: RunExploreEventInput): Promise<
     return finish(ctx, simpleEmbed(COLORS.success, '🛡️ Bạn canh gác cho họ nghỉ.\n⭐ +EXP\n⚡ Trận kế tiếp: né đòn đầu tốt hơn.'));
   }
   adjustWorldDanger(ctx.guildId, -5);
-  const gold = randInt(30, 70);
+  const gold = randInt(18, 43);
   grantGold(ctx.userId, ctx.guildId, gold);
   return finish(ctx, simpleEmbed(COLORS.success, `🧭 Bạn chỉ họ đường tránh bão tro.\n🪙 +**${gold} Gold**\n⚠️ World Danger -5`));
 }
@@ -460,7 +460,7 @@ export async function showRepDawnProcession(ctx: RunExploreEventInput): Promise<
 }
 
 export async function showRepDayPublicThanks(ctx: RunExploreEventInput): Promise<void> {
-  const gold = randInt(45, 120);
+  const gold = randInt(27, 74);
   grantGold(ctx.userId, ctx.guildId, gold);
   adjustFaction(ctx.userId, ctx.guildId, 'villagers', 5);
   return finish(ctx, simpleEmbed(COLORS.success, `☀️ Ban ngày, nhiều người nhận ra bạn trên đường và cùng gửi lời cảm ơn.\n🪙 +**${gold} Gold**\n🏘️ Villagers +5`));
