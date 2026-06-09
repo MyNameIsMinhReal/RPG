@@ -43,6 +43,7 @@ export const data = new SlashCommandBuilder()
     .setName('revive')
     .setDescription('Hồi sinh người chơi đã chết (hồi 50% HP/MP, giữ nguyên stats)')
     .addUserOption(opt => opt.setName('user').setDescription('Người chơi cần hồi sinh').setRequired(true))
+    .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
   )
   .addSubcommand(sub => sub
     .setName('give')
@@ -60,6 +61,7 @@ export const data = new SlashCommandBuilder()
     )
     .addIntegerOption(opt => opt.setName('amount').setDescription('Số lượng').setRequired(true).setMinValue(1))
     .addStringOption(opt => opt.setName('item_id').setDescription('ID item (chỉ dùng khi type = item)').setRequired(false))
+    .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
   )
   .addSubcommand(sub => sub
     .setName('set')
@@ -81,6 +83,7 @@ export const data = new SlashCommandBuilder()
       )
     )
     .addIntegerOption(opt => opt.setName('value').setDescription('Giá trị mới').setRequired(true).setMinValue(0))
+    .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -92,7 +95,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   const sub = interaction.options.getSubcommand();
-  const guildId = interaction.guildId!;
+  const guildIdOverride = interaction.options.getString('guild_id');
+  const guildId = guildIdOverride?.trim() || interaction.guildId!;
 
   // ── revive ────────────────────────────────────────────────────────────────
   if (sub === 'revive') {
