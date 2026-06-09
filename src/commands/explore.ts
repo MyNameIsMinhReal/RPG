@@ -834,7 +834,7 @@ async function handleBoss(
   const zone   = getZone(player.zone_id)!;
   if (!zone.bossId) return;
   setExploreCooldown(userId, guildId);
-  await startCombatFlow(interaction, userId, guildId, zone.bossId, handleVictory, handleDeath);
+  await startCombatFlow(interaction, userId, guildId, zone.bossId, handleVictory, handleDeath, handleFlee);
 }
 
 // ── Oak event ─────────────────────────────────────────────────────────────────
@@ -2535,21 +2535,21 @@ async function showAmbush(
     }
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `💥 Dính đòn phục kích −**${dmg} HP**! (${newHp}/${player.max_hp})\nChiến đấu bắt đầu!`)], components: [] });
     await new Promise(r => setTimeout(r, 1200));
-    await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath);
+    await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee);
   } else {
     // Try dodge
     const dodged = randInt(1, 100) <= 50;
     if (dodged) {
       await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `🌑 Bạn né được đòn phục kích! Chiến đấu bình thường bắt đầu!`)], components: [] });
       await new Promise(r => setTimeout(r, 1000));
-      await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath);
+      await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee);
     } else {
       const dmg   = Math.max(1, Math.floor(firstStrikeDmg * 1.3)); // penalty for failed dodge
       const newHp = Math.max(1, player.hp - dmg);
       updatePlayerHpMp(userId, guildId, newHp, player.mp);
       await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Né thất bại! −**${dmg} HP** (${newHp}/${player.max_hp})\nChiến đấu bắt đầu!`)], components: [] });
       await new Promise(r => setTimeout(r, 1200));
-      await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath);
+      await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee);
     }
   }
 }
