@@ -452,7 +452,7 @@ async function handleVillageService(
 
   if (back && !backHandled) {
     backHandled = true;
-    await back.deferUpdate();
+    await back.deferUpdate().catch(() => {});
     await showExploreMenu(interaction, userId, guildId);
   }
 }
@@ -690,7 +690,7 @@ async function showLegacyFind(
   }).catch(() => null);
 
   if (!btn || btn.customId === `leg_skip_${userId}`) {
-    await (btn?.deferUpdate() ?? Promise.resolve());
+    if (btn) await btn.deferUpdate().catch(() => {});
     await interaction.editReply({
       embeds: [new EmbedBuilder().setColor(COLORS.info).setDescription('🚶 Bạn bước qua, để lại di sản cho người khác...')],
       components: []
@@ -1825,7 +1825,7 @@ async function showTrap(
       componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000
     }).catch(() => null);
 
-    await (btn?.deferUpdate() ?? Promise.resolve());
+    if (btn) await btn.deferUpdate().catch(() => {});
 
     if (!btn || btn.customId === `trap_avoid_${userId}`) {
       const avoidReply = await interaction.editReply({
@@ -1913,7 +1913,7 @@ async function showAncientAltar(
     componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000
   }).catch(() => null);
 
-  await (btn?.deferUpdate() ?? Promise.resolve());
+  if (btn) await btn.deferUpdate().catch(() => {});
   const cid = btn?.customId ?? `altar_skip_${userId}`;
 
   if (cid === `altar_skip_${userId}` || !btn) {
@@ -2013,7 +2013,7 @@ async function showMysteriousFigure(
     componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000
   }).catch(() => null);
 
-  await (btn?.deferUpdate() ?? Promise.resolve());
+  if (btn) await btn.deferUpdate().catch(() => {});
   const cid = btn?.customId ?? `myst_skip_${userId}`;
 
   if (cid === `myst_skip_${userId}` || !btn) {
@@ -2100,7 +2100,7 @@ async function showAmbush(
     componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000
   }).catch(() => null);
 
-  await (btn?.deferUpdate() ?? Promise.resolve());
+  if (btn) await btn.deferUpdate().catch(() => {});
 
   if (!btn || btn.customId === `amb_fight_${userId}`) {
     // Take first hit, then combat
@@ -2178,7 +2178,7 @@ async function showVillagerRescue(
     componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000
   }).catch(() => null);
 
-  await (btn?.deferUpdate() ?? Promise.resolve());
+  if (btn) await btn.deferUpdate().catch(() => {});
 
   if (!btn || btn.customId === `vil_skip_${userId}`) {
     await interaction.editReply({
@@ -2246,7 +2246,7 @@ async function showCaravanRobbery(
     componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000
   }).catch(() => null);
 
-  await (btn?.deferUpdate() ?? Promise.resolve());
+  if (btn) await btn.deferUpdate().catch(() => {});
   const cid = btn?.customId ?? `cara_watch_${userId}`;
 
   if (cid === `cara_watch_${userId}` || !btn) {

@@ -124,7 +124,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           `> ❤️ **${fresh.max_hp} HP**  💧 **${fresh.max_mp} MP**\n` +
           `> ⚔️ **${fresh.atk} ATK**  🛡️ **${fresh.def} DEF**  🪙 **${fresh.gold} Gold**\n\n` +
           `💀 Đã chết: **${player.deaths}** lần  ·  💎 Soul Shards: **${player.soul_shards}**\n` +
-          `*Kỹ năng đã học còn đó. Trang bị không mất.*`
+          `*Kỹ năng đã học còn trong Skill Pool. Loadout, inventory và trang bị đang equip đã mất.*`
         )
         .setFooter({ text: player.deaths >= 3 ? '/prestige khi Lv.20 để nhận Rebirth Blessing!' : 'Cẩn thận hơn lần này nhé!' })],
       components: [exploreRow(userId)]
@@ -190,7 +190,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         `> ❤️ **${100 + chosenCls.hpBonus} HP**  💧 **${50 + chosenCls.mpBonus} MP**\n` +
         `> ⚔️ **${10 + chosenCls.atkBonus} ATK**  🛡️ **${5 + chosenCls.defBonus} DEF**  🪙 **50 Gold**\n\n` +
         `Dùng \`/explore\` để khám phá, \`/inventory\` để quản lý đồ.\n` +
-        `⚠️ *Khi chết sẽ mất inventory — nhưng trang bị đang equip được giữ lại.*`
+        `⚠️ *Khi chết sẽ mất inventory, loadout và cả trang bị đang equip. Skill Pool được giữ lại.*`
       )
       .setFooter({ text: 'Chúc may mắn, mạo hiểm giả!' })],
     components: [exploreRow(userId)]

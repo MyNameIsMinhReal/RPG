@@ -52,13 +52,13 @@ export function resetPlayer(userId: string, guildId: string): void {
       rebirth_blessing = MAX(0, COALESCE(rebirth_blessing,0) - ?)
     WHERE user_id = ? AND guild_id = ?
   `).run(baseHp, baseHp, baseMp, baseMp, baseAtk, baseDef, 50 + blessing * 50, blessing, userId, guildId);
-  // Clear loadout (pool is kept)
+  // Clear combat skill loadout only. Skill pool is kept, so players can attune skills again.
   db.prepare('DELETE FROM skill_loadout WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
-  // Clear inventory but KEEP items currently equipped in equipment_worn
-  db.prepare(`
-    DELETE FROM inventory WHERE user_id = ? AND guild_id = ?
-    AND item_id NOT IN (SELECT equipment_id FROM equipment_worn WHERE user_id = ? AND guild_id = ?)
-  `).run(userId, guildId, userId, guildId);
+
+  // Death reset is now harsher: equipped gear is lost too.
+  // Delete worn equipment links first, then wipe inventory without keeping equipped items.
+  db.prepare('DELETE FROM equipment_worn WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
+  db.prepare('DELETE FROM inventory WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
 }
 
 // ── Stat helpers ──────────────────────────────────────────────────────────
