@@ -92,14 +92,13 @@ export function buildRandomMerchantStock(zoneId: string): MerchantStock {
   const commonConsumableIds = [
     'minor_healing_potion','healing_potion','emergency_potion','mana_flask','antidote','cooling_salve',
     'weapon_oil','armor_polish','hunter_meal','quickstep_tea','scroll_escape','scroll_detection',
-    'strange_mushroom','suspicious_fish','fate_dice','bribe_coin'
+    'strange_mushroom','suspicious_fish','fate_dice','bribe_coin','quick_salve','shadow_mana_vial','vitality_brew','holy_water','warding_charm','ancient_book'
   ];
   const buyableItems = uniqueIds([...zone.shopItems, ...commonConsumableIds])
     .map(id => getItem(id))
     .filter((item): item is MerchantItem => Boolean(item?.buyPrice));
 
   const consumables = buyableItems.filter(item => item.type === 'consumable');
-  const skillBooks  = buyableItems.filter(item => item.type === 'skill_book');
 
   const itemStock: MerchantItem[] = [];
 
@@ -107,11 +106,7 @@ export function buildRandomMerchantStock(zoneId: string): MerchantStock {
   const consumableCount = Math.min(consumables.length, zoneIdx >= 3 ? randInt(2, 4) : randInt(1, 3));
   itemStock.push(...takeRandomStock(consumables, consumableCount));
 
-  // Skill book mạnh nên chỉ xuất hiện đôi khi, tối đa 1 cuốn/lần gặp.
-  const bookChance = zoneIdx === 0 ? 0.30 : zoneIdx <= 2 ? 0.40 : 0.50;
-  if (skillBooks.length > 0 && Math.random() < bookChance) {
-    itemStock.push(pick(skillBooks));
-  }
+  // Skill book lẻ đã được gộp thành Ancient Book. Merchant chỉ bán consumable/token.
 
   // Fallback để tránh shop trống nếu zone không có consumable buyPrice.
   if (itemStock.length === 0 && buyableItems.length > 0) {
@@ -675,8 +670,8 @@ const SOUL_SHOP_ITEMS: Array<{
   giveItem?: string; qty?: number;
 }> = [
   { id: 'mat_chest',    name: 'Material Chest ngẫu nhiên', icon: '📦', cost: 1, desc: '2–4 material ngẫu nhiên', giveItem: 'material_chest', qty: 1 },
-  { id: 'rand_book',    name: 'Skill Book ngẫu nhiên',      icon: '📚', cost: 3, desc: 'Skill book random (thường)', giveItem: '', qty: 1 },
-  { id: 'soul_book',    name: 'Soul Skill Book',            icon: '💀', cost: 5, desc: 'Một trong 3 Soul Skill Book', giveItem: '', qty: 1 },
+  { id: 'ancient_book', name: 'Ancient Book', icon: '📖', cost: 3, desc: 'Cổ thư dùng ở Hội Quán để học skill', giveItem: 'ancient_book', qty: 1 },
+  { id: 'curse_bundle', name: 'Gói Cổ Thư Nguyền', icon: '🔻', cost: 5, desc: 'Ancient Book + Curse Shard để nghiên cứu skill cao', giveItem: '', qty: 1 },
   { id: 'puri_stone',   name: 'Purification Stone',         icon: '💎', cost: 5, desc: 'Xóa toàn bộ debuff', giveItem: 'purification_stone', qty: 1 },
   { id: 'eq_box',       name: 'Cursed Equipment Box',       icon: '🎁', cost: 8, desc: 'Trang bị Rare+ ngẫu nhiên', giveItem: 'cursed_equipment_box', qty: 1 },
   { id: 'soul_anchor',  name: 'Soul Anchor',                icon: '⚓', cost: 10, desc: 'Sống sót 1 lần khi chết', giveItem: 'soul_anchor', qty: 1 },
@@ -692,13 +687,13 @@ const SOUL_SHOP_ITEMS: Array<{
 ];
 
 const COMMON_BOOKS = [
-  'book_fireball','book_ice_lance','book_shield_bash','book_shadow_step','book_mend_wounds','book_thunder_clap',
-  'book_arcane_bolt','book_poison_dart','book_cleave','book_battle_cry','book_guardian_wall','book_purify',
-  'book_blood_siphon','book_mana_surge','book_frost_nova','book_whirlwind','book_radiant_smite','book_venom_cloud','book_execute','book_meteor_shower',
-  'book_iron_skin','book_berserker','book_mana_flow','book_vampiric','book_tough_body',
-  'book_blade_mastery','book_arcane_mind','book_survival_instinct','book_blood_hunger'
+  'ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book',
+  'ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book',
+  'ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book',
+  'ancient_book','ancient_book','ancient_book','ancient_book','ancient_book',
+  'ancient_book','ancient_book','ancient_book','ancient_book'
 ];
-const SOUL_BOOKS   = ['book_soul_strike','book_soul_guard','book_soul_drain','book_void_rift'];
+const SOUL_BOOKS   = ['ancient_book','ancient_book','ancient_book','ancient_book'];
 
 export async function showSoulShop(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
@@ -780,16 +775,13 @@ export async function showSoulShop(
       gss(userId, guildId, -shopItem.cost);
 
       let result = '';
-      if (itemKey === 'rand_book') {
-        const book = pick(COMMON_BOOKS);
-        addItem(userId, guildId, book, 1);
-        const it = getItem(book)!;
-        result = `${it.icon} **${it.name}**`;
-      } else if (itemKey === 'soul_book') {
-        const book = pick(SOUL_BOOKS);
-        addItem(userId, guildId, book, 1);
-        const it = getItem(book)!;
-        result = `${it?.icon ?? '💀'} **${it?.name ?? book}** (Soul Skill!)`;
+      if (itemKey === 'ancient_book') {
+        addItem(userId, guildId, 'ancient_book', 1);
+        result = `📖 **Ancient Book**`;
+      } else if (itemKey === 'curse_bundle') {
+        addItem(userId, guildId, 'ancient_book', 1);
+        addItem(userId, guildId, 'curse_shard', 2);
+        result = `📖 **Ancient Book** + 🔻 **Curse Shard x2**`;
       } else if (itemKey === 'eq_box') {
         // Give a random rare+ equipment
         const { EQUIPMENT: EQ } = await import('../../data/equipment');

@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
-import { getPlayer, addItem } from '../systems/player';
+import { getPlayer, addItem, addPet } from '../systems/player';
 // doGather is also imported directly by explore.ts for the in-zone gather button
 import { COLORS } from '../utils/embeds';
 import db from '../database/index';
@@ -63,6 +63,11 @@ export function doGather(userId: string, guildId: string, playerName: string): G
   const found = weightedPick();
   const qty   = found.id === 'iron_ore' && Math.random() < 0.35 ? 2 : 1;
   addItem(userId, guildId, found.id, qty);
+  let petLine = '';
+  if ((found.id === 'void_shard' || found.id === 'mana_crystal') && Math.random() < (found.id === 'void_shard' ? 0.035 : 0.012)) {
+    const added = addPet(userId, guildId, 'storm_eagle');
+    petLine = added ? '\n\n🥚 Cơn gió cuốn lên — **Storm Eagle** gia nhập!' : '\n\n🥚 Bạn đã có Storm Eagle, dấu vết bão tan vào nguyên liệu.';
+  }
   const isRare = found.id === 'void_shard' || found.id === 'mana_crystal';
 
   return {
@@ -73,7 +78,7 @@ export function doGather(userId: string, guildId: string, playerName: string): G
       .setDescription(
         `> *Lướt qua những tán lá...*\n\n` +
         `**${playerName}** tìm được: **${found.name}**${qty > 1 ? ` x${qty}` : ''}!` +
-        (isRare ? '\n\n✨ *Nguyên liệu hiếm!*' : '')
+        (isRare ? '\n\n✨ *Nguyên liệu hiếm!*' : '') + petLine
       )
       .setFooter({ text: 'cooldown 60s · /inventory để xem đồ' }),
   };

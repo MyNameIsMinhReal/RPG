@@ -101,7 +101,7 @@ export function buildHelpGuideEmbeds(): EmbedBuilder[] {
       {
         name: '🐾 Pet, party, guild',
         value:
-          '`/pet` — xem pet và trứng pet\n' +
+          '`/pet` — xem pet, feed/equip, pet EXP và vai trò sau combat\n' +
           '`/party` hoặc `rpg pt` — lập party để đi cùng người khác\n' +
           '`/guild` — hệ thống guild/clan',
         inline: false,
@@ -132,7 +132,7 @@ export function buildHelpGuideEmbeds(): EmbedBuilder[] {
       '`rpg d` — daily\n' +
       '`rpg w` — world\n' +
       '`rpg pt` — party\n' +
-      '`rpg code <code>` — nhập code\n\n' +
+      '`🏛️ Hội Quán trong làng` — tiến hoá class, faction, cổ thư/pet role\n`rpg code <code>` — nhập code\n\n' +
       '**Lệnh có tham số:**\n' +
       '`rpg p @user` — xem profile người khác\n' +
       '`rpg u <item_id>` — dùng item\n' +

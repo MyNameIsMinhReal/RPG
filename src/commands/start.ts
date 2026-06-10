@@ -190,7 +190,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         `${cls.icon} **${cls.name}**\n> ${cls.description}\n> ✦ *${cls.passiveLine}*`
       ).join('\n\n')
     )
-    .setFooter({ text: 'Có thể đổi class bằng /class change khi ở làng.' });
+    .setFooter({ text: 'Class có thể tiến hoá bằng hệ thống Awakening khi đủ điều kiện.' });
 
   const msg = await interaction.editReply({ embeds: [selectEmbed], components: [classRow] });
 

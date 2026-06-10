@@ -7,6 +7,7 @@ import { getPlayer, addItem } from '../systems/player';
 import { PETS, getPet, petPassiveValue, RARITY_COLOR, RARITY_LABEL } from '../data/pets';
 import { COLORS } from '../utils/embeds';
 import { onlyUser } from '../utils/collectors';
+import { describePetRole } from '../systems/petRoles';
 
 export const data = new SlashCommandBuilder()
   .setName('pet')
@@ -27,7 +28,9 @@ export const data = new SlashCommandBuilder()
     .setDescription('Thả thú cưng về tự nhiên để nhận vật phẩm')
     .addStringOption(o => o.setName('pet_id').setDescription('ID của thú cưng').setRequired(true)));
 
-type PetRow = { pet_id: string; level: number };
+type PetRow = { pet_id: string; level: number; exp?: number };
+
+function petExpNeeded(level: number): number { return 35 + level * 15; }
 
 function passiveLabel(type: string): string {
   const labels: Record<string, string> = {
@@ -56,7 +59,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
 
   // ── /pet list ──────────────────────────────────────────────────────────
   if (sub === 'list') {
-    const pets = db.prepare('SELECT pet_id, level FROM player_pets WHERE user_id=? AND guild_id=?')
+    const pets = db.prepare('SELECT pet_id, level, COALESCE(exp,0) AS exp FROM player_pets WHERE user_id=? AND guild_id=?')
       .all(userId, guildId) as PetRow[];
     const activePetId = (player as any).active_pet as string | null;
 
@@ -84,7 +87,8 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
       return (
         `${def.icon} **${def.name}**${equipped}\n` +
         `  \`${row.pet_id}\` · Lv.**${row.level}**/${def.maxLevel} · ${RARITY_LABEL[def.rarity]}\n` +
-        `  📊 +${bonusPct}% ${passiveLabel(def.passiveType)}`
+        `  📊 +${bonusPct}% ${passiveLabel(def.passiveType)} · 🐾 EXP ${row.exp ?? 0}/${petExpNeeded(row.level)}\n` +
+        `  ${describePetRole(row.pet_id).replace(/\*\*/g, '')}`
       );
     }).join('\n\n');
 
@@ -102,7 +106,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
 
   // ── Resolve pet for equip / feed / release ──────────────────────────────
   const petId  = i.options.getString('pet_id', true).toLowerCase();
-  const petRow = db.prepare('SELECT pet_id, level FROM player_pets WHERE user_id=? AND guild_id=? AND pet_id=?')
+  const petRow = db.prepare('SELECT pet_id, level, COALESCE(exp,0) AS exp FROM player_pets WHERE user_id=? AND guild_id=? AND pet_id=?')
     .get(userId, guildId, petId) as PetRow | undefined;
 
   if (!petRow) {
@@ -127,7 +131,8 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
           .setDescription(
             `${def.description}\n\n` +
             `📊 **Passive:** +${petPassiveValue(def, petRow.level).toFixed(1)}% ${passiveLabel(def.passiveType)}\n` +
-            `⭐ Cấp: **${petRow.level}** / ${def.maxLevel} · ${RARITY_LABEL[def.rarity]}`
+            `⭐ Cấp: **${petRow.level}** / ${def.maxLevel} · ${RARITY_LABEL[def.rarity]}\n` +
+            `${describePetRole(petId)}`
           ),
       ],
     });
@@ -153,7 +158,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
     }
 
     db.prepare('UPDATE players SET gold=gold-? WHERE user_id=? AND guild_id=?').run(cost, userId, guildId);
-    db.prepare('UPDATE player_pets SET level=level+1 WHERE user_id=? AND guild_id=? AND pet_id=?').run(userId, guildId, petId);
+    db.prepare('UPDATE player_pets SET level=level+1, exp=0 WHERE user_id=? AND guild_id=? AND pet_id=?').run(userId, guildId, petId);
     const newLv = petRow.level + 1;
     await i.editReply({
       embeds: [

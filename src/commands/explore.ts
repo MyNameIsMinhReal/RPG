@@ -32,6 +32,7 @@ import {
   startOakHunt, isOakHuntActive, getOakHuntRemaining, tickOakHunt, OAK_HUNT_EXPLORES
 } from '../systems/oakEvent';
 import { awardAchievements } from '../systems/achievements';
+import { unlockRecipesBySource } from '../systems/crafting';
 import { createLegacy, pickLegacySkill, getLegaciesInZone, claimLegacy, getLegacy } from '../systems/legacy';
 import {
   COLORS, buildCombatEmbed, buildCombatButtons, buildSkillSelectMenu,
@@ -50,7 +51,7 @@ import { withImage } from '../utils/eventImages';
 import { pickExploreEvent, runExploreEvent } from './exploreEvents';
 import { updatePityCounters } from '../systems/pity';
 import { consumeBuff } from '../systems/consumables';
-import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
+import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard, showVillageHall } from '../systems/village';
 import { doGather } from './gather';
 import { onlyParty, onlyUser } from '../utils/collectors';
 import { ensurePendingChapterExploreEvent, getPendingChapterExploreEvent, incrementChapterObjective } from '../systems/chapter';
@@ -71,6 +72,7 @@ interface OakButtonInfo {
   bossMaxHp: number;
   participantCount: number;
   currentFighter: string | null;
+  blockedReason?: string;
 }
 
 // Generic combat outcome handlers, used by dispatchCombatInteraction to rebuild
@@ -153,6 +155,21 @@ function buildContinueExploreRow(userId: string) {
   )];
 }
 
+function buildOakSummonedRow(userId: string) {
+  return [new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`continue_oak_fight_${userId}`)
+      .setLabel('Công Kích Ngay')
+      .setEmoji('⚔️')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`continue_menu_${userId}`)
+      .setLabel('Menu chính')
+      .setEmoji('📍')
+      .setStyle(ButtonStyle.Secondary)
+  )];
+}
+
 async function ensurePlayerAlive(
   interaction: ChatInputCommandInteraction,
   userId: string,
@@ -188,7 +205,8 @@ async function attachContinueExploreHandler(
   collector.on('collect', async (i) => {
     if (
       i.customId !== `continue_explore_${userId}` &&
-      i.customId !== `continue_menu_${userId}`
+      i.customId !== `continue_menu_${userId}` &&
+      i.customId !== `continue_oak_fight_${userId}`
     ) {
       return;
     }
@@ -206,7 +224,9 @@ async function attachContinueExploreHandler(
       return;
     }
 
-    if (i.customId === `continue_explore_${userId}`) {
+    if (i.customId === `continue_oak_fight_${userId}`) {
+      await handleOakFight(interaction, userId, guildId);
+    } else if (i.customId === `continue_explore_${userId}`) {
       const p = getPlayer(userId, guildId)!;
       const z = getZone(p.zone_id)!;
       if (z.safe) {
@@ -315,6 +335,14 @@ export async function showExploreMenu(
         canJoin: false, canFight: false, eventPhase: null,
         bossHp: 0, bossMaxHp: 0, participantCount: 0, currentFighter: null,
       };
+    } else {
+      // Show a visible status instead of silently hiding the Oak row when the boss is on respawn cooldown.
+      oakInfo = {
+        canSummon: false, canStartHunt: false, huntRemaining: 0,
+        canJoin: false, canFight: false, eventPhase: null,
+        bossHp: 0, bossMaxHp: 0, participantCount: 0, currentFighter: null,
+        blockedReason: 'Ancient Oak đang hồi sinh',
+      };
     }
   }
   const rows = buildExploreRows(userId, zone.safe, oakInfo);
@@ -363,6 +391,7 @@ export async function showExploreMenu(
     else if (cid === `vill_smith_${userId}`)  await handleVillageService(interaction, userId, guildId, 'smith');
     else if (cid === `vill_tavern_${userId}`) await handleVillageService(interaction, userId, guildId, 'tavern');
     else if (cid === `vill_board_${userId}`)  await handleVillageService(interaction, userId, guildId, 'board');
+    else if (cid === `vill_hall_${userId}`)   await handleVillageService(interaction, userId, guildId, 'hall');
   });
 
   collector.on('end', (_c, reason) => {
@@ -390,7 +419,18 @@ function buildExploreRows(
     const rows: ActionRowBuilder<ButtonBuilder>[] = [row1];
     if (oakInfo) {
       const oakRow = new ActionRowBuilder<ButtonBuilder>();
-      if (oakInfo.huntRemaining > 0) {
+      if (oakInfo.blockedReason) {
+        oakRow.addComponents(
+          new ButtonBuilder().setCustomId(`ex_oak_blocked_${userId}`)
+            .setLabel(oakInfo.blockedReason).setEmoji('🌳').setStyle(ButtonStyle.Secondary).setDisabled(true)
+        );
+      }
+      if (oakInfo.canStartHunt) {
+        oakRow.addComponents(
+          new ButtonBuilder().setCustomId(`ex_oak_hunt_${userId}`)
+            .setLabel('Bắt Đầu Truy Tìm Linh Thú').setEmoji('🐾').setStyle(ButtonStyle.Primary)
+        );
+      } else if (oakInfo.huntRemaining > 0) {
         oakRow.addComponents(
           new ButtonBuilder().setCustomId(`ex_oak_hunt_${userId}`)
             .setLabel(`Đang Truy Tìm (còn ${oakInfo.huntRemaining})`).setEmoji('🐾').setStyle(ButtonStyle.Secondary).setDisabled(true)
@@ -428,7 +468,9 @@ function buildExploreRows(
     new ButtonBuilder().setCustomId(`vill_tavern_${userId}`)
       .setLabel('Quán trọ').setEmoji('🍺').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`vill_board_${userId}`)
-      .setLabel('Nhiệm vụ').setEmoji('📋').setStyle(ButtonStyle.Secondary)
+      .setLabel('Nhiệm vụ').setEmoji('📋').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`vill_hall_${userId}`)
+      .setLabel('Hội quán').setEmoji('🏛️').setStyle(ButtonStyle.Secondary)
   );
   return [row1, row2];
 }
@@ -550,7 +592,7 @@ async function handleTravel(
 async function handleVillageService(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string,
-  service: 'shop' | 'smith' | 'tavern' | 'board'
+  service: 'shop' | 'smith' | 'tavern' | 'board' | 'hall'
 ): Promise<void> {
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
 
@@ -561,6 +603,7 @@ async function handleVillageService(
     else if (service === 'smith')  await showVillageBlacksmith(interaction, userId, guildId);
     else if (service === 'tavern') await showVillageTavern(interaction, userId, guildId);
     else if (service === 'board')  await showVillageBoard(interaction, userId, guildId);
+    else if (service === 'hall')   await showVillageHall(interaction, userId, guildId);
   };
 
   await runService();
@@ -636,7 +679,7 @@ async function handleGather(
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
   const player = getPlayer(userId, guildId)!;
   const { embed } = doGather(userId, guildId, player.name);
-  const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+  const reply = await interaction.editReply({ embeds: [embed], components: buildOakSummonedRow(userId) });
   attachContinueExploreHandler(reply, interaction, userId, guildId);
 }
 
@@ -758,7 +801,20 @@ async function handleSearch(
   const startPartyCombat = async (enemyId: string) => {
     await startPartyCombatFlow(
       interaction, userId, guildId, partyMemberIds!, enemyId,
-      async () => {
+      async (members, defeatedEnemy) => {
+        const enemyDef = getEnemy(defeatedEnemy.id) ?? getEnemy(enemyId);
+
+        // Forest Ancient Oak route: if the miniboss is killed in party combat,
+        // mark the prerequisite for every surviving party member. Previously only
+        // solo combat called handleVictory(), so party kills did not unlock the
+        // summon step even when the players had beaten the miniboss.
+        if (enemyDef?.miniboss && enemyDef.zones?.includes('forest')) {
+          for (const m of members.filter(m => m.alive)) {
+            markOakPrereq(guildId, m.user_id);
+            setFlag(guildId, `oak_lore_miniboss_${m.user_id}`, '1');
+          }
+        }
+
         const reply = await interaction.fetchReply() as Message<boolean>;
         await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
         attachContinueExploreHandler(reply, interaction, userId, guildId);
@@ -1049,6 +1105,18 @@ async function handleOakSummon(
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
   const player = getPlayer(userId, guildId)!;
 
+  if (player.zone_id !== 'forest') {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🌲 Bạn phải đứng trong **Forest** mới triệu hồi được Ancient Oak.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+
+  if (isBossSlain(guildId, 'ancient_oak')) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🌳 Ancient Oak đang trong thời gian hồi sinh, chưa thể triệu hồi lại.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+
   if (!hasOakPrereq(guildId, userId)) {
     const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🌳 Bạn chưa đánh bại Miniboss trong rừng — chưa đủ điều kiện triệu hồi.')], components: buildContinueExploreRow(userId) });
     attachContinueExploreHandler(reply, interaction, userId, guildId);
@@ -1067,9 +1135,24 @@ async function handleOakSummon(
     return;
   }
 
-  removeItem(userId, guildId, 'ancient_relic', 3);
-  deleteFlag(guildId, `oak_lore_relic_${userId}`);
-  createOakEvent(guildId, userId);
+  const spent = removeItem(userId, guildId, 'ancient_relic', 3);
+  if (!spent) {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⚱️ Ancient Relic không đủ hoặc inventory vừa thay đổi. Hãy mở lại `/explore`.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
+
+  try {
+    deleteFlag(guildId, `oak_lore_relic_${userId}`);
+    createOakEvent(guildId, userId);
+  } catch (err) {
+    // Do not eat the summoning materials if DB/event creation fails.
+    addItem(userId, guildId, 'ancient_relic', 3);
+    console.error('[OAK] createOakEvent failed:', err);
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '🌳 Triệu hồi Ancient Oak thất bại do lỗi dữ liệu. Relic đã được hoàn lại.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0x2D7D46)
@@ -1078,10 +1161,10 @@ async function handleOakSummon(
       `**${player.name}** đã cúng tế 3 Ancient Relic...\n` +
       `*Cổ thụ ngàn năm rùng mình tỉnh giấc!*\n\n` +
       `⏳ Cửa sổ tham gia: **5 phút**\n` +
-      `Những người khác trong rừng có thể bấm **Tham Gia** trên \`/explore\` để vào trận!`
+      `Bạn có thể bấm **Công Kích Ngay**, hoặc để người khác trong rừng bấm **Tham Gia** trên \`/explore\`.`
     );
 
-  const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+  const reply = await interaction.editReply({ embeds: [embed], components: buildOakSummonedRow(userId) });
   attachContinueExploreHandler(reply, interaction, userId, guildId);
 }
 
@@ -1194,6 +1277,11 @@ async function handleOakFight(
   );
 }
 
+
+function pPlayerName(userId: string, guildId: string): string {
+  return getPlayer(userId, guildId)?.name ?? userId;
+}
+
 async function distributeOakRewards(
   interaction: ChatInputCommandInteraction,
   btnInt: ButtonInteraction,
@@ -1207,7 +1295,7 @@ async function distributeOakRewards(
   const BASE_EXP  = 500;
   const BASE_SOUL = 3;
 
-  const lines: string[] = ['## 🌳 Cổ Mộc Đã倒! Phần thưởng:\n'];
+  const lines: string[] = ['## 🌳 Cổ Mộc Đã Ngã! Phần thưởng:\n'];
   for (const p of participants) {
     const share  = p.damage / totalDmg;
     const gold   = Math.max(50, Math.round(BASE_GOLD * share));
@@ -1217,7 +1305,11 @@ async function distributeOakRewards(
     grantExp(p.user_id, guildId, exp);
     grantSoulShards(p.user_id, guildId, shards);
     const pPlayer = getPlayer(p.user_id, guildId);
-    lines.push(`**${pPlayer?.name ?? p.user_id}** — ${p.damage} dmg (${Math.round(share * 100)}%) → +${gold}🪙 +${exp}EXP +${shards}💀`);
+    if (pPlayer) {
+      logEvent(guildId, p.user_id, pPlayer.name, 'boss_kill', 'cùng party hạ gục **Ancient Oak Guardian** trong sự kiện Thức Tỉnh.', 'forest');
+    }
+    const achievementLines = awardAchievements(p.user_id, guildId);
+    lines.push(`**${pPlayer?.name ?? p.user_id}** — ${p.damage} dmg (${Math.round(share * 100)}%) → +${gold}🪙 +${exp}EXP +${shards}💀${achievementLines.length ? `\n🏆 ${achievementLines.join(' · ')}` : ''}`);
   }
 
   // Winner gets a guaranteed relic drop
@@ -1226,19 +1318,38 @@ async function distributeOakRewards(
 
   for (const p of participants) {
     markPlayerClearedBoss(guildId, p.user_id, 'ancient_oak');
+    const unlocked = unlockRecipesBySource(p.user_id, guildId, 'ancient_oak');
+    if (unlocked.length) lines.push(`📜 **${pPlayerName(p.user_id, guildId)}** mở khóa **${unlocked.length} công thức rừng cổ**.`);
   }
+  setFlag(guildId, 'forest_drop_bonus', '20', 86400);
+  setFlag(guildId, 'event_ancient_oak_fall', '🌳 Ancient Oak Guardian đã ngã xuống — rừng bị bóng tối lấn chiếm, drop rate tăng 20% trong rừng.', 86400);
   clearOakParticipants(guildId);
+
+  const description = lines.join('\n');
+  const safeDescription = description.length <= 3900
+    ? description
+    : description.slice(0, 3820).trimEnd() + '\n\n… *(log thưởng quá dài, đã rút gọn để tránh lỗi Discord)*';
 
   const embed = new EmbedBuilder()
     .setColor(0x2D7D46)
     .setTitle('🌳 Thức Tỉnh Cổ Mộc — Kết Thúc!')
-    .setDescription(lines.join('\n'));
+    .setDescription(safeDescription);
 
   const { embed: victoryImg, files: victoryFiles } = withImage(embed, 'victory');
   const player = getPlayer(winnerId, guildId)!;
-  await btnInt.editReply({ embeds: [victoryImg], files: victoryFiles, components: buildContinueExploreRow(winnerId) });
+  await btnInt.editReply({ embeds: [victoryImg], files: victoryFiles, components: buildContinueExploreRow(winnerId) }).catch(async (err: any) => {
+    if (err?.code === 50035) {
+      await btnInt.editReply({
+        embeds: [new EmbedBuilder().setColor(0x2D7D46).setTitle('🌳 Thức Tỉnh Cổ Mộc — Kết Thúc!').setDescription('Ancient Oak Guardian đã bị hạ. Phần thưởng đã được cộng, nhưng log quá dài nên bot đã rút gọn.')],
+        files: [],
+        components: buildContinueExploreRow(winnerId)
+      }).catch(() => {});
+    } else {
+      throw err;
+    }
+  });
   attachContinueExploreHandler(btnInt.message, interaction, winnerId, guildId);
-  logEvent(guildId, winnerId, player.name, 'boss', '🌳 đã hạ gục **Cổ Mộc Cổ Đại** trong sự kiện Thức Tỉnh!', 'forest');
+  logEvent(guildId, winnerId, player.name, 'boss', '🌳 đã hạ gục **Ancient Oak Guardian** trong sự kiện Thức Tỉnh!', 'forest');
 }
 
 // ── Legacy find ───────────────────────────────────────────────────────────────
@@ -1658,14 +1769,13 @@ function buildRandomMerchantStock(zoneId: string): MerchantStock {
   const commonConsumableIds = [
     'minor_healing_potion','healing_potion','emergency_potion','mana_flask','antidote','cooling_salve',
     'weapon_oil','armor_polish','hunter_meal','quickstep_tea','scroll_escape','scroll_detection',
-    'strange_mushroom','suspicious_fish','fate_dice','bribe_coin'
+    'strange_mushroom','suspicious_fish','fate_dice','bribe_coin','quick_salve','shadow_mana_vial','vitality_brew','holy_water','warding_charm','ancient_book'
   ];
   const buyableItems = uniqueIds([...zone.shopItems, ...commonConsumableIds])
     .map(id => getItem(id))
     .filter((item): item is MerchantItem => Boolean(item?.buyPrice));
 
   const consumables = buyableItems.filter(item => item.type === 'consumable');
-  const skillBooks  = buyableItems.filter(item => item.type === 'skill_book');
 
   const itemStock: MerchantItem[] = [];
 
@@ -1673,11 +1783,7 @@ function buildRandomMerchantStock(zoneId: string): MerchantStock {
   const consumableCount = Math.min(consumables.length, zoneIdx >= 3 ? randInt(2, 4) : randInt(1, 3));
   itemStock.push(...takeRandomStock(consumables, consumableCount));
 
-  // Skill book mạnh nên chỉ xuất hiện đôi khi, tối đa 1 cuốn/lần gặp.
-  const bookChance = zoneIdx === 0 ? 0.30 : zoneIdx <= 2 ? 0.40 : 0.50;
-  if (skillBooks.length > 0 && Math.random() < bookChance) {
-    itemStock.push(pick(skillBooks));
-  }
+  // Skill book lẻ đã được gộp thành Ancient Book. Merchant chỉ bán consumable/token.
 
   // Fallback để tránh shop trống nếu zone không có consumable buyPrice.
   if (itemStock.length === 0 && buyableItems.length > 0) {
@@ -2669,7 +2775,7 @@ async function showMysteriousFigure(
   } else { // 150g bet
     if (roll <= 25) {        // Big win
       grantGold(userId, guildId, 400);
-      const skBook = pick(['book_fireball','book_iron_skin','book_shadow_step','book_arcane_bolt','book_cleave','book_purify']); addItem(userId, guildId, skBook);
+      const skBook = pick(['ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book']); addItem(userId, guildId, skBook);
       title = '🌟 ĐẠI THẮNG!'; desc = `🪙 +**400 Gold** + ${getItem(skBook)?.icon} **${getItem(skBook)?.name}** — "Tuyệt vời! Bạn xứng đáng."`;
     } else if (roll <= 50) { // Good win
       grantGold(userId, guildId, 300);
@@ -2938,8 +3044,8 @@ const SOUL_SHOP_ITEMS: Array<{
   giveItem?: string; qty?: number;
 }> = [
   { id: 'mat_chest',    name: 'Material Chest ngẫu nhiên', icon: '📦', cost: 1, desc: '2–4 material ngẫu nhiên', giveItem: 'material_chest', qty: 1 },
-  { id: 'rand_book',    name: 'Skill Book ngẫu nhiên',      icon: '📚', cost: 3, desc: 'Skill book random (thường)', giveItem: '', qty: 1 },
-  { id: 'soul_book',    name: 'Soul Skill Book',            icon: '💀', cost: 5, desc: 'Một trong 3 Soul Skill Book', giveItem: '', qty: 1 },
+  { id: 'ancient_book', name: 'Ancient Book', icon: '📖', cost: 3, desc: 'Cổ thư dùng ở Hội Quán để học skill', giveItem: 'ancient_book', qty: 1 },
+  { id: 'curse_bundle', name: 'Gói Cổ Thư Nguyền', icon: '🔻', cost: 5, desc: 'Ancient Book + Curse Shard để nghiên cứu skill cao', giveItem: '', qty: 1 },
   { id: 'puri_stone',   name: 'Purification Stone',         icon: '💎', cost: 5, desc: 'Xóa toàn bộ debuff', giveItem: 'purification_stone', qty: 1 },
   { id: 'eq_box',       name: 'Cursed Equipment Box',       icon: '🎁', cost: 8, desc: 'Trang bị Rare+ ngẫu nhiên', giveItem: 'cursed_equipment_box', qty: 1 },
   { id: 'soul_anchor',  name: 'Soul Anchor',                icon: '⚓', cost: 10, desc: 'Sống sót 1 lần khi chết', giveItem: 'soul_anchor', qty: 1 },
@@ -2955,13 +3061,13 @@ const SOUL_SHOP_ITEMS: Array<{
 ];
 
 const COMMON_BOOKS = [
-  'book_fireball','book_ice_lance','book_shield_bash','book_shadow_step','book_mend_wounds','book_thunder_clap',
-  'book_arcane_bolt','book_poison_dart','book_cleave','book_battle_cry','book_guardian_wall','book_purify',
-  'book_blood_siphon','book_mana_surge','book_frost_nova','book_whirlwind','book_radiant_smite','book_venom_cloud','book_execute','book_meteor_shower',
-  'book_iron_skin','book_berserker','book_mana_flow','book_vampiric','book_tough_body',
-  'book_blade_mastery','book_arcane_mind','book_survival_instinct','book_blood_hunger'
+  'ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book',
+  'ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book',
+  'ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book','ancient_book',
+  'ancient_book','ancient_book','ancient_book','ancient_book','ancient_book',
+  'ancient_book','ancient_book','ancient_book','ancient_book'
 ];
-const SOUL_BOOKS   = ['book_soul_strike','book_soul_guard','book_soul_drain','book_void_rift'];
+const SOUL_BOOKS   = ['ancient_book','ancient_book','ancient_book','ancient_book'];
 
 async function showSoulShop(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string,

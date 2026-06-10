@@ -31,3 +31,6 @@ try { db.exec(`ALTER TABLE players ADD COLUMN last_fish    INTEGER DEFAULT 0`); 
 try { db.exec(`ALTER TABLE players ADD COLUMN last_gather  INTEGER DEFAULT 0`); } catch {}
 
 try { db.exec(`ALTER TABLE players ADD COLUMN active_pet TEXT DEFAULT NULL`); } catch {}
+
+// Pet EXP for companion progression
+try { db.exec(`ALTER TABLE player_pets ADD COLUMN exp INTEGER DEFAULT 0`); } catch {}

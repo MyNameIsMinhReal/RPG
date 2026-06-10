@@ -209,6 +209,16 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     recipeRequired: true, unlockedBy: 'deaths_5'
   },
 
+
+  // Forest Guardian recipes — mở sau khi hạ Ancient Oak
+  {
+    id: 'craft_alpha_fang_dagger', resultItemId: 'alpha_fang_dagger', resultAmount: 1,
+    category: 'weapon', resultRarity: 'epic', goldCost: 520, levelRequired: 6,
+    successRate: 88, craftingExp: 55,
+    ingredients: [{ itemId: 'thornfang_fang', amount: 1 }, { itemId: 'ancient_bark', amount: 4 }, { itemId: 'leather', amount: 6 }, { itemId: 'curse_shard', amount: 1 }],
+    recipeRequired: true, unlockedBy: 'ancient_oak'
+  },
+
   // ════════════ ARMOR ════════════════════════════════════════════════════
   {
     id: 'craft_cloth_armor', resultItemId: 'cloth_armor', resultAmount: 1,
@@ -288,6 +298,14 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     successRate: 100, craftingExp: 5,
     ingredients: [{ itemId: 'healing_herb', amount: 3 }, { itemId: 'slime_core', amount: 2 }, { itemId: 'wolf_fang', amount: 1 }],
     unlockedBy: 'default'
+  },
+
+  {
+    id: 'craft_bramble_antler_charm', resultItemId: 'bramble_antler_charm', resultAmount: 1,
+    category: 'accessory', resultRarity: 'epic', goldCost: 500, levelRequired: 6,
+    successRate: 88, craftingExp: 55,
+    ingredients: [{ itemId: 'grove_crown_fragment', amount: 1 }, { itemId: 'ancient_bark', amount: 4 }, { itemId: 'rare_herb', amount: 4 }, { itemId: 'curse_shard', amount: 1 }],
+    recipeRequired: true, unlockedBy: 'ancient_oak'
   },
   {
     id: 'craft_ring_of_focus', resultItemId: 'ring_of_focus', resultAmount: 1,

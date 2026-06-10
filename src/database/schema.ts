@@ -187,6 +187,7 @@ db.exec(`
     guild_id      TEXT NOT NULL,
     pet_id        TEXT NOT NULL,
     level         INTEGER DEFAULT 1,
+    exp           INTEGER DEFAULT 0,
     acquired_at   INTEGER DEFAULT (unixepoch()),
     PRIMARY KEY (user_id, guild_id, pet_id)
   );
@@ -451,5 +452,19 @@ db.exec(`
     leader_id  TEXT NOT NULL,
     joined_at  INTEGER DEFAULT (unixepoch()),
     PRIMARY KEY (guild_id, user_id)
+  );
+`);
+
+
+// ── Event chains ─────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS event_chain_progress (
+    user_id      TEXT NOT NULL,
+    guild_id     TEXT NOT NULL,
+    chain_id     TEXT NOT NULL,
+    step         INTEGER DEFAULT 0,
+    completed_at INTEGER,
+    updated_at   INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id, chain_id)
   );
 `);

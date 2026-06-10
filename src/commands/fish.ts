@@ -380,11 +380,11 @@ function grantFishingReward(input: FishingMiniGameInput, fish: FishEncounter, us
   } else if (fish.rarity === 'epic') {
     addRewardItem('golden_fish', 1);
     addRewardItem(Math.random() < 0.55 ? 'mystery_shell' : 'mysterious_shard', 1);
-    if (Math.random() < 0.16) addRewardItem('book_frost_nova', 1);
+    if (Math.random() < 0.16) addRewardItem('ancient_book', 1);
   } else {
     addRewardItem('golden_fish', 1);
     addRewardItem('void_shard', 1);
-    if (Math.random() < 0.25) addRewardItem('book_void_rift', 1);
+    if (Math.random() < 0.25) addRewardItem('ancient_book', 1);
   }
 
   const petRoll = Math.random();
@@ -393,9 +393,9 @@ function grantFishingReward(input: FishingMiniGameInput, fish: FishEncounter, us
   if (fish.rarity === 'rare' && petRoll < 0.025 + petBonus) {
     petId = 'river_otter';
   } else if (fish.rarity === 'epic' && petRoll < 0.075 + petBonus) {
-    petId = Math.random() < 0.55 ? 'river_otter' : 'pearl_turtle';
+    petId = Math.random() < 0.20 ? 'storm_eagle' : (Math.random() < 0.60 ? 'river_otter' : 'pearl_turtle');
   } else if (fish.rarity === 'ancient' && petRoll < 0.18 + petBonus) {
-    petId = Math.random() < 0.45 ? 'abyss_koi' : 'pearl_turtle';
+    petId = Math.random() < 0.15 ? 'storm_eagle' : (Math.random() < 0.50 ? 'abyss_koi' : 'pearl_turtle');
   }
 
   if (petId) {

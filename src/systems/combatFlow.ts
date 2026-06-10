@@ -22,24 +22,25 @@ import { getEnemyAtkBonus } from './world';
 import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumables';
 import { incrementDaily, countsAsPotion } from '../commands/daily';
 import { applyBossLevelScaling } from './bossScaling';
+import { applyMonsterLevelScaling } from './monsterScaling';
+
 
 
 function normalMobPressure(enemy: any): { hp: number; atk: number; def: number } {
-  // Boss/miniboss/shopkeeper keep their handcrafted stats. Normal mobs become scarier mainly by resource pressure.
-  if (!enemy || enemy.boss || enemy.miniboss || enemy.isShopkeeper || !Array.isArray(enemy.zones)) {
+  // Zone pressure keeps later zones slightly scarier even before level scaling is applied.
+  // Bosses use bossScaling.ts. Shopkeepers keep handcrafted stats.
+  if (!enemy || enemy.boss || enemy.isShopkeeper || !Array.isArray(enemy.zones)) {
     return { hp: 1, atk: 1, def: 1 };
   }
   const zone = enemy.zones[0] ?? 'forest';
   const base: Record<string, { hp: number; atk: number; def: number }> = {
-    village: { hp: 1.03, atk: 1.15, def: 1.00 },
-    forest:  { hp: 1.06, atk: 1.22, def: 1.04 },
-    shrine:  { hp: 1.08, atk: 1.24, def: 1.06 },
-    mines:   { hp: 1.10, atk: 1.26, def: 1.07 },
-    wastes:  { hp: 1.12, atk: 1.28, def: 1.08 },
+    village: { hp: 1.02, atk: 1.08, def: 1.00 },
+    forest:  { hp: 1.05, atk: 1.14, def: 1.03 },
+    shrine:  { hp: 1.08, atk: 1.18, def: 1.05 },
+    mines:   { hp: 1.10, atk: 1.21, def: 1.06 },
+    wastes:  { hp: 1.13, atk: 1.25, def: 1.08 },
   };
-  const m = base[zone] ?? { hp: 1.08, atk: 1.24, def: 1.05 };
-  const levelBump = Math.min(0.08, Math.floor((enemy.level ?? 1) / 5) * 0.02);
-  return { hp: m.hp + levelBump, atk: m.atk + levelBump, def: m.def };
+  return base[zone] ?? { hp: 1.08, atk: 1.18, def: 1.05 };
 }
 
 function tuneNormalMobForCombat<T extends any>(enemy: T, playerLevel: number = 1): T {
@@ -51,26 +52,13 @@ function tuneNormalMobForCombat<T extends any>(enemy: T, playerLevel: number = 1
   }
 
   const m = normalMobPressure(enemy);
-  const isMiniboss = (enemy as any).miniboss;
-
-  // Player-level scaling: enemies grow stronger as the player levels up.
-  // Normal mobs: +3.5% per player level above 1, capped at 2×.
-  // Minibosses keep the old softer scaling. Bosses use recommended-level scaling above.
-  // Shopkeepers: no scaling.
-  let levelMult = 1.0;
-  if (!isShopkeeper) {
-    const over = Math.max(0, playerLevel - 1);
-    levelMult = isMiniboss
-      ? 1.0 + Math.min(1.50, over * 0.040)
-      : 1.0 + Math.min(1.00, over * 0.035);
-  }
-
-  if (m.hp === 1 && m.atk === 1 && m.def === 1 && levelMult === 1.0) return { ...(enemy as any) };
+  const levelScaled = applyMonsterLevelScaling(enemy, [playerLevel]) as any;
+  if (m.hp === 1 && m.atk === 1 && m.def === 1) return { ...levelScaled };
   return {
-    ...(enemy as any),
-    hp:  Math.max(1, Math.floor((enemy as any).hp  * m.hp  * levelMult)),
-    atk: Math.max(1, Math.floor((enemy as any).atk * m.atk * levelMult)),
-    def: Math.max(0, Math.floor((enemy as any).def * m.def * levelMult)),
+    ...levelScaled,
+    hp:  Math.max(1, Math.round(levelScaled.hp  * m.hp)),
+    atk: Math.max(1, Math.round(levelScaled.atk * m.atk)),
+    def: Math.max(0, Math.round(levelScaled.def * m.def)),
     _normalMobTuned: true,
   };
 }
@@ -516,7 +504,8 @@ export async function startCombatFlow(
 *"${enemy.lore}"*`
     : `⚠️ **${enemy.icon} ${enemy.name}** (Lv.${enemy.level}) tấn công!`;
   const bossScaleDesc = enemy.boss ? enemy._bossLevelScaling?.desc : null;
-  const openingLogs = [log0, ...(bossScaleDesc ? [bossScaleDesc] : []), ...buffedStart.logs, ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
+  const monsterScaleDesc = !enemy.boss ? enemy._monsterLevelScaling?.desc : null;
+  const openingLogs = [log0, ...(bossScaleDesc ? [bossScaleDesc] : []), ...(monsterScaleDesc ? [monsterScaleDesc] : []), ...buffedStart.logs, ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
 
   const initState = {
     message_id: 'temp', channel_id: interaction.channelId,
@@ -590,9 +579,11 @@ export async function startCombatFlowWithEnemy(
 
   const log0 = `⚠️ **${enemy.icon} ${enemy.name}** (Lv.${enemy.level}) xuất hiện!`;
   const bossScaleDesc = enemy.boss ? enemy._bossLevelScaling?.desc : null;
+  const monsterScaleDesc = !enemy.boss ? enemy._monsterLevelScaling?.desc : null;
   const openingLogs = [
     log0,
     ...(bossScaleDesc ? [bossScaleDesc] : []),
+    ...(monsterScaleDesc ? [monsterScaleDesc] : []),
     ...buffedStart.logs,
     ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : []),
     ...(smokeBuff ? ['🗡️ Assassin’s Smoke: shopkeeper DEF -20% khi mở combat.'] : [])
@@ -657,7 +648,8 @@ export async function startGroupCombatFlow(
 
   const primary    = combatEnemies[0];
   const groupLabel = combatEnemies.map(e => `${e.icon} ${e.name}`).join(', ');
-  const openingLogs = [`⚠️ **Nhóm kẻ thù xuất hiện!** ${groupLabel}`, ...buffedStart.logs];
+  const groupScaleLines = tunedEnemies.map((e: any) => e._monsterLevelScaling?.desc).filter(Boolean).slice(0, 2);
+  const openingLogs = [`⚠️ **Nhóm kẻ thù xuất hiện!** ${groupLabel}`, ...groupScaleLines, ...buffedStart.logs];
 
   const baseState = {
     message_id: 'temp', channel_id: interaction.channelId,

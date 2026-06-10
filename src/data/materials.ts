@@ -171,6 +171,14 @@ export const MATERIALS: Record<string, MaterialDef> = {
   },
 
   // ── Cursed ─────────────────────────────────────────────────────────────
+  curse_shard: {
+    id: 'curse_shard', name: 'Curse Shard', icon: '🔻', rarity: 'cursed',
+    description: 'Mảnh nguyền lực dùng để nghiên cứu Ancient Book và mở khóa kỹ năng cổ.',
+    sellPrice: 65, dropZones: ['shrine', 'wastes'],
+    dropFrom: ['pale_confessor', 'echo_demon', 'the_forgotten'], dropChance: 10
+  },
+
+
   cursed_blood: {
     id: 'cursed_blood', name: 'Cursed Blood', icon: '🩸', rarity: 'cursed',
     description: 'Máu nguyền rủa không thể rửa sạch.',

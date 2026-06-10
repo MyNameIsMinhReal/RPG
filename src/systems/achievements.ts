@@ -90,6 +90,34 @@ const ACHIEVEMENTS: AchievementDef[] = [
     rewardGold: 100
   },
   {
+    id: 'first_awakening',
+    name: 'Awakened Path',
+    description: 'Awaken class lần đầu',
+    badge: '✨',
+    rewardGold: 300
+  },
+  {
+    id: 'oakbreaker',
+    name: 'Oakbreaker',
+    description: 'Hạ Ancient Oak lần đầu',
+    badge: '🌳',
+    rewardGold: 400
+  },
+  {
+    id: 'party_raider',
+    name: 'Party Raider',
+    description: 'Hạ boss cùng party lần đầu',
+    badge: '⚔️',
+    rewardGold: 350
+  },
+  {
+    id: 'trusted_by_village',
+    name: 'Trusted by Ashveil',
+    description: 'Đạt Villagers reputation +50',
+    badge: '🏘️',
+    rewardGold: 250
+  },
+  {
     id: 'familiar_with_death',
     name: 'Kẻ Quen Mặt Với Tử Thần',
     description: 'Chết 10 lần',
@@ -172,6 +200,9 @@ export function awardAchievements(userId: string, guildId: string): string[] {
   const tradeCount = getEventTypeCount(userId, guildId, 'trade');
   const shopkeeperKills = getEventTypeCount(userId, guildId, 'shopkeeper_robbery');
   const skillCount = getSkillBookCount(userId, guildId);
+  const oakKills = db.prepare(`SELECT COUNT(*) AS count FROM event_log WHERE user_id=? AND guild_id=? AND (description LIKE '%Ancient Oak%' OR description LIKE '%Cổ Mộc%')`).get(userId, guildId) as { count: number };
+  const partyBossKills = db.prepare(`SELECT COUNT(*) AS count FROM event_log WHERE user_id=? AND guild_id=? AND event_type='boss_kill' AND description LIKE '%party%'`).get(userId, guildId) as { count: number };
+  const villagerFaction = db.prepare(`SELECT reputation FROM player_factions WHERE user_id=? AND guild_id=? AND faction_id='villagers'`).get(userId, guildId) as { reputation: number } | undefined;
 
   const checks: Array<[string, boolean]> = [
     ['first_blood', player.kills >= 1],
@@ -184,7 +215,11 @@ export function awardAchievements(userId: string, guildId: string): string[] {
     ['merchant_nightmare', shopkeeperKills >= 3],
     ['friend_of_villagers', (player.reputation ?? 0) >= 100],
     ['walking_disaster', (player.reputation ?? 0) <= -100],
-    ['familiar_with_death', player.deaths >= 10]
+    ['familiar_with_death', player.deaths >= 10],
+    ['first_awakening', !!(player.class && ['knight','arcanist','shadowblade','warden','oracle','crusader','bloodreaver'].includes(player.class))],
+    ['oakbreaker', (oakKills?.count ?? 0) >= 1],
+    ['party_raider', (partyBossKills?.count ?? 0) >= 1],
+    ['trusted_by_village', (villagerFaction?.reputation ?? 0) >= 50]
   ];
 
   for (const [id, condition] of checks) {

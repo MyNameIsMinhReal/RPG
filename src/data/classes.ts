@@ -69,6 +69,56 @@ export const CLASSES: Record<string, ClassDef> = {
     dodgeBonus: 0, skillDmgMult: 1.0,
     passiveLine: '+40 HP  ·  +7 ATK  ·  +1 DEF',
   },
+
+  knight: {
+    id: 'knight', name: 'Kỵ Sĩ', icon: '🛡️',
+    description: 'Awaken từ Warrior. Chuyên đỡ đòn, ổn định trong party boss.',
+    hpBonus: 85, mpBonus: 10, atkBonus: 5, defBonus: 8,
+    dodgeBonus: 0, skillDmgMult: 1.05,
+    passiveLine: '+85 HP  ·  +5 ATK  ·  +8 DEF  ·  Skill +5% DMG',
+  },
+  arcanist: {
+    id: 'arcanist', name: 'Đại Pháp Sư', icon: '🧙',
+    description: 'Awaken từ Mage. MP dồi dào, skill gây sát thương mạnh hơn.',
+    hpBonus: 20, mpBonus: 95, atkBonus: 8, defBonus: 2,
+    dodgeBonus: 0, skillDmgMult: 1.38,
+    passiveLine: '+20 HP  ·  +95 MP  ·  +8 ATK  ·  Skill +38% DMG',
+  },
+  shadowblade: {
+    id: 'shadowblade', name: 'Ảnh Nhận', icon: '🌑',
+    description: 'Awaken từ Rogue/Assassin. Né cao, dồn sát thương tốt.',
+    hpBonus: 35, mpBonus: 35, atkBonus: 10, defBonus: 2,
+    dodgeBonus: 16, skillDmgMult: 1.18,
+    passiveLine: '+35 HP  ·  +35 MP  ·  +10 ATK  ·  +16% Dodge  ·  Skill +18% DMG',
+  },
+  warden: {
+    id: 'warden', name: 'Hộ Vệ Rừng', icon: '🌲',
+    description: 'Awaken từ Ranger. Cân bằng sát thương, né và sinh tồn.',
+    hpBonus: 55, mpBonus: 35, atkBonus: 7, defBonus: 4,
+    dodgeBonus: 10, skillDmgMult: 1.12,
+    passiveLine: '+55 HP  ·  +35 MP  ·  +7 ATK  ·  +4 DEF  ·  +10% Dodge',
+  },
+  oracle: {
+    id: 'oracle', name: 'Tiên Tri', icon: '🕯️',
+    description: 'Awaken từ Cleric. Hỗ trợ bền bỉ, nhiều MP và skill mạnh hơn.',
+    hpBonus: 60, mpBonus: 90, atkBonus: 4, defBonus: 5,
+    dodgeBonus: 0, skillDmgMult: 1.28,
+    passiveLine: '+60 HP  ·  +90 MP  ·  +4 ATK  ·  +5 DEF  ·  Skill +28% DMG',
+  },
+  crusader: {
+    id: 'crusader', name: 'Thập Tự Kỵ Sĩ', icon: '☀️',
+    description: 'Awaken từ Paladin. Tuyến đầu cực an toàn cho raid boss.',
+    hpBonus: 95, mpBonus: 35, atkBonus: 6, defBonus: 10,
+    dodgeBonus: 0, skillDmgMult: 1.10,
+    passiveLine: '+95 HP  ·  +35 MP  ·  +6 ATK  ·  +10 DEF  ·  Skill +10% DMG',
+  },
+  bloodreaver: {
+    id: 'bloodreaver', name: 'Huyết Cuồng', icon: '🩸',
+    description: 'Awaken từ Berserker. Sát thương cao, sinh tồn bằng áp lực tấn công.',
+    hpBonus: 70, mpBonus: 10, atkBonus: 13, defBonus: 3,
+    dodgeBonus: 0, skillDmgMult: 1.08,
+    passiveLine: '+70 HP  ·  +10 MP  ·  +13 ATK  ·  +3 DEF  ·  Skill +8% DMG',
+  },
 };
 
 export function getClass(id: string): ClassDef | undefined {

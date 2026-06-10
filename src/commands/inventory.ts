@@ -26,7 +26,7 @@ export const data = new SlashCommandBuilder()
   .setName('inventory')
   .setDescription('Quản lý đồ vật, kỹ năng và loadout');
 
-type Tab = 'items' | 'skills' | 'loadout' | 'books' | 'equip' | 'titles';
+type Tab = 'items' | 'skills' | 'loadout' | 'equip' | 'titles';
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply();
@@ -60,7 +60,6 @@ async function renderTab(
         new StringSelectMenuOptionBuilder().setLabel('📦 Vật phẩm').setDescription('Đồ consumable và materials').setValue('items').setDefault(currentTab === 'items'),
         new StringSelectMenuOptionBuilder().setLabel('🔮 Skill Pool').setDescription('Kỹ năng đã học').setValue('skills').setDefault(currentTab === 'skills'),
         new StringSelectMenuOptionBuilder().setLabel('📌 Loadout').setDescription('Trang bị skill slots chiến đấu').setValue('loadout').setDefault(currentTab === 'loadout'),
-        new StringSelectMenuOptionBuilder().setLabel('📚 Skill Books').setDescription('Học kỹ năng mới').setValue('books').setDefault(currentTab === 'books'),
         new StringSelectMenuOptionBuilder().setLabel('⚔️ Trang Bị').setDescription('Weapon · Armor · 2x Accessory').setValue('equip').setDefault(currentTab === 'equip'),
         new StringSelectMenuOptionBuilder().setLabel('🏅 Danh Hiệu').setDescription('Title đã mở khoá').setValue('titles').setDefault(currentTab === 'titles'),
       ])
@@ -73,7 +72,6 @@ async function renderTab(
     case 'items':   [embed, actionRows] = buildItemsTab(player, inventory, userId);   break;
     case 'skills':  [embed, actionRows] = buildSkillsTab(player, pool, loadout);       break;
     case 'loadout': [embed, actionRows] = buildLoadoutTab(player, pool, loadout, userId, guildId); break;
-    case 'books':   [embed, actionRows] = buildBooksTab(player, inventory, userId);   break;
     case 'equip':   [embed, actionRows] = buildEquipTab(player, userId, guildId);      break;
     case 'titles':  [embed, actionRows] = buildTitlesTab(player, userId, guildId);     break;
   }
@@ -335,7 +333,7 @@ function buildItemsTab(
     });
   }
   if (!consumables.length && !materials.length && !keyItems.length) {
-    embed.setDescription(`🪙 Gold: **${player.gold}**\n\n*Túi đồ trống. Khám phá để tìm đồ hoặc gặp lái buôn!*`);
+    embed.setDescription(`🪙 Gold: **${player.gold}**\n\n*Túi đồ trống. Khám phá để tìm đồ, cổ thư hoặc gặp lái buôn!*`);
   }
 
   const rows: ActionRowBuilder<any>[] = [];
@@ -542,7 +540,6 @@ async function handleUseItem(
       new StringSelectMenuOptionBuilder().setLabel('📦 Vật phẩm').setValue('items').setDefault(true),
       new StringSelectMenuOptionBuilder().setLabel('🔮 Skill Pool').setValue('skills'),
       new StringSelectMenuOptionBuilder().setLabel('📌 Loadout').setValue('loadout'),
-      new StringSelectMenuOptionBuilder().setLabel('📚 Skill Books').setValue('books'),
       new StringSelectMenuOptionBuilder().setLabel('⚔️ Trang Bị').setValue('equip'),
       new StringSelectMenuOptionBuilder().setLabel('🏅 Danh Hiệu').setValue('titles'),
     ])
@@ -616,10 +613,10 @@ async function handleLearnSkill(
   userId: string, guildId: string, bookId: string
 ): Promise<void> {
   const item = getItem(bookId);
-  if (!item?.teachesSkill) { await renderTab(interaction, userId, guildId, 'books'); return; }
+  if (!item?.teachesSkill) { await renderTab(interaction, userId, guildId, 'items'); return; }
 
   const qty = getItemQty(userId, guildId, bookId);
-  if (qty <= 0) { await renderTab(interaction, userId, guildId, 'books'); return; }
+  if (qty <= 0) { await renderTab(interaction, userId, guildId, 'items'); return; }
 
   // ── Random sealed tomes ────────────────────────────────────────────────
   const randomTier = item.teachesSkill as string;
@@ -635,7 +632,7 @@ async function handleLearnSkill(
           `Tome được hoàn trả — hãy dùng cho nhân vật khác hoặc bán đi.`
         );
       await interaction.editReply({ embeds: [embed], components: [] });
-      setTimeout(() => { renderTab(interaction, userId, guildId, 'books').catch(err => { console.error('[INVENTORY] delayed render books failed:', err); }); }, 2500);
+      setTimeout(() => { renderTab(interaction, userId, guildId, 'items').catch(err => { console.error('[INVENTORY] delayed render books failed:', err); }); }, 2500);
       return;
     }
 
@@ -643,7 +640,7 @@ async function handleLearnSkill(
     const skill = getSkill(pickedId);
     if (!skill) {
       console.warn(`[INVENTORY] Missing skill from pool: ${pickedId}`);
-      await renderTab(interaction, userId, guildId, 'books');
+      await renderTab(interaction, userId, guildId, 'items');
       return;
     }
     removeItem(userId, guildId, bookId, 1);
@@ -666,7 +663,7 @@ async function handleLearnSkill(
     }
 
     await interaction.editReply({ embeds: [embed], components: [] });
-    setTimeout(() => { renderTab(interaction, userId, guildId, 'books').catch(err => { console.error('[INVENTORY] delayed render books failed:', err); }); }, 2500);
+    setTimeout(() => { renderTab(interaction, userId, guildId, 'items').catch(err => { console.error('[INVENTORY] delayed render books failed:', err); }); }, 2500);
     return;
   }
 
@@ -681,7 +678,7 @@ async function handleLearnSkill(
   }
 
   if (hasSkillInPool(userId, guildId, skill.id)) {
-    await renderTab(interaction, userId, guildId, 'books');
+    await renderTab(interaction, userId, guildId, 'items');
     return;
   }
 
@@ -703,7 +700,7 @@ async function handleLearnSkill(
   }
 
   await interaction.editReply({ embeds: [embed], components: [] });
-  setTimeout(() => renderTab(interaction, userId, guildId, 'books'), 2500);
+  setTimeout(() => renderTab(interaction, userId, guildId, 'items'), 2500);
 }
 
 // ── Tab: Equipment ────────────────────────────────────────────────────────

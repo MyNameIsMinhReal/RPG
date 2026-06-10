@@ -19,6 +19,7 @@ import {
 } from './player';
 import { adjustWorldDanger } from './world';
 import { COLORS, simpleEmbed } from '../utils/embeds';
+import { learnRandomSkillFromEvent, type AncientBookTier } from './skillLearning';
 import { pick, randInt } from '../utils/format';
 import { onlyParty, onlyUser } from '../utils/collectors';
 import { getItem } from '../data/items';
@@ -318,6 +319,11 @@ function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line
     case 'soul_shard': {
       grantSoulShards(ctx.userId, ctx.guildId, action.amount);
       return { line: `💠 ${action.amount >= 0 ? '+' : ''}${action.amount} Soul Shard` };
+    }
+    case 'learn_random_skill': {
+      const result = learnRandomSkillFromEvent(ctx.userId, ctx.guildId, action.tier as AncientBookTier);
+      if (!result.ok) return { line: `📖 ${result.reason ?? 'Cổ thư không phản hồi.'}` };
+      return { line: `📖 Học được ${result.skillIcon} **${result.skillName}**` };
     }
     case 'world_danger': {
       adjustWorldDanger(ctx.guildId, action.amount);

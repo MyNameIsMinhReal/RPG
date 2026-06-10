@@ -13,6 +13,7 @@ export type DataEventAction =
   | { type: 'reputation'; amount: number }
   | { type: 'wanted'; amount: number }
   | { type: 'soul_shard'; amount: number }
+  | { type: 'learn_random_skill'; tier: 't1' | 't2' | 't3' }
   | { type: 'world_danger'; amount: number }
   | { type: 'combat_random' };
 
@@ -88,6 +89,39 @@ export interface DataDrivenExploreEventDef {
 }
 
 export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = [
+
+  {
+    id: 'dd_ancient_book_sage',
+    title: '📖 Cổ Thư Biết Nói',
+    description: 'Một cuốn cổ thư nằm mở giữa vòng nến xanh. Những dòng chữ tự dịch chuyển, như đang chờ ai đó đủ can đảm đọc tiếp.',
+    color: 0x8b5cf6,
+    image: 'mysterious',
+    weight: 2,
+    zones: ['forest', 'shrine', 'mines', 'wastes'],
+    timeoutText: '📖 Cổ thư khép lại. Tiếng thì thầm biến mất trong gió.',
+    choices: [
+      {
+        id: 'read',
+        label: 'Đọc cổ thư',
+        emoji: '📖',
+        style: 'primary',
+        outcomes: [
+          { chance: 60, text: 'Cổ tự bừng sáng. Một kỹ năng xa lạ khắc thẳng vào ký ức của bạn.', actions: [{ type: 'learn_random_skill', tier: 't1' }, { type: 'exp', min: 8, max: 18 }] },
+          { chance: 25, text: 'Cổ thư phản ứng mạnh hơn dự đoán. Bạn học được tri thức hiếm, nhưng lời nguyền cào qua da thịt.', actions: [{ type: 'learn_random_skill', tier: 't2' }, { type: 'damage_percent', min: 5, max: 10 }] },
+          { chance: 15, text: 'Trang sách vỡ thành bụi. Bạn chỉ giữ lại được vài mảnh cổ tự còn đọc được.', actions: [{ type: 'item', itemId: 'ancient_book', min: 1, max: 1 }, { type: 'item', itemId: 'curse_shard', min: 1, max: 1 }] },
+        ],
+      },
+      {
+        id: 'seal',
+        label: 'Niêm phong mang về',
+        emoji: '🔒',
+        style: 'success',
+        outcomes: [
+          { chance: 100, text: 'Bạn niêm phong cuốn sách lại. Có thể nghiên cứu nó an toàn hơn ở Hội Quán.', actions: [{ type: 'item', itemId: 'ancient_book', min: 1, max: 1 }, { type: 'item', itemId: 'curse_shard', min: 1, max: 1 }] },
+        ],
+      },
+    ],
+  },
   {
     id: 'dd_common_supply_cache',
     title: '📦 Hòm Tiếp Tế Bị Bỏ Lại',

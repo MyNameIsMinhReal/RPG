@@ -2,7 +2,7 @@ import {
   SlashCommandBuilder, ChatInputCommandInteraction,
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType
 } from 'discord.js';
-import { getPlayer, resetPlayer, addRebirthBlessing } from '../systems/player';
+import { getPlayer, resetPlayer, addRebirthBlessing, addPet } from '../systems/player';
 import { CLASSES } from '../data/classes';
 import { COLORS } from '../utils/embeds';
 
@@ -73,6 +73,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   // Grant blessing first, then resetPlayer consumes 1 blessing for bonuses
   addRebirthBlessing(userId, guildId, 1);
+  const spriteUnlocked = currentBlessing + 1 >= 3 ? addPet(userId, guildId, 'celestial_sprite') : false;
   resetPlayer(userId, guildId);
   const fresh = getPlayer(userId, guildId)!;
 
@@ -85,7 +86,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         `> ❤️ **${fresh.max_hp} HP**  ·  💧 **${fresh.max_mp} MP**\n` +
         `> ⚔️ **${fresh.atk} ATK**  ·  🛡️ **${fresh.def} DEF**\n` +
         `> 🪙 **${fresh.gold} Gold** khởi đầu\n\n` +
-        `Rebirth Blessing hiện tại: **${currentBlessing + 1}** lần ✦`
+        `Rebirth Blessing hiện tại: **${currentBlessing + 1}** lần ✦` +
+        (spriteUnlocked ? `\n\n✨ **Celestial Sprite** đã gia nhập vì bạn Prestige lần 3+!` : '')
       )
       .setFooter({ text: `Lv.${PRESTIGE_MIN_LEVEL} để Prestige lần tiếp theo` })],
     components: []

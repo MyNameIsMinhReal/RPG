@@ -10,6 +10,8 @@ import { randInt } from '../utils/format';
 import { getGreedGoldBonusPercent } from './consumables';
 import { incrementDaily } from '../commands/daily';
 import { incrementChapterObjective } from './chapter';
+import { getFactionRewardMods } from './factions';
+import { getPetRewardMods, applyActivePetAfterVictory, grantPetDropAfterVictory } from './petRoles';
 import type { PlayerRow } from '../utils/embeds';
 import type { EnemyDef } from '../data/enemies';
 
@@ -43,9 +45,14 @@ export function processVictoryRewards(
   const rewardMult = combatRewardMultipliers(enemy);
   const rolledGold = randInt(enemy.goldMin, enemy.goldMax);
   const baseGold  = scaleReward(rolledGold, rewardMult.gold, 0);
+  const baseExp   = scaleReward(enemy.expReward, rewardMult.exp, 1);
   const greedGoldBonus = getGreedGoldBonusPercent(userId, guildId);
-  const gold      = Math.max(0, Math.floor(baseGold * (1 + greedGoldBonus / 100)));
-  const exp       = scaleReward(enemy.expReward, rewardMult.exp, 1);
+  const factionMods = getFactionRewardMods(userId, guildId);
+  const petMods = getPetRewardMods(userId, guildId);
+  const goldBonusPct = greedGoldBonus + factionMods.goldPct + petMods.goldPct;
+  const expBonusPct = factionMods.expPct + petMods.expPct;
+  const gold      = Math.max(0, Math.floor(baseGold * (1 + goldBonusPct / 100)));
+  const exp       = Math.max(1, Math.floor(baseExp * (1 + expBonusPct / 100)));
   const drops: string[] = [];
 
   grantGold(userId, guildId, gold);
@@ -56,7 +63,7 @@ export function processVictoryRewards(
   const lvRes = grantExp(userId, guildId, exp);
 
   for (const drop of (Array.isArray(enemy.drops) ? enemy.drops : [])) {
-    if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * dropBonus / 100)) {
+    if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * (dropBonus + factionMods.dropPct) / 100)) {
       addItem(userId, guildId, drop.itemId, 1);
       const it = getItem(drop.itemId) ?? getMaterial(drop.itemId);
       if (it) drops.push(`${it.icon} ${it.name}`);
@@ -69,19 +76,27 @@ export function processVictoryRewards(
   );
   for (const eq of eqDrops) {
     const roll = Math.random() * 100;
-    const adjustedChance = (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * dropBonus / 100);
+    const adjustedChance = (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * (dropBonus + factionMods.dropPct) / 100);
     if (roll <= adjustedChance) {
       addItem(userId, guildId, eq.id, 1);
       drops.push(`${eq.icon} **${eq.name}** *(${['common','rare','epic','legendary'][['common','rare','epic','legendary'].indexOf(eq.rarity)]})*`);
     }
   }
 
-  let bonusLine = greedGoldBonus > 0 ? `
-📜 Scroll of Greed: gold +${greedGoldBonus}% (**${baseGold} → ${gold}**)` : '';
+  const petLines = [...applyActivePetAfterVictory(userId, guildId, player, enemy), ...grantPetDropAfterVictory(userId, guildId, enemy)];
+  const unlockedRecipes = unlockRecipesBySource(userId, guildId, enemy.id);
+  const bonusParts = [
+    greedGoldBonus > 0 ? `📜 Scroll of Greed: gold +${greedGoldBonus}% (**${baseGold} → ${gold}**)` : null,
+    ...factionMods.lines,
+    ...petMods.lines,
+    ...petLines,
+    ...(unlockedRecipes.length ? [`📜 Mở khóa công thức craft: **${unlockedRecipes.length} recipe**`] : []),
+  ].filter(Boolean) as string[];
+  let bonusLine = bonusParts.length ? `\n${bonusParts.join('\n')}` : '';
   if (enemy.boss && enemy.deathWorldFlag) {
-    bonusLine = '\n\n' + onBossKilled(guildId, enemy.id, player.name, player.zone_id);
+    const worldLine = onBossKilled(guildId, enemy.id, player.name, player.zone_id);
+    bonusLine = `${bonusLine}\n\n${worldLine}`;
     logEvent(guildId, userId, player.name, 'boss_kill', `tiêu diệt Boss **${enemy.icon} ${enemy.name}**!`, player.zone_id);
-    unlockRecipesBySource(userId, guildId, enemy.id);
   } else {
     logEvent(guildId, userId, player.name, 'kill', `tiêu diệt **${enemy.icon} ${enemy.name}**.`, player.zone_id);
   }
@@ -107,6 +122,13 @@ export function processDeathPenalty(
   createLegacy(guildId, userId, player.name, player.zone_id, goldLeft, player.deaths + 1, legacySkill);
   logEvent(guildId, userId, player.name, 'death', `bị **${enemy.icon} ${enemy.name}** tiêu diệt. Di sản tại ${player.zone_id}.`, player.zone_id);
   killPlayer(userId, guildId);
+
+  if ((player.deaths + 1) >= 5) {
+    const unlocked = unlockRecipesBySource(userId, guildId, 'deaths_5');
+    if (unlocked.length) {
+      logEvent(guildId, userId, player.name, 'recipe_unlock', `mở khóa **${unlocked.length} công thức cursed** sau 5 lần chết.`, player.zone_id);
+    }
+  }
 
   const shards = Math.max(1, Math.floor(player.level / 2));
   grantSoulShards(userId, guildId, shards);

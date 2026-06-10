@@ -4,6 +4,9 @@ import {
   ButtonInteraction,
   ButtonStyle,
   ChatInputCommandInteraction,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  StringSelectMenuInteraction,
   EmbedBuilder,
   Message
 } from 'discord.js';
@@ -15,6 +18,7 @@ import {
   getWantedTitle,
   adjustFaction,
   addPet,
+  getInventory,
   getItemQty,
   getPlayer,
   grantExp,
@@ -29,6 +33,7 @@ import {
 } from '../systems/player';
 import { startCombatFlowWithEnemy, type CombatDeathHandler, type CombatVictoryHandler, type CombatFleeHandler } from '../systems/combatFlow';
 import { getEquipment } from '../data/equipment';
+import { getWornEquipment } from '../systems/equipment';
 import { getItem } from '../data/items';
 import { getZone, ZONES } from '../data/zones';
 import { getFlag, deleteFlag, getShopMarkup, getShopkeeperRobberyCount, increaseShopMarkup, logEvent, setFlag, setWorldEvent, getMerchantFear, increaseMerchantFear, adjustWorldDanger } from '../systems/world';
@@ -81,7 +86,7 @@ import {
 } from './exploreEvents.world';
 
 export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wandering_blacksmith' | 'temporary_arena' | 'boss_tracks' | 'map_seller' | 'shrine_weeping_statue' | 'shrine_forbidden_offering' | 'shrine_sealed_reliquary' | 'mine_runaway_cart' | 'mine_living_ore' | 'mine_trapped_miner' | 'wastes_mirror_self' | 'wastes_memory_rain' | 'wastes_faceless_merchant' 
-  | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
+  | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'gear_buyer' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
   | 'soul_shop' | 'abandoned_camp' | 'lost_pouch' | 'rune_stone' | 'treasure_chest' | 'wandering_healer' | 'spirit_trial'
   | 'blood_trail' | 'nameless_grave' | 'memory_seller' | 'stranger_campfire' | 'cracked_shrine' | 'injured_monster'
   | 'wanted_merchant' | 'bounty_hunter' | 'rebirth_rift' | 'failed_legacy' | 'mirror_clone' | 'talking_corpse'
@@ -215,6 +220,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['ambush', hasCombat ? Math.floor(tm('ambush', 7) * badPenalty) : 0],
     ['legacy', hasLegacy ? 6 : 0],
     ['merchant', tm('merchant', 7 + goodBoost)],
+    ['gear_buyer', player.zone_id !== 'village' && hasSellableSpareEquipment(player.user_id, guildId) ? tm('merchant', 4 + goodBoost) : 0],
     ['spring', tm('spring', 5 + goodBoost)],
     ['trap', Math.floor(5 * badPenalty)],
     ['altar', 4],
@@ -429,6 +435,7 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'ambush': return cb.showAmbush();
     case 'legacy': return cb.showLegacyFind();
     case 'merchant': return cb.showMerchant();
+    case 'gear_buyer': return showGearBuyer(ctx);
     case 'spring': return cb.showHealingSpring();
     case 'trap': return cb.showTrap();
     case 'altar': return cb.showAncientAltar();
@@ -625,6 +632,214 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder, imageKey?:
 async function finishNoContinue(ctx: RunExploreEventInput, embed: EmbedBuilder, imageKey?: string): Promise<void> {
   const payload = imageKey ? withImage(embed, imageKey) : { embed, files: [] as any[] };
   await ctx.interaction.editReply({ embeds: [payload.embed], files: payload.files, components: [] });
+}
+
+
+type GearBuyerOffer = {
+  id: string;
+  spareQty: number;
+  price: number;
+  baseSellPrice: number;
+  name: string;
+  icon: string;
+  rarity: string;
+  slot: string;
+};
+
+function getSpareEquipmentOffers(userId: string, guildId: string, priceMultiplier = 1): GearBuyerOffer[] {
+  const wornCounts = new Map<string, number>();
+  for (const worn of getWornEquipment(userId, guildId)) {
+    wornCounts.set(worn.equipment_id, (wornCounts.get(worn.equipment_id) ?? 0) + 1);
+  }
+
+  return getInventory(userId, guildId)
+    .map(entry => {
+      const eq = getEquipment(entry.item_id);
+      if (!eq || !eq.sellPrice) return null;
+      const worn = wornCounts.get(entry.item_id) ?? 0;
+      const spareQty = Math.max(0, entry.quantity - worn);
+      if (spareQty <= 0) return null;
+      return {
+        id: eq.id,
+        spareQty,
+        price: Math.max(1, Math.floor(eq.sellPrice * priceMultiplier)),
+        baseSellPrice: eq.sellPrice,
+        name: eq.name,
+        icon: eq.icon,
+        rarity: eq.rarity,
+        slot: eq.slot,
+      } satisfies GearBuyerOffer;
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => (b.price - a.price) || a.name.localeCompare(b.name)) as GearBuyerOffer[];
+}
+
+function hasSellableSpareEquipment(userId: string, guildId: string): boolean {
+  return getSpareEquipmentOffers(userId, guildId).length > 0;
+}
+
+function gearBuyerMultiplier(player: PlayerRow): number {
+  const rep = player.reputation ?? 0;
+  // Người thu mua lưu động trả hơi dao động theo danh tiếng, nhưng không quá mạnh.
+  if (rep >= 60) return 1.15;
+  if (rep >= 25) return 1.08;
+  if (rep <= -50) return 0.78;
+  if (rep <= -20) return 0.88;
+  return 1.0;
+}
+
+async function showGearBuyer(ctx: RunExploreEventInput): Promise<void> {
+  const opener = getPlayer(ctx.userId, ctx.guildId)!;
+  const multiplier = gearBuyerMultiplier(opener);
+  const partyMode = !!ctx.partyMemberIds && ctx.partyMemberIds.length > 1;
+
+  const intro = new EmbedBuilder()
+    .setColor(COLORS.gold)
+    .setTitle('♻️ Người Thu Mua Phế Trang Bị')
+    .setDescription(
+      'Một người kéo xe cũ dừng lại bên đường. Trên xe đầy giáp nứt, kiếm mẻ và vòng cổ gãy.\n\n' +
+      '“Trang bị thừa à? Ta mua. Đồ đang mặc thì ta không đụng.”\n\n' +
+      `💱 Tỉ giá hôm nay: **${Math.round(multiplier * 100)}%** giá bán cơ bản\n` +
+      (partyMode ? '👥 Party: ai bấm mở túi thì bán đồ của chính người đó.' : 'Chọn mở túi để bán trang bị thừa của bạn.')
+    );
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`gearbuyer_open_${ctx.userId}`).setLabel('Mở túi trang bị').setEmoji('🎒').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`gearbuyer_leave_${ctx.userId}`).setLabel('Rời đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
+  );
+
+  const { embed, files } = withImage(intro, 'merchant');
+  const reply = await ctx.interaction.editReply({ embeds: [embed], files, components: [row] });
+  const filter = partyMode ? onlyParty(ctx.userId, ctx.partyMemberIds!) : onlyUser(ctx.userId);
+  const first = await reply.awaitMessageComponent({ filter, time: 45_000 }).catch(() => null);
+  if (!first) return finish(ctx, simpleEmbed(COLORS.info, '♻️ Người thu mua kéo xe rời đi.'), 'merchant');
+
+  const ok = await first.deferUpdate().then(() => true).catch(() => false);
+  if (!ok) return finish(ctx, simpleEmbed(COLORS.info, '♻️ Người thu mua kéo xe rời đi.'), 'merchant');
+  if ((first as any).customId === `gearbuyer_leave_${ctx.userId}`) {
+    return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn bỏ qua lời mời thu mua và tiếp tục hành trình.'), 'merchant');
+  }
+
+  await renderGearBuyerInventory(ctx, first.user.id, multiplier);
+}
+
+async function renderGearBuyerInventory(ctx: RunExploreEventInput, sellerId: string, multiplier: number): Promise<void> {
+  const seller = getPlayer(sellerId, ctx.guildId);
+  if (!seller) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không tìm thấy nhân vật của người bán.'), 'merchant');
+
+  const offers = getSpareEquipmentOffers(sellerId, ctx.guildId, multiplier);
+  if (!offers.length) {
+    return finish(ctx, simpleEmbed(COLORS.info,
+      `♻️ Người thu mua nhìn qua túi của **${seller.name}** rồi lắc đầu.\n\n` +
+      'Không có trang bị thừa để bán. Trang bị đang mặc được giữ lại an toàn.'
+    ), 'merchant');
+  }
+
+  const options = offers.slice(0, 25).map(o =>
+    new StringSelectMenuOptionBuilder()
+      .setLabel(`${o.name} ×${o.spareQty}`.slice(0, 100))
+      .setDescription(`${o.rarity} · ${o.slot} · ${o.price} Gold/cái`.slice(0, 100))
+      .setValue(o.id)
+      .setEmoji(o.icon)
+  );
+
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.gold)
+    .setTitle('♻️ Thu Mua Trang Bị Thừa')
+    .setDescription(
+      `Người bán: **${seller.name}**\n` +
+      `🪙 Gold hiện tại: **${seller.gold}**\n\n` +
+      'Chọn trang bị muốn bán. Đồ đang mặc sẽ không bị tính vào số lượng bán được.'
+    )
+    .addFields(offers.slice(0, 12).map(o => ({
+      name: `${o.icon} ${o.name} ×${o.spareQty}`,
+      value: `Giá thu mua: **${o.price} Gold/cái**`,
+      inline: true,
+    })));
+
+  const rows: ActionRowBuilder<any>[] = [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`gearbuyer_pick_${sellerId}`)
+        .setPlaceholder('Chọn trang bị thừa để bán...')
+        .addOptions(options)
+    ),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(`gearbuyer_cancel_${sellerId}`).setLabel('Không bán nữa').setEmoji('↩️').setStyle(ButtonStyle.Secondary)
+    )
+  ];
+
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: rows });
+  const comp = await reply.awaitMessageComponent({ filter: onlyUser(sellerId), time: 45_000 }).catch(() => null);
+  if (!comp) return finish(ctx, simpleEmbed(COLORS.info, '♻️ Người thu mua chờ một lúc rồi rời đi.'), 'merchant');
+  const ok = await comp.deferUpdate().then(() => true).catch(() => false);
+  if (!ok) return finish(ctx, simpleEmbed(COLORS.info, '♻️ Người thu mua chờ một lúc rồi rời đi.'), 'merchant');
+
+  if ((comp as any).customId === `gearbuyer_cancel_${sellerId}`) {
+    return finish(ctx, simpleEmbed(COLORS.info, '↩️ Bạn đóng túi đồ lại. Người thu mua gật đầu rồi kéo xe đi.'), 'merchant');
+  }
+
+  const selectedId = (comp as StringSelectMenuInteraction).values?.[0];
+  const selected = offers.find(o => o.id === selectedId);
+  if (!selected) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Trang bị này không còn bán được nữa.'), 'merchant');
+
+  await confirmGearBuyerSale(ctx, sellerId, selected.id, multiplier);
+}
+
+async function confirmGearBuyerSale(ctx: RunExploreEventInput, sellerId: string, equipmentId: string, multiplier: number): Promise<void> {
+  const seller = getPlayer(sellerId, ctx.guildId)!;
+  const offer = getSpareEquipmentOffers(sellerId, ctx.guildId, multiplier).find(o => o.id === equipmentId);
+  if (!offer) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Trang bị này không còn bán được nữa.'), 'merchant');
+
+  const allQty = offer.spareQty;
+  const allGold = offer.price * allQty;
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.gold)
+    .setTitle('♻️ Xác Nhận Thu Mua')
+    .setDescription(
+      `Người bán: **${seller.name}**\n\n` +
+      `${offer.icon} **${offer.name}**\n` +
+      `📦 Số lượng thừa: **${allQty}**\n` +
+      `🪙 Giá: **${offer.price} Gold/cái**\n\n` +
+      'Bạn muốn bán bao nhiêu?'
+    );
+
+  const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`gearbuyer_sell1_${sellerId}`).setLabel('Bán 1').setEmoji('💰').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`gearbuyer_sellall_${sellerId}`).setLabel(`Bán hết (+${allGold})`.slice(0, 80)).setEmoji('♻️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`gearbuyer_back_${sellerId}`).setLabel('Quay lại').setEmoji('↩️').setStyle(ButtonStyle.Secondary)
+  );
+
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [buttons] });
+  const comp = await reply.awaitMessageComponent({ filter: onlyUser(sellerId), time: 30_000 }).catch(() => null);
+  if (!comp) return finish(ctx, simpleEmbed(COLORS.info, '♻️ Người thu mua cất cân và rời đi.'), 'merchant');
+  const ok = await comp.deferUpdate().then(() => true).catch(() => false);
+  if (!ok) return finish(ctx, simpleEmbed(COLORS.info, '♻️ Người thu mua cất cân và rời đi.'), 'merchant');
+
+  const cid = (comp as any).customId as string;
+  if (cid === `gearbuyer_back_${sellerId}`) {
+    return renderGearBuyerInventory(ctx, sellerId, multiplier);
+  }
+
+  const freshOffer = getSpareEquipmentOffers(sellerId, ctx.guildId, multiplier).find(o => o.id === equipmentId);
+  if (!freshOffer) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Trang bị này không còn bán được nữa.'), 'merchant');
+
+  const qty = cid === `gearbuyer_sellall_${sellerId}` ? freshOffer.spareQty : 1;
+  const total = freshOffer.price * qty;
+  const removed = removeItem(sellerId, ctx.guildId, equipmentId, qty);
+  if (!removed) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không thể bán: số lượng trang bị đã thay đổi.'), 'merchant');
+
+  grantGold(sellerId, ctx.guildId, total);
+  adjustFaction(sellerId, ctx.guildId, 'merchants', 1);
+  const updated = getPlayer(sellerId, ctx.guildId)!;
+
+  return finish(ctx, simpleEmbed(COLORS.success,
+    `♻️ Người thu mua gói trang bị vào bao tải và trả tiền ngay tại chỗ.\n\n` +
+    `${freshOffer.icon} **${freshOffer.name}** ×${qty}\n` +
+    `🪙 +**${total} Gold**\n` +
+    `💰 Gold của **${updated.name}**: **${updated.gold}**\n` +
+    `🏛️ Merchant Guild: +1`
+  ), 'merchant');
 }
 
 async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
@@ -882,7 +1097,7 @@ async function showBloodTrail(ctx: RunExploreEventInput): Promise<void> {
     });
     return ctx.callbacks.startCombatWithEnemy(enemy,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
-        title: '🩸 Dấu Máu Đã Khép Lại', description: `Bạn hạ **${e.name}** và tìm thấy chiến lợi phẩm cạnh xác nạn nhân.`, exp: Math.floor(ctx.player.exp_next * 0.18), gold: randInt(25, 65), soulShards: randInt(1, 100) <= 35 ? 1 : 0, items: [pick(['elixir','book_berserker','book_counter','book_mend_wounds'])]
+        title: '🩸 Dấu Máu Đã Khép Lại', description: `Bạn hạ **${e.name}** và tìm thấy chiến lợi phẩm cạnh xác nạn nhân.`, exp: Math.floor(ctx.player.exp_next * 0.18), gold: randInt(25, 65), soulShards: randInt(1, 100) <= 35 ? 1 : 0, items: [pick(['elixir','ancient_book','ancient_book','ancient_book'])]
       }),
       nonLethalLoss as any,
       ctx.callbacks.handleFlee
@@ -932,7 +1147,7 @@ async function showNamelessGrave(ctx: RunExploreEventInput): Promise<void> {
 
   if (cid === `grave_dig_${ctx.userId}`) {
     const repAfter = adjustReputation(ctx.userId, ctx.guildId, -10);
-    const itemId = pick(['bone_shard','ectoplasm','mana_potion','book_shadow_step']);
+    const itemId = pick(['bone_shard','ectoplasm','mana_potion','ancient_book']);
     addItem(ctx.userId, ctx.guildId, itemId, 1);
     return finish(ctx, simpleEmbed(COLORS.warning, `⛏️ Bạn đào mộ và lấy được ${displayItem(itemId)}.\n🤝 Reputation: **${repAfter}** (-10)`));
   }
@@ -1032,7 +1247,7 @@ async function showCrackedShrine(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.danger, `🩸 Máu chảy vào khe nứt.\n❤️ -**${dmg} HP**\n⭐ +**${Math.floor(fresh.exp_next * 0.2)} EXP**`));
   }
   const corruption = increaseCorruption(ctx.guildId, 8);
-  const itemId = pick(['mana_crystal','ectoplasm','book_soul_offering','elixir']);
+  const itemId = pick(['mana_crystal','ectoplasm','ancient_book','elixir']);
   addItem(ctx.userId, ctx.guildId, itemId, 1);
   return finish(ctx, simpleEmbed(COLORS.warning, `🔨 Bàn thờ vỡ tan, rơi ra ${displayItem(itemId)}.\n🌑 World Corruption: **${corruption}%** (+8)`));
 }
@@ -1113,7 +1328,7 @@ async function showBountyHunter(ctx: RunExploreEventInput): Promise<void> {
       lore: 'Kẻ sống bằng tiền thưởng trên đầu tội phạm.'
     });
     return ctx.callbacks.startCombatWithEnemy(enemy,
-      async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '⚔️ Thợ Săn Gục Ngã', description: 'Bạn sống sót qua cuộc truy sát.', exp: Math.floor(fresh.exp_next * 0.22), gold: randInt(40, 100), items: [pick(['elixir','book_counter','book_shadow_step'])] }),
+      async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '⚔️ Thợ Săn Gục Ngã', description: 'Bạn sống sót qua cuộc truy sát.', exp: Math.floor(fresh.exp_next * 0.22), gold: randInt(40, 100), items: [pick(['elixir','ancient_book','ancient_book'])] }),
       ctx.callbacks.handleDeath,
       ctx.callbacks.handleFlee
     );
@@ -1589,8 +1804,8 @@ async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
     { id: 'soul_shard_pack', label: 'Soul Shard', price: 1200, desc: '+1 Soul Shard', emoji: '💀', special: 'soul_shard' },
     { id: 'material_chest', label: 'Material Chest', price: 1800, desc: 'Rương nguyên liệu ngẫu nhiên', emoji: '📦' },
     { id: 'cursed_equipment_box', label: 'Cursed Equipment Box', price: 2500, desc: 'Rương trang bị nguyền rủa', emoji: '🎁' },
-    { id: 'book_execute', label: 'Rare Skill Book', price: 3000, desc: 'Execute — skill book hiếm', emoji: '📕' },
-    { id: 'book_meteor_shower', label: 'Epic Skill Book', price: 10000, desc: 'Meteor Shower — skill book rất hiếm', emoji: '📙' },
+    { id: 'ancient_book', label: 'Rare Skill Book', price: 3000, desc: 'Execute — skill book hiếm', emoji: '📕' },
+    { id: 'ancient_book', label: 'Epic Skill Book', price: 10000, desc: 'Meteor Shower — skill book rất hiếm', emoji: '📙' },
     { id: 'soul_anchor', label: 'Soul Anchor', price: 2500, desc: 'Bảo hộ khi chết', emoji: '⚓' },
     { id: 'blood_vial', label: 'Blood Vial', price: 400, desc: 'Hồi máu + ATK, giảm reputation', emoji: '🩸' },
     { id: 'assassins_smoke', label: "Assassin's Smoke", price: 650, desc: 'Hỗ trợ cướp shopkeeper', emoji: '💨' },

@@ -5,7 +5,7 @@ import {
   ComponentType, StringSelectMenuInteraction
 } from 'discord.js';
 import { getPlayer, getItemQty, spendGold } from '../systems/player';
-import { isRecipeUnlocked, checkIngredients, attemptCraft, getCraftingStats, initDefaultRecipes } from '../systems/crafting';
+import { isRecipeUnlocked, checkIngredients, attemptCraft, getCraftingStats, initDefaultRecipes, getRecipeUnlockHint } from '../systems/crafting';
 import { COLORS } from '../utils/embeds';
 import { CRAFT_RECIPES, getRecipesByCategory, BASE_SUCCESS_RATE, getLevelSuccessBonus, getCraftingLevel, CRAFTING_LEVEL_THRESHOLDS, type CraftRecipe } from '../data/recipes';
 import { getItem } from '../data/items';
@@ -166,7 +166,7 @@ async function showRecipePicker(
     const rarity     = RARITY_LABELS[r.resultRarity] ?? r.resultRarity;
     const reason     = r.levelRequired && player.level < r.levelRequired
       ? `Lv.${r.levelRequired} required`
-      : r.recipeRequired ? 'Cần Recipe Scroll' : 'Chưa mở';
+      : r.recipeRequired ? getRecipeUnlockHint(r) : 'Chưa mở';
     return `🔒 **${resultName}** [${rarity}] — *${reason}*`;
   }).join('\n');
 

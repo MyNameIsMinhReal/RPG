@@ -45,6 +45,50 @@ export const TITLES: TitleDef[] = [
     fromAchievement: 'boss_hunter'
   },
   {
+    id: 'pathfinder', name: 'Pathfinder', icon: '🧭',
+    description: 'Người mở đường qua Rừng Đen.', fromAchievement: 'chapter_1'
+  },
+  {
+    id: 'ruin_seeker', name: 'Ruin Seeker', icon: '⛩️',
+    description: 'Kẻ tìm kiếm bí mật trong đền cổ.', fromAchievement: 'chapter_2'
+  },
+  {
+    id: 'mine_lord', name: 'Mine Lord', icon: '⛏️',
+    description: 'Người sống sót trước lời nguyền hầm mỏ.', fromAchievement: 'chapter_3'
+  },
+  {
+    id: 'world_ender', name: 'World Ender', icon: '🌌',
+    description: 'Người đã bước qua tiếng vọng cuối cùng.', fromAchievement: 'chapter_4'
+  },
+  {
+    id: 'awakened_one', name: 'Awakened One', icon: '✨',
+    description: 'Đã đánh thức con đường class đầu tiên.', fromAchievement: 'first_awakening'
+  },
+  {
+    id: 'oakbreaker', name: 'Oakbreaker', icon: '🌳',
+    description: 'Đã hạ Ancient Oak.', fromAchievement: 'oakbreaker'
+  },
+  {
+    id: 'party_raider', name: 'Party Raider', icon: '⚔️',
+    description: 'Đã hạ boss cùng party.', fromAchievement: 'party_raider'
+  },
+  {
+    id: 'village_trusted', name: 'Trusted of Ashveil', icon: '🏘️',
+    description: 'Được dân làng Ashveil tin tưởng.', fromAchievement: 'trusted_by_village'
+  },
+  {
+    id: 'road_broker', name: 'Road Broker', icon: '🚚',
+    description: 'Đã nối lại một tuyến hàng nguy hiểm.', fromAchievement: 'chain_merchant_road'
+  },
+  {
+    id: 'oak_sworn', name: 'Oak-Sworn', icon: '🌲',
+    description: 'Đã lập lời thề với khu rừng.', fromAchievement: 'chain_forest_oath'
+  },
+  {
+    id: 'shadow_debtor', name: 'Shadow Debtor', icon: '🌑',
+    description: 'Mang một món nợ không thể gọi tên.', fromAchievement: 'chain_shadow_debt'
+  },
+  {
     id: 'merchant_prince',
     name: 'Merchant Prince',
     icon: '🤝',

@@ -25,9 +25,13 @@ import { COLORS } from '../utils/embeds';
 import { randInt, pick, bar } from '../utils/format';
 import { incrementDaily, countsAsPotion } from '../commands/daily';
 import { incrementChapterObjective } from './chapter';
-import { logEvent, onBossKilled } from './world';
+import { logEvent, onBossKilled, markPlayerClearedBoss } from './world';
 import { unlockRecipesBySource } from './crafting';
 import { getBossLevelScaling } from './bossScaling';
+import { getMonsterLevelScaling } from './monsterScaling';
+import { getFactionRewardMods } from './factions';
+import { getPetRewardMods, applyActivePetAfterVictory, grantPetDropAfterVictory } from './petRoles';
+import { awardAchievements } from './achievements';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +64,8 @@ export interface PartyCombatEnemy {
   phaseIndex?: number;
   guard_turns?: number;
   level_special_bonus?: number;
+  level?: number;
+  level_scale_desc?: string | null;
 }
 
 type PartyAction = 'attack' | 'defend' | 'potion' | 'flee';
@@ -81,6 +87,29 @@ function logDiscordComponentError(context: string, err: any): void {
   const details = err?.rawError?.errors ? JSON.stringify(err.rawError.errors, null, 2) : '';
   console.warn(`[PARTY_COMBAT] Discord rejected components at ${context}.${details ? `
 ${details}` : ''}`);
+}
+
+
+const SAFE_EMBED_DESCRIPTION_LIMIT = 3900;
+
+function clampDiscordDescription(text: string, max = SAFE_EMBED_DESCRIPTION_LIMIT): string {
+  if (text.length <= max) return text;
+  return text.slice(0, Math.max(0, max - 80)).trimEnd() + '\n\n… *(nội dung phần thưởng quá dài, đã rút gọn để Discord không lỗi)*';
+}
+
+function safeJoinLines(lines: string[], max = 2600): string {
+  const out: string[] = [];
+  let len = 0;
+  for (const line of lines) {
+    const nextLen = len + line.length + 1;
+    if (nextLen > max) {
+      out.push(`… và **${lines.length - out.length}** dòng khác.`);
+      break;
+    }
+    out.push(line);
+    len = nextLen;
+  }
+  return out.join('\n');
 }
 
 function hpBar(hp: number, max: number): string {
@@ -235,6 +264,33 @@ function maybeTriggerBossPhase(enemy: PartyCombatEnemy, baseDef: any, log: strin
   }
 }
 
+
+function resolveRaidMechanic(enemy: PartyCombatEnemy, aliveMembers: PartyMember[], defenders: Set<string>, turn: number, log: string[]): boolean {
+  if (!enemy.boss) return false;
+  if (aliveMembers.length < 2) return false;
+  if (turn < 2 || turn % 3 !== 0) return false;
+
+  const needed = Math.max(1, Math.ceil(aliveMembers.length / 2));
+  const defenderCount = aliveMembers.filter(m => defenders.has(m.user_id)).length;
+  if (defenderCount >= needed) {
+    const breakDmg = Math.max(12, Math.floor(enemy.max_hp * 0.035));
+    enemy.hp = Math.max(0, enemy.hp - breakDmg);
+    log.push(`🧩 **Raid Mechanic:** ${defenderCount}/${needed} người phòng thủ đúng lúc — phá nhịp boss, gây **${breakDmg}** sát thương!`);
+    return true;
+  }
+
+  const pulseLines: string[] = [];
+  for (let i = 0; i < aliveMembers.length; i++) {
+    const target = aliveMembers[i];
+    const dmg = Math.max(3, Math.floor(enemy.atk * 0.38 - target.def * 0.18));
+    target.hp = Math.max(0, target.hp - dmg);
+    if (target.hp <= 0) target.alive = false;
+    pulseLines.push(`**${target.name}** −${dmg} HP${target.alive ? '' : ' 💀'}`);
+  }
+  log.push(`🧩 **Raid Mechanic thất bại:** cần ${needed} người phòng thủ, chỉ có ${defenderCount}. Boss quét toàn đội! ${pulseLines.join(' · ')}`);
+  return true;
+}
+
 function getPartyAttackPool(enemy: PartyCombatEnemy, baseDef: any): string[] {
   const phase = enemy.boss && Array.isArray(baseDef.phases)
     ? baseDef.phases.find((p: any) => p.phaseIndex === (enemy.phaseIndex ?? 1))
@@ -294,7 +350,7 @@ function displayDrop(itemId: string): string {
   return it ? `${it.icon} ${it.name}` : itemId;
 }
 
-function rollPartyDrops(userId: string, guildId: string, enemyDef: any): string[] {
+function rollPartyDrops(userId: string, guildId: string, enemyDef: any, extraDropPct = 0): string[] {
   const drops: string[] = [];
 
   // Guaranteed drops must work in party combat too, otherwise miniboss route items can be missed.
@@ -304,7 +360,7 @@ function rollPartyDrops(userId: string, guildId: string, enemyDef: any): string[
   }
 
   for (const drop of enemyDef.drops ?? []) {
-    if (Math.random() * 100 <= drop.chance) {
+    if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * extraDropPct / 100)) {
       addItem(userId, guildId, drop.itemId, 1);
       drops.push(displayDrop(drop.itemId));
     }
@@ -312,7 +368,7 @@ function rollPartyDrops(userId: string, guildId: string, enemyDef: any): string[
 
   const eqDrops = Object.values(EQUIPMENT).filter(e => e.dropFrom?.includes(enemyDef.id) && e.dropChance);
   for (const eq of eqDrops) {
-    if (Math.random() * 100 <= (eq.dropChance ?? 0)) {
+    if (Math.random() * 100 <= (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * extraDropPct / 100)) {
       addItem(userId, guildId, eq.id, 1);
       drops.push(displayDrop(eq.id));
     }
@@ -377,13 +433,15 @@ export async function startPartyCombatFlow(
   }
   const extraMembers = Math.max(0, members.length - 1);
   const isBoss = !!baseDef.boss;
-  const levelScaling = isBoss ? getBossLevelScaling(baseDef, members.map(m => m.level)) : null;
-  const hpScale = (isBoss ? (1.20 + 1.05 * extraMembers) : (1 + 0.65 * extraMembers)) * (levelScaling?.hpMult ?? 1);
-  const atkScale = (isBoss ? (1.10 + 0.18 * extraMembers) : (1 + 0.10 * extraMembers)) * (levelScaling?.atkMult ?? 1);
-  const defScale = levelScaling?.defMult ?? 1;
+  const participantLevels = members.map(m => m.level);
+  const levelScaling = isBoss ? getBossLevelScaling(baseDef, participantLevels) : getMonsterLevelScaling(baseDef, participantLevels);
+  const hpScale = (isBoss ? (1.20 + 1.05 * extraMembers) : (1 + 0.65 * extraMembers)) * levelScaling.hpMult;
+  const atkScale = (isBoss ? (1.10 + 0.18 * extraMembers) : (1 + 0.10 * extraMembers)) * levelScaling.atkMult;
+  const defScale = levelScaling.defMult;
+  const defBonus = (levelScaling as any).defBonus ?? 0;
   const scaledHp = Math.round(baseDef.hp * hpScale);
   const scaledAtk = Math.round(baseDef.atk * atkScale);
-  const scaledDef = Math.round(baseDef.def * defScale);
+  const scaledDef = Math.round((baseDef.def ?? 0) * defScale + defBonus);
   const enemy: PartyCombatEnemy = {
     id: baseDef.id,
     name: baseDef.name,
@@ -393,11 +451,13 @@ export async function startPartyCombatFlow(
     atk: scaledAtk,
     base_atk: scaledAtk,
     def: scaledDef,
+    level: ((levelScaling as any).effectiveLevel ?? levelScaling.avgLevel ?? baseDef.level),
+    level_scale_desc: levelScaling.desc,
     boss: baseDef.boss ?? false,
     specialAttacks: baseDef.specialAttacks ?? [],
     phaseIndex: 1,
     guard_turns: 0,
-    level_special_bonus: levelScaling?.specialBonus ?? 0
+    level_special_bonus: (levelScaling as any)?.specialBonus ?? 0
   };
 
   const sessionId = `${leaderId.slice(-6)}_${Date.now().toString(36)}`;
@@ -520,7 +580,8 @@ export async function startPartyCombatFlow(
 
     // ── Enemy attacks party members ────────────────────────────────────────────
     const targets = members.filter(m => m.alive);
-    if (targets.length > 0) {
+    const raidMechanicResolved = resolveRaidMechanic(enemy, targets, defenders, turn, log);
+    if (targets.length > 0 && !raidMechanicResolved && enemy.hp > 0) {
       const phase = enemy.phaseIndex ?? 1;
       const attackPool = getPartyAttackPool(enemy, baseDef);
       const baseSpecialChance = enemy.boss ? (phase >= 3 ? 72 : phase >= 2 ? 58 : 45) : 25;
@@ -625,29 +686,40 @@ export async function startPartyCombatFlow(
   }
 
   const rewardScale = levelScaling?.rewardMult ?? 1;
-  const expReward  = Math.round((baseDef.expReward * rewardScale) / survivors.length);
-  const goldReward = Math.round(
+  const baseExpReward  = Math.round((baseDef.expReward * rewardScale) / survivors.length);
+  const baseGoldReward = Math.round(
     randInt(Math.round((baseDef.goldMin ?? 5) * rewardScale), Math.round((baseDef.goldMax ?? 20) * rewardScale)) / survivors.length
   );
 
   const rewardLines: string[] = [];
   const bossLines: string[] = [];
   for (const m of survivors) {
+    const factionMods = getFactionRewardMods(m.user_id, guildId);
+    const petMods = getPetRewardMods(m.user_id, guildId);
+    const expReward = Math.max(1, Math.floor(baseExpReward * (1 + (factionMods.expPct + petMods.expPct) / 100)));
+    const goldReward = Math.max(0, Math.floor(baseGoldReward * (1 + (factionMods.goldPct + petMods.goldPct) / 100)));
     grantExp(m.user_id, guildId, expReward);
     grantGold(m.user_id, guildId, goldReward);
     incrementKills(m.user_id, guildId);
     incrementDaily(m.user_id, guildId, 'kill_count');
+    let unlockedRecipes: string[] = [];
     const fresh = getPlayer(m.user_id, guildId);
     if (fresh) {
       incrementChapterObjective(m.user_id, guildId, 'kill_in_zone', { zoneId: fresh.zone_id, enemyId: baseDef.id });
-      if (baseDef.boss) incrementChapterObjective(m.user_id, guildId, 'kill_boss', { zoneId: fresh.zone_id, enemyId: baseDef.id });
+      unlockedRecipes = unlockRecipesBySource(m.user_id, guildId, baseDef.id);
+      if (baseDef.boss) {
+        incrementChapterObjective(m.user_id, guildId, 'kill_boss', { zoneId: fresh.zone_id, enemyId: baseDef.id });
+        markPlayerClearedBoss(guildId, m.user_id, baseDef.id);
+      }
       logEvent(guildId, m.user_id, fresh.name, baseDef.boss ? 'boss_kill' : 'kill', `cùng party tiêu diệt **${baseDef.icon} ${baseDef.name}**.`, fresh.zone_id);
-      if (baseDef.boss && baseDef.deathWorldFlag) unlockRecipesBySource(m.user_id, guildId, baseDef.id);
     }
-    const drops = rollPartyDrops(m.user_id, guildId, baseDef);
-    rewardLines.push(`⚔️ **${m.name}** — +**${expReward} EXP**, +**${goldReward} Gold**${drops.length ? `\n  📦 ${drops.join(', ')}` : ''}`);
+    const drops = rollPartyDrops(m.user_id, guildId, baseDef, factionMods.dropPct);
+    const petLines = fresh ? [...applyActivePetAfterVictory(m.user_id, guildId, fresh, baseDef as any), ...grantPetDropAfterVictory(m.user_id, guildId, baseDef as any)] : [];
+    const achievementLines = fresh ? awardAchievements(m.user_id, guildId) : [];
+    const bonusLines = [...factionMods.lines, ...petMods.lines, ...petLines, ...(unlockedRecipes.length ? [`📜 Mở khóa ${unlockedRecipes.length} recipe`] : [])];
+    rewardLines.push(`⚔️ **${m.name}** — +**${expReward} EXP**, +**${goldReward} Gold**${drops.length ? `\n  📦 ${drops.join(', ')}` : ''}${bonusLines.length ? `\n  ✨ ${bonusLines.join(' · ')}` : ''}${achievementLines.length ? `\n  🏆 ${achievementLines.join(' · ')}` : ''}`);
   }
-  if (baseDef.boss && baseDef.deathWorldFlag && survivors[0]) {
+  if (baseDef.boss && survivors[0]) {
     const first = getPlayer(survivors[0].user_id, guildId);
     if (first) bossLines.push(onBossKilled(guildId, baseDef.id, first.name, first.zone_id));
   }
@@ -655,19 +727,35 @@ export async function startPartyCombatFlow(
     rewardLines.push(`💀 ~~**${m.name}**~~ — KO'd, không nhận thưởng`);
   }
 
-  await interaction.editReply({
-    embeds: [new EmbedBuilder().setColor(COLORS.success)
-      .setTitle(`🏆 Chiến Thắng! ${enemy.icon} ${enemy.name} Bị Hạ!`)
-      .setDescription(
-        `Party đã chiến thắng sau **${turn - 1} lượt**!\n\n` +
-        `**Phần thưởng (chia đều):**\n${rewardLines.join('\n')}\n${bossLines.length ? `\n${bossLines.join('\n')}` : ''}`
-      )
-    ],
-    components: []
-  });
+  const rewardText = safeJoinLines(rewardLines);
+  const bossText = bossLines.length ? `\n\n${bossLines.join('\n')}` : '';
+  const victoryDescription = clampDiscordDescription(
+    `Party đã chiến thắng sau **${turn - 1} lượt**!\n\n` +
+    `**Phần thưởng (chia đều):**\n${rewardText}${bossText}`
+  );
+  const victoryEmbed = new EmbedBuilder()
+    .setColor(COLORS.success)
+    .setTitle(`🏆 Chiến Thắng! ${enemy.icon} ${enemy.name} Bị Hạ!`)
+    .setDescription(victoryDescription);
 
-  if (onVictory) await onVictory(members, enemy);
+  try {
+    await interaction.editReply({ embeds: [victoryEmbed], components: [] });
+  } catch (err: any) {
+    if (err?.code === 50035) {
+      await interaction.editReply({
+        embeds: [new EmbedBuilder().setColor(COLORS.success)
+          .setTitle(`🏆 Chiến Thắng! ${enemy.icon} ${enemy.name} Bị Hạ!`)
+          .setDescription('Party đã hạ boss/quái thành công. Phần thưởng đã được cộng, nhưng log quá dài nên bot đã rút gọn để tránh lỗi Discord.')],
+        components: []
+      }).catch(() => {});
+    } else {
+      throw err;
+    }
+  }
+
+  if (onVictory) await onVictory(survivors, enemy);
 }
+
 
 
 /**

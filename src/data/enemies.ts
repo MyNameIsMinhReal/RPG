@@ -39,31 +39,31 @@ export interface EnemyDef {
 export const ENEMIES: Record<string, EnemyDef> = {
   // ── FOREST ──────────────────────────────────────────────────────
   forest_sprite: {
-    id: 'forest_sprite', name: 'Forest Sprite', icon: '🧚', level: 1,
+    id: 'forest_sprite', name: 'Gloomleaf Sprite', icon: '🧚', level: 1,
     hp: 40, atk: 8, def: 3, expReward: 20, goldMin: 5, goldMax: 15,
-    drops: [{ itemId: 'healing_herb', chance: 45 }, { itemId: 'slime_core', chance: 30 }, { itemId: 'wood', chance: 40 }, { itemId: 'book_fireball', chance: 5 }],
+    drops: [{ itemId: 'healing_herb', chance: 45 }, { itemId: 'slime_core', chance: 30 }, { itemId: 'wood', chance: 40 }, { itemId: 'ancient_book', chance: 5 }],
     specialAttacks: ['petal_storm'],
     zones: ['forest'],
     lore: 'Một tinh linh rừng nhỏ bị nhiễm độc bởi bóng tối.'
   },
   cursed_wolf: {
-    id: 'cursed_wolf', name: 'Cursed Wolf', icon: '🐺', level: 2,
+    id: 'cursed_wolf', name: 'Blood-Eyed Wolf', icon: '🐺', level: 2,
     hp: 65, atk: 14, def: 5, expReward: 40, goldMin: 10, goldMax: 25,
-    drops: [{ itemId: 'wolf_fang', chance: 55 }, { itemId: 'leather', chance: 45 }, { itemId: 'book_berserker', chance: 8 }],
+    drops: [{ itemId: 'wolf_fang', chance: 55 }, { itemId: 'leather', chance: 45 }, { itemId: 'ancient_book', chance: 8 }],
     specialAttacks: ['double_bite', 'howl'],
     zones: ['forest'],
     lore: 'Bị lời nguyền biến thành quái vật, đôi mắt đỏ rực bùng cháy.'
   },
   vine_golem: {
-    id: 'vine_golem', name: 'Vine Golem', icon: '🌿', level: 3,
+    id: 'vine_golem', name: 'Rootbound Golem', icon: '🌿', level: 3,
     hp: 90, atk: 16, def: 12, expReward: 65, goldMin: 20, goldMax: 40,
-    drops: [{ itemId: 'ancient_bark', chance: 45 }, { itemId: 'wood', chance: 50 }, { itemId: 'stone', chance: 30 }, { itemId: 'book_iron_skin', chance: 10 }],
+    drops: [{ itemId: 'ancient_bark', chance: 45 }, { itemId: 'wood', chance: 50 }, { itemId: 'stone', chance: 30 }, { itemId: 'ancient_book', chance: 10 }],
     specialAttacks: ['entangle'],
     zones: ['forest'],
     lore: 'Cây cổ thụ ngàn năm bị hồn ma chiếm đóng, rễ cây trở thành nanh vuốt.'
   },
   moss_lurker: {
-    id: 'moss_lurker', name: 'Moss Lurker', icon: '🌱', level: 2,
+    id: 'moss_lurker', name: 'Mosslurker', icon: '🌱', level: 2,
     hp: 55, atk: 12, def: 4, expReward: 35, goldMin: 8, goldMax: 20,
     drops: [{ itemId: 'healing_herb', chance: 50 }, { itemId: 'slime_core', chance: 35 }, { itemId: 'wood', chance: 30 }],
     specialAttacks: ['toxic_spores', 'ambush'],
@@ -71,7 +71,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Sinh vật rêu ẩn nấp trong bóng tối, chờ đợi để tấn công bất ngờ.'
   },
   thornhound: {
-    id: 'thornhound', name: 'Thornhound', icon: '🐾', level: 3,
+    id: 'thornhound', name: 'Briar Hound', icon: '🐾', level: 3,
     hp: 70, atk: 17, def: 6, expReward: 55, goldMin: 12, goldMax: 28,
     drops: [{ itemId: 'leather', chance: 50 }, { itemId: 'wolf_fang', chance: 35 }, { itemId: 'healing_herb', chance: 25 }],
     specialAttacks: ['savage_bite', 'frenzy'],
@@ -79,7 +79,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Chó rừng mọc gai từ da thịt, mỗi cú cắn để lại vết thương sâu.'
   },
   cursed_treant: {
-    id: 'cursed_treant', name: 'Cursed Treant', icon: '🌲', level: 4,
+    id: 'cursed_treant', name: 'Hollowbark Treant', icon: '🌲', level: 4,
     hp: 100, atk: 15, def: 14, expReward: 75, goldMin: 18, goldMax: 38,
     drops: [{ itemId: 'ancient_bark', chance: 50 }, { itemId: 'wood', chance: 60 }, { itemId: 'healing_herb', chance: 20 }],
     specialAttacks: ['thorn_lash', 'bark_regen'],
@@ -87,7 +87,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Cây cổ thụ bị nguyền rủa, không thể chết nhưng cũng không thể sống.'
   },
   will_o_wisp: {
-    id: 'will_o_wisp', name: "Will-o'-Wisp", icon: '🔵', level: 2,
+    id: 'will_o_wisp', name: "Graveglow Wisp", icon: '🔵', level: 2,
     hp: 45, atk: 14, def: 3, expReward: 38, goldMin: 6, goldMax: 18,
     drops: [{ itemId: 'mana_crystal', chance: 40 }, { itemId: 'ectoplasm', chance: 30 }],
     specialAttacks: ['soul_flicker', 'bewitch'],
@@ -96,7 +96,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
 
   ember_bloom: {
-    id: 'ember_bloom', name: 'Ember Bloom', icon: '🌺', level: 2,
+    id: 'ember_bloom', name: 'Cinderbloom', icon: '🌺', level: 2,
     hp: 58, atk: 15, def: 4, expReward: 42, goldMin: 9, goldMax: 22,
     drops: [{ itemId: 'healing_herb', chance: 35 }, { itemId: 'burning_core', chance: 8 }, { itemId: 'wood', chance: 25 }],
     specialAttacks: ['heat_burst', 'petal_storm'],
@@ -104,7 +104,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Đóa hoa đỏ rực mọc trên đất nguyền, cánh hoa nóng như than hồng.'
   },
   hollow_stag: {
-    id: 'hollow_stag', name: 'Hollow Stag', icon: '🦌', level: 3,
+    id: 'hollow_stag', name: 'Hollowhorn Stag', icon: '🦌', level: 3,
     hp: 78, atk: 18, def: 7, expReward: 60, goldMin: 14, goldMax: 30,
     drops: [{ itemId: 'leather', chance: 45 }, { itemId: 'ancient_bark', chance: 22 }, { itemId: 'wolf_fang', chance: 18 }],
     specialAttacks: ['soul_flicker', 'savage_bite'],
@@ -112,7 +112,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Con hươu rỗng ruột, bên trong chỉ còn tiếng gió và ánh mắt xanh lạnh.'
   },
   spore_kin: {
-    id: 'spore_kin', name: 'Spore Kin', icon: '🍄', level: 3,
+    id: 'spore_kin', name: 'Sporebound Kin', icon: '🍄', level: 3,
     hp: 72, atk: 16, def: 8, expReward: 58, goldMin: 12, goldMax: 28,
     drops: [{ itemId: 'glowing_mushroom', chance: 35 }, { itemId: 'healing_herb', chance: 35 }, { itemId: 'slime_core', chance: 20 }],
     specialAttacks: ['toxic_spores', 'bewitch'],
@@ -120,35 +120,37 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Sinh vật nấm biết đi, gieo bào tử khiến kẻ lạc đường nghe thấy tiếng gọi giả.'
   },
   briar_witch: {
-    id: 'briar_witch', name: 'Briar Witch', icon: '🧙‍♀️', level: 4,
+    id: 'briar_witch', name: 'Briar Hag', icon: '🧙‍♀️', level: 4,
     hp: 86, atk: 21, def: 8, expReward: 82, goldMin: 20, goldMax: 42,
-    drops: [{ itemId: 'rare_herb', chance: 25 }, { itemId: 'rune_ink', chance: 15 }, { itemId: 'book_mend_wounds', chance: 7 }],
+    drops: [{ itemId: 'rare_herb', chance: 25 }, { itemId: 'rune_ink', chance: 15 }, { itemId: 'ancient_book', chance: 7 }],
     specialAttacks: ['entangle', 'death_curse'],
     zones: ['forest'],
     lore: 'Phù thủy gai sống trong bụi mâm xôi đen, đổi máu lấy lời nguyền.'
   },
   alpha_thornmaw: {
-    id: 'alpha_thornmaw', name: 'Alpha Thornmaw', icon: '🐺', level: 5,
+    id: 'alpha_thornmaw', name: 'Thornfang, Alpha of the Wilds', icon: '🐺', level: 5,
     hp: 168, atk: 29, def: 14, expReward: 130, goldMin: 45, goldMax: 85,
-    drops: [{ itemId: 'wolf_fang', chance: 75 }, { itemId: 'leather', chance: 60 }, { itemId: 'hunter_mark', chance: 8 }, { itemId: 'book_berserker', chance: 12 }],
+    drops: [{ itemId: 'wolf_fang', chance: 75 }, { itemId: 'leather', chance: 60 }, { itemId: 'hunter_mark', chance: 8 }, { itemId: 'ancient_book', chance: 12 }],
+    guaranteedDrops: ['thornfang_fang'],
     specialAttacks: ['howl', 'double_bite', 'frenzy'],
     zones: ['forest'], miniboss: true,
     lore: 'Con đầu đàn của bầy sói gai. Tiếng hú của nó làm cả rừng im bặt.'
   },
   moss_crowned_stag: {
-    id: 'moss_crowned_stag', name: 'Moss-Crowned Stag', icon: '🦌', level: 5,
+    id: 'moss_crowned_stag', name: 'Elarok, Warden of the Root-Crown', icon: '🦌', level: 5,
     hp: 180, atk: 25, def: 18, expReward: 140, goldMin: 42, goldMax: 90,
-    drops: [{ itemId: 'ancient_bark', chance: 70 }, { itemId: 'rare_herb', chance: 28 }, { itemId: 'crown_fragment', chance: 10 }, { itemId: 'book_iron_skin', chance: 12 }],
+    drops: [{ itemId: 'ancient_bark', chance: 70 }, { itemId: 'rare_herb', chance: 28 }, { itemId: 'grove_crown_fragment', chance: 10 }, { itemId: 'ancient_book', chance: 12 }],
+    guaranteedDrops: ['grove_crown_fragment'],
     specialAttacks: ['root_slam', 'nature_regeneration', 'entangle'],
     zones: ['forest'], miniboss: true,
     lore: 'Linh thú già đội vương miện rêu. Nó không ác, nhưng không tha thứ cho kẻ xâm phạm.'
   },
   ancient_oak: {
-    id: 'ancient_oak', name: 'Ancient Oak', icon: '🌳', level: 7,
+    id: 'ancient_oak', name: 'Ancient Oak Guardian', icon: '🌳', level: 7,
     hp: 820, atk: 58, def: 42, expReward: 650, goldMin: 190, goldMax: 300,
     drops: [
-      { itemId: 'book_tough_body', chance: 45 },
-      { itemId: 'book_mend_wounds', chance: 35 },
+      { itemId: 'ancient_book', chance: 45 },
+      { itemId: 'ancient_book', chance: 35 },
       { itemId: 'elixir', chance: 25 },
       { itemId: 'ancient_relic', chance: 20 },
       { itemId: 'wood', chance: 100 },
@@ -184,23 +186,23 @@ export const ENEMIES: Record<string, EnemyDef> = {
 
   // ── SHRINE ──────────────────────────────────────────────────────
   skeleton_archer: {
-    id: 'skeleton_archer', name: 'Skeleton Archer', icon: '💀', level: 3,
+    id: 'skeleton_archer', name: 'Oathbound Archer', icon: '💀', level: 3,
     hp: 70, atk: 18, def: 6, expReward: 60, goldMin: 15, goldMax: 35,
-    drops: [{ itemId: 'bone_shard', chance: 55 }, { itemId: 'ancient_bone', chance: 20 }, { itemId: 'silver_ore', chance: 15 }, { itemId: 'book_shadow_step', chance: 8 }],
+    drops: [{ itemId: 'bone_shard', chance: 55 }, { itemId: 'ancient_bone', chance: 20 }, { itemId: 'silver_ore', chance: 15 }, { itemId: 'ancient_book', chance: 8 }],
     specialAttacks: ['piercing_arrow'],
     zones: ['shrine'],
     lore: 'Linh hồn lính canh cổ đền bị giam cầm, vẫn bảo vệ nơi thiêng liêng.'
   },
   phantom: {
-    id: 'phantom', name: 'Phantom', icon: '👻', level: 4,
+    id: 'phantom', name: 'Veil Phantom', icon: '👻', level: 4,
     hp: 80, atk: 20, def: 8, expReward: 85, goldMin: 25, goldMax: 50,
-    drops: [{ itemId: 'ectoplasm', chance: 60 }, { itemId: 'mana_crystal', chance: 25 }, { itemId: 'frost_shard', chance: 15 }, { itemId: 'book_counter', chance: 10 }],
+    drops: [{ itemId: 'ectoplasm', chance: 60 }, { itemId: 'mana_crystal', chance: 25 }, { itemId: 'frost_shard', chance: 15 }, { itemId: 'ancient_book', chance: 10 }],
     specialAttacks: ['drain_mp', 'phase_through'],
     zones: ['shrine'],
     lore: 'Bóng ma không đầu lang thang, tìm kiếm linh hồn để hoàn chỉnh bản thân.'
   },
   bone_mage: {
-    id: 'bone_mage', name: 'Bone Mage', icon: '🧙', level: 5,
+    id: 'bone_mage', name: 'Marrow Hexer', icon: '🧙', level: 5,
     hp: 85, atk: 22, def: 7, expReward: 95, goldMin: 22, goldMax: 48,
     drops: [{ itemId: 'bone_shard', chance: 55 }, { itemId: 'ancient_bone', chance: 30 }, { itemId: 'mana_crystal', chance: 20 }],
     specialAttacks: ['bone_shards', 'death_curse'],
@@ -251,7 +253,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   scripture_mimic: {
     id: 'scripture_mimic', name: 'Scripture Mimic', icon: '📖', level: 5,
     hp: 105, atk: 22, def: 13, expReward: 104, goldMin: 22, goldMax: 55,
-    drops: [{ itemId: 'rune_ink', chance: 28 }, { itemId: 'mana_crystal', chance: 32 }, { itemId: 'book_counter', chance: 7 }],
+    drops: [{ itemId: 'rune_ink', chance: 28 }, { itemId: 'mana_crystal', chance: 32 }, { itemId: 'ancient_book', chance: 7 }],
     specialAttacks: ['idol_curse', 'hex_bolt'],
     zones: ['shrine'],
     lore: 'Cuốn kinh biết nuốt người đọc. Chữ trên trang bò như kiến đen.'
@@ -259,25 +261,25 @@ export const ENEMIES: Record<string, EnemyDef> = {
   pale_confessor: {
     id: 'pale_confessor', name: 'Pale Confessor', icon: '🙏', level: 7,
     hp: 212, atk: 35, def: 19, expReward: 190, goldMin: 70, goldMax: 130,
-    drops: [{ itemId: 'ancient_bone', chance: 60 }, { itemId: 'purification_stone', chance: 18 }, { itemId: 'shrine_relic', chance: 6 }, { itemId: 'book_last_stand', chance: 10 }],
+    drops: [{ itemId: 'ancient_bone', chance: 60 }, { itemId: 'purification_stone', chance: 18 }, { itemId: 'shrine_relic', chance: 6 }, { itemId: 'ancient_book', chance: 10 }],
     specialAttacks: ['divine_judgment', 'death_curse', 'banish'],
     zones: ['shrine'], miniboss: true,
     lore: 'Kẻ giải tội không còn mặt. Hắn bắt người sống thú nhận những tội chưa từng phạm.'
   },
   bell_wraith: {
-    id: 'bell_wraith', name: 'Bell Wraith', icon: '🔔', level: 7,
+    id: 'bell_wraith', name: 'Tolling Bell Wraith', icon: '🔔', level: 7,
     hp: 195, atk: 39, def: 15, expReward: 200, goldMin: 65, goldMax: 125,
-    drops: [{ itemId: 'ectoplasm', chance: 70 }, { itemId: 'frost_shard', chance: 30 }, { itemId: 'bell_of_silence', chance: 6 }, { itemId: 'book_thunder_clap', chance: 10 }],
+    drops: [{ itemId: 'ectoplasm', chance: 70 }, { itemId: 'frost_shard', chance: 30 }, { itemId: 'bell_of_silence', chance: 6 }, { itemId: 'ancient_book', chance: 10 }],
     specialAttacks: ['screech', 'drain_mp', 'shatter_guard'],
     zones: ['shrine'], miniboss: true,
     lore: 'Oan hồn của người kéo chuông cuối cùng, tiếng ngân của nó làm giáp nứt vỡ.'
   },
   shrine_guardian: {
-    id: 'shrine_guardian', name: 'Shrine Guardian', icon: '⛩️', level: 8,
+    id: 'shrine_guardian', name: 'Shrine Guardian, Fallen Verdict', icon: '⛩️', level: 8,
     hp: 620, atk: 48, def: 34, expReward: 520, goldMin: 180, goldMax: 300,
     drops: [
-      { itemId: 'book_thunder_clap', chance: 35 },
-      { itemId: 'book_last_stand', chance: 25 },
+      { itemId: 'ancient_book', chance: 35 },
+      { itemId: 'ancient_book', chance: 25 },
       { itemId: 'shrine_relic', chance: 15 }
     ],
     specialAttacks: ['divine_judgment', 'shatter_guard', 'enrage'],
@@ -309,23 +311,23 @@ export const ENEMIES: Record<string, EnemyDef> = {
 
   // ── MINES ────────────────────────────────────────────────────────
   cave_troll: {
-    id: 'cave_troll', name: 'Cave Troll', icon: '👹', level: 5,
+    id: 'cave_troll', name: 'Grotto Breaker', icon: '👹', level: 5,
     hp: 130, atk: 26, def: 10, expReward: 120, goldMin: 30, goldMax: 60,
-    drops: [{ itemId: 'troll_hide', chance: 55 }, { itemId: 'iron_ore', chance: 40 }, { itemId: 'burning_core', chance: 15 }, { itemId: 'book_shield_bash', chance: 12 }],
+    drops: [{ itemId: 'troll_hide', chance: 55 }, { itemId: 'iron_ore', chance: 40 }, { itemId: 'burning_core', chance: 15 }, { itemId: 'ancient_book', chance: 12 }],
     specialAttacks: ['ground_slam', 'rock_throw'],
     zones: ['mines'],
     lore: 'Hung thần hang động, mỗi bước chân làm rung chuyển hầm mỏ.'
   },
   shadow_bat: {
-    id: 'shadow_bat', name: 'Shadow Bat', icon: '🦇', level: 6,
+    id: 'shadow_bat', name: 'Blackwing Leech', icon: '🦇', level: 6,
     hp: 100, atk: 30, def: 7, expReward: 140, goldMin: 35, goldMax: 70,
-    drops: [{ itemId: 'dark_wing', chance: 55 }, { itemId: 'shadow_essence', chance: 30 }, { itemId: 'black_iron', chance: 10 }, { itemId: 'book_vampiric', chance: 12 }],
+    drops: [{ itemId: 'dark_wing', chance: 55 }, { itemId: 'shadow_essence', chance: 30 }, { itemId: 'black_iron', chance: 10 }, { itemId: 'ancient_book', chance: 12 }],
     specialAttacks: ['blood_drain', 'screech'],
     zones: ['mines'],
     lore: 'Sống trong bóng tối tuyệt đối, hút máu để duy trì sự bất tử.'
   },
   lava_crab: {
-    id: 'lava_crab', name: 'Lava Crab', icon: '🦀', level: 6,
+    id: 'lava_crab', name: 'Emberclaw Crab', icon: '🦀', level: 6,
     hp: 120, atk: 24, def: 12, expReward: 130, goldMin: 28, goldMax: 55,
     drops: [{ itemId: 'burning_core', chance: 45 }, { itemId: 'iron_ore', chance: 40 }, { itemId: 'stone', chance: 35 }],
     specialAttacks: ['magma_claw', 'heat_burst'],
@@ -333,7 +335,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Cua dung nham sống trong lõi núi lửa, mai giáp nóng đỏ rực như than hồng.'
   },
   crystal_spider: {
-    id: 'crystal_spider', name: 'Crystal Spider', icon: '🕷️', level: 7,
+    id: 'crystal_spider', name: 'Glassweb Spider', icon: '🕷️', level: 7,
     hp: 105, atk: 28, def: 8, expReward: 145, goldMin: 32, goldMax: 65,
     drops: [{ itemId: 'shadow_essence', chance: 40 }, { itemId: 'iron_ore', chance: 30 }, { itemId: 'black_iron', chance: 15 }],
     specialAttacks: ['crystal_web', 'venom_inject'],
@@ -341,7 +343,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Nhện pha lê dệt tơ cứng như thép, nọc độc làm tê liệt toàn thân.'
   },
   iron_sentinel: {
-    id: 'iron_sentinel', name: 'Iron Sentinel', icon: '🤖', level: 8,
+    id: 'iron_sentinel', name: 'Rust-Iron Sentinel', icon: '🤖', level: 8,
     hp: 150, atk: 32, def: 20, expReward: 170, goldMin: 40, goldMax: 75,
     drops: [{ itemId: 'black_iron', chance: 50 }, { itemId: 'iron_ore', chance: 60 }, { itemId: 'troll_hide', chance: 20 }],
     specialAttacks: ['iron_crush', 'fortress_stance'],
@@ -350,7 +352,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
 
   coal_imp: {
-    id: 'coal_imp', name: 'Coal Imp', icon: '👺', level: 5,
+    id: 'coal_imp', name: 'Cinder Imp', icon: '👺', level: 5,
     hp: 92, atk: 25, def: 8, expReward: 105, goldMin: 24, goldMax: 50,
     drops: [{ itemId: 'burning_core', chance: 20 }, { itemId: 'stone', chance: 40 }, { itemId: 'iron_ore', chance: 32 }],
     specialAttacks: ['heat_burst', 'rock_throw'],
@@ -358,7 +360,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Tiểu quỷ than chuyên phá đuốc của thợ mỏ, cười khanh khách trong bóng tối.'
   },
   ore_devourer: {
-    id: 'ore_devourer', name: 'Ore Devourer', icon: '🪱', level: 6,
+    id: 'ore_devourer', name: 'Oremaw Devourer', icon: '🪱', level: 6,
     hp: 135, atk: 27, def: 15, expReward: 135, goldMin: 32, goldMax: 68,
     drops: [{ itemId: 'iron_ore', chance: 65 }, { itemId: 'silver_ore', chance: 25 }, { itemId: 'black_iron', chance: 12 }],
     specialAttacks: ['ground_slam', 'crystal_web'],
@@ -366,7 +368,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Sâu mỏ ăn quặng để lớn lên, để lại đường hầm trống rỗng sau lưng.'
   },
   soot_harpy: {
-    id: 'soot_harpy', name: 'Soot Harpy', icon: '🪽', level: 7,
+    id: 'soot_harpy', name: 'Ashwing Harpy', icon: '🪽', level: 7,
     hp: 110, atk: 33, def: 8, expReward: 150, goldMin: 36, goldMax: 76,
     drops: [{ itemId: 'dark_wing', chance: 45 }, { itemId: 'shadow_essence', chance: 28 }, { itemId: 'black_iron', chance: 10 }],
     specialAttacks: ['screech', 'phantom_shot'],
@@ -374,7 +376,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Điểu nữ phủ bồ hóng bay trong giếng thông gió, lao xuống như mũi tên đen.'
   },
   molten_jailer: {
-    id: 'molten_jailer', name: 'Molten Jailer', icon: '⛓️', level: 8,
+    id: 'molten_jailer', name: 'Chain-Molten Jailer', icon: '⛓️', level: 8,
     hp: 150, atk: 32, def: 18, expReward: 180, goldMin: 42, goldMax: 88,
     drops: [{ itemId: 'black_iron', chance: 42 }, { itemId: 'burning_core', chance: 35 }, { itemId: 'cursed_blood', chance: 8 }],
     specialAttacks: ['magma_claw', 'entangle', 'iron_crush'],
@@ -382,27 +384,27 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Cai ngục dung nham kéo theo xiềng xích đỏ rực, giam giữ cả tiếng hét trong đá.'
   },
   slag_brute: {
-    id: 'slag_brute', name: 'Slag Brute', icon: '🧱', level: 9,
+    id: 'slag_brute', name: 'Slagbound Brute', icon: '🧱', level: 9,
     hp: 285, atk: 49, def: 25, expReward: 260, goldMin: 90, goldMax: 170,
-    drops: [{ itemId: 'black_iron', chance: 70 }, { itemId: 'troll_hide', chance: 42 }, { itemId: 'colossus_core', chance: 8 }, { itemId: 'book_tough_body', chance: 10 }],
+    drops: [{ itemId: 'black_iron', chance: 70 }, { itemId: 'troll_hide', chance: 42 }, { itemId: 'colossus_core', chance: 8 }, { itemId: 'ancient_book', chance: 10 }],
     specialAttacks: ['ground_slam', 'iron_crush', 'fortress_stance'],
     zones: ['mines'], miniboss: true,
     lore: 'Khối xỉ thép mang hình người, mỗi cú đấm nện xuống như búa máy.'
   },
   rustbound_foreman: {
-    id: 'rustbound_foreman', name: 'Rustbound Foreman', icon: '👷', level: 9,
+    id: 'rustbound_foreman', name: 'Rustbound Taskmaster', icon: '👷', level: 9,
     hp: 258, atk: 45, def: 27, expReward: 275, goldMin: 95, goldMax: 180,
-    drops: [{ itemId: 'rusty_gear', chance: 80 }, { itemId: 'black_iron', chance: 55 }, { itemId: 'guard_emblem', chance: 8 }, { itemId: 'book_shield_bash', chance: 12 }],
+    drops: [{ itemId: 'rusty_gear', chance: 80 }, { itemId: 'black_iron', chance: 55 }, { itemId: 'guard_emblem', chance: 8 }, { itemId: 'ancient_book', chance: 12 }],
     specialAttacks: ['rock_throw', 'fortress_stance', 'seismic_slam'],
     zones: ['mines'], miniboss: true,
     lore: 'Quản đốc mỏ đã chết nhưng vẫn thổi còi bắt mọi linh hồn quay lại làm việc.'
   },
   mine_colossus: {
-    id: 'mine_colossus', name: 'Mine Colossus', icon: '🪨', level: 11,
+    id: 'mine_colossus', name: 'Mine Colossus, Heart of the Deep', icon: '🪨', level: 11,
     hp: 900, atk: 62, def: 39, expReward: 850, goldMin: 300, goldMax: 480,
     drops: [
-      { itemId: 'book_ice_lance', chance: 30 },
-      { itemId: 'book_mana_flow', chance: 25 },
+      { itemId: 'ancient_book', chance: 30 },
+      { itemId: 'ancient_book', chance: 25 },
       { itemId: 'colossus_core', chance: 25 },
       { itemId: 'dragon_scale', chance: 15 },
       { itemId: 'burning_core', chance: 30 },
@@ -437,23 +439,23 @@ export const ENEMIES: Record<string, EnemyDef> = {
 
   // ── ECHO WASTES ──────────────────────────────────────────────────
   void_wraith: {
-    id: 'void_wraith', name: 'Void Wraith', icon: '🌀', level: 8,
+    id: 'void_wraith', name: 'Nullveil Wraith', icon: '🌀', level: 8,
     hp: 160, atk: 35, def: 12, expReward: 200, goldMin: 50, goldMax: 100,
-    drops: [{ itemId: 'void_essence', chance: 50 }, { itemId: 'broken_soul', chance: 15 }, { itemId: 'abyss_core', chance: 10 }, { itemId: 'book_mark_zone', chance: 15 }],
+    drops: [{ itemId: 'void_essence', chance: 50 }, { itemId: 'broken_soul', chance: 15 }, { itemId: 'abyss_core', chance: 10 }, { itemId: 'ancient_book', chance: 15 }],
     specialAttacks: ['void_drain', 'reality_tear'],
     zones: ['wastes'],
     lore: 'Được sinh ra từ sự hư không, thứ còn lại sau khi linh hồn hoàn toàn tan biến.'
   },
   echo_demon: {
-    id: 'echo_demon', name: 'Echo Demon', icon: '👁️', level: 11,
+    id: 'echo_demon', name: 'Echoing Dreadfiend', icon: '👁️', level: 11,
     hp: 220, atk: 42, def: 18, expReward: 320, goldMin: 70, goldMax: 130,
-    drops: [{ itemId: 'demon_seal', chance: 45 }, { itemId: 'demon_horn', chance: 20 }, { itemId: 'cursed_blood', chance: 12 }, { itemId: 'book_soul_offering', chance: 15 }],
+    drops: [{ itemId: 'demon_seal', chance: 45 }, { itemId: 'demon_horn', chance: 20 }, { itemId: 'cursed_blood', chance: 12 }, { itemId: 'curse_shard', chance: 25 }, { itemId: 'ancient_book', chance: 15 }],
     specialAttacks: ['skill_echo', 'mind_crush'],
     zones: ['wastes'],
     lore: 'Phản chiếu nỗi sợ hãi của người đối diện, bắt chước từng động tác một cách hoàn hảo.'
   },
   mirage_hunter: {
-    id: 'mirage_hunter', name: 'Mirage Hunter', icon: '👤', level: 9,
+    id: 'mirage_hunter', name: 'Mirage Stalker', icon: '👤', level: 9,
     hp: 170, atk: 36, def: 13, expReward: 210, goldMin: 52, goldMax: 105,
     drops: [{ itemId: 'void_essence', chance: 45 }, { itemId: 'shadow_essence', chance: 35 }, { itemId: 'abyss_core', chance: 12 }],
     specialAttacks: ['phantom_shot', 'mirror_split'],
@@ -504,7 +506,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   dust_prophet: {
     id: 'dust_prophet', name: 'Dust Prophet', icon: '🧿', level: 11,
     hp: 170, atk: 45, def: 16, expReward: 310, goldMin: 70, goldMax: 135,
-    drops: [{ itemId: 'demon_seal', chance: 26 }, { itemId: 'rune_ink', chance: 25 }, { itemId: 'book_mark_zone', chance: 8 }],
+    drops: [{ itemId: 'demon_seal', chance: 26 }, { itemId: 'rune_ink', chance: 25 }, { itemId: 'ancient_book', chance: 8 }],
     specialAttacks: ['mind_crush', 'skill_echo'],
     zones: ['wastes'],
     lore: 'Nhà tiên tri bụi nói bằng giọng của người đã chết, gọi đúng tên nỗi hối tiếc của bạn.'
@@ -512,7 +514,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   eclipse_reaver: {
     id: 'eclipse_reaver', name: 'Eclipse Reaver', icon: '🌘', level: 13,
     hp: 388, atk: 65, def: 27, expReward: 520, goldMin: 160, goldMax: 280,
-    drops: [{ itemId: 'abyss_core', chance: 55 }, { itemId: 'void_fragment', chance: 25 }, { itemId: 'eclipse_blade', chance: 4 }, { itemId: 'book_soul_strike', chance: 10 }],
+    drops: [{ itemId: 'abyss_core', chance: 55 }, { itemId: 'void_fragment', chance: 25 }, { itemId: 'eclipse_blade', chance: 4 }, { itemId: 'ancient_book', chance: 10 }],
     specialAttacks: ['abyss_strike', 'reality_tear', 'doom_call'],
     zones: ['wastes'], miniboss: true,
     lore: 'Kẻ gặt nhật thực khoác bóng tối quanh lưỡi hái, cắt cả ánh sáng khỏi vết thương.'
@@ -520,7 +522,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   mirror_knight: {
     id: 'mirror_knight', name: 'Mirror Knight', icon: '🪞', level: 13,
     hp: 410, atk: 61, def: 31, expReward: 540, goldMin: 170, goldMax: 300,
-    drops: [{ itemId: 'lost_memory', chance: 35 }, { itemId: 'broken_crown_fragment', chance: 12 }, { itemId: 'void_core', chance: 12 }, { itemId: 'book_counter', chance: 12 }],
+    drops: [{ itemId: 'lost_memory', chance: 35 }, { itemId: 'broken_crown_fragment', chance: 12 }, { itemId: 'void_core', chance: 12 }, { itemId: 'ancient_book', chance: 12 }],
     specialAttacks: ['mirror_split', 'skill_echo', 'forgotten_rage'],
     zones: ['wastes'], miniboss: true,
     lore: 'Kỵ sĩ gương phản chiếu lối đánh của bạn, nhưng không phản chiếu lòng thương xót.'
@@ -530,8 +532,8 @@ export const ENEMIES: Record<string, EnemyDef> = {
     hp: 1250, atk: 78, def: 46, expReward: 1600, goldMin: 550, goldMax: 900,
     drops: [
       { itemId: 'forgotten_crown', chance: 100 },
-      { itemId: 'book_last_stand', chance: 50 },
-      { itemId: 'book_counter', chance: 50 },
+      { itemId: 'ancient_book', chance: 50 },
+      { itemId: 'ancient_book', chance: 50 },
       { itemId: 'fallen_star_fragment', chance: 30 },
       { itemId: 'broken_soul', chance: 25 },
       { itemId: 'void_fragment', chance: 20 },

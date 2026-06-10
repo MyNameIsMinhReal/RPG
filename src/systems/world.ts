@@ -162,6 +162,7 @@ export function logEvent(
     INSERT INTO event_log (guild_id, user_id, player_name, event_type, description, zone_id)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(guildId, userId, playerName, type, description, zoneId ?? null);
+
 }
 
 export function getRecentEvents(guildId: string, limit = 10): EventEntry[] {

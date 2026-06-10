@@ -4,7 +4,7 @@ import {
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
   ComponentType
 } from 'discord.js';
-import { getPlayer, addItem, getItemQty, getInventory, removeItem, grantSoulShards, applyPassiveStats } from './player';
+import { getPlayer, addItem, getItemQty, getInventory, removeItem, grantSoulShards, applyPassiveStats, getFactionSummary } from './player';
 import { getPartyOf } from './party';
 import { getBookTier, pickDifferentBook } from '../commands/reroll';
 import { onlyUser } from '../utils/collectors';
@@ -14,6 +14,12 @@ import { getItem, ITEMS } from '../data/items';
 import { getEquipment, EQUIPMENT, RARITY_LABELS, SLOT_LABELS } from '../data/equipment';
 import { ZONES } from '../data/zones';
 import db from '../database/index';
+import { getAwakeningStatus, awakenClass } from './classProgression';
+import { FACTIONS, factionTier } from '../data/factions';
+import { getFactionRewardMods } from './factions';
+import { getActivePetInfo, describePetRole } from './petRoles';
+import { CLASSES } from '../data/classes';
+import { ANCIENT_BOOK_STUDY_COST, ancientBookCostLine, buildAncientBookResultEmbed, canStudyAncientBook, studyAncientBook, type AncientBookTier, ANCIENT_BOOK_ITEM_ID, CURSE_SHARD_ITEM_ID } from './skillLearning';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -104,6 +110,285 @@ function villageActorFilter(leaderId: string, guildId: string, opts?: { leaderOn
   };
 }
 
+
+
+function fmtBool(ok: boolean): string {
+  return ok ? '✅' : '❌';
+}
+
+function getClassIconName(classId: string): string {
+  const cls = CLASSES[classId] ?? CLASSES.warrior;
+  return `${cls.icon} ${cls.name}`;
+}
+
+async function showVillageAwakening(
+  interaction: ChatInputCommandInteraction,
+  leaderId: string,
+  guildId: string,
+  actorId: string
+): Promise<void> {
+  const actor = getPlayer(actorId, guildId);
+  if (!actor) {
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Không tìm thấy nhân vật.')], components: [backRow(leaderId)] });
+    return;
+  }
+
+  const status = getAwakeningStatus(actorId, guildId);
+  if (!status) {
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Không tìm thấy tiến trình class.')], components: [backRow(leaderId)] });
+    return;
+  }
+
+  const title = `🌟 Tiến Hoá Class — ${actor.name}`;
+  if (!status.def) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setColor(COLORS.warning)
+        .setTitle(title)
+        .setDescription(`Class hiện tại: **${getClassIconName(status.currentClassId)}**\n\n${status.missing.join('\n')}`)],
+      components: [backRow(leaderId)]
+    });
+    return;
+  }
+
+  const req = status.def.requirement;
+  const reqLines = [
+    `${fmtBool(actor.level >= req.level)} Lv.${req.level} trở lên`,
+    `${fmtBool(actor.gold >= req.gold)} ${req.gold.toLocaleString()} Gold`,
+    req.soulShards ? `${fmtBool((actor as any).soul_shards >= req.soulShards)} ${req.soulShards} Soul Shard` : null,
+    ...(req.items ?? []).map(it => `${fmtBool(getItemQty(actorId, guildId, it.itemId) >= it.qty)} ${it.itemId} x${it.qty} · đang có ${getItemQty(actorId, guildId, it.itemId)}`),
+  ].filter(Boolean).join('\n');
+
+  const embed = new EmbedBuilder()
+    .setColor(status.canAwaken ? COLORS.gold : COLORS.info)
+    .setTitle(title)
+    .setDescription(
+      `Hiện tại: **${getClassIconName(status.currentClassId)}**\n` +
+      `Tiến hoá: **${status.def.icon} ${status.def.name}**\n\n` +
+      `*${status.def.lore}*\n\n` +
+      `**Điều kiện:**\n${reqLines}\n\n` +
+      (status.canAwaken ? '✅ Đủ điều kiện. Bấm **Tiến hoá** để xác nhận.' : `Còn thiếu:\n${status.missing.map(m => `• ${m}`).join('\n')}`)
+    );
+
+  if (!status.canAwaken) {
+    await interaction.editReply({ embeds: [embed], components: [backRow(leaderId)] });
+    return;
+  }
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_awaken_confirm_${leaderId}_${actorId}`).setLabel('Tiến hoá').setEmoji('🌟').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`vill_back_${leaderId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
+  );
+  const msg = await interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await msg.awaitMessageComponent({
+    filter: (i) => {
+      if (i.customId === `vill_back_${leaderId}`) return i.user.id === leaderId;
+      if (i.user.id !== actorId) { rejectVillageInteraction(i, '❌ Chỉ người đang tiến hoá class mới xác nhận được.'); return false; }
+      return true;
+    },
+    componentType: ComponentType.Button,
+    time: 30_000
+  }).catch(() => null);
+
+  if (!btn) return;
+  await safeDeferUpdate(btn);
+  if (btn.customId === `vill_back_${leaderId}`) {
+    await showVillageHall(interaction, leaderId, guildId);
+    return;
+  }
+
+  const result = awakenClass(actorId, guildId);
+  if (!result.ok || !result.toClassId) {
+    const reason = result.reason === 'missing_requirements' ? 'Điều kiện đã thay đổi, hãy kiểm tra lại.' : `Không thể tiến hoá (${result.reason ?? 'unknown'}).`;
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ ${reason}`)], components: [backRow(leaderId)] });
+    return;
+  }
+
+  await interaction.editReply({
+    embeds: [new EmbedBuilder()
+      .setColor(COLORS.gold)
+      .setTitle('🌟 Class Awakened!')
+      .setDescription(`**${actor.name}** đã tiến hoá thành **${getClassIconName(result.toClassId)}**!`)],
+    components: [backRow(leaderId)]
+  });
+}
+
+async function showVillageFactions(
+  interaction: ChatInputCommandInteraction,
+  leaderId: string,
+  guildId: string,
+  actorId: string
+): Promise<void> {
+  const actor = getPlayer(actorId, guildId);
+  if (!actor) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Không tìm thấy nhân vật.')], components: [backRow(leaderId)] }); return; }
+  const values = getFactionSummary(actorId, guildId);
+  const mods = getFactionRewardMods(actorId, guildId);
+  const lines = Object.values(FACTIONS).map(f => {
+    const rep = values[f.id] ?? 0;
+    const sign = rep > 0 ? '+' : '';
+    return `${f.icon} **${f.name}** — **${sign}${rep}** (${factionTier(rep)})\n> ${rep >= 0 ? f.positiveBenefit : f.negativeWarning}`;
+  }).join('\n\n');
+  await interaction.editReply({
+    embeds: [new EmbedBuilder()
+      .setColor(COLORS.info)
+      .setTitle(`🏛️ Danh vọng phe — ${actor.name}`)
+      .setDescription(lines + '\n\n' + (mods.lines.length ? `**Bonus đang có:**\n${mods.lines.join('\n')}` : '**Bonus đang có:** Chưa có bonus faction.'))],
+    components: [backRow(leaderId)]
+  });
+}
+
+async function showVillagePetRole(
+  interaction: ChatInputCommandInteraction,
+  leaderId: string,
+  guildId: string,
+  actorId: string
+): Promise<void> {
+  const actor = getPlayer(actorId, guildId);
+  const pet = getActivePetInfo(actorId, guildId);
+  if (!actor) { await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Không tìm thấy nhân vật.')], components: [backRow(leaderId)] }); return; }
+  if (!pet) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setColor(COLORS.info)
+        .setTitle(`🐾 Đồng hành — ${actor.name}`)
+        .setDescription('Bạn chưa trang bị pet nào. Dùng menu `/pet list` hiện có để xem pet, rồi `/pet equip` để trang bị.')],
+      components: [backRow(leaderId)]
+    });
+    return;
+  }
+  await interaction.editReply({
+    embeds: [new EmbedBuilder()
+      .setColor(COLORS.success)
+      .setTitle(`🐾 Đồng hành — ${actor.name}`)
+      .setDescription(
+        `${pet.icon} **${pet.name}** · Lv.**${pet.level}**/${pet.maxLevel}\n` +
+        `📊 Passive: **+${pet.passivePct.toFixed(1)}%** ${pet.passiveType}\n\n` +
+        `${describePetRole(pet.petId)}`
+      )],
+    components: [backRow(leaderId)]
+  });
+}
+
+
+async function showVillageAncientBookStudy(
+  interaction: ChatInputCommandInteraction,
+  leaderId: string,
+  guildId: string,
+  actorId: string
+): Promise<void> {
+  const actor = getPlayer(actorId, guildId);
+  if (!actor) {
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Không tìm thấy nhân vật.')], components: [backRow(leaderId)] });
+    return;
+  }
+
+  const bookQty = getItemQty(actorId, guildId, ANCIENT_BOOK_ITEM_ID);
+  const shardQty = getItemQty(actorId, guildId, CURSE_SHARD_ITEM_ID);
+  const tierRows = (['t1','t2','t3'] as AncientBookTier[]).map(tier => {
+    const cost = ANCIENT_BOOK_STUDY_COST[tier];
+    const check = canStudyAncientBook(actorId, guildId, tier);
+    return `${check.ok ? '✅' : '❌'} **${cost.label}** — ${ancientBookCostLine(tier)}` + (check.ok ? '' : `\n> ${check.missing.join(' · ')}`);
+  }).join('\n');
+
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.magic)
+    .setTitle(`📖 Cổ Thư Kỹ Năng — ${actor.name}`)
+    .setDescription(
+      `Ancient Book thay cho toàn bộ Skill Book lẻ. Học skill bằng cách gặp event cổ thư ngoài đường, hoặc nghiên cứu tại Hội Quán.\n\n` +
+      `Đang có: 📖 **${bookQty} Ancient Book** · 🔻 **${shardQty} Curse Shard** · 🪙 **${actor.gold} Gold**\n\n` +
+      tierRows
+    );
+
+  const options = (['t1','t2','t3'] as AncientBookTier[]).map(tier => {
+    const cost = ANCIENT_BOOK_STUDY_COST[tier];
+    const check = canStudyAncientBook(actorId, guildId, tier);
+    return new StringSelectMenuOptionBuilder()
+      .setLabel(`Nghiên cứu ${cost.label}`)
+      .setDescription(ancientBookCostLine(tier).slice(0, 100))
+      .setValue(tier)
+      .setEmoji(check.ok ? '📖' : '🔒');
+  });
+
+  const rows: ActionRowBuilder<any>[] = [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`vill_book_study_${leaderId}_${actorId}`)
+        .setPlaceholder('Chọn tier cổ thư để nghiên cứu...')
+        .addOptions(options)
+    ),
+    backRow(leaderId)
+  ];
+
+  const msg = await interaction.editReply({ embeds: [embed], components: rows });
+  const sel = await msg.awaitMessageComponent({
+    filter: (i) => {
+      if (i.customId === `vill_back_${leaderId}`) return i.user.id === leaderId;
+      if (i.user.id !== actorId) { rejectVillageInteraction(i, '❌ Chỉ người đang nghiên cứu cổ thư mới chọn được.'); return false; }
+      return true;
+    },
+    time: 45_000
+  }).catch(() => null);
+
+  if (!sel) { await interaction.editReply({ components: [] }).catch(() => {}); return; }
+  await safeDeferUpdate(sel);
+  if (sel.customId === `vill_back_${leaderId}`) { await showVillageHall(interaction, leaderId, guildId); return; }
+  if (!sel.isStringSelectMenu()) return;
+
+  const tier = sel.values[0] as AncientBookTier;
+  const result = studyAncientBook(actorId, guildId, tier);
+  await interaction.editReply({
+    embeds: [buildAncientBookResultEmbed(actor.name, tier, result)],
+    components: [backRow(leaderId)]
+  });
+}
+
+export async function showVillageHall(
+  interaction: ChatInputCommandInteraction,
+  userId: string, guildId: string
+): Promise<void> {
+  const leader = getPlayer(userId, guildId)!;
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.purple)
+    .setTitle('🏛️ Hội Quán Ashveil')
+    .setDescription(
+      `Leader: **${leader.name}**\n\n` +
+      `Nơi xem các hệ thống dài hạn mà không cần thêm lệnh mới:\n` +
+      `🌟 **Tiến hoá Class** — kiểm tra/tiến hoá khi đủ điều kiện\n` +
+      `🏛️ **Danh vọng phe** — xem reputation và bonus hiện có\n` +
+      `📜 **Chuỗi sự kiện** — xem chain lore/event đang theo\n` +
+      `🐾 **Đồng hành** — xem vai trò pet đang trang bị` +
+      partyVillageHint(userId, guildId)
+    );
+
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_hall_awaken_${userId}`).setLabel('Tiến hoá Class').setEmoji('🌟').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`vill_hall_faction_${userId}`).setLabel('Danh vọng phe').setEmoji('🏛️').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`vill_hall_books_${userId}`).setLabel('Cổ thư').setEmoji('📖').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`vill_hall_pet_${userId}`).setLabel('Đồng hành').setEmoji('🐾').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Rời đi').setStyle(ButtonStyle.Secondary)
+  );
+
+  const msg = await interaction.editReply({ embeds: [embed], components: [row1] });
+  const btn = await msg.awaitMessageComponent({
+    filter: villageActorFilter(userId, guildId),
+    componentType: ComponentType.Button,
+    time: 60_000
+  }).catch(() => null);
+
+  if (!btn) { await interaction.editReply({ components: [] }).catch(() => {}); return; }
+  await safeDeferUpdate(btn);
+  if (btn.customId === `vill_back_${userId}`) {
+    await interaction.editReply({ components: [] }).catch(() => {});
+    return;
+  }
+
+  const actorId = btn.user.id;
+  if (btn.customId === `vill_hall_awaken_${userId}`) await showVillageAwakening(interaction, userId, guildId, actorId);
+  else if (btn.customId === `vill_hall_faction_${userId}`) await showVillageFactions(interaction, userId, guildId, actorId);
+  else if (btn.customId === `vill_hall_books_${userId}`) await showVillageAncientBookStudy(interaction, userId, guildId, actorId);
+  else if (btn.customId === `vill_hall_pet_${userId}`) await showVillagePetRole(interaction, userId, guildId, actorId);
+}
+
 // ── SHOP ──────────────────────────────────────────────────────────────────
 
 export async function showVillageShop(
@@ -156,7 +441,7 @@ export async function showVillageShop(
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
         new StringSelectMenuBuilder()
           .setCustomId(`vill_shop_item_sel_${userId}`)
-          .setPlaceholder('Mua vật phẩm / skill book...')
+          .setPlaceholder('Mua vật phẩm / cổ thư...')
           .addOptions(consumableOptions.slice(0, 25))
       )
     );
@@ -279,11 +564,10 @@ export async function showVillageBlacksmith(
       `Chọn thao tác bên dưới. Vật liệu/Gold sẽ lấy từ **người bấm nút**.${partyVillageHint(userId, guildId)}\n\n` +
       `Mỗi nâng cấp: **Weapon** +2 ATK · **Armor** +2 DEF · **Accessory** +1 ATK`
     )
-    .setFooter({ text: 'Tối đa +5 mỗi trang bị · 🎲 Reroll đổi Skill Book (2 💀)' });
+    .setFooter({ text: 'Tối đa +5 mỗi trang bị · Học skill đã chuyển sang 🏛️ Hội Quán → 📖 Cổ thư' });
 
   const bsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`vill_bs_upgrade_${userId}`).setLabel('Nâng trang bị của tôi').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`vill_bs_reroll_${userId}`).setLabel('Reroll Skill Book của tôi').setEmoji('🎲').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
   );
 
@@ -304,11 +588,6 @@ export async function showVillageBlacksmith(
   }
 
   const actorId = btn.user.id;
-  if (btn.customId === `vill_bs_reroll_${userId}`) {
-    await showBlacksmithReroll(interaction, actorId, guildId, userId);
-    return;
-  }
-
   await showBlacksmithUpgradeList(interaction, actorId, guildId, userId);
 }
 

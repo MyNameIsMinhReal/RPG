@@ -5,6 +5,7 @@ export interface BossLevelScalingResult {
   hpMult: number;
   atkMult: number;
   defMult: number;
+  defBonus: number;
   specialBonus: number;
   rewardMult: number;
   desc: string | null;
@@ -36,31 +37,37 @@ export function getBossLevelScaling(enemy: any, participantLevels: number[]): Bo
   let hpMult = 1;
   let atkMult = 1;
   let defMult = 1;
+  let defBonus = 0;
   let specialBonus = 0;
   let rewardMult = 1;
 
   if (levelDelta > 0) {
     const hpPerLevel = isAncientOak ? 0.05 : 0.04;
     const atkPerLevel = isAncientOak ? 0.035 : 0.03;
+    const defPerLevel = isAncientOak ? 0.035 : 0.030;
     hpMult = 1 + Math.min(isAncientOak ? 0.85 : 0.70, levelDelta * hpPerLevel);
     atkMult = 1 + Math.min(isAncientOak ? 0.55 : 0.45, levelDelta * atkPerLevel);
-    defMult = 1 + Math.min(0.30, levelDelta * 0.02);
+    // DEF uses both multiplier and flat bonus.
+    // Multiplier alone is too weak for early bosses with low base DEF.
+    defMult = 1 + Math.min(isAncientOak ? 0.65 : 0.55, levelDelta * defPerLevel);
+    defBonus = Math.min(isAncientOak ? 28 : 24, Math.floor(levelDelta * (isAncientOak ? 1.35 : 1.10)));
     specialBonus = Math.min(14, Math.floor(levelDelta * 1.5));
     rewardMult = 1 + Math.min(0.35, levelDelta * 0.025);
   } else if (levelDelta < 0) {
     // Underlevel parties get only a tiny mercy. Bosses should still feel dangerous.
     hpMult = Math.max(0.92, 1 + levelDelta * 0.015);
     atkMult = Math.max(0.92, 1 + levelDelta * 0.012);
-    defMult = Math.max(0.95, 1 + levelDelta * 0.008);
+    defMult = Math.max(0.96, 1 + levelDelta * 0.006);
+    defBonus = 0;
   }
 
   const desc = levelDelta === 0
     ? null
     : levelDelta > 0
-      ? `📈 Boss scale: Lv TB ${average} vs đề xuất ${recommendedLevel} → HP x${hpMult.toFixed(2)}, ATK x${atkMult.toFixed(2)}`
-      : `📉 Boss mercy nhẹ: Lv TB ${average} dưới đề xuất ${recommendedLevel} → HP x${hpMult.toFixed(2)}, ATK x${atkMult.toFixed(2)}`;
+      ? `📈 Boss scale: Lv TB ${average} vs đề xuất ${recommendedLevel} → HP x${hpMult.toFixed(2)}, ATK x${atkMult.toFixed(2)}, DEF x${defMult.toFixed(2)}${defBonus > 0 ? ` +${defBonus}` : ''}`
+      : `📉 Boss mercy nhẹ: Lv TB ${average} dưới đề xuất ${recommendedLevel} → HP x${hpMult.toFixed(2)}, ATK x${atkMult.toFixed(2)}, DEF x${defMult.toFixed(2)}`;
 
-  return { recommendedLevel, avgLevel: average, levelDelta, hpMult, atkMult, defMult, specialBonus, rewardMult, desc };
+  return { recommendedLevel, avgLevel: average, levelDelta, hpMult, atkMult, defMult, defBonus, specialBonus, rewardMult, desc };
 }
 
 export function applyBossLevelScaling<T extends any>(enemy: T, participantLevels: number[]): T {
@@ -70,7 +77,7 @@ export function applyBossLevelScaling<T extends any>(enemy: T, participantLevels
     ...(enemy as any),
     hp: Math.max(1, Math.round((enemy as any).hp * s.hpMult)),
     atk: Math.max(1, Math.round((enemy as any).atk * s.atkMult)),
-    def: Math.max(0, Math.round((enemy as any).def * s.defMult)),
+    def: Math.max(0, Math.round(((enemy as any).def ?? 0) * s.defMult + s.defBonus)),
     expReward: Math.max(1, Math.round(((enemy as any).expReward ?? 0) * s.rewardMult)),
     goldMin: Math.max(0, Math.round(((enemy as any).goldMin ?? 0) * s.rewardMult)),
     goldMax: Math.max(0, Math.round(((enemy as any).goldMax ?? 0) * s.rewardMult)),

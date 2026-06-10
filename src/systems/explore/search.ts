@@ -946,8 +946,8 @@ async function showMysteriousFigure(
   } else { // 150g bet
     if (roll <= 25) {        // Big win
       grantGold(userId, guildId, 400);
-      const skBook = pick(['book_fireball','book_iron_skin','book_shadow_step','book_arcane_bolt','book_cleave','book_purify']); addItem(userId, guildId, skBook);
-      title = '🌟 ĐẠI THẮNG!'; desc = `🪙 +**400 Gold** + ${getItem(skBook)?.icon} **${getItem(skBook)?.name}** — "Tuyệt vời! Bạn xứng đáng."`;
+      addItem(userId, guildId, 'ancient_book', 1);
+      title = '🌟 ĐẠI THẮNG!'; desc = `🪙 +**400 Gold** + 📖 **Ancient Book** — "Tuyệt vời! Bạn xứng đáng."`;
     } else if (roll <= 50) { // Good win
       grantGold(userId, guildId, 300);
       title = '🎉 Thắng Lớn!'; desc = `🪙 +**300 Gold** — "Vận may đang theo bạn hôm nay."`;

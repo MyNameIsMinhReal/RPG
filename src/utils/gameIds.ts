@@ -85,7 +85,7 @@ export const GAME_ID_CATEGORY_CHOICES: Array<{ name: string; value: GameIdCatego
 
 // Code-driven explore event IDs. Data-driven events are appended from DATA_DRIVEN_EXPLORE_EVENTS below.
 const CODE_DRIVEN_EXPLORE_EVENT_IDS = [
-  'combat', 'ambush', 'legacy', 'merchant', 'spring', 'trap',
+  'combat', 'ambush', 'legacy', 'merchant', 'gear_buyer', 'spring', 'trap',
   'altar', 'mysterious', 'villager', 'caravan', 'loot', 'soul_shop',
   'abandoned_camp', 'lost_pouch', 'rune_stone', 'treasure_chest', 'wandering_healer', 'spirit_trial',
   'blood_trail', 'nameless_grave', 'memory_seller', 'stranger_campfire', 'cracked_shrine', 'injured_monster',

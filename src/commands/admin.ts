@@ -1,14 +1,15 @@
 import {
   SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, AttachmentBuilder
 } from 'discord.js';
-import { clearPlayerBossProgress, hasPlayerClearedBoss, setFlag } from '../systems/world';
+import { clearPlayerBossProgress, hasPlayerClearedBoss, setFlag, getFlag } from '../systems/world';
 import {
   getPlayer, revivePlayer, applyPassiveStats,
-  grantGold, grantExp, addItem, updatePlayerHpMp
+  grantGold, grantExp, addItem, updatePlayerHpMp, getItemQty
 } from '../systems/player';
 import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
 import { getEquipment } from '../data/equipment';
+import { ENEMIES } from '../data/enemies';
 import { expNext } from '../utils/format';
 import { ZONES } from '../data/zones';
 import db from '../database/index';
@@ -22,6 +23,12 @@ import {
   getGameIdSectionsFor,
   type GameIdCategory,
 } from '../utils/gameIds';
+import {
+  getOakEvent, getOakParticipants, hasOakPrereq,
+  isOakHuntActive, getOakHuntRemaining
+} from '../systems/oakEvent';
+import { getBossRecommendedLevel, getBossLevelScaling } from '../systems/bossScaling';
+import { getCombatByUser } from '../systems/combat';
 
 const BOSS_IDS = Object.values(ZONES)
   .filter(z => z.bossId)
@@ -66,6 +73,33 @@ function resetAncientOakAftermath(guildId: string): number {
     'event_ancient_oak_fall',
     'forest_drop_bonus',
   ]);
+}
+
+
+function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function getWorldFlagRow(guildId: string, key: string): { flag_value: string; expires_at: number | null; created_at: number } | undefined {
+  const now = Math.floor(Date.now() / 1000);
+  return db.prepare(`
+    SELECT flag_value, expires_at, created_at FROM world_state
+    WHERE guild_id=? AND flag_key=? AND (expires_at IS NULL OR expires_at > ?)
+  `).get(guildId, key, now) as { flag_value: string; expires_at: number | null; created_at: number } | undefined;
+}
+
+function okLine(ok: boolean, label: string, detail: string): string {
+  return `${ok ? '✅' : '❌'} **${label}** — ${detail}`;
+}
+
+function warnLine(label: string, detail: string): string {
+  return `⚠️ **${label}** — ${detail}`;
 }
 
 
@@ -160,6 +194,13 @@ export const data = new SlashCommandBuilder()
     .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
   )
   .addSubcommand(sub => sub
+    .setName('check')
+    .setDescription('Kiểm tra điều kiện/debug boss theo ID, dùng được cho boss mới')
+    .addUserOption(opt => opt.setName('user').setDescription('Người chơi cần kiểm tra').setRequired(true))
+    .addStringOption(opt => opt.setName('boss_id').setDescription('ID boss cần check, ví dụ: ancient_oak').setRequired(true))
+    .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
+  )
+  .addSubcommand(sub => sub
     .setName('forceevent')
     .setDescription('Ép event tiếp theo của người chơi khi /explore')
     .addUserOption(opt => opt.setName('user').setDescription('Người chơi').setRequired(true))
@@ -250,6 +291,128 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           { name: 'Oak event đóng', value: `${oakEvents}`, inline: true },
           { name: 'Participant xoá', value: `${oakParticipants}`, inline: true },
           { name: 'Aftermath flag xoá', value: `${aftermathDeleted}`, inline: true },
+        )]
+    });
+    return;
+  }
+
+  // ── check ─────────────────────────────────────────────────────────────────
+  if (sub === 'check') {
+    const target = interaction.options.getUser('user', true);
+    const bossId = interaction.options.getString('boss_id', true).trim();
+    const player = getPlayer(target.id, guildId);
+    const now = Math.floor(Date.now() / 1000);
+
+    if (!player) {
+      await interaction.editReply({ content: `❌ <@${target.id}> chưa có nhân vật.` });
+      return;
+    }
+
+    const enemy = ENEMIES[bossId];
+    const enemyAny = enemy as any;
+    const zoneByBoss = Object.values(ZONES).find(z => z.bossId === bossId);
+    const enemyZones = Array.isArray(enemyAny?.zones) ? enemyAny.zones as string[] : [];
+    const allowedZones = Array.from(new Set([
+      zoneByBoss?.id,
+      ...enemyZones,
+    ].filter(Boolean) as string[]));
+    const allowedZoneText = allowedZones.length > 0
+      ? allowedZones.map(z => `\`${z}\``).join(', ')
+      : 'chưa khai báo zone';
+
+    const cooldownKey = String(enemyAny?.cooldownFlag ?? `boss_${bossId}_slain`);
+    const cooldownFlag = getWorldFlagRow(guildId, cooldownKey);
+    const rawCooldownValue = getFlag(guildId, cooldownKey);
+    const combat = getCombatByUser(target.id, guildId);
+    const alreadyCleared = hasPlayerClearedBoss(guildId, target.id, bossId);
+    const level = Number(player.level ?? 1);
+    const recommendedLevel = enemy ? getBossRecommendedLevel(enemyAny) : 1;
+    const levelScaling = enemy ? getBossLevelScaling(enemyAny, [level]) : null;
+
+    const checks: string[] = [];
+    checks.push(okLine(Boolean(enemy), 'Boss ID tồn tại', enemy ? `${enemy.icon} **${enemy.name}**` : `không tìm thấy \`${bossId}\` trong ENEMIES`));
+    checks.push(okLine(Boolean(enemyAny?.boss), 'Được đánh dấu boss', enemyAny?.boss ? '`boss: true`' : 'thiếu `boss: true` hoặc đây không phải boss'));
+    checks.push(okLine(Boolean(zoneByBoss), 'Có zone boss gate', zoneByBoss ? `${zoneByBoss.icon} ${zoneByBoss.name} → \`${zoneByBoss.id}\`` : 'chưa có `bossId` trong ZONES'));
+    checks.push(okLine(allowedZones.length === 0 || allowedZones.includes(player.zone_id), 'Người chơi ở đúng zone', `hiện tại: \`${player.zone_id}\`, yêu cầu: ${allowedZoneText}`));
+    checks.push(okLine(Boolean(player.alive), 'Còn sống', player.alive ? `${player.hp}/${player.max_hp} HP` : 'người chơi đang chết'));
+    checks.push(okLine(level >= recommendedLevel, 'Level khuyến nghị', `Lv ${level}/${recommendedLevel}`));
+    checks.push(okLine(!cooldownFlag, 'Không bị cooldown world boss', cooldownFlag?.expires_at ? `key \`${cooldownKey}\`, còn ${formatDuration(cooldownFlag.expires_at - now)}` : rawCooldownValue ? `key \`${cooldownKey}\` đang tồn tại: ${rawCooldownValue}` : `không có key \`${cooldownKey}\``));
+    checks.push(okLine(!combat, 'Không đang combat khác', combat ? `đang combat với \`${combat.enemy_id}\`` : 'không có active combat'));
+    checks.push(okLine(!alreadyCleared, 'Chưa clear boss gate cá nhân', alreadyCleared ? `đã có \`boss_cleared_${target.id}_${bossId}\`` : 'chưa clear'));
+
+    const requiredFlag = enemyAny?.requiredFlag ?? enemyAny?.required_flag;
+    if (typeof requiredFlag === 'string' && requiredFlag.trim()) {
+      const flagValue = getFlag(guildId, requiredFlag.trim());
+      checks.push(okLine(Boolean(flagValue), 'Required flag custom', flagValue ? `\`${requiredFlag}\` = ${flagValue}` : `thiếu \`${requiredFlag}\``));
+    }
+
+    const requiredFlags = Array.isArray(enemyAny?.requiredFlags) ? enemyAny.requiredFlags as string[] : [];
+    for (const flag of requiredFlags) {
+      const flagValue = getFlag(guildId, flag);
+      checks.push(okLine(Boolean(flagValue), `Required flag: ${flag}`, flagValue ? String(flagValue) : 'thiếu'));
+    }
+
+    const requiredItems = Array.isArray(enemyAny?.requiredItems)
+      ? enemyAny.requiredItems as Array<{ itemId?: string; id?: string; amount?: number; qty?: number }>
+      : [];
+    for (const req of requiredItems) {
+      const itemId = String(req.itemId ?? req.id ?? '').trim();
+      if (!itemId) continue;
+      const need = Math.max(1, Number(req.amount ?? req.qty ?? 1) || 1);
+      const have = getItemQty(target.id, guildId, itemId);
+      checks.push(okLine(have >= need, `Required item: ${itemId}`, `${have}/${need}`));
+    }
+
+    // Ancient Oak vẫn có route đặc biệt, nên check thêm các điều kiện riêng của nó.
+    if (bossId === 'ancient_oak') {
+      const relicCount = getItemQty(target.id, guildId, 'ancient_relic');
+      const hasPrep = hasOakPrereq(guildId, target.id);
+      const activeOak = getOakEvent(guildId);
+      const participants = getOakParticipants(guildId);
+      const huntActive = isOakHuntActive(guildId, target.id);
+      const huntRemaining = getOakHuntRemaining(guildId, target.id);
+
+      checks.push(okLine(hasPrep, 'Oak route: đã hạ mini boss rừng', hasPrep ? '`oak_prep` đã có' : 'thiếu flag `oak_prep_<userId>`'));
+      checks.push(okLine(relicCount >= 3, 'Oak route: Ancient Relic', `${relicCount}/3`));
+      checks.push(okLine(!activeOak, 'Oak route: không có event đang mở', activeOak ? `phase: \`${activeOak.phase}\`, HP: ${activeOak.boss_hp}/${activeOak.boss_max_hp}, participants: ${participants.length}` : 'không có event đang mở'));
+
+      if (!hasPrep && huntActive) {
+        checks.push(warnLine('Oak route: đang hunt mini boss', `còn ${huntRemaining} lần explore nữa`));
+      } else if (!hasPrep && !huntActive) {
+        checks.push(warnLine('Oak route: chưa bắt đầu hunt', 'vào Forest rồi bấm `🐾 Bắt Đầu Truy Tìm Linh Thú`'));
+      }
+    }
+
+    const hardFails = checks.filter(line => line.startsWith('❌')).length;
+    const canTry = Boolean(enemy) && Boolean(enemyAny?.boss) && Boolean(player.alive) && !combat && (allowedZones.length === 0 || allowedZones.includes(player.zone_id)) && !cooldownFlag;
+
+    const suggestions: string[] = [];
+    if (!enemy) suggestions.push(`Thêm boss \`${bossId}\` vào \`src/data/enemies.ts\`.`);
+    if (enemy && !enemyAny?.boss) suggestions.push(`Thêm \`boss: true\` cho \`${bossId}\`.`);
+    if (enemy && !zoneByBoss) suggestions.push(`Nếu boss có nút/gate riêng trong zone, thêm \`bossId: '${bossId}'\` vào zone tương ứng trong \`src/data/zones.ts\`.`);
+    if (allowedZones.length > 0 && !allowedZones.includes(player.zone_id)) suggestions.push(`Đưa người chơi về đúng zone: ${allowedZoneText}.`);
+    if (!player.alive) suggestions.push('Hồi sinh người chơi trước khi test boss.');
+    if (level < recommendedLevel) suggestions.push(`Người chơi dưới level khuyến nghị. Boss vẫn có thể test, nhưng nên set Lv >= ${recommendedLevel}.`);
+    if (cooldownFlag) suggestions.push(`Cooldown đang chặn: dùng /admin resettime nếu boss này có target reset, hoặc xoá world flag \`${cooldownKey}\`.`);
+    if (combat) suggestions.push('Người chơi đang có active combat; kết thúc combat trước khi test boss.');
+    if (alreadyCleared) suggestions.push(`Người chơi đã clear gate cá nhân. Có thể dùng /admin resetboss boss:${bossId}.`);
+    if (bossId === 'ancient_oak') suggestions.push('Ancient Oak có điều kiện riêng: cần `oak_prep_<userId>` + 3 ancient_relic + không có Oak event đang mở.');
+    if (suggestions.length === 0) suggestions.push('Không thấy lỗi điều kiện cơ bản. Nếu nút vẫn không hiện, khả năng nằm ở handler/menu riêng của boss route hoặc dist cũ.');
+
+    await interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setColor(canTry && hardFails === 0 ? 0x57F287 : 0xFEE75C)
+        .setTitle(canTry && hardFails === 0 ? '✅ Boss Check: Có Thể Test' : '🔎 Boss Check')
+        .setDescription([
+          `Boss ID: \`${bossId}\``,
+          `Người chơi: <@${target.id}> (${player.name})`,
+          '',
+          checks.join('\n'),
+        ].join('\n'))
+        .addFields(
+          { name: 'Scale level', value: levelScaling ? `Lv người chơi: **${level}**\nLv đề xuất: **${levelScaling.recommendedLevel}**\nHP x${levelScaling.hpMult.toFixed(2)} · ATK x${levelScaling.atkMult.toFixed(2)} · Reward x${levelScaling.rewardMult.toFixed(2)}` : 'Không tính được vì boss ID chưa tồn tại.', inline: true },
+          { name: 'Debug keys thường dùng', value: `\`boss_${bossId}_slain\`\n\`boss_cleared_${target.id}_${bossId}\`\n\`forced_event_${target.id}\``, inline: true },
+          { name: 'Gợi ý', value: suggestions.map(s => `• ${s}`).join('\n').slice(0, 1024), inline: false },
         )]
     });
     return;

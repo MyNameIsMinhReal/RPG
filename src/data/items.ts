@@ -26,6 +26,16 @@ export interface ItemDef {
 export const ITEMS: Record<string, ItemDef> = {
 
   // ══════════════════════════════════════════════════════════════════════
+  //  KNOWLEDGE TOKENS — dùng để học skill, không còn dùng book lẻ
+  // ══════════════════════════════════════════════════════════════════════
+  ancient_book: {
+    id: 'ancient_book', name: 'Ancient Book', icon: '📖',
+    type: 'key_item', stackable: true,
+    description: 'Cổ thư kỹ năng. Mang về Hội Quán ở làng để nghiên cứu, hoặc gặp event học trực tiếp ngoài đường.',
+    sellPrice: 80, buyPrice: 240
+  },
+
+  // ══════════════════════════════════════════════════════════════════════
   //  CONSUMABLES — Tier 1: Early game, rẻ, dễ kiếm
   // ══════════════════════════════════════════════════════════════════════
   bread: {
