@@ -6,7 +6,7 @@ import {
   EmbedBuilder,
   Message
 } from 'discord.js';
-import { addItem, adjustReputation, getPlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp } from '../systems/player';
+import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp } from '../systems/player';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { onlyUser } from '../utils/collectors';
@@ -23,7 +23,7 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<v
 //  SHRINE — Chuông Đền Im Lặng
 // ════════════════════════════════════════════════════════════════
 export async function showShrineSilentBell(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const canAfford = player.gold >= 50;
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -149,7 +149,7 @@ export async function showShrinePrayerBeads(ctx: RunExploreEventInput): Promise<
 }
 
 export async function showShrineSealDoor(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const canOffer = player.gold >= 80;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`sd_open_${ctx.userId}`).setLabel('Xé bùa mở cửa').setEmoji('🚪').setStyle(ButtonStyle.Danger),
@@ -182,7 +182,7 @@ export async function showShrineSealDoor(ctx: RunExploreEventInput): Promise<voi
 }
 
 export async function showShrineSpiritLamp(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`sl_light_${ctx.userId}`).setLabel('Thắp đèn').setEmoji('🕯️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`sl_pray_${ctx.userId}`).setLabel('Cầu nguyện').setEmoji('🙏').setStyle(ButtonStyle.Success),
@@ -218,7 +218,7 @@ export async function showShrineSpiritLamp(ctx: RunExploreEventInput): Promise<v
 
 // EXTRA_EVENTS_SHRINE_START
 export async function showShrineWeepingStatue(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`sws_wipe_${ctx.userId}`).setLabel('Lau vết máu').setEmoji('🩸').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`sws_collect_${ctx.userId}`).setLabel('Hứng máu tượng').setEmoji('🧪').setStyle(ButtonStyle.Danger),
@@ -245,7 +245,7 @@ export async function showShrineWeepingStatue(ctx: RunExploreEventInput): Promis
 }
 
 export async function showShrineForbiddenOffering(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`sfo_gold_${ctx.userId}`).setLabel('Dâng 80 Gold').setEmoji('💰').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 80),
     new ButtonBuilder().setCustomId(`sfo_hp_${ctx.userId}`).setLabel('Dâng máu').setEmoji('❤️').setStyle(ButtonStyle.Danger),
@@ -268,7 +268,7 @@ export async function showShrineForbiddenOffering(ctx: RunExploreEventInput): Pr
 }
 
 export async function showShrineSealedReliquary(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`ssr_open_${ctx.userId}`).setLabel('Phá phong ấn').setEmoji('🔓').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId(`ssr_read_${ctx.userId}`).setLabel('Đọc chú văn').setEmoji('📜').setStyle(ButtonStyle.Primary),

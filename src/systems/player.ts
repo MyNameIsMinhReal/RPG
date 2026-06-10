@@ -15,6 +15,11 @@ export function getPlayer(userId: string, guildId: string): PlayerRow | undefine
     .get(userId, guildId) as unknown as PlayerRow | undefined;
 }
 
+export function getEffectivePlayer(userId: string, guildId: string): PlayerRow | undefined {
+  const player = getPlayer(userId, guildId);
+  return player ? applyPassiveStats(player) : undefined;
+}
+
 export function createPlayer(userId: string, guildId: string, name: string, classId = 'warrior'): PlayerRow {
   const cls = CLASSES[classId] ?? CLASSES.warrior;
   db.prepare(`
@@ -29,6 +34,37 @@ export function createPlayer(userId: string, guildId: string, name: string, clas
     classId
   );
   return getPlayer(userId, guildId)!;
+}
+
+
+export function changePlayerClass(userId: string, guildId: string, classId: string): { ok: boolean; reason?: string; oldClassId?: string; newClassId?: string } {
+  const player = getPlayer(userId, guildId) as any;
+  if (!player) return { ok: false, reason: 'not_found' };
+
+  const oldCls = getClass(player.class ?? 'warrior') ?? CLASSES.warrior;
+  const newCls = getClass(classId);
+  if (!newCls) return { ok: false, reason: 'invalid_class' };
+  if (oldCls.id === newCls.id) return { ok: false, reason: 'same_class', oldClassId: oldCls.id, newClassId: newCls.id };
+
+  const hpDiff  = newCls.hpBonus  - oldCls.hpBonus;
+  const mpDiff  = newCls.mpBonus  - oldCls.mpBonus;
+  const atkDiff = newCls.atkBonus - oldCls.atkBonus;
+  const defDiff = newCls.defBonus - oldCls.defBonus;
+
+  const nextMaxHp = Math.max(1, player.max_hp + hpDiff);
+  const nextMaxMp = Math.max(0, player.max_mp + mpDiff);
+  const nextHp    = Math.max(1, Math.min(nextMaxHp, player.hp + hpDiff));
+  const nextMp    = Math.max(0, Math.min(nextMaxMp, player.mp + mpDiff));
+  const nextAtk   = Math.max(1, player.atk + atkDiff);
+  const nextDef   = Math.max(0, player.def + defDiff);
+
+  db.prepare(`
+    UPDATE players SET
+      class = ?, hp = ?, max_hp = ?, mp = ?, max_mp = ?, atk = ?, def = ?
+    WHERE user_id = ? AND guild_id = ?
+  `).run(classId, nextHp, nextMaxHp, nextMp, nextMaxMp, nextAtk, nextDef, userId, guildId);
+
+  return { ok: true, oldClassId: oldCls.id, newClassId: newCls.id };
 }
 
 export function resetPlayer(userId: string, guildId: string): void {
@@ -134,8 +170,19 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
 }
 
 export function updatePlayerHpMp(userId: string, guildId: string, hp: number, mp: number): void {
+  const raw = getPlayer(userId, guildId);
+  if (!raw) return;
+
+  const effective = applyPassiveStats(raw);
+  const nextHp = Number.isFinite(hp)
+    ? Math.max(0, Math.min(Math.floor(hp), effective.max_hp))
+    : raw.hp;
+  const nextMp = Number.isFinite(mp)
+    ? Math.max(0, Math.min(Math.floor(mp), effective.max_mp))
+    : raw.mp;
+
   db.prepare('UPDATE players SET hp = ?, mp = ? WHERE user_id = ? AND guild_id = ?')
-    .run(hp, mp, userId, guildId);
+    .run(nextHp, nextMp, userId, guildId);
 }
 
 export function updatePlayerLastExplore(userId: string, guildId: string, lastExplore: number): void {

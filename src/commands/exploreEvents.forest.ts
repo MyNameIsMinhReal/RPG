@@ -7,7 +7,7 @@ import {
   EmbedBuilder,
   Message
 } from 'discord.js';
-import { addItem, adjustReputation, getPlayer, grantExp, grantGold, updatePlayerHpMp } from '../systems/player';
+import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, updatePlayerHpMp } from '../systems/player';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { onlyUser } from '../utils/collectors';
@@ -84,7 +84,7 @@ export async function showForestWhisperingTree(ctx: RunExploreEventInput): Promi
   }
 
   // Khắc tên lên cây
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const dmg = Math.max(1, Math.floor(player.max_hp * 0.05));
   const newHp = Math.max(1, player.hp - dmg);
   updatePlayerHpMp(ctx.userId, ctx.guildId, newHp, player.mp);
@@ -157,7 +157,7 @@ export async function showForestWolfDen(ctx: RunExploreEventInput): Promise<void
 }
 
 export async function showForestHerbalistHut(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`fh_brew_${ctx.userId}`).setLabel('Nhờ pha thuốc').setEmoji('🍵').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`fh_gather_${ctx.userId}`).setLabel('Hái thảo dược').setEmoji('🌿').setStyle(ButtonStyle.Primary),
@@ -203,7 +203,7 @@ export async function showForestHerbalistHut(ctx: RunExploreEventInput): Promise
 }
 
 export async function showForestMoonlitClearing(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`fm_rest_${ctx.userId}`).setLabel('Nghỉ dưới ánh trăng').setEmoji('🌙').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`fm_pick_${ctx.userId}`).setLabel('Hái hoa phát sáng').setEmoji('🌺').setStyle(ButtonStyle.Primary),
@@ -269,7 +269,7 @@ export async function showForestBanditAmbush(ctx: RunExploreEventInput): Promise
     await new Promise(r => setTimeout(r, 600));
     return ctx.callbacks.startCombat(pick(ctx.enemies).id);
   }
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
   updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
   return finish(ctx, simpleEmbed(COLORS.warning, `💨 Bạn chạy thoát nhưng bị một mũi tên sượt qua.\n❤️ HP mất **${dmg}**`));
@@ -294,7 +294,7 @@ export async function showForestGiantSpider(ctx: RunExploreEventInput): Promise<
     return ctx.callbacks.startCombat('spore_kin');
   }
   if (id === `fgs_fire_${ctx.userId}`) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.06));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     addItem(ctx.userId, ctx.guildId, 'spider_silk', 1);
@@ -303,7 +303,7 @@ export async function showForestGiantSpider(ctx: RunExploreEventInput): Promise<
     return finish(ctx, new EmbedBuilder().setColor(COLORS.success).setTitle('🔥 Lửa Đẩy Lùi Nhện')
       .setDescription(`Bạn đốt mạng nhện — con nhện tháo lui. Tuy nhiên lửa bắn vào tay bạn.\n🕸️ +**1× Spider Silk**\n⭐ +**${exp} EXP**\n❤️ HP mất **${dmg}**`));
   }
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const dmg = Math.max(1, Math.floor(player.max_hp * 0.08));
   updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
   return finish(ctx, simpleEmbed(COLORS.warning, `💨 Bạn chạy nhưng bị vướng mạng nhện.\n❤️ HP mất **${dmg}**`));
@@ -323,7 +323,7 @@ export async function showForestCursedScarecrow(ctx: RunExploreEventInput): Prom
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
   if (id === `fcs_destroy_${ctx.userId}`) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const roll = randInt(1, 100);
     if (roll <= 40) {
       const dmg = Math.max(1, Math.floor(player.max_hp * 0.15));
@@ -354,7 +354,7 @@ export async function showForestSnakePit(ctx: RunExploreEventInput): Promise<voi
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐍 *Bạn đứng quan sát rồi bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   if (id === `fsp_jump_${ctx.userId}`) {
     if (randInt(1, 100) <= 60) {
       const exp = randInt(7, 18); grantExp(ctx.userId, ctx.guildId, exp);
@@ -426,7 +426,7 @@ export async function showForestCorruptedTreant(ctx: RunExploreEventInput): Prom
     return ctx.callbacks.startCombat('cursed_treant');
   }
   if (id === `fct_purify_${ctx.userId}`) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const mpCost = Math.floor(player.max_mp * 0.3);
     if (player.mp < mpCost) {
       return finish(ctx, simpleEmbed(COLORS.warning, `✨ Bạn không đủ MP để thanh tẩy. (Cần **${mpCost} MP**)`));
@@ -438,7 +438,7 @@ export async function showForestCorruptedTreant(ctx: RunExploreEventInput): Prom
     return finish(ctx, new EmbedBuilder().setColor(COLORS.magic).setTitle('✨ Cây Thần Được Giải Thoát')
       .setDescription(`Ánh sáng từ tay bạn xua tan bóng tối. Cây già rùng mình rồi đứng yên.\n🔵 MP -**${mpCost}**\n⭐ +**${exp} EXP**\n💎 +**1× Mysterious Shard**\n🤝 Reputation: **${rep}** (+6)`));
   }
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const dmg = Math.max(1, Math.floor(player.max_hp * 0.08));
   updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
   return finish(ctx, simpleEmbed(COLORS.warning, `💨 Bạn chạy nhưng bị một cành cây quật vào lưng.\n❤️ HP mất **${dmg}**`));
@@ -456,7 +456,7 @@ export async function showForestWildBoar(ctx: RunExploreEventInput): Promise<voi
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐗 *Con lợn hừng hừng rồi bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fwb_dodge_${ctx.userId}`) {
     if (randInt(1, 100) <= 65) {
@@ -489,13 +489,13 @@ export async function showForestPoisonSpores(ctx: RunExploreEventInput): Promise
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.15));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     return finish(ctx, simpleEmbed(COLORS.danger, `🍄 Bạn đứng quá lâu trong đám bào tử!\n❤️ HP mất **${dmg}**`));
   }
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fps_hold_${ctx.userId}`) {
     if (randInt(1, 100) <= 70) return finish(ctx, simpleEmbed(COLORS.success, '🫁 Bạn nín thở và bước qua nhanh chóng. An toàn!'));
@@ -525,13 +525,13 @@ export async function showForestRabidFox(ctx: RunExploreEventInput): Promise<voi
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     return finish(ctx, simpleEmbed(COLORS.danger, `🦊 Con cáo cắn vào bắp chân bạn trước khi bạn kịp phản ứng!\n❤️ HP mất **${dmg}**`));
   }
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `frf_fight_${ctx.userId}`) {
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.08));
@@ -580,7 +580,7 @@ export async function showForestBanditWatchtower(ctx: RunExploreEventInput): Pro
     await new Promise(r => setTimeout(r, 600));
     return ctx.callbacks.startCombat(pick(ctx.enemies).id);
   }
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const cost = 30;
   if (player.gold < cost) return finish(ctx, simpleEmbed(COLORS.warning, `🪙 Bạn không đủ **${cost} Gold** để hối lộ.`));
   grantGold(ctx.userId, ctx.guildId, -cost);
@@ -610,7 +610,7 @@ export async function showForestHollowLog(ctx: RunExploreEventInput): Promise<vo
   }
   const roll = randInt(1, 100);
   if (roll <= 15) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.08));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     return finish(ctx, simpleEmbed(COLORS.danger, `🐍 Một con rắn đang ẩn trong đó cắn vào tay bạn!\n❤️ HP mất **${dmg}**`));
@@ -637,7 +637,7 @@ export async function showForestBuriedChest(ctx: RunExploreEventInput): Promise<
   await btn.deferUpdate().catch(() => {});
   const id = btn.customId;
   if (id === `fbc_dig_${ctx.userId}`) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const roll = randInt(1, 100);
     if (roll <= 20) {
       const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
@@ -666,7 +666,7 @@ export async function showForestEagleNest(ctx: RunExploreEventInput): Promise<vo
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🦅 *Bạn nhìn lên tổ rồi bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fen_climb_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -704,7 +704,7 @@ export async function showForestMushroomRing(ctx: RunExploreEventInput): Promise
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🍄 *Bạn nhìn vòng nấm rồi rời đi.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fmr_step_${ctx.userId}`) {
     const outcomes = [
@@ -744,7 +744,7 @@ export async function showForestAmberSap(ctx: RunExploreEventInput): Promise<voi
 }
 
 export async function showForestForgottenPack(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const roll = randInt(1, 100);
   const outcomes = [
     () => { const g = randInt(12, 37); grantGold(ctx.userId, ctx.guildId, g); return `🪙 +**${g} Gold** (trong túi tiền cũ)`; },
@@ -770,7 +770,7 @@ export async function showForestBeehive(ctx: RunExploreEventInput): Promise<void
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🐝 *Bạn nghe tiếng vo ve và đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fbh_steal_${ctx.userId}`) {
     if (randInt(1, 100) <= 35) {
@@ -802,7 +802,7 @@ export async function showForestFruitGrove(ctx: RunExploreEventInput): Promise<v
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🍒 *Bạn ngắm vườn cây rồi tiếp tục đường.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `ffg_eat_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -862,7 +862,7 @@ export async function showForestBogPearl(ctx: RunExploreEventInput): Promise<voi
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '💧 *Bạn nhìn viên ngọc chìm xuống bùn và bỏ đi.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   if (btn.customId === `fbp_wade_${ctx.userId}`) {
     if (randInt(1, 100) <= 70) {
       addItem(ctx.userId, ctx.guildId, 'bog_pearl', 1);
@@ -928,7 +928,7 @@ export async function showForestHermitCave(ctx: RunExploreEventInput): Promise<v
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🏔️ *Bạn rời đi mà không làm phiền vị ẩn sĩ.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fhc_talk_${ctx.userId}`) {
     const exp = randInt(21, 43); grantExp(ctx.userId, ctx.guildId, exp);
@@ -992,7 +992,7 @@ export async function showForestFairyCircle(ctx: RunExploreEventInput): Promise<
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '✨ *Tiếng nhạc phai dần khi bạn rời đi.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `ffc_join_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1032,7 +1032,7 @@ export async function showForestPilgrimGroup(ctx: RunExploreEventInput): Promise
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🙏 *Nhóm hành hương đi qua, tiếng hát vang xa.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fpg_join_${ctx.userId}`) {
     const exp = randInt(14, 32); grantExp(ctx.userId, ctx.guildId, exp);
@@ -1066,13 +1066,13 @@ export async function showForestMadTrapper(ctx: RunExploreEventInput): Promise<v
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     return finish(ctx, simpleEmbed(COLORS.danger, `😱 Bạn đứng quá lâu — hắn ném bẫy vào chân bạn!\n❤️ HP mất **${dmg}**`));
   }
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fmt_calm_${ctx.userId}`) {
     if (randInt(1, 100) <= 60) {
@@ -1137,7 +1137,7 @@ export async function showForestDryadBlessing(ctx: RunExploreEventInput): Promis
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌿 *Bóng hình xanh tan biến vào không khí.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fdb_accept_${ctx.userId}`) {
     const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.4));
@@ -1171,7 +1171,7 @@ export async function showForestTravelingBard(ctx: RunExploreEventInput): Promis
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🎵 *Tiếng đàn vọng theo bạn một lúc rồi tắt.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `ftb_listen_${ctx.userId}`) {
     const mp = Math.min(player.max_mp, player.mp + Math.floor(player.max_mp * 0.35));
@@ -1221,7 +1221,7 @@ export async function showForestBeastTamer(ctx: RunExploreEventInput): Promise<v
     const exp = randInt(18, 36); grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.success, `🦁 Cùng nhau bắt được một con thú hoang!\n🟫 +**3× Leather**\n🥩 +**2× Meat**\n⭐ +**${exp} EXP**`));
   }
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const dmg = Math.max(1, Math.floor(player.max_hp * 0.1));
   updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
   return finish(ctx, simpleEmbed(COLORS.warning, `🦁 Con thú cào bạn trước khi bị bắt.\n❤️ HP mất **${dmg}**`));
@@ -1243,7 +1243,7 @@ export async function showForestAncientRuins(ctx: RunExploreEventInput): Promise
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🏛️ *Bạn nhìn những cột đá im lặng rồi rời đi.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `far_explore_${ctx.userId}`) {
     const exp = randInt(25, 46); grantExp(ctx.userId, ctx.guildId, exp);
@@ -1282,7 +1282,7 @@ export async function showForestMagicSpring(ctx: RunExploreEventInput): Promise<
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '💧 *Bạn lắng nghe tiếng suối rồi tiếp tục đường.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fms_drink_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1318,7 +1318,7 @@ export async function showForestStoneCircle(ctx: RunExploreEventInput): Promise<
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🗿 *Bạn đi quanh vòng đá rồi tiếp tục.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fsc2_center_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1354,7 +1354,7 @@ export async function showForestSpiritLantern(ctx: RunExploreEventInput): Promis
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🪔 *Đèn lồng tắt dần khi bạn không tiếp cận.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fsl_follow_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1393,7 +1393,7 @@ export async function showForestCursedStatue(ctx: RunExploreEventInput): Promise
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🗿 *Bạn tránh xa bức tượng và đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fcs2_smash_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1434,7 +1434,7 @@ export async function showForestMemoryTree(ctx: RunExploreEventInput): Promise<v
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌳 *Bạn rời đi, mang theo cảm giác kỳ lạ khó tả.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fmt2_touch_${ctx.userId}`) {
     const outcomes = [
@@ -1468,7 +1468,7 @@ export async function showForestDreamFlower(ctx: RunExploreEventInput): Promise<
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌸 *Hương hoa vẫn còn trong ký ức bạn suốt một lúc.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fdf_inhale_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1501,7 +1501,7 @@ export async function showForestEchoGrove(ctx: RunExploreEventInput): Promise<vo
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌿 *Tiếng bước chân của bạn vang đi không dứt.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `feg_shout_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1536,7 +1536,7 @@ export async function showForestTimeAnomaly(ctx: RunExploreEventInput): Promise<
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌀 *Vùng dị thường từ từ tan biến.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fta_step_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1607,7 +1607,7 @@ export async function showForestHerbForaging(ctx: RunExploreEventInput): Promise
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌿 *Bạn rời vùng thảo dược tay trắng.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fhf_careful_${ctx.userId}`) {
     addItem(ctx.userId, ctx.guildId, 'herb', randInt(3, 6));
@@ -1680,7 +1680,7 @@ export async function showForestRiverCrossing(ctx: RunExploreEventInput): Promis
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌊 *Bạn dừng lại trước sông rồi quay đầu.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `frc_wade_${ctx.userId}`) {
     if (randInt(1, 100) <= 60) {
@@ -1718,7 +1718,7 @@ export async function showForestTreeClimbing(ctx: RunExploreEventInput): Promise
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌲 *Bạn nhìn lên cây rồi đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `ftc_high_${ctx.userId}`) {
     if (randInt(1, 100) <= 50) {
@@ -1751,13 +1751,13 @@ export async function showForestFogMaze(ctx: RunExploreEventInput): Promise<void
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) {
-    const player = getPlayer(ctx.userId, ctx.guildId)!;
+    const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.max(1, Math.floor(player.max_hp * 0.12));
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, player.hp - dmg), player.mp);
     return finish(ctx, simpleEmbed(COLORS.danger, `🌫️ Bạn lạc lối trong sương và vấp ngã nhiều lần!\n❤️ HP mất **${dmg}**`));
   }
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `ffm_sound_${ctx.userId}`) {
     if (randInt(1, 100) <= 55) {
@@ -1792,7 +1792,7 @@ export async function showForestWaterfallCave(ctx: RunExploreEventInput): Promis
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '💦 *Tiếng thác nước theo bạn suốt quãng đường dài.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fwc_enter_${ctx.userId}`) {
     const roll = randInt(1, 100);
@@ -1829,7 +1829,7 @@ export async function showForestDeadTreeOracle(ctx: RunExploreEventInput): Promi
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '💀 *Đôi mắt khắc trên cây nhìn theo bạn cho đến khi khuất tầm.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fdto_ask_${ctx.userId}`) {
     const prophecies = [
@@ -1865,7 +1865,7 @@ export async function showForestFlowerField(ctx: RunExploreEventInput): Promise<
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🌼 *Bạn đứng ở rìa đồng hoa nhìn ngắm rồi đi tiếp.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fff_collect_${ctx.userId}`) {
     addItem(ctx.userId, ctx.guildId, 'rare_herb', randInt(1, 3));
@@ -1932,7 +1932,7 @@ export async function showForestCampfireStranger(ctx: RunExploreEventInput): Pro
   const btn = await awaitVote(ctx, reply, 30_000);
   if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🔥 *Bạn đi qua lửa trại. Người lạ vẫn im lặng nhìn theo.*'));
   await btn.deferUpdate().catch(() => {});
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const id = btn.customId;
   if (id === `fcs3_sit_${ctx.userId}`) {
     const hp = Math.min(player.max_hp, player.hp + Math.floor(player.max_hp * 0.3));

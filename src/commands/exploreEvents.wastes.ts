@@ -6,7 +6,7 @@ import {
   EmbedBuilder,
   Message
 } from 'discord.js';
-import { addItem, adjustReputation, getPlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp } from '../systems/player';
+import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp } from '../systems/player';
 import { setBuff } from '../systems/consumables';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
@@ -24,7 +24,7 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<v
 //  WASTES — Bão Tro Lửa
 // ════════════════════════════════════════════════════════════════
 export async function showWastesAshStorm(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`ws_charge_${ctx.userId}`).setLabel('Lao thẳng vào').setEmoji('⚡').setStyle(ButtonStyle.Danger),
@@ -126,7 +126,7 @@ export async function showWastesAshStorm(ctx: RunExploreEventInput): Promise<voi
 //  WASTES — Đoàn Xương, Ảo Ảnh Kính, Cờ Gãy
 // ════════════════════════════════════════════════════════════════
 export async function showWastesBoneCaravan(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const canBuy = player.gold >= 120;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`bc_buy_${ctx.userId}`).setLabel('Mua hàng xương').setEmoji('🦴').setStyle(ButtonStyle.Primary).setDisabled(!canBuy),
@@ -175,7 +175,7 @@ export async function showWastesBoneCaravan(ctx: RunExploreEventInput): Promise<
 }
 
 export async function showWastesGlassMirage(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`gm_enter_${ctx.userId}`).setLabel('Bước vào ảo ảnh').setEmoji('🏜️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`gm_break_${ctx.userId}`).setLabel('Đập mặt kính').setEmoji('🪞').setStyle(ButtonStyle.Danger),
@@ -239,7 +239,7 @@ export async function showWastesFallenBanner(ctx: RunExploreEventInput): Promise
 
 // EXTRA_EVENTS_WASTES_START
 export async function showWastesMirrorSelf(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`wms_talk_${ctx.userId}`).setLabel('Nói chuyện').setEmoji('💬').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`wms_fight_${ctx.userId}`).setLabel('Chiến đấu').setEmoji('⚔️').setStyle(ButtonStyle.Danger),
@@ -264,7 +264,7 @@ export async function showWastesMirrorSelf(ctx: RunExploreEventInput): Promise<v
 }
 
 export async function showWastesMemoryRain(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`wmr_stand_${ctx.userId}`).setLabel('Đứng dưới mưa').setEmoji('🌧️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`wmr_collect_${ctx.userId}`).setLabel('Hứng nước mưa').setEmoji('🧪').setStyle(ButtonStyle.Success),
@@ -282,7 +282,7 @@ export async function showWastesMemoryRain(ctx: RunExploreEventInput): Promise<v
 }
 
 export async function showWastesFacelessMerchant(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`wfm_gold_${ctx.userId}`).setLabel('Mua bằng 180G').setEmoji('💰').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 180),
     new ButtonBuilder().setCustomId(`wfm_soul_${ctx.userId}`).setLabel('Trả 1 Soul Shard').setEmoji('💠').setStyle(ButtonStyle.Danger).setDisabled((player.soul_shards ?? 0) < 1),

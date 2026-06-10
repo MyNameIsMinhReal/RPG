@@ -29,6 +29,28 @@ function backRow(userId: string) {
   );
 }
 
+async function safeDeferUpdate(component: { deferUpdate: () => Promise<unknown>; deferred?: boolean; replied?: boolean; customId?: string }): Promise<boolean> {
+  try {
+    if (component.deferred || component.replied) return true;
+    await component.deferUpdate();
+    return true;
+  } catch (err: any) {
+    const code = err?.code ?? err?.rawError?.code;
+    const message = String(err?.message ?? '');
+
+    // Discord component interactions expire quickly. If the bot/network is slow,
+    // Discord returns 10062. This is safe to ignore because the UI can still be
+    // refreshed through the original command reply.
+    if (code === 10062 || code === 40060 || message.includes('Unknown interaction') || message.includes('already acknowledged')) {
+      console.warn(`[VILLAGE] Bỏ qua interaction hết hạn${component.customId ? `: ${component.customId}` : ''}.`);
+      return false;
+    }
+
+    console.warn('[VILLAGE] deferUpdate lỗi:', code ?? message);
+    return false;
+  }
+}
+
 // ── SHOP ──────────────────────────────────────────────────────────────────
 
 export async function showVillageShop(
@@ -104,7 +126,7 @@ export async function showVillageShop(
   }).catch(() => null);
 
   if (!sel) { await interaction.editReply({ components: [] }); return; }
-  await sel.deferUpdate();
+  await safeDeferUpdate(sel);
 
   const value = sel.values[0]; // buy_item_xxx or buy_equip_xxx
   const isEquip = value.startsWith('buy_equip_');
@@ -139,12 +161,12 @@ export async function showVillageShop(
   }).catch(() => null);
 
   if (!btn || btn.customId !== `vill_buy_confirm_${userId}`) {
-    if (btn) await btn.deferUpdate();
+    if (btn) await safeDeferUpdate(btn);
     await showVillageShop(interaction, userId, guildId);
     return;
   }
 
-  await btn.deferUpdate();
+  await safeDeferUpdate(btn);
   const p2 = getPlayer(userId, guildId)!;
   if (p2.gold < def.buyPrice) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Không đủ Gold! Cần **${def.buyPrice}**, có **${p2.gold}**.`)], components: [backRow(userId)] });
@@ -248,7 +270,7 @@ export async function showVillageBlacksmith(
   }).catch(() => null);
 
   if (!sel) { await interaction.editReply({ components: [] }); return; }
-  await sel.deferUpdate();
+  await safeDeferUpdate(sel);
 
   if (sel.customId === `vill_back_${userId}`) {
     await interaction.editReply({ components: [] });
@@ -301,12 +323,12 @@ export async function showVillageBlacksmith(
   }).catch(() => null);
 
   if (!btn || btn.customId !== `vill_bs_confirm_${userId}`) {
-    if (btn) await btn.deferUpdate();
+    if (btn) await safeDeferUpdate(btn);
     await showVillageBlacksmith(interaction, userId, guildId);
     return;
   }
 
-  await btn.deferUpdate();
+  await safeDeferUpdate(btn);
 
   const pNow    = getPlayer(userId, guildId)!;
   const ironNow = getItemQty(userId, guildId, 'iron_ore');
@@ -409,7 +431,7 @@ async function showBlacksmithReroll(
   }).catch(() => null);
 
   if (!sel) { await interaction.editReply({ components: [] }); return; }
-  await sel.deferUpdate();
+  await safeDeferUpdate(sel);
 
   if (sel.customId === `vill_back_${userId}`) {
     await showVillageBlacksmith(interaction, userId, guildId);
@@ -496,12 +518,12 @@ export async function showVillageTavern(
   }).catch(() => null);
 
   if (!btn || btn.customId !== `vill_rest_confirm_${userId}`) {
-    if (btn) await btn.deferUpdate();
+    if (btn) await safeDeferUpdate(btn);
     await interaction.editReply({ components: [] });
     return;
   }
 
-  await btn.deferUpdate();
+  await safeDeferUpdate(btn);
   const pNow = applyPassiveStats(getPlayer(userId, guildId)!);
   if (pNow.gold < healCost) {
     await interaction.editReply({
@@ -660,7 +682,7 @@ export async function showVillageBoard(
   const btn = await msg.awaitMessageComponent({
     filter: (i) => {
       if (i.user.id !== userId) { i.reply({ content: '❌ Đây không phải tương tác của bạn.', flags: 64 }).catch(() => {}); return false; }
-      if (i.customId !== `vill_board_claim_${userId}`) { i.deferUpdate().catch(() => {}); return false; }
+      if (i.customId !== `vill_board_claim_${userId}`) { safeDeferUpdate(i); return false; }
       return true;
     },
     componentType: ComponentType.Button,
@@ -668,7 +690,7 @@ export async function showVillageBoard(
   }).catch(() => null);
 
   if (!btn) { await interaction.editReply({ components: [] }); return; }
-  await btn.deferUpdate();
+  await safeDeferUpdate(btn);
 
   // Claim all ready bounties
   let totalGold = 0;

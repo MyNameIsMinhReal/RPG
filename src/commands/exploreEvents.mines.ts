@@ -6,7 +6,7 @@ import {
   EmbedBuilder,
   Message
 } from 'discord.js';
-import { addItem, adjustReputation, getPlayer, grantExp, grantGold, updatePlayerHpMp } from '../systems/player';
+import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, updatePlayerHpMp } from '../systems/player';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { onlyUser } from '../utils/collectors';
@@ -23,7 +23,7 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<v
 //  MINES — Sập Hầm Mỏ
 // ════════════════════════════════════════════════════════════════
 export async function showMineCollapse(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const hpSafe = player.hp > Math.floor(player.max_hp * 0.25);
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -123,7 +123,7 @@ export async function showMineCollapse(ctx: RunExploreEventInput): Promise<void>
 //  MINES — Vỉa Quặng, Đường Hầm Vọng Âm, Thang Máy Gỉ
 // ════════════════════════════════════════════════════════════════
 export async function showMineRichOreVein(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`ov_mine_${ctx.userId}`).setLabel('Đào quặng').setEmoji('⛏️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`ov_careful_${ctx.userId}`).setLabel('Đào cẩn thận').setEmoji('🧤').setStyle(ButtonStyle.Success),
@@ -159,7 +159,7 @@ export async function showMineRichOreVein(ctx: RunExploreEventInput): Promise<vo
 }
 
 export async function showMineEchoTunnel(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`et_call_${ctx.userId}`).setLabel('Gọi vào bóng tối').setEmoji('📣').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`et_listen_${ctx.userId}`).setLabel('Lắng nghe vọng âm').setEmoji('👂').setStyle(ButtonStyle.Secondary),
@@ -199,7 +199,7 @@ export async function showMineEchoTunnel(ctx: RunExploreEventInput): Promise<voi
 }
 
 export async function showMineRustedLift(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`rl_ride_${ctx.userId}`).setLabel('Đi xuống bằng thang').setEmoji('🛗').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId(`rl_repair_${ctx.userId}`).setLabel('Sửa tạm dây kéo').setEmoji('🔧').setStyle(ButtonStyle.Primary),
@@ -238,7 +238,7 @@ export async function showMineRustedLift(ctx: RunExploreEventInput): Promise<voi
 
 // EXTRA_EVENTS_MINES_START
 export async function showMineRunawayCart(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`mrc_dodge_${ctx.userId}`).setLabel('Né sang bên').setEmoji('🏃').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`mrc_jump_${ctx.userId}`).setLabel('Nhảy lên xe').setEmoji('🛒').setStyle(ButtonStyle.Danger),
@@ -260,7 +260,7 @@ export async function showMineRunawayCart(ctx: RunExploreEventInput): Promise<vo
 }
 
 export async function showMineLivingOre(ctx: RunExploreEventInput): Promise<void> {
-  const player = getPlayer(ctx.userId, ctx.guildId)!;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`mlo_light_${ctx.userId}`).setLabel('Khai thác nhẹ').setEmoji('⛏️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`mlo_deep_${ctx.userId}`).setLabel('Đào sâu').setEmoji('💎').setStyle(ButtonStyle.Danger),

@@ -113,19 +113,20 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   // ── Already alive ─────────────────────────────────────────────────────────
   if (player?.alive) {
-    const cls = CLASSES[(player as any).class ?? 'warrior'] ?? CLASSES.warrior;
-    const blessing = (player as any).rebirth_blessing ?? 0;
+    const shown = applyPassiveStats(player);
+    const cls = CLASSES[(shown as any).class ?? 'warrior'] ?? CLASSES.warrior;
+    const blessing = (shown as any).rebirth_blessing ?? 0;
 
     await interaction.editReply({
       embeds: [new EmbedBuilder()
         .setColor(classColor(cls.id))
-        .setTitle(`${cls.icon} ${player.name}`)
+        .setTitle(`${cls.icon} ${shown.name}`)
         .setDescription(
-          `Lv.**${player.level}** ${cls.name}` +
+          `Lv.**${shown.level}** ${cls.name}` +
           (blessing > 0 ? `  ✦ Rebirth ×${blessing}` : '') + '\n\n' +
-          `> ❤️ **${player.hp}/${player.max_hp}**  💧 **${player.mp}/${player.max_mp}**\n` +
-          `> ⚔️ **${player.atk}**  🛡️ **${player.def}**  🪙 **${player.gold}**\n` +
-          `> 🏆 Kills: **${player.kills}**  💀 Deaths: **${player.deaths}**`
+          `> ❤️ **${shown.hp}/${shown.max_hp}**  💧 **${shown.mp}/${shown.max_mp}**\n` +
+          `> ⚔️ **${shown.atk}**  🛡️ **${shown.def}**  🪙 **${shown.gold}**\n` +
+          `> 🏆 Kills: **${shown.kills}**  💀 Deaths: **${shown.deaths}**`
         )
         .setFooter({ text: 'Nhân vật đang sống — dùng /explore để phiêu lưu' })],
       components: [exploreRow(userId)]
@@ -189,7 +190,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         `${cls.icon} **${cls.name}**\n> ${cls.description}\n> ✦ *${cls.passiveLine}*`
       ).join('\n\n')
     )
-    .setFooter({ text: 'Hiện tại chưa có lệnh đổi class. Hãy chọn class khởi đầu thật kỹ.' });
+    .setFooter({ text: 'Có thể đổi class bằng /class change khi ở làng.' });
 
   const msg = await interaction.editReply({ embeds: [selectEmbed], components: [classRow] });
 
@@ -207,9 +208,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  const acknowledged = await safeDeferComponent(sel);
-  if (!acknowledged) return;
-
+  await sel.deferUpdate();
   const chosenId  = sel.values[0];
   const chosenCls = CLASSES[chosenId] ?? CLASSES.warrior;
 

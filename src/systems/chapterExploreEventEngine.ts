@@ -9,7 +9,7 @@ import {
 } from 'discord.js';
 import { getChapterExploreEvent, describeChapterReward, type ChapterButtonStyle, type ChapterEventEffect, type TrackDirection } from '../data/chapterExploreEvents';
 import { completePendingChapterExploreEvent, getPendingChapterExploreEvent } from './chapter';
-import { addItem, adjustReputation, getPlayer, grantExp, grantGold, grantSoulShards, updatePlayerHpMp } from './player';
+import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, updatePlayerHpMp } from './player';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { onlyUser } from '../utils/collectors';
 import { randInt } from '../utils/format';
@@ -66,7 +66,7 @@ function applyEffects(userId: string, guildId: string, effects: ChapterEventEffe
   const lines: string[] = [];
 
   for (const effect of effects) {
-    const player = getPlayer(userId, guildId);
+    const player = getEffectivePlayer(userId, guildId);
     if (!player) continue;
 
     if (effect.type === 'gold') {

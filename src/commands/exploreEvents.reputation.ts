@@ -12,7 +12,7 @@ import {
   adjustReputation,
   adjustWanted,
   getItemQty,
-  getPlayer,
+  getPlayer, getEffectivePlayer,
   grantExp,
   grantGold,
   grantSoulShards,
@@ -49,7 +49,7 @@ async function awaitBtn(
 }
 
 function healPercent(ctx: RunExploreEventInput, hpPct: number, mpPct = 0): { hp: number; mp: number } {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const hp = Math.min(fresh.max_hp, fresh.hp + Math.floor(fresh.max_hp * hpPct));
   const mp = Math.min(fresh.max_mp, fresh.mp + Math.floor(fresh.max_mp * mpPct));
   updatePlayerHpMp(ctx.userId, ctx.guildId, hp, mp);
@@ -113,7 +113,7 @@ export async function showRepGratefulVillagers(ctx: RunExploreEventInput): Promi
     .setTitle('🏘️ Gia Đình Biết Ơn')
     .setDescription('Một gia đình dân làng chạy đến gọi tên bạn. Họ từng được bạn cứu trong một chuyến explore trước đó.');
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   if (cid === `rgv_refuse_${ctx.userId}`) {
     const exp = randInt(14, 32);
@@ -246,7 +246,7 @@ export async function showRepHeroStatue(ctx: RunExploreEventInput): Promise<void
     .setTitle('🏛️ Bức Tượng Vị Anh Hùng')
     .setDescription('Ở ngã ba đường có một bức tượng nhỏ. Gương mặt chưa giống bạn hoàn toàn, nhưng chiếc bảng đồng bên dưới lại ghi tên bạn.');
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   if (cid === `rhs_leavecoin_${ctx.userId}`) {
     if (fresh.gold < 25) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Bạn không đủ **25 Gold**.'));
@@ -299,7 +299,7 @@ export async function showRepRoyalMessenger(ctx: RunExploreEventInput): Promise<
 }
 
 export async function showRepChampionChallenge(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const base = ctx.enemies.length ? pick(ctx.enemies) : null;
   const enemy = {
     id: `honor_champion_${ctx.userId}_${Date.now()}`,

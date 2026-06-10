@@ -421,6 +421,224 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     sellPrice: 650, dropFrom: ['void_wraith', 'echo_demon'], dropChance: 4, minZone: 'wastes'
   },
 
+  // ── Extra weapon expansion ─────────────────────────
+  chipped_dagger: {
+    id: 'chipped_dagger', name: 'Chipped Dagger', icon: '🔪', slot: 'weapon', rarity: 'common',
+    description: 'Dao găm mẻ lưỡi. Rẻ, nhẹ, hợp cho rogue/assassin mới chơi.',
+    stats: { atk: 2, critChance: 5 }, sellPrice: 12, buyPrice: 35, minZone: 'village'
+  },
+  militia_hammer: {
+    id: 'militia_hammer', name: 'Militia Hammer', icon: '🔨', slot: 'weapon', rarity: 'common',
+    description: 'Búa dân binh thô sơ. Ít sát thương hơn rìu nhưng chắc tay hơn.',
+    stats: { atk: 4, def: 1 }, sellPrice: 18, buyPrice: 65, minZone: 'village'
+  },
+  cracked_orb: {
+    id: 'cracked_orb', name: 'Cracked Orb', icon: '🔮', slot: 'weapon', rarity: 'common',
+    description: 'Quả cầu phép bị nứt. Cho thêm MP đầu game.',
+    stats: { atk: 2, maxMp: 12 }, sellPrice: 16, buyPrice: 55, minZone: 'village'
+  },
+  farmer_pitchfork: {
+    id: 'farmer_pitchfork', name: 'Farmer Pitchfork', icon: '🔱', slot: 'weapon', rarity: 'common',
+    description: 'Cây chĩa của nông dân. Dài hơn kiếm ngắn, dùng tạm khá ổn.',
+    stats: { atk: 4, maxHp: 5 }, sellPrice: 18, buyPrice: 70, minZone: 'village'
+  },
+  novice_crossbow: {
+    id: 'novice_crossbow', name: 'Novice Crossbow', icon: '🏹', slot: 'weapon', rarity: 'common',
+    description: 'Nỏ tập bắn. Sát thương ổn nhưng không có hiệu ứng đặc biệt.',
+    stats: { atk: 5 }, sellPrice: 20, buyPrice: 80, minZone: 'forest'
+  },
+  bone_club: {
+    id: 'bone_club', name: 'Bone Club', icon: '🦴', slot: 'weapon', rarity: 'common',
+    description: 'Chùy xương thô sơ lấy từ quái rừng.',
+    stats: { atk: 5, critChance: -2 }, sellPrice: 18,
+    dropFrom: ['cursed_wolf', 'moss_lurker'], dropChance: 9, minZone: 'forest'
+  },
+
+  poison_dagger: {
+    id: 'poison_dagger', name: 'Poison Dagger', icon: '🧪', slot: 'weapon', rarity: 'rare',
+    description: 'Dao tẩm độc nhẹ. Crit cao, phù hợp lối đánh nhanh.',
+    stats: { atk: 6, critChance: 12 }, sellPrice: 90, buyPrice: 280,
+    dropFrom: ['briar_witch', 'spore_kin'], dropChance: 8, minZone: 'forest'
+  },
+  oakwood_bow: {
+    id: 'oakwood_bow', name: 'Oakwood Bow', icon: '🏹', slot: 'weapon', rarity: 'rare',
+    description: 'Cung gỗ sồi bền chắc. Có tỉ lệ bắn thêm một phát nhỏ.',
+    stats: { atk: 7, critChance: 4 }, effects: ['extra_hit'],
+    sellPrice: 90, buyPrice: 290, dropFrom: ['thornhound', 'moss_crowned_stag'], dropChance: 8, minZone: 'forest'
+  },
+  silver_rapier: {
+    id: 'silver_rapier', name: 'Silver Rapier', icon: '🗡️', slot: 'weapon', rarity: 'rare',
+    description: 'Kiếm đâm bạc, nhẹ và sắc. Tăng crit nhưng không quá nhiều ATK.',
+    stats: { atk: 7, critChance: 9 }, sellPrice: 95, buyPrice: 300, minZone: 'shrine'
+  },
+  war_pick: {
+    id: 'war_pick', name: 'War Pick', icon: '⛏️', slot: 'weapon', rarity: 'rare',
+    description: 'Cuốc chiến trong hầm mỏ. Mạnh, hơi giảm khả năng phòng thủ.',
+    stats: { atk: 10, def: -1 }, sellPrice: 95, buyPrice: 310,
+    dropFrom: ['coal_imp', 'ore_devourer'], dropChance: 8, minZone: 'mines'
+  },
+  ember_wand: {
+    id: 'ember_wand', name: 'Ember Wand', icon: '🔥', slot: 'weapon', rarity: 'rare',
+    description: 'Đũa phép than hồng. Tăng MP và có chút sát thương phép.',
+    stats: { atk: 5, maxMp: 28 }, sellPrice: 95, buyPrice: 300,
+    dropFrom: ['ember_bloom', 'ash_acolyte'], dropChance: 8, minZone: 'shrine'
+  },
+  bone_halberd: {
+    id: 'bone_halberd', name: 'Bone Halberd', icon: '☠️', slot: 'weapon', rarity: 'rare',
+    description: 'Kích xương dài. Cân bằng giữa ATK và DEF.',
+    stats: { atk: 8, def: 4 }, sellPrice: 100, buyPrice: 330,
+    dropFrom: ['skeleton_archer', 'spirit_knight'], dropChance: 9, minZone: 'shrine'
+  },
+  crystal_knife: {
+    id: 'crystal_knife', name: 'Crystal Knife', icon: '💎', slot: 'weapon', rarity: 'rare',
+    description: 'Dao pha lê nhỏ. Sát thương vừa phải, crit cao.',
+    stats: { atk: 6, critChance: 14 }, sellPrice: 105, buyPrice: 340,
+    dropFrom: ['crystal_spider'], dropChance: 10, minZone: 'mines'
+  },
+  ash_mace: {
+    id: 'ash_mace', name: 'Ash Mace', icon: '🔨', slot: 'weapon', rarity: 'rare',
+    description: 'Chùy tro tàn. Cho thêm HP, hợp cleric/paladin đầu mid game.',
+    stats: { atk: 7, maxHp: 25 }, sellPrice: 95, buyPrice: 320,
+    dropFrom: ['ash_acolyte', 'pale_confessor'], dropChance: 8, minZone: 'shrine'
+  },
+
+  venom_kris: {
+    id: 'venom_kris', name: 'Venom Kris', icon: '🟢', slot: 'weapon', rarity: 'epic',
+    description: 'Dao cong tẩm nọc. Crit cao, sau khi crit có cơ hội né đòn.',
+    stats: { atk: 11, critChance: 18 }, effects: ['dodge_on_crit'],
+    sellPrice: 330, buyPrice: 1050, dropFrom: ['briar_witch', 'glass_serpent'], dropChance: 6, minZone: 'mines'
+  },
+  thunder_rapier: {
+    id: 'thunder_rapier', name: 'Thunder Rapier', icon: '⚡', slot: 'weapon', rarity: 'epic',
+    description: 'Kiếm đâm sấm sét. Có tỉ lệ đánh thêm một hit nhỏ.',
+    stats: { atk: 13, critChance: 9 }, effects: ['extra_hit'],
+    sellPrice: 340, buyPrice: 1100, dropFrom: ['bell_specter', 'bell_wraith'], dropChance: 7, minZone: 'shrine'
+  },
+  crystal_greatsword: {
+    id: 'crystal_greatsword', name: 'Crystal Greatsword', icon: '💎', slot: 'weapon', rarity: 'epic',
+    description: 'Đại kiếm pha lê. Sát thương cao, chậm và khó thủ.',
+    stats: { atk: 17, def: -3 }, sellPrice: 360, buyPrice: 1150,
+    dropFrom: ['crystal_spider', 'iron_sentinel'], dropChance: 7, minZone: 'mines'
+  },
+  witchwood_staff: {
+    id: 'witchwood_staff', name: 'Witchwood Staff', icon: '🪄', slot: 'weapon', rarity: 'epic',
+    description: 'Gậy gỗ phù thủy. Hồi MP định kỳ, phù hợp mage sustain.',
+    stats: { atk: 10, maxMp: 45 }, effects: ['mp_regen_3t'],
+    sellPrice: 330, buyPrice: 1050, dropFrom: ['briar_witch', 'scripture_mimic'], dropChance: 7, minZone: 'shrine'
+  },
+  molten_pickaxe: {
+    id: 'molten_pickaxe', name: 'Molten Pickaxe', icon: '⛏️', slot: 'weapon', rarity: 'epic',
+    description: 'Cuốc nung đỏ. Có cơ hội gây Burn khi đánh thường.',
+    stats: { atk: 14, def: -2 }, effects: ['burn_on_hit'],
+    sellPrice: 350, buyPrice: 1120, dropFrom: ['molten_jailer', 'slag_brute'], dropChance: 7, minZone: 'mines'
+  },
+  phantom_lance: {
+    id: 'phantom_lance', name: 'Phantom Lance', icon: '👻', slot: 'weapon', rarity: 'epic',
+    description: 'Thương bóng ma. ATK/DEF ổn và có cơ hội làm chậm khi dùng skill.',
+    stats: { atk: 12, def: 5, maxMp: 10 }, effects: ['slow_on_skill'],
+    sellPrice: 340, buyPrice: 1080, dropFrom: ['phantom', 'spirit_knight'], dropChance: 7, minZone: 'shrine'
+  },
+  briar_bow: {
+    id: 'briar_bow', name: 'Briar Bow', icon: '🌿', slot: 'weapon', rarity: 'epic',
+    description: 'Cung gai rừng sâu. Crit cao và có tỉ lệ bắn thêm.',
+    stats: { atk: 12, critChance: 12 }, effects: ['extra_hit'],
+    sellPrice: 340, buyPrice: 1060, dropFrom: ['thornhound', 'cursed_treant'], dropChance: 7, minZone: 'forest'
+  },
+  bellbreaker_mace: {
+    id: 'bellbreaker_mace', name: 'Bellbreaker Mace', icon: '🔔', slot: 'weapon', rarity: 'epic',
+    description: 'Chùy phá chuông. Có tỉ lệ làm choáng enemy 1 lượt.',
+    stats: { atk: 12, def: 4 }, effects: ['stun_on_hit'],
+    sellPrice: 360, buyPrice: 1180, dropFrom: ['bell_wraith', 'shrine_guardian'], dropChance: 6, minZone: 'shrine'
+  },
+
+  serpentbite_daggers: {
+    id: 'serpentbite_daggers', name: 'Serpentbite Daggers', icon: '🐍', slot: 'weapon', rarity: 'legendary',
+    description: 'Song dao rắn độc. Crit cao và hút máu nhẹ.',
+    stats: { atk: 16, critChance: 18, lifesteal: 5 },
+    sellPrice: 650, dropFrom: ['glass_serpent', 'void_wraith'], dropChance: 5, minZone: 'wastes'
+  },
+  oathkeeper_blade: {
+    id: 'oathkeeper_blade', name: 'Oathkeeper Blade', icon: '⚔️', slot: 'weapon', rarity: 'legendary',
+    description: 'Kiếm thệ ước. Cân bằng ATK/DEF, đáng tin khi đánh boss.',
+    stats: { atk: 18, def: 6 }, effects: ['boss_damage'],
+    sellPrice: 680, dropFrom: ['mirror_knight', 'shrine_guardian'], dropChance: 5, minZone: 'wastes'
+  },
+  volcanic_greataxe: {
+    id: 'volcanic_greataxe', name: 'Volcanic Greataxe', icon: '🌋', slot: 'weapon', rarity: 'legendary',
+    description: 'Đại phủ núi lửa. ATK rất cao, có Burn, nhưng giảm DEF.',
+    stats: { atk: 23, def: -5 }, effects: ['burn_on_hit'],
+    sellPrice: 700, dropFrom: ['molten_jailer', 'mine_colossus'], dropChance: 5, minZone: 'mines'
+  },
+  oracle_staff: {
+    id: 'oracle_staff', name: 'Oracle Staff', icon: '✨', slot: 'weapon', rarity: 'legendary',
+    description: 'Gậy tiên tri. MP cao và hồi mana đều đặn.',
+    stats: { atk: 14, maxMp: 70 }, effects: ['mp_regen_3t'],
+    sellPrice: 660, dropFrom: ['pale_confessor', 'dust_prophet'], dropChance: 5, minZone: 'wastes'
+  },
+  mirror_edge: {
+    id: 'mirror_edge', name: 'Mirror Edge', icon: '🪞', slot: 'weapon', rarity: 'legendary',
+    description: 'Lưỡi kiếm phản chiếu. Sau khi né, đòn kế tiếp mạnh hơn.',
+    stats: { atk: 17, dodgeChance: 8, critChance: 10 }, effects: ['dodge_then_dmg'],
+    sellPrice: 680, dropFrom: ['mirror_knight', 'memory_moth'], dropChance: 5, minZone: 'wastes'
+  },
+  saint_lance: {
+    id: 'saint_lance', name: 'Saint Lance', icon: '🌟', slot: 'weapon', rarity: 'legendary',
+    description: 'Thánh thương. Tăng HP/DEF, hợp paladin/cleric đánh lâu.',
+    stats: { atk: 16, def: 10, maxHp: 35 }, effects: ['potion_bonus'],
+    sellPrice: 680, dropFrom: ['pale_confessor', 'shrine_guardian'], dropChance: 5, minZone: 'wastes'
+  },
+
+  nightfall_katana: {
+    id: 'nightfall_katana', name: 'Nightfall Katana', icon: '🌘', slot: 'weapon', rarity: 'mythic',
+    description: 'Katana màn đêm. Crit cực cao, khi HP thấp sẽ bùng sát thương.',
+    stats: { atk: 27, critChance: 22 }, effects: ['low_hp_atk'],
+    sellPrice: 1700, dropFrom: ['eclipse_reaver', 'the_forgotten'], dropChance: 4, minZone: 'wastes'
+  },
+  aurora_bow: {
+    id: 'aurora_bow', name: 'Aurora Bow', icon: '🌈', slot: 'weapon', rarity: 'mythic',
+    description: 'Cung cực quang. Star Damage và đánh boss tốt.',
+    stats: { atk: 24, critChance: 12 }, effects: ['star_damage', 'boss_damage'],
+    sellPrice: 1700, dropFrom: ['memory_moth', 'the_forgotten'], dropChance: 4, minZone: 'wastes'
+  },
+  chronicle_staff: {
+    id: 'chronicle_staff', name: 'Chronicle Staff', icon: '📖', slot: 'weapon', rarity: 'mythic',
+    description: 'Gậy biên niên. MP cực cao, hồi MP mỗi 3 lượt và hồi MP khi hạ gục.',
+    stats: { atk: 19, maxMp: 95 }, effects: ['mp_regen_3t', 'kill_mp_regen'],
+    sellPrice: 1750, dropFrom: ['dust_prophet', 'the_forgotten'], dropChance: 4, minZone: 'wastes'
+  },
+  titanbreaker_maul: {
+    id: 'titanbreaker_maul', name: 'Titanbreaker Maul', icon: '🔨', slot: 'weapon', rarity: 'mythic',
+    description: 'Đại chùy phá titan. ATK cao, có stun, thêm sát thương lên boss.',
+    stats: { atk: 30, def: 8 }, effects: ['stun_on_hit', 'boss_damage'],
+    sellPrice: 1900, dropFrom: ['mine_colossus', 'the_forgotten'], dropChance: 4, minZone: 'wastes'
+  },
+
+  parasite_dagger: {
+    id: 'parasite_dagger', name: 'Parasite Dagger', icon: '🪱', slot: 'weapon', rarity: 'cursed',
+    description: 'Dao ký sinh. Crit và lifesteal cao, nhưng mỗi lượt bị rút HP.',
+    stats: { atk: 20, critChance: 20, lifesteal: 10 }, effects: ['curse_hp_drain'],
+    sellPrice: 760, dropFrom: ['mind_leech', 'void_wraith'], dropChance: 4, minZone: 'wastes'
+  },
+  glass_rapier: {
+    id: 'glass_rapier', name: 'Glass Rapier', icon: '🪞', slot: 'weapon', rarity: 'cursed',
+    description: 'Kiếm thủy tinh. Crit rất cao nhưng mỏng manh, giảm HP tối đa.',
+    stats: { atk: 24, critChance: 25, maxHp: -35 }, effects: ['dodge_then_dmg'],
+    sellPrice: 780, dropFrom: ['glass_serpent', 'mirror_knight'], dropChance: 4, minZone: 'wastes'
+  },
+  famine_scythe: {
+    id: 'famine_scythe', name: 'Famine Scythe', icon: '☠️', slot: 'weapon', rarity: 'cursed',
+    description: 'Lưỡi hái đói khát. Giết enemy hồi HP, nhưng không thể dùng potion hồi máu.',
+    stats: { atk: 27, lifesteal: 6 }, effects: ['kill_hp_regen', 'no_healing'],
+    sellPrice: 820, dropFrom: ['abyss_fiend', 'the_forgotten'], dropChance: 3, minZone: 'wastes'
+  },
+  oathbreaker_blade: {
+    id: 'oathbreaker_blade', name: 'Oathbreaker Blade', icon: '💔', slot: 'weapon', rarity: 'cursed',
+    description: 'Kiếm phá thệ. Sát thương lớn, nhưng chết sẽ bị phạt gold nặng hơn.',
+    stats: { atk: 31, def: -6 }, effects: ['debt_on_death'],
+    sellPrice: 820, dropFrom: ['mirror_knight', 'the_forgotten'], dropChance: 3, minZone: 'wastes'
+  },
+
+
   // ════════════════════════════════════════════════════
   //  ARMOR
   // ════════════════════════════════════════════════════

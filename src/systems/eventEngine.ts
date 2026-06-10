@@ -11,6 +11,7 @@ import {
   adjustWanted,
   getItemQty,
   getPlayer,
+  getEffectivePlayer,
   grantExp,
   grantGold,
   grantSoulShards,
@@ -83,7 +84,7 @@ function miniGameOptionButtonId(ctx: RunExploreEventInput, eventId: string, roun
 }
 
 function isChoiceDisabled(ctx: RunExploreEventInput, choice: DataEventChoice): boolean {
-  const player = getPlayer(ctx.userId, ctx.guildId) ?? ctx.player;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId) ?? ctx.player;
   const req = choice.requires;
   if (!req) return false;
   if (req.gold !== undefined && player.gold < req.gold) return true;
@@ -169,7 +170,7 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder, image?: st
 }
 
 function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line?: string; startsCombat?: boolean } {
-  const player = getPlayer(ctx.userId, ctx.guildId) ?? ctx.player;
+  const player = getEffectivePlayer(ctx.userId, ctx.guildId) ?? ctx.player;
 
   switch (action.type) {
     case 'gold': {

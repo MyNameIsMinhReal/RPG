@@ -12,7 +12,7 @@ import {
   adjustReputation,
   adjustWanted,
   getItemQty,
-  getPlayer,
+  getPlayer, getEffectivePlayer,
   grantExp,
   grantGold,
   grantSoulShards,
@@ -96,7 +96,7 @@ export async function showWorldPlaguesSpreads(ctx: RunExploreEventInput): Promis
     const roll = randInt(1, 100);
     if (roll <= 40) {
       // Lây bệnh nhẹ - mất HP
-      const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+      const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
       const newHp = Math.max(1, fresh.hp - Math.floor(fresh.max_hp * 0.15));
       updatePlayerHpMp(ctx.userId, ctx.guildId, newHp, fresh.mp);
       setFlag(ctx.guildId, 'world_plague_active', '1', 43200);
@@ -355,7 +355,7 @@ export async function showWorldPriceGouger(ctx: RunExploreEventInput): Promise<v
   }
 
   if (cid === `wpg_buy_${ctx.userId}`) {
-    const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+    const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     if (fresh.gold < 80) {
       return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không đủ **80 Gold** để mua.'));
     }
@@ -393,7 +393,7 @@ export async function showWorldTaxCollector(ctx: RunExploreEventInput): Promise<
   const cid = await awaitBtn(ctx, embed, row);
 
   if (cid === `wtc_pay_${ctx.userId}`) {
-    const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+    const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     if (fresh.gold < 50) {
       return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không đủ **50 Gold** để nộp thuế.'));
     }
@@ -799,7 +799,7 @@ export async function showWorldSecretMeeting(ctx: RunExploreEventInput): Promise
   if (cid === `wsm_interrupt_${ctx.userId}`) {
     adjustWorldDanger(ctx.guildId, 5);
     adjustWanted(ctx.userId, ctx.guildId, 1);
-    const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+    const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
     const dmg = Math.floor(fresh.max_hp * 0.20);
     updatePlayerHpMp(ctx.userId, ctx.guildId, Math.max(1, fresh.hp - dmg), fresh.mp);
     return finish(ctx, simpleEmbed(COLORS.danger,
@@ -1056,7 +1056,7 @@ export async function showWorldVillagerDispute(ctx: RunExploreEventInput): Promi
     ));
   }
 
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const fee = 20;
   if (fresh.gold < fee) {
     return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không đủ tiền để "làm trung gian" theo cách này.'));

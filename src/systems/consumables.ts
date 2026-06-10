@@ -10,6 +10,7 @@ import { MATERIALS } from '../data/materials';
 import { EQUIPMENT } from '../data/equipment';
 import { randInt, pick } from '../utils/format';
 import type { PlayerRow } from '../utils/embeds';
+import { getEquipmentStats } from './equipment';
 
 export type BuffKey =
   | 'weapon_oil'
@@ -179,19 +180,30 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
   if (effect.passiveOnly) {
     return { ok: false, title: '🧿 Nội tại', lines: ['Vật phẩm này tự kích hoạt khi đủ điều kiện, không cần dùng thủ công.'] };
   }
+
+  const eqStats = getEquipmentStats(userId, guildId);
+  const isHealthPotion = !!(effect.hp || effect.hpPercent);
+  if (isHealthPotion && eqStats.effects.includes('no_healing')) {
+    return { ok: false, title: '🚫 Không thể hồi máu', lines: [`**${item.name}** không thể dùng vì trang bị hiện tại chặn hồi máu.`] };
+  }
+  const potionMult = isHealthPotion
+    ? Math.max(0, 1 + (eqStats.effects.includes('potion_bonus') ? 0.20 : 0) - (eqStats.effects.includes('blood_kill_regen') ? 0.50 : 0))
+    : 1;
+
   if (effect.hpBelowPct && player.hp / player.max_hp > effect.hpBelowPct) {
     return { ok: false, title: '❌ Chưa thể dùng', lines: [`Chỉ dùng được khi HP dưới **${Math.floor(effect.hpBelowPct * 100)}%**.`] };
   }
 
   if (effect.hpPercent) {
-    const amount = Math.max(1, Math.floor(player.max_hp * effect.hpPercent));
+    const amount = Math.max(1, Math.floor(player.max_hp * effect.hpPercent * potionMult));
     const gain = Math.min(amount, player.max_hp - newHp);
     newHp = Math.min(player.max_hp, newHp + amount);
     lines.push(`❤️ +**${gain} HP** (${newHp}/${player.max_hp})`);
   }
   if (effect.hp) {
-    const gain = Math.min(effect.hp, player.max_hp - newHp);
-    newHp = Math.min(player.max_hp, newHp + effect.hp);
+    const rawHp = Math.max(1, Math.floor(effect.hp * potionMult));
+    const gain = Math.min(rawHp, player.max_hp - newHp);
+    newHp = Math.min(player.max_hp, newHp + rawHp);
     lines.push(`❤️ +**${gain} HP** (${newHp}/${player.max_hp})`);
   }
   if (effect.mpPercent) {

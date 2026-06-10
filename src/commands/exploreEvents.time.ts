@@ -8,7 +8,7 @@ import {
 } from 'discord.js';
 import {
   addItem, adjustReputation, adjustWanted,
-  getPlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp
+  getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp
 } from '../systems/player';
 import { setBuff } from '../systems/consumables';
 import { logEvent } from '../systems/world';
@@ -117,7 +117,7 @@ export async function showDawnRitual(ctx: RunExploreEventInput): Promise<void> {
       'Vài bóng người đang thực hiện một nghi lễ im lặng — lòng bàn tay hướng lên bầu trời.'
     );
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   if (!cid || cid === `dr_leave_${ctx.userId}`) {
     return finish(ctx, simpleEmbed(COLORS.info, '🌅 *Bạn để nghi lễ lại phía sau và tiếp tục hành trình.*'));
@@ -159,7 +159,7 @@ export async function showDawnTraveler(ctx: RunExploreEventInput): Promise<void>
       '*"Chào buổi sáng. Ít người dậy sớm như ta thế này..."*'
     );
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   if (!cid || cid === `dt_pass_${ctx.userId}`) {
     return finish(ctx, simpleEmbed(COLORS.info, '🌄 *Bạn gật đầu lịch sự và tiếp tục con đường của mình.*'));
@@ -216,7 +216,7 @@ export async function showNoonRest(ctx: RunExploreEventInput): Promise<void> {
       '*Đây là lúc hiếm hoi để lấy lại sức.*'
     );
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   if (!cid || cid === `nr_push_${ctx.userId}`) {
     const gold = randInt(4, 12);
@@ -250,7 +250,7 @@ export async function showNoonRest(ctx: RunExploreEventInput): Promise<void> {
 }
 
 export async function showDayPatrol(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const wanted = fresh.reputation !== undefined && fresh.reputation <= -20 ? 1 : 0;
   // Check wanted level via player.wanted_level if it exists, else use rep as proxy
   const isWanted = (fresh as any).wanted_level > 0 || wanted > 0;
@@ -309,7 +309,7 @@ export async function showDayPatrol(ctx: RunExploreEventInput): Promise<void> {
 // ════════════════════════════════════════════════════════════════════════
 
 export async function showDuskTrader(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const offers: Array<{ itemId: string; name: string; icon: string; price: number }> = [
     { itemId: 'health_potion', name: 'Health Potion', icon: '🧪', price: 15 },
     { itemId: 'mana_potion', name: 'Mana Potion', icon: '💧', price: 12 },
@@ -381,7 +381,7 @@ export async function showDuskOmen(ctx: RunExploreEventInput): Promise<void> {
       'Không ai biết điều này có nghĩa gì. Có lẽ không có nghĩa gì. Có lẽ có.'
     );
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   if (!cid || cid === `do_ignore_${ctx.userId}`) {
     return finish(ctx, simpleEmbed(COLORS.info, '🌆 *Bạn không để tâm và tiếp tục đường mình.*'));
@@ -438,7 +438,7 @@ export async function showNightPredator(ctx: RunExploreEventInput): Promise<void
       '*Đêm tối là lãnh địa của chúng.*'
     );
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   if (!cid || cid === `np_flee_${ctx.userId}`) {
     const dmg = Math.max(1, Math.floor(fresh.max_hp * 0.08));
@@ -497,7 +497,7 @@ export async function showMidnightWanderer(ctx: RunExploreEventInput): Promise<v
       'Bạn không chắc người này là ai. Hay là người thật sự.'
     );
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
 
   if (!cid || cid === `mw_avoid_${ctx.userId}`) {
     return finish(ctx, simpleEmbed(COLORS.info, '🌑 *Bạn đi vòng tránh và không nhìn lại. Một số thứ tốt hơn là không biết.*'));
@@ -556,7 +556,7 @@ export async function showMidnightWanderer(ctx: RunExploreEventInput): Promise<v
 // ════════════════════════════════════════════════════════════════════════
 
 export async function showDawnDewBlessing(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`dew_drink_${ctx.userId}`).setLabel('Uống sương mai').setEmoji('💧').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`dew_collect_${ctx.userId}`).setLabel('Thu vào lọ').setEmoji('🫙').setStyle(ButtonStyle.Primary),
@@ -610,7 +610,7 @@ export async function showDawnHunterTracks(ctx: RunExploreEventInput): Promise<v
 }
 
 export async function showDayTrainingGround(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`tg_train_${ctx.userId}`).setLabel('Tập luyện').setEmoji('🏋️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`tg_spar_${ctx.userId}`).setLabel('Đấu tập').setEmoji('⚔️').setStyle(ButtonStyle.Danger),
@@ -642,7 +642,7 @@ export async function showDayTrainingGround(ctx: RunExploreEventInput): Promise<
 }
 
 export async function showDaySupplyCart(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const canBuy = fresh.gold >= 70;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`sc_buy_${ctx.userId}`).setLabel('Mua gói tiếp tế').setEmoji('📦').setStyle(ButtonStyle.Primary).setDisabled(!canBuy),
@@ -698,7 +698,7 @@ export async function showDuskCrowOmen(ctx: RunExploreEventInput): Promise<void>
 }
 
 export async function showDuskCardDealer(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const canPlay = fresh.gold >= 40;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`card_draw_${ctx.userId}`).setLabel('Rút 1 lá - 40 Gold').setEmoji('🃏').setStyle(ButtonStyle.Primary).setDisabled(!canPlay),
@@ -728,7 +728,7 @@ export async function showDuskCardDealer(ctx: RunExploreEventInput): Promise<voi
 }
 
 export async function showNightGhostLantern(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`gl_follow_${ctx.userId}`).setLabel('Đi theo đèn').setEmoji('🕯️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`gl_pray_${ctx.userId}`).setLabel('Cầu nguyện từ xa').setEmoji('🙏').setStyle(ButtonStyle.Secondary),
