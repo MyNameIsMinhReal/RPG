@@ -2874,11 +2874,11 @@ async function showCaravanRobbery(
 
   if (cid === `cara_watch_${userId}` || !btn) {
     // Spectate — random small loot
-    const watchLoot = pick(['health_potion','herb','wolf_fang','bone_shard']);
+    const watchLoot = pick(['health_potion','healing_herb','wolf_fang','bone_shard']);
     const watchGold = randInt(5, 20);
     addItem(userId, guildId, watchLoot, 1);
     grantGold(userId, guildId, watchGold);
-    const it = getItem(watchLoot)!;
+    const it = getAnyRewardInfo(watchLoot);
     const watchReply = await interaction.editReply({
       embeds: [
         new EmbedBuilder().setColor(COLORS.info)
@@ -2916,6 +2916,20 @@ async function showCaravanRobbery(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function simpleEmbed(color: number, desc: string) {
   return new EmbedBuilder().setColor(color).setDescription(desc);
+}
+
+
+function getAnyRewardInfo(id: string): { icon: string; name: string } {
+  const item = getItem(id);
+  if (item) return { icon: item.icon ?? '🎁', name: item.name ?? id };
+
+  const material = getMaterial(id);
+  if (material) return { icon: material.icon ?? '🧱', name: material.name ?? id };
+
+  const equipment = getEquipment(id);
+  if (equipment) return { icon: equipment.icon ?? '⚔️', name: equipment.name ?? id };
+
+  return { icon: '🎁', name: id };
 }
 
 // ── Event: Soul Shop ──────────────────────────────────────────────────────

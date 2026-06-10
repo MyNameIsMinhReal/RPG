@@ -84,6 +84,22 @@ function safeComponentText(text: string, max: number): string {
   return cleaned.slice(0, Math.max(1, max - 1)).trimEnd() + '…';
 }
 
+function isUsableButtonEmoji(emoji?: string | null): emoji is string {
+  const value = String(emoji ?? '').trim();
+  if (!value) return false;
+  // Custom Discord emoji: <:name:id> or <a:name:id>
+  if (/^<a?:[a-zA-Z0-9_]{2,32}:\d{17,20}>$/.test(value)) return true;
+  // Unicode emoji/arrows/symbols that Discord accepts as button emoji.
+  // This deliberately rejects plain punctuation like '•', '••', '-' or '—',
+  // which caused Invalid Form Body on the bird-call mini game.
+  if (!(/[\p{Extended_Pictographic}\p{Emoji_Presentation}]/u.test(value))) return false;
+  return value.length <= 32;
+}
+
+function maybeSetButtonEmoji(button: ButtonBuilder, emoji?: string | null): ButtonBuilder {
+  return isUsableButtonEmoji(emoji) ? button.setEmoji(emoji.trim()) : button;
+}
+
 function buttonId(ctx: RunExploreEventInput, eventId: string, choiceId: string): string {
   // Discord custom_id limit is 100 chars. Keep IDs compact so long event/choice IDs never break components.
   return `dde_${shortHash(`${eventId}:${choiceId}`)}_${ctx.userId}`;
@@ -111,14 +127,13 @@ function isChoiceDisabled(ctx: RunExploreEventInput, choice: DataEventChoice): b
 function buildChoiceRow(ctx: RunExploreEventInput, event: DataDrivenExploreEventDef): ActionRowBuilder<ButtonBuilder> {
   const row = new ActionRowBuilder<ButtonBuilder>();
   for (const choice of (event.choices ?? []).slice(0, 5)) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(buttonId(ctx, event.id, choice.id))
-        .setLabel(safeComponentText(choice.label, 80))
-        .setEmoji(choice.emoji ?? '•')
-        .setStyle(STYLE_MAP[choice.style ?? 'secondary'])
-        .setDisabled(isChoiceDisabled(ctx, choice)),
-    );
+    const button = new ButtonBuilder()
+      .setCustomId(buttonId(ctx, event.id, choice.id))
+      .setLabel(safeComponentText(choice.label, 80))
+      .setStyle(STYLE_MAP[choice.style ?? 'secondary'])
+      .setDisabled(isChoiceDisabled(ctx, choice));
+    maybeSetButtonEmoji(button, choice.emoji);
+    row.addComponents(button);
   }
   return row;
 }
@@ -192,13 +207,12 @@ async function awaitEventButton(
 }
 
 function buildMiniGameStartRow(ctx: RunExploreEventInput, event: DataDrivenExploreEventDef, miniGame: DataEventMiniGame): ActionRowBuilder<ButtonBuilder> {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder()
-      .setCustomId(miniGameStartButtonId(ctx, event.id))
-      .setLabel(safeComponentText(miniGame.startLabel ?? 'Bắt đầu', 80))
-      .setEmoji(miniGame.startEmoji ?? '🎮')
-      .setStyle(STYLE_MAP[miniGame.startStyle ?? 'primary']),
-  );
+  const button = new ButtonBuilder()
+    .setCustomId(miniGameStartButtonId(ctx, event.id))
+    .setLabel(safeComponentText(miniGame.startLabel ?? 'Bắt đầu', 80))
+    .setStyle(STYLE_MAP[miniGame.startStyle ?? 'primary']);
+  maybeSetButtonEmoji(button, miniGame.startEmoji ?? '🎮');
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(button);
 }
 
 function buildMiniGameOptionRow(
@@ -209,13 +223,12 @@ function buildMiniGameOptionRow(
 ): ActionRowBuilder<ButtonBuilder> {
   const row = new ActionRowBuilder<ButtonBuilder>();
   for (const option of miniGame.options.slice(0, 5)) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(miniGameOptionButtonId(ctx, event.id, roundIndex, option.id))
-        .setLabel(safeComponentText(option.label, 80))
-        .setEmoji(option.emoji ?? '•')
-        .setStyle(STYLE_MAP[option.style ?? 'secondary']),
-    );
+    const button = new ButtonBuilder()
+      .setCustomId(miniGameOptionButtonId(ctx, event.id, roundIndex, option.id))
+      .setLabel(safeComponentText(option.label, 80))
+      .setStyle(STYLE_MAP[option.style ?? 'secondary']);
+    maybeSetButtonEmoji(button, option.emoji);
+    row.addComponents(button);
   }
   return row;
 }

@@ -1,5 +1,5 @@
 import {
-  SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder
+  SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, AttachmentBuilder
 } from 'discord.js';
 import { clearPlayerBossProgress, hasPlayerClearedBoss, setFlag } from '../systems/world';
 import {
@@ -12,6 +12,16 @@ import { getEquipment } from '../data/equipment';
 import { expNext } from '../utils/format';
 import { ZONES } from '../data/zones';
 import db from '../database/index';
+import {
+  GAME_ID_CATEGORY_CHOICES,
+  GAME_ID_CATEGORY_LABELS,
+  countRows,
+  filterGameIdSections,
+  formatGameIdsPreview,
+  formatGameIdsText,
+  getGameIdSectionsFor,
+  type GameIdCategory,
+} from '../utils/gameIds';
 
 const BOSS_IDS = Object.values(ZONES)
   .filter(z => z.bossId)
@@ -24,6 +34,40 @@ const ALLOWED_IDS = new Set(
 function isAllowed(userId: string): boolean {
   return ALLOWED_IDS.has(userId);
 }
+
+function deleteWorldFlagKeys(guildId: string, keys: string[]): number {
+  if (keys.length === 0) return 0;
+  const stmt = db.prepare('DELETE FROM world_state WHERE guild_id=? AND flag_key=?');
+  let total = 0;
+  for (const key of keys) total += stmt.run(guildId, key).changes as number;
+  return total;
+}
+
+function resetActiveOakEvent(guildId: string): { events: number; participants: number } {
+  const now = Math.floor(Date.now() / 1000);
+  const events = db.prepare(`
+    UPDATE oak_event
+    SET phase='dead', current_fighter=NULL, expires_at=?
+    WHERE guild_id=? AND phase!='dead'
+  `).run(now, guildId).changes as number;
+  const participants = db.prepare('DELETE FROM oak_participants WHERE guild_id=?')
+    .run(guildId).changes as number;
+  return { events, participants };
+}
+
+function resetAncientOakCooldown(guildId: string): number {
+  return deleteWorldFlagKeys(guildId, [
+    'boss_ancient_oak_slain',
+  ]);
+}
+
+function resetAncientOakAftermath(guildId: string): number {
+  return deleteWorldFlagKeys(guildId, [
+    'event_ancient_oak_fall',
+    'forest_drop_bonus',
+  ]);
+}
+
 
 export const data = new SlashCommandBuilder()
   .setName('admin')
@@ -86,6 +130,36 @@ export const data = new SlashCommandBuilder()
     .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
   )
   .addSubcommand(sub => sub
+    .setName('ids')
+    .setDescription('Xuất danh sách ID game theo nhóm để dùng cho admin/debug')
+    .addStringOption(opt => opt
+      .setName('category')
+      .setDescription('Nhóm ID cần xem')
+      .setRequired(false)
+      .addChoices(...GAME_ID_CATEGORY_CHOICES)
+    )
+    .addStringOption(opt => opt
+      .setName('search')
+      .setDescription('Lọc theo ID/tên/ghi chú, ví dụ: relic, forest, dagger')
+      .setRequired(false)
+    )
+  )
+  .addSubcommand(sub => sub
+    .setName('resettime')
+    .setDescription('Reset cooldown/time của boss hoặc event đang mở')
+    .addStringOption(opt => opt
+      .setName('target')
+      .setDescription('Loại time cần reset')
+      .setRequired(true)
+      .addChoices(
+        { name: '🌳 Ancient Oak cooldown', value: 'oak_cooldown' },
+        { name: '🌳 Ancient Oak event đang mở', value: 'oak_event' },
+        { name: '🌳 Ancient Oak tất cả', value: 'oak_all' },
+      )
+    )
+    .addStringOption(opt => opt.setName('guild_id').setDescription('Guild ID khác (cross-server)').setRequired(false))
+  )
+  .addSubcommand(sub => sub
     .setName('forceevent')
     .setDescription('Ép event tiếp theo của người chơi khi /explore')
     .addUserOption(opt => opt.setName('user').setDescription('Người chơi').setRequired(true))
@@ -104,6 +178,82 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const sub = interaction.options.getSubcommand();
   const guildIdOverride = interaction.options.getString('guild_id');
   const guildId = guildIdOverride?.trim() || interaction.guildId!;
+
+  // ── ids ───────────────────────────────────────────────────────────────────
+  if (sub === 'ids') {
+    const category = (interaction.options.getString('category') ?? 'all') as GameIdCategory;
+    const search = interaction.options.getString('search');
+    const sections = filterGameIdSections(getGameIdSectionsFor(category), search);
+    const total = countRows(sections);
+    const text = formatGameIdsText(category, search);
+    const fileName = `game-ids-${category}${search?.trim() ? '-search' : ''}.txt`;
+    const attachment = new AttachmentBuilder(Buffer.from(text, 'utf8'), { name: fileName });
+
+    await interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setColor(total > 0 ? 0x5865F2 : 0x95A5A6)
+        .setTitle('🧾 Game ID Index')
+        .setDescription(formatGameIdsPreview(category, search))
+        .addFields(
+          { name: 'Nhóm', value: GAME_ID_CATEGORY_LABELS[category], inline: true },
+          { name: 'Số ID', value: `${total}`, inline: true },
+          { name: 'File đầy đủ', value: `Đã đính kèm \`${fileName}\``, inline: false },
+        )
+        .setFooter({ text: 'Dùng search để lọc nhanh: relic, forest, dagger, boss...' })
+      ],
+      files: [attachment],
+    });
+    return;
+  }
+
+  // ── resettime ─────────────────────────────────────────────────────────────
+  if (sub === 'resettime') {
+    const target = interaction.options.getString('target', true);
+
+    let cooldownDeleted = 0;
+    let aftermathDeleted = 0;
+    let oakEvents = 0;
+    let oakParticipants = 0;
+    let title = '⏱️ Đã Reset Time';
+    let description = '';
+
+    if (target === 'oak_cooldown' || target === 'oak_all') {
+      cooldownDeleted = resetAncientOakCooldown(guildId);
+      description += '🌳 Đã mở lại cooldown triệu hồi **Ancient Oak**.\n';
+    }
+
+    if (target === 'oak_event' || target === 'oak_all') {
+      const result = resetActiveOakEvent(guildId);
+      oakEvents = result.events;
+      oakParticipants = result.participants;
+      description += '⚔️ Đã đóng event Ancient Oak đang mở và xoá danh sách tham gia cũ.\n';
+    }
+
+    if (target === 'oak_all') {
+      aftermathDeleted = resetAncientOakAftermath(guildId);
+      description += '🌲 Đã xoá hiệu ứng hậu quả Ancient Oak cũ nếu còn tồn tại.\n';
+    }
+
+    if (!description) {
+      title = 'ℹ️ Không có gì để reset';
+      description = 'Target không hợp lệ hoặc không có dữ liệu cần reset.';
+    }
+
+    await interaction.editReply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle(title)
+        .setDescription(description.trim())
+        .addFields(
+          { name: 'Server', value: `\`${guildId}\``, inline: false },
+          { name: 'Cooldown flag xoá', value: `${cooldownDeleted}`, inline: true },
+          { name: 'Oak event đóng', value: `${oakEvents}`, inline: true },
+          { name: 'Participant xoá', value: `${oakParticipants}`, inline: true },
+          { name: 'Aftermath flag xoá', value: `${aftermathDeleted}`, inline: true },
+        )]
+    });
+    return;
+  }
 
   // ── revive ────────────────────────────────────────────────────────────────
   if (sub === 'revive') {

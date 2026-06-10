@@ -3654,19 +3654,19 @@ export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = 
         {
           "id": "short",
           "label": "Một Tiếng Ngắn",
-          "emoji": "•",
+          "emoji": "🐤",
           "style": "secondary"
         },
         {
           "id": "double",
           "label": "Hai Tiếng Liền",
-          "emoji": "••",
+          "emoji": "🐦",
           "style": "primary"
         },
         {
           "id": "long",
           "label": "Một Tiếng Dài",
-          "emoji": "—",
+          "emoji": "🦉",
           "style": "success"
         }
       ],
