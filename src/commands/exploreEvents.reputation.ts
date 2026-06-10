@@ -12,7 +12,7 @@ import {
   adjustReputation,
   adjustWanted,
   getItemQty,
-  getPlayer, getEffectivePlayer,
+  getPlayer,
   grantExp,
   grantGold,
   grantSoulShards,
@@ -49,7 +49,7 @@ async function awaitBtn(
 }
 
 function healPercent(ctx: RunExploreEventInput, hpPct: number, mpPct = 0): { hp: number; mp: number } {
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   const hp = Math.min(fresh.max_hp, fresh.hp + Math.floor(fresh.max_hp * hpPct));
   const mp = Math.min(fresh.max_mp, fresh.mp + Math.floor(fresh.max_mp * mpPct));
   updatePlayerHpMp(ctx.userId, ctx.guildId, hp, mp);
@@ -113,7 +113,7 @@ export async function showRepGratefulVillagers(ctx: RunExploreEventInput): Promi
     .setTitle('🏘️ Gia Đình Biết Ơn')
     .setDescription('Một gia đình dân làng chạy đến gọi tên bạn. Họ từng được bạn cứu trong một chuyến explore trước đó.');
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
 
   if (cid === `rgv_refuse_${ctx.userId}`) {
     const exp = randInt(14, 32);
@@ -246,7 +246,7 @@ export async function showRepHeroStatue(ctx: RunExploreEventInput): Promise<void
     .setTitle('🏛️ Bức Tượng Vị Anh Hùng')
     .setDescription('Ở ngã ba đường có một bức tượng nhỏ. Gương mặt chưa giống bạn hoàn toàn, nhưng chiếc bảng đồng bên dưới lại ghi tên bạn.');
   const cid = await awaitBtn(ctx, embed, row);
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
 
   if (cid === `rhs_leavecoin_${ctx.userId}`) {
     if (fresh.gold < 25) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Bạn không đủ **25 Gold**.'));
@@ -299,7 +299,7 @@ export async function showRepRoyalMessenger(ctx: RunExploreEventInput): Promise<
 }
 
 export async function showRepChampionChallenge(ctx: RunExploreEventInput): Promise<void> {
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   const base = ctx.enemies.length ? pick(ctx.enemies) : null;
   const enemy = {
     id: `honor_champion_${ctx.userId}_${Date.now()}`,
@@ -326,7 +326,7 @@ export async function showRepChampionChallenge(ctx: RunExploreEventInput): Promi
   await ctx.interaction.editReply({ embeds: [embed], components: [] });
   await new Promise(r => setTimeout(r, 700));
 
-  return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+  return ctx.callbacks.startCombatWithEnemy(enemy,
     async (_int, btn, _uid, _gid, _p, e, state) => {
       updatePlayerHpMp(ctx.userId, ctx.guildId, state.player_hp, state.player_mp);
       const exp = Math.max(60, Math.floor(fresh.exp_next * 0.25));

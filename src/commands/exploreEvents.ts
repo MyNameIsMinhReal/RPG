@@ -16,7 +16,7 @@ import {
   adjustFaction,
   addPet,
   getItemQty,
-  getPlayer, getEffectivePlayer,
+  getPlayer,
   grantExp,
   grantGold,
   grantSoulShards,
@@ -37,7 +37,7 @@ import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { getBuff, consumeBuff, setBuff } from '../systems/consumables';
 import { startFishingMiniGame } from './fish';
-import { onlyUser } from '../utils/collectors';
+import { onlyParty, onlyUser } from '../utils/collectors';
 import { incrementChapterObjective } from '../systems/chapter';
 import { getPityCounters, getPityBonus, PITY_EVENTS } from '../systems/pity';
 import { startOakHunt, isOakHuntActive, hasOakPrereq, OAK_HUNT_EXPLORES } from '../systems/oakEvent';
@@ -129,6 +129,12 @@ export interface PickExploreEventInput {
 
 export interface ExploreEventCallbacks {
   startCombat: (enemyId: string) => Promise<void>;
+  startCombatWithEnemy: (
+    enemy: any,
+    onVictory?: CombatVictoryHandler,
+    onDeath?: CombatDeathHandler,
+    onFlee?: CombatFleeHandler
+  ) => Promise<void>;
   showAmbush: () => Promise<void>;
   showLegacyFind: () => Promise<void>;
   showMerchant: () => Promise<void>;
@@ -652,13 +658,9 @@ async function showFishingSpot(ctx: RunExploreEventInput): Promise<void> {
     .setFooter({ text: 'Fishing Spot có thể xuất hiện ở mọi zone · cooldown 60s' });
 
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({
-    filter: onlyUser(ctx.userId),
-    time: 30_000,
-  }).catch(() => null);
+  const btn = await awaitVote(ctx, reply as Message<boolean>, 30_000);
 
-  const deferred = btn ? await btn.deferUpdate().then(() => true).catch(() => false) : false;
-  if (!deferred || !btn || btn.customId === `ev_skip_${ctx.userId}`) {
+  if (!btn || btn.customId === `ev_skip_${ctx.userId}`) {
     return finish(ctx, simpleEmbed(COLORS.info, '🎣 *Bạn bỏ qua điểm câu cá và tiếp tục hành trình.*'));
   }
 
@@ -785,7 +787,7 @@ function scaleEventExp(value: number): number { return Math.max(1, Math.floor(va
 function scaleEventGold(value: number): number { return Math.max(0, Math.floor(value * 0.62)); }
 
 function eventEnemy(ctx: RunExploreEventInput, base: any, overrides: Partial<any>) {
-  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
   return {
     id: `${overrides.id ?? 'event_enemy'}_${ctx.userId}_${Date.now()}`,
     name: overrides.name ?? base?.name ?? 'Unknown Enemy',
@@ -878,7 +880,7 @@ async function showBloodTrail(ctx: RunExploreEventInput): Promise<void> {
       hp: Math.floor(base.hp * 1.15), atk: Math.floor(base.atk * 1.12), def: base.def,
       lore: 'Một kẻ săn mồi bị mùi máu đánh thức.'
     });
-    return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+    return ctx.callbacks.startCombatWithEnemy(enemy,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
         title: '🩸 Dấu Máu Đã Khép Lại', description: `Bạn hạ **${e.name}** và tìm thấy chiến lợi phẩm cạnh xác nạn nhân.`, exp: Math.floor(ctx.player.exp_next * 0.18), gold: randInt(25, 65), soulShards: randInt(1, 100) <= 35 ? 1 : 0, items: [pick(['elixir','book_berserker','book_counter','book_mend_wounds'])]
       }),
@@ -910,13 +912,13 @@ async function showNamelessGrave(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`grave_offer_${ctx.userId}`).setLabel('Để lại 25 Gold').setEmoji('🪙').setStyle(ButtonStyle.Secondary)
   );
   const cid = await awaitButton(ctx, row, embed, 'legacy');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
 
   if (cid === `grave_pray_${ctx.userId}`) {
     if (rep < -30 && randInt(1, 100) <= 65 && ctx.enemies.length) {
       const base = pick(ctx.enemies);
       const ghost = eventEnemy(ctx, base, { id: 'grave_spirit', name: 'Linh Hồn Phẫn Nộ', icon: '👻', hp: Math.floor(base.hp * 0.9), atk: Math.floor(base.atk * 1.05), def: base.def });
-      return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, ghost, undefined,
+      return ctx.callbacks.startCombatWithEnemy(ghost,
         async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '👻 Linh Hồn Được Giải Thoát', description: 'Lời nguyền trong mộ tan biến.', exp: Math.floor(ctx.player.exp_next * 0.12), soulShards: 1 }),
         ctx.callbacks.handleDeath,
         ctx.callbacks.handleFlee
@@ -957,7 +959,7 @@ async function showMemorySeller(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`mem_leave_${ctx.userId}`).setLabel('Từ chối').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
   );
   const cid = await awaitButton(ctx, row, embed, 'mysterious');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `mem_combat_${ctx.userId}`) {
     if (fresh.gold < combatCost) return finish(ctx, simpleEmbed(COLORS.warning, `❌ Cần **${combatCost} Gold**, bạn chỉ có **${fresh.gold}**.`));
     spendGold(ctx.userId, ctx.guildId, combatCost);
@@ -985,7 +987,7 @@ async function showStrangerCampfire(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`camp_eat_${ctx.userId}`).setLabel('Ăn thức ăn lạ').setEmoji('🍲').setStyle(ButtonStyle.Danger)
   );
   const cid = await awaitButton(ctx, row, embed, 'spring');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `camp_rest_${ctx.userId}`) {
     const hp = Math.min(fresh.max_hp, fresh.hp + Math.floor(fresh.max_hp * 0.28));
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
@@ -1016,7 +1018,7 @@ async function showCrackedShrine(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`shrine_break_${ctx.userId}`).setLabel('Phá bàn thờ').setEmoji('🔨').setStyle(ButtonStyle.Secondary)
   );
   const cid = await awaitButton(ctx, row, embed, 'altar');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `shrine_gold_${ctx.userId}`) {
     if (fresh.gold < 50) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Bạn không đủ **50 Gold** để hiến.'));
     spendGold(ctx.userId, ctx.guildId, 50);
@@ -1102,7 +1104,7 @@ async function showBountyHunter(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`bh_surrender_${ctx.userId}`).setLabel('Đầu hàng').setEmoji('🙌').setStyle(ButtonStyle.Secondary)
   );
   const cid = await awaitButton(ctx, row, embed, 'ambush');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `bh_fight_${ctx.userId}`) {
     const scale = 1 + Math.min(0.8, Math.abs(rep) / 100);
     const enemy = eventEnemy(ctx, pick(ctx.enemies), {
@@ -1110,7 +1112,7 @@ async function showBountyHunter(ctx: RunExploreEventInput): Promise<void> {
       hp: Math.floor((fresh.max_hp * 0.9 + 60) * scale), atk: Math.floor((fresh.atk + 8) * scale), def: Math.floor((fresh.def + 4) * scale),
       lore: 'Kẻ sống bằng tiền thưởng trên đầu tội phạm.'
     });
-    return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+    return ctx.callbacks.startCombatWithEnemy(enemy,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '⚔️ Thợ Săn Gục Ngã', description: 'Bạn sống sót qua cuộc truy sát.', exp: Math.floor(fresh.exp_next * 0.22), gold: randInt(40, 100), items: [pick(['elixir','book_counter','book_shadow_step'])] }),
       ctx.callbacks.handleDeath,
       ctx.callbacks.handleFlee
@@ -1141,7 +1143,7 @@ async function showRebirthRift(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`rift_seal_${ctx.userId}`).setLabel('Phong ấn').setEmoji('🕯️').setStyle(ButtonStyle.Success)
   );
   const cid = await awaitButton(ctx, row, embed, 'legacy');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `rift_touch_${ctx.userId}`) {
     const { dmg, hp } = safeHpLoss(fresh, 0.22);
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
@@ -1178,7 +1180,7 @@ async function showFailedLegacy(ctx: RunExploreEventInput): Promise<void> {
   }
   if (cid === `fl_face_${ctx.userId}` && ctx.enemies.length) {
     const enemy = eventEnemy(ctx, pick(ctx.enemies), { id: 'fallen_self', name: `Bóng Ma ${ctx.player.name}`, icon: '🪞', hp: Math.floor(ctx.player.max_hp * 0.9), atk: ctx.player.atk + 5, def: ctx.player.def + 2 });
-    return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+    return ctx.callbacks.startCombatWithEnemy(enemy,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🪞 Bạn Vượt Qua Chính Mình', description: 'Bóng ma tan thành những mảnh sáng nhỏ.', exp: Math.floor(ctx.player.exp_next * 0.25), soulShards: 1 }),
       ctx.callbacks.handleDeath,
       ctx.callbacks.handleFlee
@@ -1199,7 +1201,7 @@ async function showMirrorClone(ctx: RunExploreEventInput): Promise<void> {
   const cid = await awaitButton(ctx, row, embed, 'mysterious');
   if (cid === `mirror_fight_${ctx.userId}`) {
     const enemy = eventEnemy(ctx, pick(ctx.enemies), { id: 'mirror_clone', name: `Bản Sao ${ctx.player.name}`, icon: '🪞', hp: Math.floor(ctx.player.max_hp * 1.05), atk: ctx.player.atk + 4, def: ctx.player.def + 2 });
-    return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+    return ctx.callbacks.startCombatWithEnemy(enemy,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🪞 Gương Vỡ', description: 'Bạn đánh bại phản chiếu méo mó của mình.', exp: Math.floor(ctx.player.exp_next * 0.3), soulShards: randInt(1,100) <= 50 ? 1 : 0 }),
       ctx.callbacks.handleDeath,
       ctx.callbacks.handleFlee
@@ -1215,7 +1217,7 @@ async function showMirrorClone(ctx: RunExploreEventInput): Promise<void> {
     grantExp(ctx.userId, ctx.guildId, exp);
     return finish(ctx, simpleEmbed(COLORS.magic, `👁️ Bạn nhìn thấy một nước đi chưa từng nghĩ tới.\n⭐ +**${exp} EXP**`));
   }
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   const { dmg, hp } = safeHpLoss(fresh, 0.2);
   updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
   return finish(ctx, simpleEmbed(COLORS.warning, `👁️ Bản sao nhìn ngược lại bạn.\n❤️ -**${dmg} HP**`));
@@ -1272,7 +1274,7 @@ async function showFateCoin(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.success, `🪙 Mặt sáng!\n🪙 +**${gold} Gold**`));
   }
   if (ctx.enemies.length && randInt(1,100) <= 50) return ctx.callbacks.showAmbush();
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   const { dmg, hp } = safeHpLoss(fresh, 0.16);
   updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
   return finish(ctx, simpleEmbed(COLORS.warning, `🪙 Mặt tối...\n❤️ -**${dmg} HP**`));
@@ -1290,7 +1292,7 @@ async function showMerchantTax(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`tax_threat_${ctx.userId}`).setLabel('Đe dọa lại').setEmoji('🗡️').setStyle(ButtonStyle.Danger)
   );
   const cid = await awaitButton(ctx, row, embed, 'merchant');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `tax_pay_${ctx.userId}`) {
     if (fresh.gold < cost) return finish(ctx, simpleEmbed(COLORS.warning, `❌ Không đủ **${cost} Gold** để chuộc lỗi.`));
     spendGold(ctx.userId, ctx.guildId, cost);
@@ -1318,7 +1320,7 @@ async function showMerchantGuard(ctx: RunExploreEventInput): Promise<void> {
   const cid = await awaitButton(ctx, row, embed, 'ambush');
   if (cid !== `guard_fight_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn rút lui trước khi sự việc xấu hơn.'));
   const enemy = eventEnemy(ctx, pick(ctx.enemies), { id: 'merchant_guard', name: 'Vệ Sĩ Thương Nhân', icon: '🛡️', hp: Math.floor(ctx.player.max_hp * 1.1), atk: ctx.player.atk + 6, def: ctx.player.def + 8 });
-  return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+  return ctx.callbacks.startCombatWithEnemy(enemy,
     async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🛡️ Vệ Sĩ Bị Hạ', description: 'Bạn thắng, nhưng tin này sẽ lan rất nhanh.', exp: Math.floor(ctx.player.exp_next * 0.18), gold: randInt(25, 70), rep: -5 }),
     ctx.callbacks.handleDeath,
     ctx.callbacks.handleFlee
@@ -1336,7 +1338,7 @@ async function showWantedNotice(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`notice_hide_${ctx.userId}`).setLabel('Ẩn mặt rời đi').setEmoji('🥷').setStyle(ButtonStyle.Secondary)
   );
   const cid = await awaitButton(ctx, row, embed, 'mysterious');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `notice_pay_${ctx.userId}`) {
     if (fresh.gold < fine) return finish(ctx, simpleEmbed(COLORS.warning, `❌ Bạn không đủ **${fine} Gold**.`));
     spendGold(ctx.userId, ctx.guildId, fine);
@@ -1405,7 +1407,7 @@ async function showDiceGambler(ctx: RunExploreEventInput): Promise<void> {
   const cid = await awaitButton(ctx, row, embed, 'merchant');
   const amount = bets.find(b => cid === `dice_${b}_${ctx.userId}`) ?? 0;
   if (!amount) return finish(ctx, simpleEmbed(COLORS.info, '🎲 Bạn bỏ qua canh bạc.'));
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (fresh.gold < amount) return finish(ctx, simpleEmbed(COLORS.warning, `❌ Không đủ **${amount} Gold** để cược.`));
   spendGold(ctx.userId, ctx.guildId, amount);
   const win = randInt(1, 100) <= (amount >= 120 ? 42 : 48);
@@ -1433,7 +1435,7 @@ async function showGlowingMushroom(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.success, `🧺 Bạn thu thập được **${qty} Healing Herb**.`));
   }
   if (cid === `mush_eat_${ctx.userId}`) {
-    const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+    const fresh = getPlayer(ctx.userId, ctx.guildId)!;
     if (randInt(1, 100) <= 50) {
       const exp = Math.floor(fresh.exp_next * 0.18);
       grantExp(ctx.userId, ctx.guildId, exp);
@@ -1482,7 +1484,7 @@ async function showMagicFountain(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`fountain_bathe_${ctx.userId}`).setLabel('Tắm trong suối').setEmoji('✨').setStyle(ButtonStyle.Secondary)
   );
   const cid = await awaitButton(ctx, row, embed, 'spring');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `fountain_drink_${ctx.userId}`) {
     const hp = Math.min(fresh.max_hp, fresh.hp + Math.floor(fresh.max_hp * 0.32));
     const mp = Math.min(fresh.max_mp, fresh.mp + Math.floor(fresh.max_mp * 0.32));
@@ -1514,7 +1516,7 @@ async function showLaughingBones(ctx: RunExploreEventInput): Promise<void> {
     return finish(ctx, simpleEmbed(COLORS.info, `💬 Bộ xương kể một câu chuyện tệ đến mức bạn học được điều gì đó.\n⭐ +**${exp} EXP**`));
   }
   if (cid === `bones_kick_${ctx.userId}`) {
-    const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+    const fresh = getPlayer(ctx.userId, ctx.guildId)!;
     const { dmg, hp } = safeHpLoss(fresh, 0.14);
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
     return finish(ctx, simpleEmbed(COLORS.warning, `🦶 Bạn đá đống xương. Một cái xương bay ngược vào mặt bạn.\n❤️ -**${dmg} HP**`));
@@ -1552,7 +1554,7 @@ async function showMissingChildChain(ctx: RunExploreEventInput): Promise<void> {
     setFlag(ctx.guildId, key, '3', 172800);
     const base = pick(ctx.enemies);
     const enemy = eventEnemy(ctx, base, { id: 'child_cave_guard', name: `Kẻ Canh Hang ${base.name}`, icon: base.icon, hp: Math.floor(base.hp * 1.2), atk: Math.floor(base.atk * 1.1), def: base.def });
-    return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+    return ctx.callbacks.startCombatWithEnemy(enemy,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '👣 Dấu Chân Dẫn Tới Hang', description: 'Bạn đánh bại kẻ canh hang. Từ bên trong vọng ra tiếng khóc trẻ con.', exp: Math.floor(ctx.player.exp_next * 0.2), gold: randInt(25, 80) }),
       ctx.callbacks.handleDeath,
       ctx.callbacks.handleFlee
@@ -1624,33 +1626,49 @@ async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`black_leave_${ctx.userId}`).setLabel('Rời đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
   ));
 
+  if (ctx.partyMemberIds && ctx.partyMemberIds.length > 1) {
+    embed.addFields({
+      name: '👥 Party shop',
+      value: 'Thành viên nào bấm mua thì dùng Gold và nhận item của chính người đó.',
+      inline: false
+    });
+  }
+
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: rows });
-  const comp = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 45_000 }).catch(() => null);
+  const filter = ctx.partyMemberIds && ctx.partyMemberIds.length > 1
+    ? onlyParty(ctx.userId, ctx.partyMemberIds)
+    : onlyUser(ctx.userId);
+  const comp = await reply.awaitMessageComponent({ filter, time: 45_000 }).catch(() => null);
   if (!comp) return finish(ctx, simpleEmbed(COLORS.info, '🌑 Cánh cửa chợ đen khép lại.'));
   const ok = await comp.deferUpdate().then(() => true).catch(() => false);
   if (!ok) return finish(ctx, simpleEmbed(COLORS.info, '🌑 Cánh cửa chợ đen khép lại.'));
-  if ((comp as any).customId === `black_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🚶 Bạn rời chợ đen trước khi bị kéo sâu hơn.'));
+  if ((comp as any).customId === `black_leave_${ctx.userId}`) {
+    const actor = getPlayer(comp.user.id, ctx.guildId)?.name ?? (comp.user.id === ctx.userId ? 'Bạn' : 'Một thành viên');
+    return finish(ctx, simpleEmbed(COLORS.info, `🚶 **${actor}** rời chợ đen trước khi bị kéo sâu hơn.`));
+  }
 
+  const buyerId = comp.user.id;
+  const buyer = getPlayer(buyerId, ctx.guildId)!;
   const itemId = (comp as any).values?.[0];
   const row = stock.find(x => x.id === itemId);
   if (!row) return finish(ctx, simpleEmbed(COLORS.info, '🌑 Cánh cửa chợ đen khép lại.'));
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
-  if (fresh.gold < row.price) return finish(ctx, simpleEmbed(COLORS.warning, '❌ Không đủ Gold.'));
-  spendGold(ctx.userId, ctx.guildId, row.price);
-  const rep = adjustReputation(ctx.userId, ctx.guildId, -3);
-  adjustFaction(ctx.userId, ctx.guildId, 'shadow_court', 5);
-  adjustFaction(ctx.userId, ctx.guildId, 'merchants', -3);
+  const fresh = getPlayer(buyerId, ctx.guildId)!;
+  if (fresh.gold < row.price) return finish(ctx, simpleEmbed(COLORS.warning, `❌ **${buyer.name}** không đủ Gold.`));
+  spendGold(buyerId, ctx.guildId, row.price);
+  const rep = adjustReputation(buyerId, ctx.guildId, -3);
+  adjustFaction(buyerId, ctx.guildId, 'shadow_court', 5);
+  adjustFaction(buyerId, ctx.guildId, 'merchants', -3);
 
   if ((row as any).special === 'soul_shard') {
-    grantSoulShards(ctx.userId, ctx.guildId, 1);
-    return finish(ctx, simpleEmbed(COLORS.dark, `🌑 Bạn mua 💀 **Soul Shard** với giá **${row.price} Gold**.
+    grantSoulShards(buyerId, ctx.guildId, 1);
+    return finish(ctx, simpleEmbed(COLORS.dark, `🌑 **${buyer.name}** mua 💀 **Soul Shard** với giá **${row.price} Gold**.
 🤝 Reputation: **${rep}** (-3)
 🌑 Hội Bóng Tối: +5`));
   }
 
-  addItem(ctx.userId, ctx.guildId, row.id, 1);
+  addItem(buyerId, ctx.guildId, row.id, 1);
   const item = getItem(row.id)!;
-  return finish(ctx, simpleEmbed(COLORS.dark, `🌑 Bạn mua ${item.icon} **${item.name}** với giá **${row.price} Gold**.
+  return finish(ctx, simpleEmbed(COLORS.dark, `🌑 **${buyer.name}** mua ${item.icon} **${item.name}** với giá **${row.price} Gold**.
 🤝 Reputation: **${rep}** (-3)
 🌑 Hội Bóng Tối: +5`));
 }
@@ -1672,7 +1690,7 @@ async function showAtonementMonk(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`atone_mark_${ctx.userId}`).setLabel('Dùng Ấn Chuộc Lỗi').setEmoji('🧾').setStyle(ButtonStyle.Secondary)
   );
   const cid = await awaitButton(ctx, row, embed, 'mysterious');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
 
   if (cid === `atone_gold_${ctx.userId}`) {
     if (fresh.gold < fine) return finish(ctx, simpleEmbed(COLORS.warning, `❌ Không đủ **${fine} Gold**.`));
@@ -1711,7 +1729,7 @@ async function showConditionalMiniboss(ctx: RunExploreEventInput): Promise<void>
   const rep = ctx.player.reputation ?? 0;
   const robberies = getShopkeeperRobberyCount(ctx.guildId, ctx.userId);
   const base = ctx.enemies.length ? pick(ctx.enemies) : null;
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
 
   let spec = {
     id: 'fallen_self', name: 'Bản Ngã Sa Ngã', icon: '🪞', title: '🪞 Bản Ngã Sa Ngã',
@@ -1743,7 +1761,7 @@ async function showConditionalMiniboss(ctx: RunExploreEventInput): Promise<void>
   await finishNoContinue(ctx, embed, 'ambush');
   await new Promise(r => setTimeout(r, 700));
 
-  return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+  return ctx.callbacks.startCombatWithEnemy(enemy,
     async (_int, btn, _uid, _gid, _p, e, state) => {
       if (spec.id === 'merchant_guardian') adjustWanted(ctx.userId, ctx.guildId, -1);
       await grantCombatReward(ctx, btn, e, state, {
@@ -1790,8 +1808,8 @@ async function showMimicChest(ctx: RunExploreEventInput): Promise<void> {
       drops: [{ itemId: pick(['mysterious_shard', 'mana_crystal', 'iron_ore']), chance: 45 }],
       lore: 'Một chiếc rương sống chuyên nuốt những kẻ tham lam.',
     });
-    return startCombatFlowWithEnemy(
-      ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+    return ctx.callbacks.startCombatWithEnemy(
+      enemy,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
         title: '🎁 Mimic Bị Hạ',
         description: 'Bạn phá vỡ lớp gỗ sống của Mimic và gom được phần lõi bên trong.',
@@ -1812,7 +1830,7 @@ async function showMimicChest(ctx: RunExploreEventInput): Promise<void> {
 }
 
 async function showWanderingBlacksmith(ctx: RunExploreEventInput): Promise<void> {
-  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
   const embed = new EmbedBuilder().setColor(0x9b7653).setTitle('🔥 Thợ Rèn Lang Thang').setDescription('Một lò rèn nhỏ cháy đỏ bên vệ đường. Người thợ rèn già nhìn vũ khí của bạn rồi gật đầu.');
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`smith_weapon_${ctx.userId}`).setLabel('Mua Weapon Oil - 60G').setEmoji('⚔️').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 60),
@@ -1835,7 +1853,7 @@ async function showWanderingBlacksmith(ctx: RunExploreEventInput): Promise<void>
 }
 
 async function showTemporaryArena(ctx: RunExploreEventInput): Promise<void> {
-  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
   const bet = Math.min(player.gold, Math.max(30, 30 + player.level * 10));
   const embed = new EmbedBuilder().setColor(0xb35c00).setTitle('⚔️ Đấu Trường Tạm Thời').setDescription('Một vòng tròn đá được dựng vội. Khán giả hò reo khi thấy bạn bước đến.');
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -1850,8 +1868,8 @@ async function showTemporaryArena(ctx: RunExploreEventInput): Promise<void> {
   const enemy = eventEnemy(ctx, base, { id: 'arena_challenger', name: `Đấu Sĩ ${base.name}`, icon: '⚔️', hp: Math.floor((base.hp ?? 60) * 1.1), atk: Math.floor((base.atk ?? ctx.player.atk) * 1.05), def: base.def ?? ctx.player.def, lore: 'Một đấu sĩ nhận kèo từ đấu trường tạm thời.' });
   const isBet = cid === `arena_bet_${ctx.userId}`;
   if (isBet) spendGold(ctx.userId, ctx.guildId, bet);
-  return startCombatFlowWithEnemy(
-    ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined,
+  return ctx.callbacks.startCombatWithEnemy(
+    enemy,
     async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
       title: isBet ? '💰 Bạn Thắng Kèo Đấu!' : '🏆 Chiến Thắng Đấu Trường',
       description: isBet ? 'Khán giả ném tiền vào vòng đấu khi bạn hạ đối thủ.' : 'Bạn thắng trận và được đám đông công nhận.',
@@ -1877,11 +1895,11 @@ async function showBossTracks(ctx: RunExploreEventInput): Promise<void> {
   if (!cid || !ctx.enemies.length) return finish(ctx, simpleEmbed(COLORS.info, '🐾 Dấu vết mất hút trong sương mù.'), 'boss');
   const base = pick(ctx.enemies);
   const enemy = eventEnemy(ctx, base, { id: 'boss_track_guardian', name: `Hộ Vệ Dấu Vết ${base.name}`, icon: '🐾', hp: Math.floor((base.hp ?? 70) * 1.35), atk: Math.floor((base.atk ?? ctx.player.atk) * 1.18), def: Math.floor((base.def ?? ctx.player.def) * 1.1), expReward: Math.floor(ctx.player.exp_next * 0.25), goldMin: 60, goldMax: 140, lore: 'Kẻ canh giữ lãnh địa boss.' });
-  return startCombatFlowWithEnemy(ctx.interaction, ctx.userId, ctx.guildId, enemy, undefined, async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🐾 Dấu Vết Được Mở Đường', description: 'Bạn hạ hộ vệ và hiểu rõ hơn về con boss đang ẩn trong khu vực.', exp: Math.floor(ctx.player.exp_next * 0.24), gold: randInt(70, 160), soulShards: randInt(1, 100) <= 45 ? 1 : 0 }), nonLethalLoss as any, ctx.callbacks.handleFlee);
+  return ctx.callbacks.startCombatWithEnemy(enemy, async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, { title: '🐾 Dấu Vết Được Mở Đường', description: 'Bạn hạ hộ vệ và hiểu rõ hơn về con boss đang ẩn trong khu vực.', exp: Math.floor(ctx.player.exp_next * 0.24), gold: randInt(70, 160), soulShards: randInt(1, 100) <= 45 ? 1 : 0 }), nonLethalLoss as any, ctx.callbacks.handleFlee);
 }
 
 async function showMapSeller(ctx: RunExploreEventInput): Promise<void> {
-  const player = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const player = getPlayer(ctx.userId, ctx.guildId)!;
   const embed = new EmbedBuilder().setColor(0x6b4f2a).setTitle('🗺️ Người Bán Bản Đồ').setDescription('Một người bán bản đồ trải giấy da trên thùng gỗ. Một số tuyến đường được đánh dấu bằng mực đỏ.');
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`map_safe_${ctx.userId}`).setLabel('Mua bản đồ an toàn - 45G').setEmoji('🛡️').setStyle(ButtonStyle.Primary).setDisabled(player.gold < 45),
@@ -1940,7 +1958,7 @@ async function showShrineRelicEvent(ctx: RunExploreEventInput): Promise<void> {
   // Dâng lên — consume và random outcome
   removeItem(ctx.userId, ctx.guildId, 'shrine_relic', 1);
   const roll = randInt(1, 100);
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = applyPassiveStats(getPlayer(ctx.userId, ctx.guildId)!);
 
   if (roll <= 35) {
     // Hồi HP + MP
@@ -2016,7 +2034,7 @@ async function showForgottenCrownEvent(ctx: RunExploreEventInput): Promise<void>
     ), 'altar');
   } else if (roll <= 70) {
     // Nguyền nặng — -30% HP
-    const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+    const fresh = applyPassiveStats(getPlayer(ctx.userId, ctx.guildId)!);
     const { dmg, hp } = safeHpLoss(fresh, 0.30);
     updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
     return finish(ctx, simpleEmbed(COLORS.danger,
@@ -2047,8 +2065,8 @@ async function showForgottenCrownEvent(ctx: RunExploreEventInput): Promise<void>
         .setDescription('Vương miện tan chảy — một bóng ma hiệp sĩ hiện ra với ánh mắt rực lửa xanh!\n🗑️ Forgotten Crown đã sử dụng.')],
       components: []
     });
-    return startCombatFlowWithEnemy(
-      ctx.interaction, ctx.userId, ctx.guildId, ghost, undefined,
+    return ctx.callbacks.startCombatWithEnemy(
+      ghost,
       async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
         title: '👻 Hồn Ma Bị Giải Thoát',
         description: 'Hồn ma hiệp sĩ tan biến với nụ cười nhẹ nhõm.',
@@ -2085,7 +2103,7 @@ async function showFlowerCrownEvent(ctx: RunExploreEventInput): Promise<void> {
 
   // Đặt xuống — consume, heal 35% HP + luck buff 5 lần
   removeItem(ctx.userId, ctx.guildId, 'flower_crown', 1);
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = applyPassiveStats(getPlayer(ctx.userId, ctx.guildId)!);
   const healHp = Math.floor(fresh.max_hp * 0.35);
   const newHp = Math.min(fresh.max_hp, fresh.hp + healHp);
   updatePlayerHpMp(ctx.userId, ctx.guildId, newHp, fresh.mp);

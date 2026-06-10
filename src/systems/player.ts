@@ -207,7 +207,11 @@ export interface LevelUpResult {
 
 export function grantExp(userId: string, guildId: string, amount: number): LevelUpResult {
   const player = getPlayer(userId, guildId)!;
-  let { level, exp, exp_next, hp, max_hp, mp, max_mp, atk, def } = player;
+  const effectiveBefore = applyPassiveStats(player);
+  const missingHp = Math.max(0, effectiveBefore.max_hp - effectiveBefore.hp);
+  const missingMp = Math.max(0, effectiveBefore.max_mp - effectiveBefore.mp);
+
+  let { level, exp, exp_next, max_hp, max_mp, atk, def } = player;
   exp += amount;
 
   let leveledUp = false;
@@ -222,18 +226,27 @@ export function grantExp(userId: string, guildId: string, amount: number): Level
     const mg = Math.floor(5 + level);
     const ag = Math.floor(2 + level * 0.5);
     const dg = Math.floor(1 + level * 0.3);
-    max_hp += hg; hp = Math.min(max_hp, hp + hg);
-    max_mp += mg; mp = Math.min(max_mp, mp + mg);
+    max_hp += hg;
+    max_mp += mg;
     atk    += ag;
     def    += dg;
     hpGain += hg; mpGain += mg; atkGain += ag; defGain += dg;
     leveledUp = true;
   }
 
+  let hp = player.hp;
+  let mp = player.mp;
+  if (leveledUp) {
+    const afterBase = { ...player, level, exp, exp_next, max_hp, max_mp, atk, def } as PlayerRow;
+    const effectiveAfter = applyPassiveStats(afterBase);
+    hp = Math.max(1, Math.min(effectiveAfter.max_hp, effectiveAfter.max_hp - missingHp));
+    mp = Math.max(0, Math.min(effectiveAfter.max_mp, effectiveAfter.max_mp - missingMp));
+  }
+
   db.prepare(`
     UPDATE players SET level=?, exp=?, exp_next=?, hp=?, max_hp=?, mp=?, max_mp=?, atk=?, def=?
     WHERE user_id=? AND guild_id=?
-  `).run(level, exp, exp_next, hp, max_hp, mp, max_mp, atk, def, userId, guildId);
+  `).run(level, exp, exp_next, Math.floor(hp), max_hp, Math.floor(mp), max_mp, atk, def, userId, guildId);
 
   return { leveledUp, newLevel: level, hpGain, mpGain, atkGain, defGain };
 }

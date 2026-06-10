@@ -544,6 +544,12 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     stats: { atk: 12, critChance: 12 }, effects: ['extra_hit'],
     sellPrice: 340, buyPrice: 1060, dropFrom: ['thornhound', 'cursed_treant'], dropChance: 7, minZone: 'forest'
   },
+  alpha_fang_dagger: {
+    id: 'alpha_fang_dagger', name: 'Alpha Fang Dagger', icon: '🗡️', slot: 'weapon', rarity: 'epic',
+    description: 'Dao găm khắc từ nanh Thornfang. Crit cao, hợp Rogue/Assassin sau khi vượt thử thách rừng.',
+    stats: { atk: 13, critChance: 16 }, effects: ['dodge_on_crit'],
+    sellPrice: 380, dropFrom: ['alpha_thornmaw'], dropChance: 12, minZone: 'forest'
+  },
   bellbreaker_mace: {
     id: 'bellbreaker_mace', name: 'Bellbreaker Mace', icon: '🔔', slot: 'weapon', rarity: 'epic',
     description: 'Chùy phá chuông. Có tỉ lệ làm choáng enemy 1 lượt.',
@@ -1017,6 +1023,12 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     id: 'guard_emblem', name: 'Guard Emblem', icon: '🛡️', slot: 'accessory1', rarity: 'rare',
     description: '+4 DEF, +20 HP.',
     stats: { def: 4, maxHp: 20 }, sellPrice: 95, buyPrice: 360, minZone: 'mines'
+  },
+  bramble_antler_charm: {
+    id: 'bramble_antler_charm', name: 'Bramble Antler Charm', icon: '🦌', slot: 'accessory1', rarity: 'epic',
+    description: 'Mảnh gạc quấn gai của Elarok. Tăng sống sót khi đánh lâu trong rừng.',
+    stats: { def: 6, maxHp: 35 }, effects: ['boss_dmg_redux'],
+    sellPrice: 420, dropFrom: ['moss_crowned_stag'], dropChance: 12, minZone: 'forest'
   },
   ring_of_focus: {
     id: 'ring_of_focus', name: 'Ring of Focus', icon: '💫', slot: 'accessory1', rarity: 'epic',

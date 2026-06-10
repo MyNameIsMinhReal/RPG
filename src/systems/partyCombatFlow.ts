@@ -3,8 +3,8 @@
  * Each turn, alive members choose actions sequentially (one at a time).
  * After all members choose, actions resolve, then the enemy attacks one random alive member.
  *
- * Enemy HP is scaled: base × (1 + 0.4 × extraMembers).
- * Enemy ATK is unchanged so individual hits stay dangerous.
+ * Enemy HP is scaled: base × (1 + 0.65 × extraMembers).
+ * Bosses use stronger raid scaling, phase transitions, and special attacks.
  */
 
 import {
@@ -16,7 +16,7 @@ import {
   Message
 } from 'discord.js';
 import { getPlayer, grantExp, grantGold, updatePlayerHpMp, applyPassiveStats, removeItem, addItem } from './player';
-import { getEnemy } from '../data/enemies';
+import { ENEMIES, getEnemy } from '../data/enemies';
 import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
 import { EQUIPMENT, getEquipment } from '../data/equipment';
@@ -27,6 +27,7 @@ import { incrementDaily, countsAsPotion } from '../commands/daily';
 import { incrementChapterObjective } from './chapter';
 import { logEvent, onBossKilled } from './world';
 import { unlockRecipesBySource } from './crafting';
+import { getBossLevelScaling } from './bossScaling';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ export interface PartyMember {
   max_mp: number;
   stamina: number;
   max_stamina: number;
+  level: number;
   atk: number;
   def: number;
   alive: boolean;
@@ -54,6 +56,10 @@ export interface PartyCombatEnemy {
   def: number;
   boss: boolean;
   specialAttacks: string[];
+  base_atk?: number;
+  phaseIndex?: number;
+  guard_turns?: number;
+  level_special_bonus?: number;
 }
 
 type PartyAction = 'attack' | 'defend' | 'potion' | 'flee';
@@ -65,6 +71,17 @@ const PARTY_MAX_STAMINA = 100;
 const ATTACK_STAMINA_COST = 15;
 const DEFEND_STAMINA_GAIN = 25;
 const TURN_STAMINA_REGEN = 6;
+
+
+function isDiscordInvalidComponentsError(err: any): boolean {
+  return err?.code === 50035 && String(err?.rawError?.message ?? '').includes('Invalid Form Body');
+}
+
+function logDiscordComponentError(context: string, err: any): void {
+  const details = err?.rawError?.errors ? JSON.stringify(err.rawError.errors, null, 2) : '';
+  console.warn(`[PARTY_COMBAT] Discord rejected components at ${context}.${details ? `
+${details}` : ''}`);
+}
 
 function hpBar(hp: number, max: number): string {
   const pct = Math.max(0, Math.min(1, hp / max));
@@ -137,6 +154,95 @@ function calcDmg(atk: number, def: number): number {
   return Math.max(1, Math.floor(atk - def * 0.5 + randInt(-3, 3)));
 }
 
+function currentEnemyDef(enemy: PartyCombatEnemy): number {
+  if ((enemy.guard_turns ?? 0) <= 0) return enemy.def;
+  return enemy.def + Math.max(6, Math.floor(enemy.def * 0.35));
+}
+
+function pickMany<T>(arr: T[], count: number): T[] {
+  const pool = [...arr];
+  const out: T[] = [];
+  while (pool.length > 0 && out.length < count) {
+    const idx = randInt(0, pool.length - 1);
+    out.push(pool.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
+function getSpecialLabel(special: string): string {
+  const labels: Record<string, string> = {
+    oak_bark_armor: 'Bark Armor', oak_root_slam: 'Oak Root Slam', oak_regen: 'Oak Regen', oak_regen_deep: 'Deep Oak Regen',
+    splinter_rain: 'Splinter Rain', vine_whip: 'Vine Whip', oak_ancient_rage: 'Ancient Rage', thorn_burst: 'Thorn Burst', bark_rend: 'Bark Rend',
+    divine_judgment: 'Divine Judgment', shatter_guard: 'Shatter Guard', enrage: 'Enrage', death_curse: 'Death Curse', banish: 'Banish', screech: 'Screech',
+    cave_in: 'Cave In', seismic_slam: 'Seismic Slam', magma_core: 'Magma Core', iron_crush: 'Iron Crush', fortress_stance: 'Fortress Stance',
+    erase: 'Erase', butterfly_curse: 'Butterfly Curse', forgotten_rage: 'Forgotten Rage', doom_call: 'Doom Call', reality_tear: 'Reality Tear', skill_echo: 'Skill Echo', mind_crush: 'Mind Crush',
+  };
+  return labels[special] ?? special.replace(/_/g, ' ');
+}
+
+function getPartySpecialProfile(special: string, enemy: PartyCombatEnemy, aliveCount: number): { mult: number; targets: number; pierce?: boolean; healPct?: number; guard?: number } {
+  const phase = enemy.phaseIndex ?? 1;
+  const aoe2 = new Set(['splinter_rain', 'thorn_burst', 'divine_judgment', 'cave_in', 'seismic_slam', 'magma_core', 'butterfly_curse', 'reality_tear', 'doom_call']);
+  const aoe3 = new Set(['oak_ancient_rage', 'erase', 'forgotten_rage', 'thorn_burst', 'splinter_rain']);
+  const pierce = new Set(['oak_ancient_rage', 'erase', 'banish', 'abyss_strike', 'reality_tear']);
+
+  const multMap: Record<string, number> = {
+    oak_root_slam: 1.65, splinter_rain: 1.25, vine_whip: 1.50, oak_ancient_rage: 2.45, thorn_burst: 1.55, bark_rend: 1.70,
+    divine_judgment: 1.70, shatter_guard: 1.45, enrage: 1.60, death_curse: 1.85, banish: 1.35, screech: 1.15,
+    cave_in: 1.55, seismic_slam: 1.85, magma_core: 1.75, iron_crush: 1.60,
+    erase: 2.35, butterfly_curse: 1.45, forgotten_rage: 2.05, doom_call: 2.10, reality_tear: 1.65, skill_echo: 1.35, mind_crush: 1.55,
+  };
+
+  if (special === 'oak_regen') return { mult: 0, targets: 0, healPct: 0.10 };
+  if (special === 'oak_regen_deep') return { mult: 0, targets: 0, healPct: 0.075 };
+  if (special === 'nature_regeneration') return { mult: 0, targets: 0, healPct: 0.10 };
+  if (special === 'fortress_stance') return { mult: 0, targets: 0, healPct: 0.055, guard: 2 };
+  if (special === 'oak_bark_armor') return { mult: 0, targets: 0, healPct: 0.045, guard: 2 };
+
+  const targets = aoe3.has(special) && phase >= 3
+    ? Math.min(aliveCount, 3)
+    : aoe2.has(special)
+      ? Math.min(aliveCount, phase >= 3 ? 3 : 2)
+      : 1;
+
+  return {
+    mult: multMap[special] ?? (enemy.boss ? (phase >= 3 ? 1.75 : 1.45) : 1.35),
+    targets,
+    pierce: pierce.has(special),
+  };
+}
+
+function maybeTriggerBossPhase(enemy: PartyCombatEnemy, baseDef: any, log: string[]): void {
+  if (!enemy.boss || !Array.isArray(baseDef.phases) || baseDef.phases.length === 0) return;
+
+  const phases = [...baseDef.phases].sort((a, b) => a.phaseIndex - b.phaseIndex);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const hpPct = enemy.hp / Math.max(1, enemy.max_hp);
+    const next = phases.find(p => p.phaseIndex > (enemy.phaseIndex ?? 1) && hpPct <= p.threshold);
+    if (!next) break;
+
+    enemy.phaseIndex = next.phaseIndex;
+    enemy.name = next.name ?? enemy.name;
+    enemy.icon = next.icon ?? enemy.icon;
+    enemy.atk = Math.round((enemy.base_atk ?? enemy.atk) * (next.atkMult ?? 1));
+
+    const heal = next.healOnTransition ? Math.max(1, Math.floor(enemy.max_hp * next.healOnTransition)) : 0;
+    if (heal > 0) enemy.hp = Math.min(enemy.max_hp, enemy.hp + heal);
+    log.push(`${next.transitionMsg ?? `⚠️ **${enemy.name}** chuyển phase!`}${heal > 0 ? ` (+${heal} HP)` : ''}`);
+    changed = true;
+  }
+}
+
+function getPartyAttackPool(enemy: PartyCombatEnemy, baseDef: any): string[] {
+  const phase = enemy.boss && Array.isArray(baseDef.phases)
+    ? baseDef.phases.find((p: any) => p.phaseIndex === (enemy.phaseIndex ?? 1))
+    : null;
+  const pool = phase?.specialAttacks?.length ? phase.specialAttacks : enemy.specialAttacks;
+  return Array.isArray(pool) ? pool : [];
+}
+
 function findBestPotion(userId: string, guildId: string): string | null {
   const { getInventory } = require('./player');
   const { getItem } = require('../data/items');
@@ -183,13 +289,24 @@ function applyPotion(member: PartyMember, userId: string, guildId: string): { me
   };
 }
 
+function displayDrop(itemId: string): string {
+  const it = getItem(itemId) ?? getMaterial(itemId) ?? getEquipment(itemId);
+  return it ? `${it.icon} ${it.name}` : itemId;
+}
+
 function rollPartyDrops(userId: string, guildId: string, enemyDef: any): string[] {
   const drops: string[] = [];
+
+  // Guaranteed drops must work in party combat too, otherwise miniboss route items can be missed.
+  for (const itemId of enemyDef.guaranteedDrops ?? []) {
+    addItem(userId, guildId, itemId, 1);
+    drops.push(displayDrop(itemId));
+  }
+
   for (const drop of enemyDef.drops ?? []) {
     if (Math.random() * 100 <= drop.chance) {
       addItem(userId, guildId, drop.itemId, 1);
-      const it = getItem(drop.itemId) ?? getMaterial(drop.itemId);
-      drops.push(it ? `${it.icon} ${it.name}` : drop.itemId);
+      drops.push(displayDrop(drop.itemId));
     }
   }
 
@@ -197,14 +314,18 @@ function rollPartyDrops(userId: string, guildId: string, enemyDef: any): string[
   for (const eq of eqDrops) {
     if (Math.random() * 100 <= (eq.dropChance ?? 0)) {
       addItem(userId, guildId, eq.id, 1);
-      const def = getEquipment(eq.id);
-      drops.push(def ? `${def.icon} ${def.name}` : eq.id);
+      drops.push(displayDrop(eq.id));
     }
   }
   return drops;
 }
 
 // ── Main flow ─────────────────────────────────────────────────────────────────
+
+export interface PartyCombatOptions {
+  /** Set false for event combats that handle their own rewards/message in onVictory. */
+  grantDefaultRewards?: boolean;
+}
 
 export async function startPartyCombatFlow(
   interaction: ChatInputCommandInteraction,
@@ -213,7 +334,8 @@ export async function startPartyCombatFlow(
   memberIds: string[],
   enemyId: string,
   onVictory?: (members: PartyMember[], enemy: PartyCombatEnemy) => Promise<void>,
-  onWipe?: (members: PartyMember[], enemy: PartyCombatEnemy) => Promise<void>
+  onWipe?: (members: PartyMember[], enemy: PartyCombatEnemy) => Promise<void>,
+  options: PartyCombatOptions = {}
 ): Promise<void> {
   // ── Load members ────────────────────────────────────────────────────────────
   const members: PartyMember[] = [];
@@ -230,6 +352,7 @@ export async function startPartyCombatFlow(
       max_mp: p.max_mp,
       stamina: PARTY_MAX_STAMINA,
       max_stamina: PARTY_MAX_STAMINA,
+      level: p.level ?? base.level ?? 1,
       atk: p.atk,
       def: p.def,
       alive: true
@@ -244,23 +367,41 @@ export async function startPartyCombatFlow(
     return;
   }
   // ── Load & scale enemy ──────────────────────────────────────────────────────
-  const baseDef = getEnemy(enemyId)!;
+  const baseDef = getEnemy(enemyId);
+  if (!baseDef) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription(`⚠️ Không tìm thấy enemy ID: ${enemyId}`)],
+      components: []
+    });
+    return;
+  }
   const extraMembers = Math.max(0, members.length - 1);
-  const scaledHp = Math.round(baseDef.hp * (1 + 0.4 * extraMembers));
+  const isBoss = !!baseDef.boss;
+  const levelScaling = isBoss ? getBossLevelScaling(baseDef, members.map(m => m.level)) : null;
+  const hpScale = (isBoss ? (1.20 + 1.05 * extraMembers) : (1 + 0.65 * extraMembers)) * (levelScaling?.hpMult ?? 1);
+  const atkScale = (isBoss ? (1.10 + 0.18 * extraMembers) : (1 + 0.10 * extraMembers)) * (levelScaling?.atkMult ?? 1);
+  const defScale = levelScaling?.defMult ?? 1;
+  const scaledHp = Math.round(baseDef.hp * hpScale);
+  const scaledAtk = Math.round(baseDef.atk * atkScale);
+  const scaledDef = Math.round(baseDef.def * defScale);
   const enemy: PartyCombatEnemy = {
     id: baseDef.id,
     name: baseDef.name,
     icon: baseDef.icon,
     hp: scaledHp,
     max_hp: scaledHp,
-    atk: baseDef.atk,
-    def: baseDef.def,
+    atk: scaledAtk,
+    base_atk: scaledAtk,
+    def: scaledDef,
     boss: baseDef.boss ?? false,
-    specialAttacks: baseDef.specialAttacks ?? []
+    specialAttacks: baseDef.specialAttacks ?? [],
+    phaseIndex: 1,
+    guard_turns: 0,
+    level_special_bonus: levelScaling?.specialBonus ?? 0
   };
 
-  const sessionId = `${leaderId}_${Date.now()}`;
-  const log: string[] = [];
+  const sessionId = `${leaderId.slice(-6)}_${Date.now().toString(36)}`;
+  const log: string[] = levelScaling?.desc ? [levelScaling.desc] : [];
   let turn = 1;
 
   // ── Turn loop ────────────────────────────────────────────────────────────────
@@ -272,14 +413,25 @@ export async function startPartyCombatFlow(
 
     // Collect actions sequentially — one member at a time
     const actions = new Map<string, PartyAction>();
-    const row = buildActionRow(sessionId);
-
     let reply: Message<boolean>;
 
     for (let idx = 0; idx < aliveMembers.length; idx++) {
       const currentMember = aliveMembers[idx];
       const embed = buildCombatEmbed(members, enemy, turn, log, currentMember.user_id, actions);
-      reply = await interaction.editReply({ embeds: [embed], components: [row] }) as Message<boolean>;
+      try {
+        // Build a fresh row for each edit; reusing builder instances across many edits can make debugging Discord component errors harder.
+        reply = await interaction.editReply({ embeds: [embed], components: [buildActionRow(sessionId)] }) as Message<boolean>;
+      } catch (err: any) {
+        if (isDiscordInvalidComponentsError(err)) {
+          logDiscordComponentError('turn action row', err);
+          await interaction.editReply({
+            embeds: [new EmbedBuilder(embed.toJSON()).setFooter({ text: '⚠️ Discord từ chối nút combat. Trận này đã được dừng an toàn, hãy thử lại.' })],
+            components: []
+          }).catch(() => {});
+          return;
+        }
+        throw err;
+      }
 
       const action = await new Promise<PartyAction>(resolve => {
         const collector = reply!.createMessageComponentCollector({
@@ -305,7 +457,8 @@ export async function startPartyCombatFlow(
 
     // ── Check flee ─────────────────────────────────────────────────────────────
     const fleeCount = [...actions.values()].filter(a => a === 'flee').length;
-    if (fleeCount > 0 && randInt(1, 100) <= 50) {
+    const fleeChance = enemy.boss ? 18 : 50;
+    if (fleeCount > 0 && randInt(1, 100) <= fleeChance) {
       for (const m of members) updatePlayerHpMp(m.user_id, guildId, m.alive ? m.hp : 1, m.mp);
       await interaction.editReply({
         embeds: [new EmbedBuilder().setColor(COLORS.info)
@@ -339,9 +492,10 @@ export async function startPartyCombatFlow(
           ...members[mIdx],
           stamina: Math.max(0, members[mIdx].stamina - ATTACK_STAMINA_COST)
         };
-        const dmg = calcDmg(members[mIdx].atk, enemy.def);
+        const enemyDefNow = currentEnemyDef(enemy);
+        const dmg = calcDmg(members[mIdx].atk, enemyDefNow);
         enemy.hp = Math.max(0, enemy.hp - dmg);
-        log.push(`⚔️ **${members[mIdx].name}** gây **${dmg}** sát thương! (${enemy.hp}/${enemy.max_hp})`);
+        log.push(`⚔️ **${members[mIdx].name}** gây **${dmg}** sát thương! (${enemy.hp}/${enemy.max_hp})${enemy.guard_turns ? ' 🛡️' : ''}`);
         if (enemy.hp <= 0) break;
       } else if (action === 'defend') {
         defenders.add(uid);
@@ -361,27 +515,62 @@ export async function startPartyCombatFlow(
     // ── Check enemy dead ───────────────────────────────────────────────────────
     if (enemy.hp <= 0) break;
 
-    // ── Enemy attacks random alive member ──────────────────────────────────────
+    // Boss phase transition happens after party damage resolves, before the boss turn.
+    maybeTriggerBossPhase(enemy, baseDef, log);
+
+    // ── Enemy attacks party members ────────────────────────────────────────────
     const targets = members.filter(m => m.alive);
     if (targets.length > 0) {
-      const target = pick(targets);
-      const tIdx = members.findIndex(m => m.user_id === target.user_id);
-      const isDefending = defenders.has(target.user_id);
-      const effectiveDef = target.def + (isDefending ? Math.floor(target.def * 0.5) : 0);
-      let dmg = calcDmg(enemy.atk, effectiveDef);
+      const phase = enemy.phaseIndex ?? 1;
+      const attackPool = getPartyAttackPool(enemy, baseDef);
+      const baseSpecialChance = enemy.boss ? (phase >= 3 ? 72 : phase >= 2 ? 58 : 45) : 25;
+      const specialChance = Math.min(88, baseSpecialChance + (enemy.level_special_bonus ?? 0));
+      const special = attackPool.length > 0 && randInt(1, 100) <= specialChance ? pick(attackPool) : null;
 
-      // Special attack chance
-      if (!enemy.boss && Array.isArray(enemy.specialAttacks) && enemy.specialAttacks.length > 0 && randInt(1, 100) <= 25) {
-        dmg = Math.floor(dmg * 1.5);
-        log.push(`${enemy.icon} **${enemy.name}** dùng kỹ năng đặc biệt vào **${target.name}**! **${dmg}** sát thương!`);
+      if (special) {
+        const profile = getPartySpecialProfile(special, enemy, targets.length);
+        const label = getSpecialLabel(special);
+
+        if ((profile.healPct ?? 0) > 0) {
+          const heal = Math.max(1, Math.floor(enemy.max_hp * (profile.healPct ?? 0)));
+          enemy.hp = Math.min(enemy.max_hp, enemy.hp + heal);
+          if (profile.guard) enemy.guard_turns = Math.max(enemy.guard_turns ?? 0, profile.guard);
+          log.push(`${enemy.icon} **${enemy.name}** dùng **${label}** — hồi **${heal} HP**${profile.guard ? ` và nhận giáp trong ${profile.guard} lượt` : ''}!`);
+        } else {
+          const selectedTargets = pickMany(targets, Math.max(1, profile.targets));
+          const hitLines: string[] = [];
+          for (const target of selectedTargets) {
+            const tIdx = members.findIndex(m => m.user_id === target.user_id);
+            if (tIdx < 0 || !members[tIdx].alive) continue;
+
+            const isDefending = defenders.has(target.user_id);
+            const defendBonus = isDefending ? Math.floor(target.def * 0.75) : 0;
+            const effectiveDef = profile.pierce ? 0 : target.def + defendBonus;
+            const baseDmg = calcDmg(enemy.atk, effectiveDef);
+            const dmg = Math.max(1, Math.floor(baseDmg * profile.mult));
+
+            members[tIdx] = { ...members[tIdx], hp: Math.max(0, members[tIdx].hp - dmg) };
+            hitLines.push(`**${target.name}** −${dmg} HP${isDefending ? ' 🛡️' : ''}`);
+            if (members[tIdx].hp <= 0) {
+              members[tIdx] = { ...members[tIdx], alive: false };
+              hitLines.push(`💀 **${target.name}** đã ngã xuống!`);
+            }
+          }
+          log.push(`${enemy.icon} **${enemy.name}** dùng **${label}**! ${hitLines.join(' · ')}`);
+        }
       } else {
-        log.push(`${enemy.icon} **${enemy.name}** tấn công **${target.name}** gây **${dmg}** sát thương.`);
-      }
+        const target = pick(targets);
+        const tIdx = members.findIndex(m => m.user_id === target.user_id);
+        const isDefending = defenders.has(target.user_id);
+        const effectiveDef = target.def + (isDefending ? Math.floor(target.def * 0.5) : 0);
+        const dmg = calcDmg(enemy.atk, effectiveDef);
 
-      members[tIdx] = { ...members[tIdx], hp: Math.max(0, members[tIdx].hp - dmg) };
-      if (members[tIdx].hp <= 0) {
-        members[tIdx] = { ...members[tIdx], alive: false };
-        log.push(`💀 **${target.name}** đã ngã xuống!`);
+        log.push(`${enemy.icon} **${enemy.name}** tấn công **${target.name}** gây **${dmg}** sát thương.`);
+        members[tIdx] = { ...members[tIdx], hp: Math.max(0, members[tIdx].hp - dmg) };
+        if (members[tIdx].hp <= 0) {
+          members[tIdx] = { ...members[tIdx], alive: false };
+          log.push(`💀 **${target.name}** đã ngã xuống!`);
+        }
       }
     }
 
@@ -393,6 +582,8 @@ export async function startPartyCombatFlow(
         stamina: Math.min(members[i].max_stamina, members[i].stamina + TURN_STAMINA_REGEN)
       };
     }
+
+    if ((enemy.guard_turns ?? 0) > 0) enemy.guard_turns = Math.max(0, (enemy.guard_turns ?? 0) - 1);
 
     turn++;
 
@@ -421,9 +612,22 @@ export async function startPartyCombatFlow(
 
   // ── Victory ────────────────────────────────────────────────────────────────
   const survivors = members.filter(m => m.alive);
-  const expReward  = Math.round(baseDef.expReward / survivors.length);
+
+  if (options.grantDefaultRewards === false) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(COLORS.success)
+        .setTitle(`🏆 Party Chiến Thắng! ${enemy.icon} ${enemy.name} Bị Hạ!`)
+        .setDescription(`Party đã chiến thắng sau **${turn - 1} lượt**.`)],
+      components: []
+    });
+    if (onVictory) await onVictory(survivors, enemy);
+    return;
+  }
+
+  const rewardScale = levelScaling?.rewardMult ?? 1;
+  const expReward  = Math.round((baseDef.expReward * rewardScale) / survivors.length);
   const goldReward = Math.round(
-    randInt(baseDef.goldMin ?? 5, baseDef.goldMax ?? 20) / survivors.length
+    randInt(Math.round((baseDef.goldMin ?? 5) * rewardScale), Math.round((baseDef.goldMax ?? 20) * rewardScale)) / survivors.length
   );
 
   const rewardLines: string[] = [];
@@ -463,4 +667,31 @@ export async function startPartyCombatFlow(
   });
 
   if (onVictory) await onVictory(members, enemy);
+}
+
+
+/**
+ * Party combat for event-generated enemies that are not static entries in data/enemies.ts.
+ * It temporarily registers the enemy by ID, then reuses normal party combat.
+ */
+export async function startPartyCombatFlowWithEnemy(
+  interaction: ChatInputCommandInteraction,
+  leaderId: string,
+  guildId: string,
+  memberIds: string[],
+  enemy: any,
+  onVictory?: (members: PartyMember[], enemy: PartyCombatEnemy) => Promise<void>,
+  onWipe?: (members: PartyMember[], enemy: PartyCombatEnemy) => Promise<void>,
+  options: PartyCombatOptions = {}
+): Promise<void> {
+  if (!enemy?.id) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription('⚠️ Event enemy không có ID hợp lệ.')],
+      components: []
+    });
+    return;
+  }
+
+  if (!ENEMIES[enemy.id]) ENEMIES[enemy.id] = enemy;
+  await startPartyCombatFlow(interaction, leaderId, guildId, memberIds, enemy.id, onVictory, onWipe, options);
 }

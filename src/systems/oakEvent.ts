@@ -1,4 +1,7 @@
 import db from '../database/index';
+import { getEnemy } from '../data/enemies';
+import { getPlayer } from './player';
+import { getBossLevelScaling } from './bossScaling';
 
 export type OakPhase = 'summoning' | 'active' | 'dead';
 
@@ -20,9 +23,20 @@ export interface OakParticipant {
   joined_at: number;
 }
 
-export const OAK_BASE_HP      = 550;
+export const OAK_BASE_HP      = 820;
 export const OAK_SUMMON_WINDOW = 5 * 60;   // 5 phút
 export const OAK_RESPAWN_TTL   = 48 * 3600; // 48 giờ
+
+
+function getAncientOakBaseHp(): number {
+  return Math.max(1, getEnemy('ancient_oak')?.hp ?? OAK_BASE_HP);
+}
+
+function getOakParticipantLevels(guildId: string): number[] {
+  return getOakParticipants(guildId)
+    .map(p => getPlayer(p.user_id, guildId)?.level ?? 1)
+    .filter(level => Number.isFinite(level) && level > 0);
+}
 
 export function getOakEvent(guildId: string): OakEvent | undefined {
   const now = Math.floor(Date.now() / 1000);
@@ -39,7 +53,7 @@ export function createOakEvent(guildId: string, summonerId: string): void {
     INSERT OR REPLACE INTO oak_event
       (guild_id, phase, summoner_id, spawned_at, expires_at, boss_hp, boss_max_hp, current_fighter)
     VALUES (?, 'summoning', ?, ?, ?, ?, ?, NULL)
-  `).run(guildId, summonerId, now, now + OAK_SUMMON_WINDOW, OAK_BASE_HP, OAK_BASE_HP);
+  `).run(guildId, summonerId, now, now + OAK_SUMMON_WINDOW, getAncientOakBaseHp(), getAncientOakBaseHp());
   joinOakEvent(guildId, summonerId);
 }
 
@@ -79,7 +93,10 @@ export function setOakCurrentFighter(guildId: string, userId: string | null): vo
 
 export function activateOakEvent(guildId: string): { hp: number; maxHp: number } {
   const count = Math.max(1, getOakParticipants(guildId).length);
-  const scaledHp = Math.floor(OAK_BASE_HP * (0.6 + 0.4 * count));
+  const oak = getEnemy('ancient_oak') ?? { id: 'ancient_oak', hp: OAK_BASE_HP, boss: true, level: 6 };
+  const levelScaling = getBossLevelScaling(oak, getOakParticipantLevels(guildId));
+  const participantScale = 0.6 + 0.4 * count;
+  const scaledHp = Math.floor(getAncientOakBaseHp() * participantScale * levelScaling.hpMult);
   db.prepare(`
     UPDATE oak_event SET phase = 'active', boss_hp = ?, boss_max_hp = ? WHERE guild_id = ?
   `).run(scaledHp, scaledHp, guildId);

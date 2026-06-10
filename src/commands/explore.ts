@@ -14,7 +14,7 @@ import {
 import { getCombatByUser, saveCombat, deleteCombat } from '../systems/combat';
 import { startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow, hasActiveCombatSkills, hasUsableItems, type CombatVictoryHandler, type CombatDeathHandler, type CombatFleeHandler } from '../systems/combatFlow';
 import { registerCombat, setCombatFallbackHandlers } from '../systems/combatRegistry';
-import { startPartyCombatFlow } from '../systems/partyCombatFlow';
+import { startPartyCombatFlow, startPartyCombatFlowWithEnemy, type PartyMember, type PartyCombatEnemy } from '../systems/partyCombatFlow';
 import { getPartyOf } from '../systems/party';
 import { canExplore, exploreCooldownRemaining, setExploreCooldown } from '../systems/economy';
 import { processVictoryRewards, processDeathPenalty } from '../systems/rewards';
@@ -52,7 +52,7 @@ import { updatePityCounters } from '../systems/pity';
 import { consumeBuff } from '../systems/consumables';
 import { showVillageShop, showVillageBlacksmith, showVillageTavern, showVillageBoard } from '../systems/village';
 import { doGather } from './gather';
-import { onlyUser } from '../utils/collectors';
+import { onlyParty, onlyUser } from '../utils/collectors';
 import { ensurePendingChapterExploreEvent, getPendingChapterExploreEvent, incrementChapterObjective } from '../systems/chapter';
 import { runPendingChapterExploreEvent } from '../systems/chapterExploreEventEngine';
 
@@ -317,7 +317,7 @@ export async function showExploreMenu(
       };
     }
   }
-  const rows = buildExploreRows(userId, zone.safe, !bossSlain, bossId, player.level, zone.minLevel, oakInfo);
+  const rows = buildExploreRows(userId, zone.safe, oakInfo);
   const { embed: zoneEmbed, files: zoneFiles } = withImage(embed, `zone_${player.zone_id}`);
   const reply = await interaction.editReply({ embeds: [zoneEmbed], files: zoneFiles, components: rows });
 
@@ -347,7 +347,6 @@ export async function showExploreMenu(
     const cid = (i as any).customId as string;
 
     if (cid === `ex_search_${userId}`) await handleSearch(interaction, userId, guildId);
-    else if (cid === `ex_boss_${userId}`) await handleBoss(interaction, userId, guildId);
     else if (cid === `ex_zone_${userId}`) await handleZonePicker(interaction, userId, guildId);
     else if (cid.startsWith(`ex_travel_${userId}_`)) {
       const zoneId = cid.replace(`ex_travel_${userId}_`, '');
@@ -374,16 +373,12 @@ export async function showExploreMenu(
 }
 
 function buildExploreRows(
-  userId: string, isSafe: boolean, hasBoss: boolean,
-  bossId: string | undefined, playerLevel: number, zoneMinLevel: number,
+  userId: string, isSafe: boolean,
   oakInfo?: OakButtonInfo | null
 ) {
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`ex_search_${userId}`)
       .setLabel('Khám phá').setEmoji('🗺️').setStyle(ButtonStyle.Primary).setDisabled(isSafe),
-    new ButtonBuilder().setCustomId(`ex_boss_${userId}`)
-      .setLabel('Thách Boss').setEmoji('👑').setStyle(ButtonStyle.Danger)
-      .setDisabled(isSafe || !hasBoss || playerLevel < zoneMinLevel + 2 || bossId === 'ancient_oak'),
     new ButtonBuilder().setCustomId(`ex_zone_${userId}`)
       .setLabel('Zone').setEmoji('🗺️').setStyle(ButtonStyle.Secondary)
   );
@@ -653,12 +648,61 @@ async function blockIfPartyMember(
   if (party && party.leaderId !== userId && (party.memberIds.length ?? 0) > 1) {
     const leaderName = getPlayer(party.leaderId, guildId)?.name ?? 'Leader';
     await interaction.editReply({
-      embeds: [simpleEmbed(COLORS.warning, `👥 Bạn đang trong party. Chỉ **${leaderName}** (leader) mới có thể khám phá và di chuyển cho cả nhóm.`)],
+      embeds: [simpleEmbed(COLORS.warning, `👥 Bạn đang trong party. Chỉ **${leaderName}** (leader) mới có thể khám phá và di chuyển cho cả nhóm. Nếu muốn chơi riêng, dùng \`/party leave\`.`)],
       components: []
     });
     return true;
   }
   return false;
+}
+
+function getReadyPartyMemberIds(guildId: string, leaderId: string, zoneId: string): string[] | undefined {
+  const party = getPartyOf(guildId, leaderId);
+  if (!party || party.leaderId !== leaderId || (party.memberIds.length ?? 0) <= 1) return undefined;
+
+  const ready = party.memberIds.filter(id => {
+    const p = getPlayer(id, guildId);
+    if (!p?.alive) return false;
+    if (p.zone_id !== zoneId) return false;
+    if (getCombatByUser(id, guildId)) return false;
+    return true;
+  });
+
+  return ready.includes(leaderId) && ready.length > 1 ? ready : undefined;
+}
+
+
+async function startEnemyCombatMaybeParty(
+  interaction: ChatInputCommandInteraction,
+  userId: string,
+  guildId: string,
+  enemy: any,
+  bonus: { bonusGold: number; bonusDesc: string; bonusItem?: string } | undefined,
+  onVictory: CombatVictoryHandler,
+  onDeath: CombatDeathHandler,
+  onFlee?: CombatFleeHandler
+): Promise<void> {
+  const player = getPlayer(userId, guildId);
+  const partyMemberIds = player ? getReadyPartyMemberIds(guildId, userId, player.zone_id) : undefined;
+
+  if (partyMemberIds && !enemy?.isShopkeeper) {
+    const partyEnemy = { ...enemy };
+    if (bonus?.bonusGold) {
+      partyEnemy.goldMin = (partyEnemy.goldMin ?? 5) + Math.floor(bonus.bonusGold * 0.6);
+      partyEnemy.goldMax = (partyEnemy.goldMax ?? partyEnemy.goldMin ?? 20) + bonus.bonusGold;
+    }
+    if (bonus?.bonusItem) {
+      partyEnemy.guaranteedDrops = [...(partyEnemy.guaranteedDrops ?? []), bonus.bonusItem];
+    }
+    await startPartyCombatFlowWithEnemy(interaction, userId, guildId, partyMemberIds, partyEnemy, async () => {
+      const reply = await interaction.fetchReply() as Message<boolean>;
+      await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
+      attachContinueExploreHandler(reply, interaction, userId, guildId);
+    });
+    return;
+  }
+
+  await startCombatFlowWithEnemy(interaction, userId, guildId, enemy, bonus, onVictory, onDeath, onFlee);
 }
 
 // ── Search: random event ───────────────────────────────────────────────────────
@@ -690,9 +734,9 @@ async function handleSearch(
   const legacies = getLegaciesInZone(guildId, player.zone_id, 5);
 
   // Detect party trước khi cộng daily để leader khám phá cũng tính cho cả party.
-  const party = getPartyOf(guildId, userId);
-  const isPartyLeader = party?.leaderId === userId && (party?.memberIds.length ?? 0) > 1;
-  const partyMemberIds = isPartyLeader ? party!.memberIds : undefined;
+  // Chỉ tính các thành viên đang sống, cùng zone và không mắc kẹt trong combat khác.
+  const partyMemberIds = getReadyPartyMemberIds(guildId, userId, player.zone_id);
+  const isPartyLeader = !!partyMemberIds;
   const partyMemberNames: Record<string, string> | undefined = partyMemberIds
     ? Object.fromEntries(
         partyMemberIds
@@ -719,6 +763,65 @@ async function handleSearch(
         await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
         attachContinueExploreHandler(reply, interaction, userId, guildId);
       }
+    );
+  };
+
+  const makePartyEventVictory = (
+    onVictory?: CombatVictoryHandler,
+    onDeath?: CombatDeathHandler,
+    onFlee?: CombatFleeHandler
+  ) => async (members: PartyMember[], enemy: PartyCombatEnemy) => {
+    const reply = await interaction.fetchReply() as Message<boolean>;
+    const leaderMember = members.find(m => m.user_id === userId);
+    const leader = getPlayer(userId, guildId);
+
+    if (onVictory && leader && leaderMember) {
+      const fakeBtn = {
+        editReply: (payload: any) => interaction.editReply(payload),
+        message: reply
+      } as unknown as ButtonInteraction;
+      const fakeState = {
+        player_hp: leaderMember.hp,
+        player_mp: leaderMember.mp,
+        enemy_hp: 0,
+        enemy_max_hp: enemy.max_hp,
+        enemy_id: enemy.id,
+        enemy_name: enemy.name
+      };
+      await onVictory(interaction, fakeBtn, userId, guildId, leader, enemy, fakeState);
+      return;
+    }
+
+    await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+  };
+
+  const makePartyEventWipe = (onDeath?: CombatDeathHandler) => async (_members: PartyMember[], enemy: PartyCombatEnemy) => {
+    const reply = await interaction.fetchReply() as Message<boolean>;
+    const leader = getPlayer(userId, guildId);
+    if (onDeath && leader) {
+      const fakeBtn = {
+        editReply: (payload: any) => interaction.editReply(payload),
+        message: reply
+      } as unknown as ButtonInteraction;
+      await onDeath(interaction, fakeBtn, userId, guildId, leader, enemy, enemy.hp);
+      return;
+    }
+    await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+  };
+
+  const startPartyCombatWithEnemy = async (
+    enemy: any,
+    onVictory?: CombatVictoryHandler,
+    onDeath?: CombatDeathHandler,
+    onFlee?: CombatFleeHandler
+  ) => {
+    await startPartyCombatFlowWithEnemy(
+      interaction, userId, guildId, partyMemberIds!, enemy,
+      makePartyEventVictory(onVictory, onDeath, onFlee),
+      makePartyEventWipe(onDeath),
+      { grantDefaultRewards: !!enemy?.useDefaultPartyRewards }
     );
   };
 
@@ -775,13 +878,22 @@ async function handleSearch(
       setExploreCooldown(userId, guildId);
       const minibossId = Math.random() < 0.5 ? 'alpha_thornmaw' : 'moss_crowned_stag';
       const miniboss = getEnemy(minibossId)!;
+      const intro = minibossId === 'alpha_thornmaw'
+        ? 'Một tiếng gầm xé toạc màn sương. Những bụi gai rung lên như hàng ngàn lưỡi dao — kẻ săn mồi đầu đàn đã ngửi thấy mùi máu.'
+        : 'Mặt đất rung nhẹ. Từ giữa rừng già, một linh thú đội vương miện rễ cây bước ra, đôi mắt như đang phán xét linh hồn bạn.';
       const embed = new EmbedBuilder()
         .setColor(COLORS.danger)
-        .setTitle(`${miniboss.icon} Linh Thú Xuất Hiện!`)
-        .setDescription(`*${miniboss.lore}*\n\n⚠️ Bạn không thể bỏ chạy khỏi cuộc đối đầu này.`);
+        .setTitle(`⚠️ MINI BOSS ENCOUNTER — ${miniboss.icon} ${miniboss.name}`)
+        .setDescription(
+          `**${intro}**\n\n` +
+          `*${miniboss.lore}*\n\n` +
+          '🌳 Đây là hộ vệ của Ancient Oak route. Đánh bại nó để mở bước tiếp theo.\n' +
+          '⚠️ Bạn không thể bỏ chạy khỏi cuộc đối đầu này.'
+        );
       await interaction.editReply({ embeds: [embed], components: [] });
       await new Promise(r => setTimeout(r, 800));
-      await startCombatFlow(interaction, userId, guildId, minibossId, handleVictory, handleDeath, handleFlee);
+      if (isPartyLeader) await startPartyCombat(minibossId);
+      else await startCombatFlow(interaction, userId, guildId, minibossId, handleVictory, handleDeath, handleFlee);
       return;
     }
   }
@@ -848,10 +960,13 @@ async function handleSearch(
       startCombat: isPartyLeader
         ? startPartyCombat
         : (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee),
+      startCombatWithEnemy: isPartyLeader
+        ? startPartyCombatWithEnemy
+        : (enemy: any, onVictory?: CombatVictoryHandler, onDeath?: CombatDeathHandler, onFlee?: CombatFleeHandler) => startCombatFlowWithEnemy(interaction, userId, guildId, enemy, undefined, onVictory, onDeath, onFlee),
       handleFlee,
       showAmbush: () => showAmbush(interaction, userId, guildId, pick(enemies).id),
       showLegacyFind: () => showLegacyFind(interaction, userId, guildId, legacies),
-      showMerchant: () => showMerchant(interaction, userId, guildId),
+      showMerchant: () => showMerchant(interaction, userId, guildId, partyMemberIds, partyMemberNames),
       showHealingSpring: () => showHealingSpring(interaction, userId, guildId),
       showTrap: () => showTrap(interaction, userId, guildId),
       showAncientAltar: () => showAncientAltar(interaction, userId, guildId),
@@ -859,12 +974,12 @@ async function handleSearch(
       showVillagerRescue: () => showVillagerRescue(interaction, userId, guildId, enemies),
       showCaravanRobbery: () => showCaravanRobbery(interaction, userId, guildId, enemies),
       showLootFind: () => showLootFind(interaction, userId, guildId),
-      showSoulShop: () => showSoulShop(interaction, userId, guildId),
+      showSoulShop: () => showSoulShop(interaction, userId, guildId, partyMemberIds, partyMemberNames),
       showAbandonedCamp: () => showAbandonedCamp(interaction, userId, guildId),
       showLostPouch: () => showLostPouch(interaction, userId, guildId),
       showRuneStone: () => showRuneStone(interaction, userId, guildId),
       showTreasureChest: () => showTreasureChest(interaction, userId, guildId),
-      showWanderingHealer: () => showWanderingHealer(interaction, userId, guildId),
+      showWanderingHealer: () => showWanderingHealer(interaction, userId, guildId, partyMemberIds, partyMemberNames),
       showSpiritTrial: () => showSpiritTrial(interaction, userId, guildId, enemies),
       buildContinueExploreRow,
       attachContinueExploreHandler,
@@ -885,6 +1000,17 @@ async function handleBoss(
   const zone   = getZone(player.zone_id)!;
   if (!zone.bossId) return;
   setExploreCooldown(userId, guildId);
+
+  const partyMemberIds = getReadyPartyMemberIds(guildId, userId, player.zone_id);
+  if (partyMemberIds) {
+    await startPartyCombatFlow(interaction, userId, guildId, partyMemberIds, zone.bossId, async () => {
+      const reply = await interaction.fetchReply() as Message<boolean>;
+      await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
+      attachContinueExploreHandler(reply, interaction, userId, guildId);
+    });
+    return;
+  }
+
   await startCombatFlow(interaction, userId, guildId, zone.bossId, handleVictory, handleDeath, handleFlee);
 }
 
@@ -1378,17 +1504,19 @@ async function showTreasureChest(
 }
 
 async function showWanderingHealer(
-  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string,
+  partyMemberIds?: string[], partyMemberNames?: Record<string, string>
 ): Promise<void> {
   const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const price = Math.max(10, Math.floor(18 + player.level * 4));
+  const isPartyShop = !!(partyMemberIds && partyMemberIds.length > 1);
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`healer_pay_${userId}`).setLabel(`Trả ${price} Gold`).setEmoji('💚').setStyle(ButtonStyle.Success).setDisabled(player.gold < price),
+    new ButtonBuilder().setCustomId(`healer_pay_${userId}`).setLabel(`Trả ${price} Gold`).setEmoji('💚').setStyle(ButtonStyle.Success).setDisabled(!isPartyShop && player.gold < price),
     new ButtonBuilder().setCustomId(`healer_leave_${userId}`).setLabel('Rời đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
   );
-  const { embed, files } = withImage(new EmbedBuilder().setColor(COLORS.success).setTitle('💚 Tu Sĩ Lang Thang').setDescription(`Một tu sĩ đề nghị chữa trị cho bạn với giá **${price} Gold**.`), 'healer');
+  const { embed, files } = withImage(new EmbedBuilder().setColor(COLORS.success).setTitle('💚 Tu Sĩ Lang Thang').setDescription(`Một tu sĩ đề nghị chữa trị với giá khoảng **${price} Gold**.${isPartyShop ? '\n\n👥 Thành viên nào bấm trả tiền thì người đó được hồi máu/mana.' : ''}`), 'healer');
   const reply = await interaction.editReply({ embeds: [embed], files, components: [row] });
-  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000 }).catch(() => null);
+  const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: isPartyShop ? onlyParty(userId, partyMemberIds!) : onlyUser(userId), time: 25_000 }).catch(() => null);
   const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
 
   if (!btn || !deferred || btn.customId !== `healer_pay_${userId}`) {
@@ -1397,13 +1525,20 @@ async function showWanderingHealer(
     return;
   }
 
-  if (!spendGold(userId, guildId, price)) return;
-  const hpGain = Math.floor(player.max_hp * 0.45);
-  const mpGain = Math.floor(player.max_mp * 0.25);
-  const newHp = Math.min(player.max_hp, player.hp + hpGain);
-  const newMp = Math.min(player.max_mp, player.mp + mpGain);
-  updatePlayerHpMp(userId, guildId, newHp, newMp);
-  const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💚 Ánh sáng dịu bao phủ bạn.\n❤️ +**${hpGain} HP** → ${newHp}/${player.max_hp}\n💧 +**${mpGain} MP** → ${newMp}/${player.max_mp}`)], components: buildContinueExploreRow(userId) });
+  const targetId = btn.user.id;
+  const target = applyPassiveStats(getPlayer(targetId, guildId)!);
+  const targetPrice = Math.max(10, Math.floor(18 + target.level * 4));
+  if (!spendGold(targetId, guildId, targetPrice)) {
+    const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ **${target.name}** không đủ **${targetPrice} Gold** để chữa trị.`)], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(res, interaction, userId, guildId);
+    return;
+  }
+  const hpGain = Math.floor(target.max_hp * 0.45);
+  const mpGain = Math.floor(target.max_mp * 0.25);
+  const newHp = Math.min(target.max_hp, target.hp + hpGain);
+  const newMp = Math.min(target.max_mp, target.mp + mpGain);
+  updatePlayerHpMp(targetId, guildId, newHp, newMp);
+  const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💚 Ánh sáng dịu bao phủ **${target.name}**.\n🪙 -**${targetPrice} Gold**\n❤️ +**${hpGain} HP** → ${newHp}/${target.max_hp}\n💧 +**${mpGain} MP** → ${newMp}/${target.max_mp}`)], components: buildContinueExploreRow(userId) });
   attachContinueExploreHandler(res, interaction, userId, guildId);
 }
 
@@ -1440,7 +1575,7 @@ async function showSpiritTrial(
     return;
   }
 
-  await startCombatFlowWithEnemy(
+  await startEnemyCombatMaybeParty(
     interaction, userId, guildId, trialEnemy,
     { bonusGold: 0, bonusDesc: `\n💀 Linh hồn tan biến, để lại **1 Soul Shard** và một mảnh ký ức.`, bonusItem: undefined },
     async (int, btnInt, uid, gid, p, enemy, state) => {
@@ -1581,7 +1716,8 @@ function buildRandomMerchantStock(zoneId: string): MerchantStock {
 
 // ── Merchant encounter ────────────────────────────────────────────────────────
 async function showMerchant(
-  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string,
+  partyMemberIds?: string[], partyMemberNames?: Record<string, string>
 ): Promise<void> {
   const player = getPlayer(userId, guildId)!;
   const zone   = getZone(player.zone_id)!;
@@ -1592,15 +1728,20 @@ async function showMerchant(
   const markup = getEffectiveShopMarkup(guildId);
 
   const stock = buildRandomMerchantStock(zone.id);
-  await renderMerchantBuy(interaction, userId, guildId, zone.id, discount, markup, player.gold, stock);
+  await renderMerchantBuy(interaction, userId, guildId, zone.id, discount, markup, player.gold, stock, partyMemberIds, partyMemberNames);
 }
 
 async function renderMerchantBuy(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string, zoneId: string,
-  discount: number, markup: number, playerGold: number, stock: MerchantStock
+  discount: number, markup: number, playerGold: number, stock: MerchantStock,
+  partyMemberIds?: string[], partyMemberNames?: Record<string, string>
 ): Promise<void> {
   const zone  = getZone(zoneId)!;
+  const isPartyShop = !!(partyMemberIds && partyMemberIds.length > 1);
+  const partyShopNote = isPartyShop
+    ? '\n\n👥 **Party Shop:** Ai bấm mua/bán thì dùng Gold/kho đồ của người đó. Chỉ leader được cướp hoặc rời shop.'
+    : '';
 
   const shopItems = stock.itemIds
     .map(id => getItem(id))
@@ -1637,7 +1778,7 @@ async function renderMerchantBuy(
     .setDescription(
       `*Một lái buôn xuất hiện từ sau cây...*\n` +
       `📦 Kho hàng hôm nay là **ngẫu nhiên**. Hàng hiếm xuất hiện ít, không phải lúc nào cũng có.\n` +
-      priceNote + '\n' + (itemLines || '*Hôm nay lái buôn không có gì đáng mua.*') + `\n\n🪙 Gold của bạn: **${playerGold}**`
+      priceNote + '\n' + (itemLines || '*Hôm nay lái buôn không có gì đáng mua.*') + `\n\n🪙 Gold leader: **${playerGold}**` + partyShopNote
     );
 
   const allBuyOptions = [
@@ -1683,7 +1824,7 @@ async function renderMerchantBuy(
   const reply = await interaction.editReply({ embeds: [merchEmbed], files: merchFiles, components: rows });
 
   const collector = reply.createMessageComponentCollector({
-    filter: onlyUser(userId),
+    filter: isPartyShop ? onlyParty(userId, partyMemberIds!) : onlyUser(userId),
     time: 60_000
   });
 
@@ -1694,15 +1835,23 @@ async function renderMerchantBuy(
     const cid = (compInt as any).customId as string;
 
     if (cid === `merch_leave_${userId}`) {
+      if (compInt.user.id !== userId) {
+        await interaction.editReply({ embeds: [new EmbedBuilder(merchEmbed.toJSON()).setFooter({ text: '👥 Chỉ leader party mới được rời shop cho cả nhóm.' })] }).catch(() => {});
+        return;
+      }
       collector.stop();
       const leaveReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn vẫy tay chào lái buôn và bước đi.')], components: buildContinueExploreRow(userId) });
       attachContinueExploreHandler(leaveReply, interaction, userId, guildId);
 
     } else if (cid === `merch_sell_${userId}`) {
       collector.stop();
-      await renderMerchantSell(interaction, userId, guildId, zoneId, discount, markup, stock);
+      await renderMerchantSell(interaction, userId, guildId, zoneId, discount, markup, stock, compInt.user.id, partyMemberIds, partyMemberNames);
 
     } else if (cid === `merch_rob_${userId}`) {
+      if (compInt.user.id !== userId) {
+        await interaction.editReply({ embeds: [new EmbedBuilder(merchEmbed.toJSON()).setFooter({ text: '👥 Chỉ leader party mới được chọn cướp shopkeeper.' })] }).catch(() => {});
+        return;
+      }
       collector.stop();
       await renderShopkeeperRobPrompt(interaction, userId, guildId, zoneId, stock);
 
@@ -1711,7 +1860,8 @@ async function renderMerchantBuy(
       const rawVal  = sel.values[0];
       const isBuyEq = rawVal.startsWith('buyeq_');
       const itemId  = rawVal.replace('buyeq_', '').replace('buy_', '');
-      const fresh   = getPlayer(userId, guildId)!;
+      const buyerId = compInt.user.id;
+      const fresh   = getPlayer(buyerId, guildId)!;
 
       let price = 0;
       let displayName = '';
@@ -1732,24 +1882,24 @@ async function renderMerchantBuy(
 
       if (fresh.gold < price) {
         await interaction.editReply({
-          embeds: [embed.setFooter({ text: `❌ Không đủ Gold! Cần ${price} 🪙, bạn có ${fresh.gold} 🪙` })]
+          embeds: [embed.setFooter({ text: `❌ ${fresh.name} không đủ Gold! Cần ${price} 🪙, đang có ${fresh.gold} 🪙` })]
         });
         return;
       }
 
-      spendGold(userId, guildId, price);
-      addItem(userId, guildId, itemId, 1);
+      spendGold(buyerId, guildId, price);
+      addItem(buyerId, guildId, itemId, 1);
       if (isBuyEq) stock.equipmentIds = stock.equipmentIds.filter(id => id !== itemId);
       else stock.itemIds = stock.itemIds.filter(id => id !== itemId);
 
-      const updatedPlayer = getPlayer(userId, guildId)!;
+      const updatedPlayer = getPlayer(buyerId, guildId)!;
       await interaction.editReply({
         embeds: [
           new EmbedBuilder().setColor(COLORS.gold)
             .setTitle('🛒 Lái Buôn Lữ Hành!')
             .setDescription(
-              `✅ Đã mua **${displayName}** — −${price} 🪙\n` +
-              priceNote + '\n' + itemLines + `\n\n🪙 Gold còn lại: **${updatedPlayer.gold}**`
+              `✅ **${updatedPlayer.name}** đã mua **${displayName}** — −${price} 🪙\n` +
+              priceNote + '\n' + itemLines + `\n\n🪙 Gold của ${updatedPlayer.name}: **${updatedPlayer.gold}**`
             )
         ]
       });
@@ -1768,10 +1918,11 @@ async function renderMerchantBuy(
 
 async function renderMerchantSell(
   interaction: ChatInputCommandInteraction,
-  userId: string, guildId: string, zoneId: string, discount: number, markup: number, stock: MerchantStock
+  userId: string, guildId: string, zoneId: string, discount: number, markup: number, stock: MerchantStock,
+  sellerId = userId, partyMemberIds?: string[], partyMemberNames?: Record<string, string>
 ): Promise<void> {
-  const player    = getPlayer(userId, guildId)!;
-  const inventory = getInventory(userId, guildId);
+  const player    = getPlayer(sellerId, guildId)!;
+  const inventory = getInventory(sellerId, guildId);
   const sellable  = inventory
     .map(e => ({ entry: e, item: getItem(e.item_id) ?? getMaterial(e.item_id) }))
     .filter(({ item }) => item?.sellPrice && (item as any).type !== 'key_item');
@@ -1781,20 +1932,20 @@ async function renderMerchantSell(
       embeds: [simpleEmbed(COLORS.info, '🎒 Không có gì để bán cả.')],
       components: [
         new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId(`sell_back_${userId}`).setLabel('Quay lại').setEmoji('↩️').setStyle(ButtonStyle.Secondary)
+          new ButtonBuilder().setCustomId(`sell_back_${sellerId}`).setLabel('Quay lại').setEmoji('↩️').setStyle(ButtonStyle.Secondary)
         )
       ]
     });
 
     const reply = await interaction.fetchReply();
     const btn = await reply.awaitMessageComponent({
-      componentType: ComponentType.Button, filter: onlyUser(userId), time: 20_000
+      componentType: ComponentType.Button, filter: onlyUser(sellerId), time: 20_000
     }).catch(() => null);
     if (btn) {
       const deferred = await btn.deferUpdate().then(() => true).catch(() => false);
       if (deferred) {
         const fresh = getPlayer(userId, guildId)!;
-        await renderMerchantBuy(interaction, userId, guildId, zoneId, discount, markup, fresh.gold, stock);
+        await renderMerchantBuy(interaction, userId, guildId, zoneId, discount, markup, getPlayer(userId, guildId)?.gold ?? fresh.gold, stock, partyMemberIds, partyMemberNames);
       }
     }
     return;
@@ -1822,13 +1973,13 @@ async function renderMerchantSell(
   const rows: ActionRowBuilder<any>[] = [
     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
-        .setCustomId(`merch_sellitem_${userId}`)
+        .setCustomId(`merch_sellitem_${sellerId}`)
         .setPlaceholder('Chọn vật phẩm để bán...')
         .addOptions(options.slice(0, 25))
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`merch_sellback_${userId}`).setLabel('Quay lại shop').setEmoji('↩️').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`merch_sellleave_${userId}`).setLabel('Rời đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId(`merch_sellback_${sellerId}`).setLabel('Quay lại shop').setEmoji('↩️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`merch_sellleave_${sellerId}`).setLabel('Rời đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
     )
   ];
 
@@ -1836,7 +1987,7 @@ async function renderMerchantSell(
   const reply = await interaction.editReply({ embeds: [sellEmbed], files: sellFiles, components: rows });
 
   const collector = reply.createMessageComponentCollector({
-    filter: onlyUser(userId), time: 60_000
+    filter: onlyUser(sellerId), time: 60_000
   });
 
   collector.on('collect', async (compInt) => {
@@ -1845,32 +1996,32 @@ async function renderMerchantSell(
 
     const cid = (compInt as any).customId as string;
 
-    if (cid === `merch_sellback_${userId}`) {
+    if (cid === `merch_sellback_${sellerId}`) {
       collector.stop();
       const fresh = getPlayer(userId, guildId)!;
-      await renderMerchantBuy(interaction, userId, guildId, zoneId, discount, markup, fresh.gold, stock);
-    } else if (cid === `merch_sellleave_${userId}`) {
+      await renderMerchantBuy(interaction, userId, guildId, zoneId, discount, markup, getPlayer(userId, guildId)?.gold ?? fresh.gold, stock, partyMemberIds, partyMemberNames);
+    } else if (cid === `merch_sellleave_${sellerId}`) {
       collector.stop();
       const leaveReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn vẫy tay chào lái buôn và bước đi.')], components: buildContinueExploreRow(userId) });
       attachContinueExploreHandler(leaveReply, interaction, userId, guildId);
-    } else if (cid === `merch_sellitem_${userId}`) {
+    } else if (cid === `merch_sellitem_${sellerId}`) {
       const sel    = compInt as StringSelectMenuInteraction;
       const itemId = sel.values[0].replace('sell_', '');
       const item   = getItem(itemId) ?? getMaterial(itemId);
       if (!item?.sellPrice) return;
 
-      const qty = getItemQty(userId, guildId, itemId);
+      const qty = getItemQty(sellerId, guildId, itemId);
       if (qty <= 0) return;
 
-      removeItem(userId, guildId, itemId, 1);
-      grantGold(userId, guildId, item.sellPrice);
+      removeItem(sellerId, guildId, itemId, 1);
+      grantGold(sellerId, guildId, item.sellPrice);
 
-      const fresh = getPlayer(userId, guildId)!;
+      const fresh = getPlayer(sellerId, guildId)!;
       await interaction.editReply({
         embeds: [
           new EmbedBuilder().setColor(COLORS.gold)
             .setTitle('💰 Bán Đồ')
-            .setDescription(`✅ Bán **${item.icon} ${item.name}** → +**${item.sellPrice}** 🪙\n🪙 Gold: **${fresh.gold}**`)
+            .setDescription(`✅ **${fresh.name}** bán **${item.icon} ${item.name}** → +**${item.sellPrice}** 🪙\n🪙 Gold: **${fresh.gold}**`)
             .addFields(
               sellable
                 .map(({ entry, item: it }) => {
@@ -2665,7 +2816,7 @@ async function showVillagerRescue(
   await new Promise(r => setTimeout(r, 800));
   // Mark that this combat gives bonus reward (we'll hook into victory flow via world flag hack)
   // Simpler: just do combat with inline enemy
-  await startCombatFlowWithEnemy(interaction, userId, guildId, banditEnemy, {
+  await startEnemyCombatMaybeParty(interaction, userId, guildId, banditEnemy, {
     bonusGold: goldReward,
     bonusDesc: `👨‍👩‍👧 Dân làng cảm ơn bạn và trao **${goldReward} Gold**!`
   }, handleVictory, handleDeath, handleFlee);
@@ -2746,7 +2897,7 @@ async function showCaravanRobbery(
   if (cid === `cara_help_${userId}`) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '⚔️ Bạn xông vào giúp thương nhân!')], components: [] });
     await new Promise(r => setTimeout(r, 800));
-    await startCombatFlowWithEnemy(interaction, userId, guildId, banditBossEnemy, {
+    await startEnemyCombatMaybeParty(interaction, userId, guildId, banditBossEnemy, {
       bonusGold: randInt(80, 150),
       bonusDesc: `🛒 Thương nhân trả ơn với **{gold} Gold** và hàng hóa!`,
       bonusItem: 'elixir'
@@ -2754,7 +2905,7 @@ async function showCaravanRobbery(
   } else {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '😈 Bạn chọn đứng về phía bọn cướp...')], components: [] });
     await new Promise(r => setTimeout(r, 800));
-    await startCombatFlowWithEnemy(interaction, userId, guildId, guardEnemy, {
+    await startEnemyCombatMaybeParty(interaction, userId, guildId, guardEnemy, {
       bonusGold: randInt(40, 80),
       bonusDesc: `💰 Chia chác chiến lợi phẩm: +**{gold} Gold** + đồ cướp được!`,
       bonusItem: pick(['health_potion','mana_potion','antidote'])
@@ -2799,7 +2950,8 @@ const COMMON_BOOKS = [
 const SOUL_BOOKS   = ['book_soul_strike','book_soul_guard','book_soul_drain','book_void_rift'];
 
 async function showSoulShop(
-  interaction: ChatInputCommandInteraction, userId: string, guildId: string
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string,
+  partyMemberIds?: string[], partyMemberNames?: Record<string, string>
 ): Promise<void> {
   const player = getPlayer(userId, guildId)!;
   const flavors = [
@@ -2812,13 +2964,17 @@ async function showSoulShop(
     `${i.icon} **${i.name}** — **${i.cost} 💀** Soul Shard\n> *${i.desc}*`
   ).join('\n');
 
+  const isPartyShop = !!(partyMemberIds && partyMemberIds.length > 1);
+  const partyNote = isPartyShop
+    ? '\n\n👥 **Party Soul Shop:** Ai bấm mua thì dùng Soul Shard và nhận vật phẩm/chỉ số của người đó.'
+    : '';
+
   const embed = new EmbedBuilder()
     .setColor(COLORS.purple)
     .setTitle('💀 Người Giữ Linh Hồn')
-    .setDescription(`*${pick(flavors)}*\n\n${itemLines}\n\n💀 Soul Shards của bạn: **${player.soul_shards}**`);
+    .setDescription(`*${pick(flavors)}*\n\n${itemLines}\n\n💀 Soul Shards leader: **${player.soul_shards}**${partyNote}`);
 
   const options = SOUL_SHOP_ITEMS
-    .filter(i => player.soul_shards >= i.cost)
     .map(i =>
       new StringSelectMenuOptionBuilder()
         .setLabel(`${i.name} — ${i.cost} 💀`)
@@ -2845,7 +3001,7 @@ async function showSoulShop(
   const reply = await interaction.editReply({ embeds: [embed], components: rows });
 
   const collector = reply.createMessageComponentCollector({
-    filter: onlyUser(userId), time: 60_000
+    filter: isPartyShop ? onlyParty(userId, partyMemberIds!) : onlyUser(userId), time: 60_000
   });
 
   collector.on('collect', async (compInt) => {
@@ -2853,39 +3009,45 @@ async function showSoulShop(
     if (!deferred) return;
 
     const cid = (compInt as any).customId as string;
-    collector.stop();
 
     if (cid === `soul_leave_${userId}`) {
+      if (compInt.user.id !== userId) {
+        await interaction.editReply({ embeds: [new EmbedBuilder(embed.toJSON()).setFooter({ text: '👥 Chỉ leader party mới được đóng Soul Shop cho cả nhóm.' })] }).catch(() => {});
+        return;
+      }
+      collector.stop();
       const leaveReply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '💀 *"Đến lần sau..."* Bóng hình tan biến.')], components: buildContinueExploreRow(userId) });
       attachContinueExploreHandler(leaveReply, interaction, userId, guildId);
       return;
     }
 
     if (cid === `soul_buy_${userId}`) {
+      collector.stop();
+      const buyerId = compInt.user.id;
       const sel     = compInt as StringSelectMenuInteraction;
       const itemKey = sel.values[0];
       const shopItem = SOUL_SHOP_ITEMS.find(i => i.id === itemKey);
       if (!shopItem) return;
 
-      const freshP = getPlayer(userId, guildId)!;
+      const freshP = getPlayer(buyerId, guildId)!;
       if (freshP.soul_shards < shopItem.cost) {
-        await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ Không đủ Soul Shard (cần ${shopItem.cost}, có ${freshP.soul_shards})`)], components: [] });
+        await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ **${freshP.name}** không đủ Soul Shard (cần ${shopItem.cost}, có ${freshP.soul_shards})`)], components: [] });
         return;
       }
 
       // Deduct soul shards
       const { grantSoulShards: gss } = await import('../systems/player');
-      gss(userId, guildId, -shopItem.cost);
+      gss(buyerId, guildId, -shopItem.cost);
 
       let result = '';
       if (itemKey === 'rand_book') {
         const book = pick(COMMON_BOOKS);
-        addItem(userId, guildId, book, 1);
+        addItem(buyerId, guildId, book, 1);
         const it = getItem(book)!;
         result = `${it.icon} **${it.name}**`;
       } else if (itemKey === 'soul_book') {
         const book = pick(SOUL_BOOKS);
-        addItem(userId, guildId, book, 1);
+        addItem(buyerId, guildId, book, 1);
         const it = getItem(book)!;
         result = `${it?.icon ?? '💀'} **${it?.name ?? book}** (Soul Skill!)`;
       } else if (itemKey === 'eq_box') {
@@ -2893,51 +3055,51 @@ async function showSoulShop(
         const { EQUIPMENT: EQ } = await import('../data/equipment');
         const rareEq = Object.values(EQ).filter(e => e.rarity === 'rare' || e.rarity === 'epic');
         const chosen = pick(rareEq);
-        addItem(userId, guildId, chosen.id, 1);
+        addItem(buyerId, guildId, chosen.id, 1);
         result = `${chosen.icon} **${chosen.name}** (${chosen.rarity})`;
       } else if (itemKey === 'mat_chest') {
         const mats = ['herb','wolf_fang','ancient_bark','bone_shard','ectoplasm','troll_hide','ancient_wood','broken_rune','merchant_seal','soul_dust','rusty_gear','cursed_cloth'];
         const qty = randInt(2, 4);
         const picked: string[] = [];
-        for (let i = 0; i < qty; i++) { const m = pick(mats); addItem(userId, guildId, m, 1); picked.push(m); }
+        for (let i = 0; i < qty; i++) { const m = pick(mats); addItem(buyerId, guildId, m, 1); picked.push(m); }
         const distinct = [...new Set(picked)].map(m => getItem(m)?.name ?? m).join(', ');
         result = `📦 ${distinct}`;
       } else if (itemKey === 'stat_atk') {
-        addPermanentStat(userId, guildId, 'atk', 1);
+        addPermanentStat(buyerId, guildId, 'atk', 1);
         result = '⚔️ **ATK vĩnh viễn +1**';
       } else if (itemKey === 'stat_def') {
-        addPermanentStat(userId, guildId, 'def', 1);
+        addPermanentStat(buyerId, guildId, 'def', 1);
         result = '🛡️ **DEF vĩnh viễn +1**';
       } else if (itemKey === 'stat_hp') {
-        addPermanentStat(userId, guildId, 'max_hp', 10);
+        addPermanentStat(buyerId, guildId, 'max_hp', 10);
         result = '❤️ **Max HP vĩnh viễn +10**';
       } else if (itemKey === 'keep_item') {
-        const charges = addKeepItemCharge(userId, guildId, 1);
+        const charges = addKeepItemCharge(buyerId, guildId, 1);
         result = `🔒 **Keep Item Charge +1** *(đang có ${charges})*`;
       } else if (itemKey === 'skill_slot') {
-        const slots = addExtraSkillSlot(userId, guildId, 1);
+        const slots = addExtraSkillSlot(buyerId, guildId, 1);
         result = `📌 **Mở thêm slot kỹ năng** *(+${slots}/2)*`;
       } else if (itemKey === 'death_reduce') {
-        const reduction = improveDeathPenaltyReduction(userId, guildId, 10);
+        const reduction = improveDeathPenaltyReduction(buyerId, guildId, 10);
         result = `🕯️ **Death penalty reduction ${reduction}%**`;
       } else if (itemKey === 'next_bless') {
-        const blessings = addRebirthBlessing(userId, guildId, 1);
+        const blessings = addRebirthBlessing(buyerId, guildId, 1);
         result = `🧬 **Blessing cho kiếp sau +1** *(đang có ${blessings})*`;
       } else if (itemKey === 'mercy_mark') {
-        const marks = addMerchantMercy(userId, guildId, 1);
+        const marks = addMerchantMercy(buyerId, guildId, 1);
         result = `🧾 **Ấn chuộc lỗi thương nhân +1** *(đang có ${marks})*`;
       } else if (shopItem.giveItem) {
-        addItem(userId, guildId, shopItem.giveItem, shopItem.qty ?? 1);
+        addItem(buyerId, guildId, shopItem.giveItem, shopItem.qty ?? 1);
         const it = getItem(shopItem.giveItem);
         result = `${it?.icon ?? '✨'} **${it?.name ?? shopItem.giveItem}**`;
       }
 
-      const afterP = getPlayer(userId, guildId)!;
+      const afterP = getPlayer(buyerId, guildId)!;
       const resReply = await interaction.editReply({
         embeds: [
           new EmbedBuilder().setColor(COLORS.purple)
             .setTitle('💀 Người Giữ Linh Hồn — Khế Ước Hoàn Tất')
-            .setDescription(`−**${shopItem.cost} 💀** Soul Shard\nNhận được: ${result}\n\n💀 Còn lại: **${afterP.soul_shards}** Soul Shards`)
+            .setDescription(`**${afterP.name}** đã giao ước.\n−**${shopItem.cost} 💀** Soul Shard\nNhận được: ${result}\n\n💀 Còn lại: **${afterP.soul_shards}** Soul Shards`)
         ],
         components: buildContinueExploreRow(userId)
       });

@@ -54,7 +54,8 @@ function calcDamage(atk: number, def: number, variance = 0.15): number {
 }
 
 function targetIsBoss(enemyId: string): boolean {
-  return !!getEnemy(enemyId)?.boss;
+  const enemy = getEnemy(enemyId);
+  return !!(enemy?.boss || enemy?.miniboss);
 }
 
 function applyOutgoingDamageModifiers(
@@ -836,7 +837,7 @@ function enemyTurn(
       : (Array.isArray(enemy.specialAttacks) ? enemy.specialAttacks : []);
     // Don't re-activate bark_armor if it's already up
     const attackPool    = hasEffect(effects, 'bark_armor')
-      ? rawPool.filter((a: string) => a !== 'oak_bark_armor')
+      ? rawPool.filter((a: string) => a !== 'oak_bark_armor' && a !== 'elarok_bramble_guard')
       : rawPool;
     special = useSpecial && attackPool.length > 0 ? pick(attackPool) : null;
   }
@@ -849,7 +850,7 @@ function enemyTurn(
     playerMp = res.playerMp;
     dealDmg  = res.dmg;
     if (dealDmg > 0) {
-      const adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!enemy.boss, isSpecial: true });
+      const adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(enemy.boss || enemy.miniboss), isSpecial: true });
       playerHp = Math.min(current.player_max_hp, playerHp + (dealDmg - adjusted));
       dealDmg = adjusted;
     }
@@ -857,13 +858,17 @@ function enemyTurn(
       current = { ...current, enemy_hp: Math.min(current.enemy_max_hp, current.enemy_hp + res.enemyHeal) };
     }
     // Boss-specific after-effects
-    if (special === 'oak_root_slam')  addEffect(effects, 'rooted', 1);
-    if (special === 'vine_whip')      addEffect(effects, 'rooted', 2);
-    if (special === 'thorn_burst')    addEffect(effects, 'poison', 3, Math.max(4, Math.floor(current.enemy_atk * 0.10)));
-    if (special === 'oak_bark_armor') addEffect(effects, 'bark_armor', 2, 60, 'enemy');
+    if (special === 'oak_root_slam')             addEffect(effects, 'rooted', 1);
+    if (special === 'vine_whip')                 addEffect(effects, 'rooted', 2);
+    if (special === 'thorn_burst')               addEffect(effects, 'poison', 3, Math.max(4, Math.floor(current.enemy_atk * 0.10)));
+    if (special === 'oak_bark_armor')            addEffect(effects, 'bark_armor', 2, 60, 'enemy');
+    if (special === 'thornfang_predator_roar')   addEffect(effects, 'incoming_damage_up', 2, 18);
+    if (special === 'thornfang_blood_hunt')      addEffect(effects, 'poison', 2, Math.max(5, Math.floor(current.enemy_atk * 0.12)));
+    if (special === 'elarok_rootbind')           addEffect(effects, 'rooted', 1);
+    if (special === 'elarok_bramble_guard')      addEffect(effects, 'bark_armor', 2, 35, 'enemy');
   } else {
     dealDmg  = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
-    dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!enemy.boss });
+    dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(enemy.boss || enemy.miniboss) });
     playerHp = Math.max(0, playerHp - dealDmg);
     logs.push(`${enemy.icon} **${enemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP còn lại)`);
   }
@@ -1143,7 +1148,7 @@ function groupEnemyTurn(
       const res = applySpecialAttack(special, enemyAtk, fakeDef, playerHp, playerMp, logs, (current as any).player_def ?? 0);
       playerHp = res.playerHp; playerMp = res.playerMp; dealDmg = res.dmg;
       if (dealDmg > 0) {
-        const adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!fakeDef.boss, isSpecial: true });
+        const adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(fakeDef.boss || fakeDef.miniboss), isSpecial: true });
         playerHp = Math.min(current.player_max_hp, playerHp + (dealDmg - adjusted));
         dealDmg = adjusted;
       }
@@ -1151,9 +1156,13 @@ function groupEnemyTurn(
         const healIdx = enemies.findIndex(e => e === combatEnemy);
         if (healIdx >= 0) enemies[healIdx] = { ...combatEnemy, hp: Math.min(combatEnemy.max_hp, combatEnemy.hp + res.enemyHeal) };
       }
+      if (special === 'thornfang_predator_roar') addEffect(effects, 'incoming_damage_up', 2, 18);
+      if (special === 'thornfang_blood_hunt')    addEffect(effects, 'poison', 2, Math.max(5, Math.floor(enemyAtk * 0.12)));
+      if (special === 'elarok_rootbind')         addEffect(effects, 'rooted', 1);
+      if (special === 'elarok_bramble_guard')    addEffect(effects, 'bark_armor', 2, 35, 'enemy');
     } else {
       dealDmg = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
-      dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!getEnemy(combatEnemy.id)?.boss });
+      dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(getEnemy(combatEnemy.id)?.boss || getEnemy(combatEnemy.id)?.miniboss) });
       playerHp = Math.max(0, playerHp - dealDmg);
       logs.push(`${combatEnemy.icon} **${combatEnemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP)`);
     }
@@ -1446,6 +1455,34 @@ function applySpecialAttack(
       dmg = Math.max(1, calcDamage(baseAtk * 1.0, def(special)));
       playerHp = Math.max(0, playerHp - dmg);
       logs.push(`${ic} **${n}** trói chặt bằng rễ cây! **${dmg}** sát thương!`); break;
+
+    // ── Forest mini boss attacks ──────────────────────────────────────────
+    case 'thornfang_predator_roar':
+      dmg = Math.max(1, calcDamage(baseAtk * 0.65, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`🐺 **${n}** gầm **Predator's Roar**! **${dmg}** sát thương — bạn bị đánh dấu con mồi *(nhận thêm sát thương 2 lượt)*!`); break;
+    case 'thornfang_savage_pounce':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.75, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`🐺 **${n}** phóng qua bụi gai bằng **Savage Pounce**! **${dmg}** sát thương cực mạnh!`); break;
+    case 'thornfang_blood_hunt':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.25, Math.floor(def(special) * 0.55)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`🩸 **${n}** kích hoạt **Blood Hunt**! **${dmg}** sát thương xuyên thủ — vết thương tiếp tục rỉ máu!`); break;
+    case 'elarok_rootbind':
+      dmg = Math.max(1, calcDamage(baseAtk * 0.95, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`🌿 **${n}** gọi **Rootbind**! Rễ cây khóa chân bạn và gây **${dmg}** sát thương!`); break;
+    case 'elarok_bramble_guard':
+      enemyHeal = Math.max(1, Math.floor(enemy.hp * 0.10));
+      logs.push(`🦌 **${n}** dựng **Bramble Guard** — rừng gai che chắn thân thể, hồi **${enemyHeal} HP** và giảm sát thương nhận vào!`); break;
+    case 'elarok_warden_renewal':
+      enemyHeal = Math.max(1, Math.floor(enemy.hp * 0.18));
+      logs.push(`🌱 **${n}** dùng **Warden's Renewal**, hút sinh lực từ rễ cổ thụ và hồi **${enemyHeal} HP**!`); break;
+    case 'elarok_antler_judgment':
+      dmg = Math.max(1, calcDamage(baseAtk * 1.45, def(special)));
+      playerHp = Math.max(0, playerHp - dmg);
+      logs.push(`🦌 **${n}** giáng **Antler Judgment**! Vương miện rễ cây đập xuống gây **${dmg}** sát thương!`); break;
 
     // ── Ancient Oak boss attacks ──────────────────────────────────────────
     case 'oak_bark_armor':

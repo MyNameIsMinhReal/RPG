@@ -10,7 +10,7 @@ import {
   createParty, disbandParty, addMember, removeMember,
   getPartyOf, getPartyMembers, isPartyLeader
 } from '../systems/party';
-import { getPlayer } from '../systems/player';
+import { getPlayer, applyPassiveStats } from '../systems/player';
 import { COLORS } from '../utils/embeds';
 
 export const data = new SlashCommandBuilder()
@@ -49,18 +49,25 @@ function se(color: number, desc: string) {
 
 function memberListText(guildId: string, leaderId: string, memberIds: string[]): string {
   return memberIds.map(id => {
-    const p = getPlayer(id, guildId);
+    const raw = getPlayer(id, guildId);
+    const p = raw ? applyPassiveStats(raw) : null;
     const role = id === leaderId ? '👑' : '⚔️';
     return `${role} **${p?.name ?? id}** Lv.${p?.level ?? '?'} — ❤️ ${p?.hp ?? 0}/${p?.max_hp ?? 0} HP`;
   }).join('\n');
 }
 
-export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  await interaction.deferReply({ flags: 64 });
+async function safeDeferButton(btn: any): Promise<boolean> {
+  return btn.deferUpdate().then(() => true).catch(() => false);
+}
 
+export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const userId  = interaction.user.id;
   const guildId = interaction.guildId!;
   const sub     = interaction.options.getSubcommand();
+
+  // Invite phải là tin nhắn công khai, nếu để ephemeral thì người được mời không thấy nút Accept.
+  if (sub === 'invite') await interaction.deferReply();
+  else await interaction.deferReply({ flags: 64 });
 
   const player = getPlayer(userId, guildId);
   if (!player || !player.alive) {
@@ -154,8 +161,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       await interaction.editReply({ embeds: [se(COLORS.info, '⏰ Lời mời đã hết hạn.')], components: [], content: '' });
       return;
     }
-    const ok = await btn.deferUpdate().then(() => true).catch(() => false);
-    if (!ok) return;
+    const ok = await safeDeferButton(btn);
+    if (!ok) {
+      await interaction.editReply({ embeds: [se(COLORS.warning, '⚠️ Interaction lời mời đã hết hạn. Hãy mời lại.')], components: [], content: '' }).catch(() => {});
+      return;
+    }
 
     if (btn.customId === `party_decline_${userId}_${invitee.id}`) {
       await interaction.editReply({ embeds: [se(COLORS.info, `❌ **${inviteePlayer.name}** từ chối lời mời.`)], components: [], content: '' });

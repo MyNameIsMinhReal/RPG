@@ -21,6 +21,7 @@ import { withImage } from '../utils/eventImages';
 import { getEnemyAtkBonus } from './world';
 import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumables';
 import { incrementDaily, countsAsPotion } from '../commands/daily';
+import { applyBossLevelScaling } from './bossScaling';
 
 
 function normalMobPressure(enemy: any): { hp: number; atk: number; def: number } {
@@ -42,20 +43,26 @@ function normalMobPressure(enemy: any): { hp: number; atk: number; def: number }
 }
 
 function tuneNormalMobForCombat<T extends any>(enemy: T, playerLevel: number = 1): T {
-  const m = normalMobPressure(enemy);
-  const isBoss = (enemy as any).boss || (enemy as any).miniboss;
   const isShopkeeper = (enemy as any).isShopkeeper;
+  if ((enemy as any).boss && !isShopkeeper) {
+    // Bosses scale from their recommended level instead of from level 1.
+    // Ancient Oak is configured at recommended Lv.6 in bossScaling.ts.
+    return applyBossLevelScaling(enemy, [playerLevel]);
+  }
+
+  const m = normalMobPressure(enemy);
+  const isMiniboss = (enemy as any).miniboss;
 
   // Player-level scaling: enemies grow stronger as the player levels up.
   // Normal mobs: +3.5% per player level above 1, capped at 2×.
-  // Bosses/minibosses: +2% per level, capped at 1.5× (they're already hard).
+  // Minibosses keep the old softer scaling. Bosses use recommended-level scaling above.
   // Shopkeepers: no scaling.
   let levelMult = 1.0;
   if (!isShopkeeper) {
     const over = Math.max(0, playerLevel - 1);
-    levelMult = isBoss
-      ? 1.0 + Math.min(1.50, over * 0.040)  // boss: +4%/level, max 2.5×
-      : 1.0 + Math.min(1.00, over * 0.035); // mob:  +3.5%/level, max 2×
+    levelMult = isMiniboss
+      ? 1.0 + Math.min(1.50, over * 0.040)
+      : 1.0 + Math.min(1.00, over * 0.035);
   }
 
   if (m.hp === 1 && m.atk === 1 && m.def === 1 && levelMult === 1.0) return { ...(enemy as any) };
@@ -508,7 +515,8 @@ export async function startCombatFlow(
     ? `👑 **BOSS** — **${enemy.icon} ${enemy.name}** xuất hiện!
 *"${enemy.lore}"*`
     : `⚠️ **${enemy.icon} ${enemy.name}** (Lv.${enemy.level}) tấn công!`;
-  const openingLogs = [log0, ...buffedStart.logs, ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
+  const bossScaleDesc = enemy.boss ? enemy._bossLevelScaling?.desc : null;
+  const openingLogs = [log0, ...(bossScaleDesc ? [bossScaleDesc] : []), ...buffedStart.logs, ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
 
   const initState = {
     message_id: 'temp', channel_id: interaction.channelId,
@@ -581,8 +589,10 @@ export async function startCombatFlowWithEnemy(
   if (smokeBuff) enemy.def = Math.max(0, Math.floor(enemy.def * 0.8));
 
   const log0 = `⚠️ **${enemy.icon} ${enemy.name}** (Lv.${enemy.level}) xuất hiện!`;
+  const bossScaleDesc = enemy.boss ? enemy._bossLevelScaling?.desc : null;
   const openingLogs = [
     log0,
+    ...(bossScaleDesc ? [bossScaleDesc] : []),
     ...buffedStart.logs,
     ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : []),
     ...(smokeBuff ? ['🗡️ Assassin’s Smoke: shopkeeper DEF -20% khi mở combat.'] : [])

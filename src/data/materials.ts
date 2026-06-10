@@ -276,6 +276,19 @@ export const MATERIALS: Record<string, MaterialDef> = {
     sellPrice: 120, dropZones: ['forest', 'shrine'], dropChance: 3
   },
 
+  thornfang_fang: {
+    id: 'thornfang_fang', name: 'Thornfang Fang', icon: '🦷', rarity: 'epic',
+    description: 'Nanh của Thornfang, Alpha of the Wilds. Còn vương mùi máu và nhựa gai đen.',
+    sellPrice: 110, dropZones: ['forest'],
+    dropFrom: ['alpha_thornmaw'], dropChance: 100
+  },
+  grove_crown_fragment: {
+    id: 'grove_crown_fragment', name: 'Grove Crown Fragment', icon: '🌿', rarity: 'epic',
+    description: 'Mảnh vương miện rễ cây của Elarok. Nó rung nhẹ khi ở gần Ancient Oak.',
+    sellPrice: 115, dropZones: ['forest'],
+    dropFrom: ['moss_crowned_stag'], dropChance: 100
+  },
+
   // ── Pet release items ────────────────────────────────────────────────────
   shadow_shard: {
     id: 'shadow_shard', name: 'Shadow Shard', icon: '🌑', rarity: 'rare',

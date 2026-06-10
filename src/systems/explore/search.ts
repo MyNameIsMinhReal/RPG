@@ -1,5 +1,5 @@
 import {
-  ChatInputCommandInteraction,
+  ChatInputCommandInteraction, ButtonInteraction,
   EmbedBuilder, ButtonBuilder, ButtonStyle,
   ActionRowBuilder, ComponentType, Message
 } from 'discord.js';
@@ -10,7 +10,7 @@ import {
 import {
   startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow
 } from '../combatFlow';
-import { startPartyCombatFlow } from '../partyCombatFlow';
+import { startPartyCombatFlow, startPartyCombatFlowWithEnemy, type PartyMember, type PartyCombatEnemy } from '../partyCombatFlow';
 import { getPartyOf } from '../party';
 import { canExplore, exploreCooldownRemaining, setExploreCooldown } from '../economy';
 import { logEvent, setFlag, getFlag, deleteFlag } from '../world';
@@ -97,6 +97,65 @@ export async function handleSearch(
         await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
         attachContinueExploreHandler(reply, interaction, userId, guildId);
       }
+    );
+  };
+
+  const makePartyEventVictory = (
+    onVictory?: any,
+    onDeath?: any,
+    onFlee?: any
+  ) => async (members: PartyMember[], enemy: PartyCombatEnemy) => {
+    const reply = await interaction.fetchReply() as Message<boolean>;
+    const leaderMember = members.find(m => m.user_id === userId);
+    const leader = getPlayer(userId, guildId);
+
+    if (onVictory && leader && leaderMember) {
+      const fakeBtn = {
+        editReply: (payload: any) => interaction.editReply(payload),
+        message: reply
+      } as unknown as ButtonInteraction;
+      const fakeState = {
+        player_hp: leaderMember.hp,
+        player_mp: leaderMember.mp,
+        enemy_hp: 0,
+        enemy_max_hp: enemy.max_hp,
+        enemy_id: enemy.id,
+        enemy_name: enemy.name
+      };
+      await onVictory(interaction, fakeBtn, userId, guildId, leader, enemy, fakeState);
+      return;
+    }
+
+    await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+  };
+
+  const makePartyEventWipe = (onDeath?: any) => async (_members: PartyMember[], enemy: PartyCombatEnemy) => {
+    const reply = await interaction.fetchReply() as Message<boolean>;
+    const leader = getPlayer(userId, guildId);
+    if (onDeath && leader) {
+      const fakeBtn = {
+        editReply: (payload: any) => interaction.editReply(payload),
+        message: reply
+      } as unknown as ButtonInteraction;
+      await onDeath(interaction, fakeBtn, userId, guildId, leader, enemy, enemy.hp);
+      return;
+    }
+    await reply.edit({ components: buildContinueExploreRow(userId) }).catch(() => {});
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+  };
+
+  const startPartyCombatWithEnemy = async (
+    enemy: any,
+    onVictory?: any,
+    onDeath?: any,
+    onFlee?: any
+  ) => {
+    await startPartyCombatFlowWithEnemy(
+      interaction, userId, guildId, partyMemberIds!, enemy,
+      makePartyEventVictory(onVictory, onDeath, onFlee),
+      makePartyEventWipe(onDeath),
+      { grantDefaultRewards: !!enemy?.useDefaultPartyRewards }
     );
   };
 
@@ -226,6 +285,9 @@ export async function handleSearch(
       startCombat: isPartyLeader
         ? startPartyCombat
         : (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee),
+      startCombatWithEnemy: isPartyLeader
+        ? startPartyCombatWithEnemy
+        : (enemy: any, onVictory?: any, onDeath?: any, onFlee?: any) => startCombatFlowWithEnemy(interaction, userId, guildId, enemy, undefined, onVictory, onDeath, onFlee),
       handleFlee,
       showAmbush: () => showAmbush(interaction, userId, guildId, pick(enemies).id),
       showLegacyFind: () => showLegacyFind(interaction, userId, guildId, legacies),
