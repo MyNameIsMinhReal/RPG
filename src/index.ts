@@ -40,7 +40,10 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent
-  ]
+  ],
+  rest: {
+    timeout: 30_000
+  }
 });
 
 type CommandHandler = (i: ChatInputCommandInteraction) => Promise<void>;
@@ -435,6 +438,18 @@ function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): s
   return null;
 }
 
+
+function isUnknownInteractionError(err: any): boolean {
+  return err?.code === 10062 || err?.rawError?.code === 10062;
+}
+
+function isTransientDiscordNetworkError(err: any): boolean {
+  return err?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    err?.code === 'UND_ERR_CONNECT' ||
+    err?.code === 'ETIMEDOUT' ||
+    err?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT';
+}
+
 client.once('ready', (c) => {
   console.log(`✅ Bot ready: ${c.user.tag}`);
   c.user.setActivity('⚔️ Butterfly Effect RPG');
@@ -563,7 +578,12 @@ client.on('messageCreate', async (message) => {
     }, 15_000);
 
     await handler(prefixInteraction as unknown as ChatInputCommandInteraction);
-  } catch (err) {
+  } catch (err: any) {
+    if (isUnknownInteractionError(err)) {
+      console.warn(`[PREFIX] rpg ${parsed.alias}: interaction đã hết hạn trước khi bot kịp phản hồi`);
+      return;
+    }
+
     console.error(`[PREFIX] rpg ${parsed.alias}:`, err);
 
     if (prefixInteraction.deferred || prefixInteraction.replied) {
@@ -581,10 +601,18 @@ client.on('messageCreate', async (message) => {
     }
   } finally {
     if (timeout) clearTimeout(timeout);
+    if (message.guildId) {
+      sendUnseenLogsDM(client, message.author.id, message.guildId).catch(() => {});
+    }
   }
 });
 
-process.on('unhandledRejection', (reason) => {
+process.on('unhandledRejection', (reason: any) => {
+  if (isTransientDiscordNetworkError(reason)) {
+    console.warn(`[PROCESS] Discord connection timeout: ${reason?.message ?? reason?.code ?? reason}`);
+    return;
+  }
+
   console.error('[PROCESS] Unhandled rejection:', reason);
 });
 

@@ -60,8 +60,7 @@ export async function showVillageShop(
       .setValue(`buy_equip_${eq.id}`)
   );
 
-  const allOptions = [...consumableOptions, ...equipOptions];
-  if (allOptions.length === 0) {
+  if (consumableOptions.length === 0 && equipOptions.length === 0) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, 'Cửa hàng trống.')], components: [backRow(userId)] });
     return;
   }
@@ -69,17 +68,34 @@ export async function showVillageShop(
   const shopEmbed = new EmbedBuilder()
     .setColor(COLORS.gold)
     .setTitle('🏪 Cửa Hàng Làng')
-    .setDescription(`🪙 Bạn có **${player.gold} Gold**\n\nChọn vật phẩm muốn mua:`)
-    .setFooter({ text: 'Chọn từ menu bên dưới' });
+    .setDescription(`🪙 Bạn có **${player.gold} Gold**\n\nChọn vật phẩm hoặc trang bị muốn mua:`)
+    .setFooter({ text: 'Mỗi menu hiển thị tối đa 25 món theo giới hạn của Discord' });
 
-  const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`vill_shop_sel_${userId}`)
-      .setPlaceholder('Chọn vật phẩm...')
-      .addOptions(allOptions.slice(0, 25))
-  );
+  const componentRows: ActionRowBuilder<StringSelectMenuBuilder>[] = [];
 
-  const msg = await interaction.editReply({ embeds: [shopEmbed], components: [selectRow, backRow(userId)] });
+  if (consumableOptions.length > 0) {
+    componentRows.push(
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`vill_shop_item_sel_${userId}`)
+          .setPlaceholder('Mua vật phẩm / skill book...')
+          .addOptions(consumableOptions.slice(0, 25))
+      )
+    );
+  }
+
+  if (equipOptions.length > 0) {
+    componentRows.push(
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(`vill_shop_equip_sel_${userId}`)
+          .setPlaceholder('Mua trang bị starter / phổ thông...')
+          .addOptions(equipOptions.slice(0, 25))
+      )
+    );
+  }
+
+  const msg = await interaction.editReply({ embeds: [shopEmbed], components: [...componentRows, backRow(userId)] });
 
   const sel = await msg.awaitMessageComponent({
     filter: onlyUser(userId),

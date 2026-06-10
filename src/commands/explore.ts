@@ -13,7 +13,7 @@ import {
 } from '../systems/player';
 import { getCombatByUser, saveCombat, deleteCombat } from '../systems/combat';
 import { startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow, hasActiveCombatSkills, hasUsableItems, type CombatVictoryHandler, type CombatDeathHandler, type CombatFleeHandler } from '../systems/combatFlow';
-import { registerCombat } from '../systems/combatRegistry';
+import { registerCombat, setCombatFallbackHandlers } from '../systems/combatRegistry';
 import { startPartyCombatFlow } from '../systems/partyCombatFlow';
 import { getPartyOf } from '../systems/party';
 import { canExplore, exploreCooldownRemaining, setExploreCooldown } from '../systems/economy';
@@ -72,6 +72,10 @@ interface OakButtonInfo {
   participantCount: number;
   currentFighter: string | null;
 }
+
+// Generic combat outcome handlers, used by dispatchCombatInteraction to rebuild
+// the in-memory combat registry after a bot restart wipes it.
+setCombatFallbackHandlers({ onVictory: handleVictory, onDeath: handleDeath, onFlee: handleFlee });
 
 // ─────────────────────────────────────────────────────────────────────────────
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -721,10 +725,10 @@ async function handleSearch(
   // Group encounter chance scales with zone danger
   const GROUP_CHANCE: Record<string, number> = {
     village: 0.12,
-    forest:  0.22,
-    shrine:  0.28,
-    mines:   0.34,
-    wastes:  0.40,
+    forest:  0.12,
+    shrine:  0.18,
+    mines:   0.24,
+    wastes:  0.30,
   };
   const THREE_ENEMY_CHANCE: Record<string, number> = {
     village: 0.12,
@@ -2096,7 +2100,7 @@ async function handleShopkeeperVictory(
   attachContinueExploreHandler(btnInt.message, interaction, userId, guildId);
 }
 
-async function handleVictory(
+export async function handleVictory(
   interaction: ChatInputCommandInteraction, btnInt: ButtonInteraction,
   userId: string, guildId: string, player: any, enemy: any,
   state: any
@@ -2175,7 +2179,7 @@ async function handleVictory(
   attachContinueExploreHandler(btnInt.message, interaction, userId, guildId);
 }
 
-async function handleFlee(
+export async function handleFlee(
   interaction: ChatInputCommandInteraction,
   btnInt: ButtonInteraction,
   userId: string,
@@ -2203,7 +2207,7 @@ async function handleFlee(
   attachContinueExploreHandler(btnInt.message as any, interaction, userId, guildId);
 }
 
-async function handleDeath(
+export async function handleDeath(
   interaction: ChatInputCommandInteraction, btnInt: ButtonInteraction,
   userId: string, guildId: string, player: any, enemy: any
 ): Promise<void> {

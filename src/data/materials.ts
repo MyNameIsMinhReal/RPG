@@ -30,6 +30,11 @@ export const MATERIALS: Record<string, MaterialDef> = {
     description: 'Quặng sắt dùng để rèn vũ khí và giáp.',
     sellPrice: 5, dropZones: ['mines'], dropChance: 30
   },
+  copper_ore: {
+    id: 'copper_ore', name: 'Copper Ore', icon: '🟤', rarity: 'common',
+    description: 'Quặng đồng mềm hơn sắt, dùng để rèn đồ cơ bản và linh kiện máy móc cũ.',
+    sellPrice: 4, dropZones: ['mines'], dropChance: 28
+  },
   leather: {
     id: 'leather', name: 'Leather', icon: '🟫', rarity: 'common',
     description: 'Da thuộc từ quái vật rừng.',
@@ -259,6 +264,11 @@ export const MATERIALS: Record<string, MaterialDef> = {
     id: 'time_fragment', name: 'Time Fragment', icon: '⌛', rarity: 'epic',
     description: 'Mảnh vỡ của thời gian thu được từ dị thường không gian. Không rõ nguồn gốc.',
     sellPrice: 150, dropZones: ['forest'], dropChance: 2
+  },
+  rune_stone: {
+    id: 'rune_stone', name: 'Rune Stone', icon: '🔮', rarity: 'rare',
+    description: 'Viên đá khắc ký tự ma thuật mờ nhạt. Thường xuất hiện trong các sự kiện kỳ bí của rừng.',
+    sellPrice: 35, dropZones: ['forest', 'shrine'], dropChance: 6
   },
   ancient_rune: {
     id: 'ancient_rune', name: 'Ancient Rune', icon: '📜', rarity: 'epic',

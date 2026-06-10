@@ -24,7 +24,8 @@ import {
   removeItem,
   setZone,
   spendGold,
-  updatePlayerHpMp
+  updatePlayerHpMp,
+  applyPassiveStats
 } from '../systems/player';
 import { startCombatFlowWithEnemy, type CombatDeathHandler, type CombatVictoryHandler, type CombatFleeHandler } from '../systems/combatFlow';
 import { getEquipment } from '../data/equipment';
@@ -34,7 +35,7 @@ import { getFlag, deleteFlag, getShopMarkup, getShopkeeperRobberyCount, increase
 import { COLORS, simpleEmbed, type PlayerRow } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
-import { getBuff, consumeBuff } from '../systems/consumables';
+import { getBuff, consumeBuff, setBuff } from '../systems/consumables';
 import { startFishingMiniGame } from './fish';
 import { onlyUser } from '../utils/collectors';
 import { incrementChapterObjective } from '../systems/chapter';
@@ -85,6 +86,7 @@ export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wande
   | 'blood_trail' | 'nameless_grave' | 'memory_seller' | 'stranger_campfire' | 'cracked_shrine' | 'injured_monster'
   | 'wanted_merchant' | 'bounty_hunter' | 'rebirth_rift' | 'failed_legacy' | 'mirror_clone' | 'talking_corpse'
   | 'black_eclipse' | 'fate_coin' | 'merchant_tax' | 'merchant_guard' | 'wanted_notice' | 'shopkeeper_mercy'
+  | 'shrine_relic_event' | 'forgotten_crown_event' | 'flower_crown_event' | 'knight_emblem_event' | 'bard_song_event'
   | 'black_cat' | 'dice_gambler' | 'glowing_mushroom' | 'chained_prisoner' | 'magic_fountain' | 'laughing_bones'
   | 'missing_child_chain' | 'black_market' | 'atonement_monk' | 'conditional_miniboss' | 'fishing_spot' | 'oak_hunt_start' | 'nothing'
   // Zone-specific events (separate files)
@@ -237,6 +239,12 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['talking_corpse', tm('talking_corpse', 3)],
     ['black_eclipse', tm('black_eclipse', 1)],
     ['fate_coin', 3],
+    // Key item events — only appear when player has the item
+    ['shrine_relic_event',    getItemQty(player.user_id, guildId, 'shrine_relic')    > 0 ? 5 : 0],
+    ['forgotten_crown_event', getItemQty(player.user_id, guildId, 'forgotten_crown') > 0 ? 4 : 0],
+    ['flower_crown_event',    getItemQty(player.user_id, guildId, 'flower_crown')    > 0 && player.zone_id === 'forest' ? 5 : 0],
+    ['knight_emblem_event',   getItemQty(player.user_id, guildId, 'knight_emblem')   > 0 ? 5 : 0],
+    ['bard_song_event',       getItemQty(player.user_id, guildId, 'bard_song')       > 0 ? 5 : 0],
     ['merchant_tax', robberyCount > 0 || markup > 0 ? 3 : 0],
     ['merchant_guard', (rep <= -35 || wanted >= 3) && hasCombat ? 3 + wanted : 0],
     ['wanted_notice', robberyCount > 0 || rep <= -25 || wanted > 0 ? 3 + wanted : 0],
@@ -444,6 +452,11 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'talking_corpse': return showTalkingCorpse(ctx);
     case 'black_eclipse': return showBlackEclipse(ctx);
     case 'fate_coin': return showFateCoin(ctx);
+    case 'shrine_relic_event':    return showShrineRelicEvent(ctx);
+    case 'forgotten_crown_event': return showForgottenCrownEvent(ctx);
+    case 'flower_crown_event':    return showFlowerCrownEvent(ctx);
+    case 'knight_emblem_event':   return showKnightEmblemEvent(ctx);
+    case 'bard_song_event':       return showBardSongEvent(ctx);
     case 'merchant_tax': return showMerchantTax(ctx);
     case 'merchant_guard': return showMerchantGuard(ctx);
     case 'wanted_notice': return showWantedNotice(ctx);
@@ -1900,3 +1913,265 @@ async function showOakHuntStart(ctx: RunExploreEventInput): Promise<void> {
 }
 
 // EXTRA_EVENTS_COMMON_END
+
+// ── Key item events ──────────────────────────────────────────────────────────
+
+async function showShrineRelicEvent(ctx: RunExploreEventInput): Promise<void> {
+  const embed = new EmbedBuilder()
+    .setColor(0xF1C40F)
+    .setTitle('✨ Hào Quang Cổ Vật')
+    .setDescription(
+      '*Ánh hào quang vàng nhẹ phát ra từ trong túi bạn — Shrine Relic đang cộng hưởng với vùng đất này.*\n\n' +
+      'Dâng cổ vật lên có thể triệu gọi phép màu... hoặc tai họa.'
+    );
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`shrine_offer_${ctx.userId}`).setLabel('Dâng lên').setEmoji('🙏').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`shrine_keep_${ctx.userId}`).setLabel('Giữ lại').setEmoji('🤲').setStyle(ButtonStyle.Secondary)
+  );
+  const cid = await awaitButton(ctx, row, embed, 'altar');
+
+  if (!cid || cid === `shrine_keep_${ctx.userId}`) {
+    const lvResult = grantExp(ctx.userId, ctx.guildId, 40);
+    return finish(ctx, simpleEmbed(COLORS.info,
+      `🤲 Bạn giữ lại cổ vật và tiếp tục.\n⭐ +**40 EXP**${lvResult.leveledUp ? ` → **Level ${lvResult.newLevel}!**` : ''}`
+    ), 'altar');
+  }
+
+  // Dâng lên — consume và random outcome
+  removeItem(ctx.userId, ctx.guildId, 'shrine_relic', 1);
+  const roll = randInt(1, 100);
+  const fresh = applyPassiveStats(getPlayer(ctx.userId, ctx.guildId)!);
+
+  if (roll <= 35) {
+    // Hồi HP + MP
+    const healHp = Math.floor(fresh.max_hp * 0.40);
+    const healMp = Math.floor(fresh.max_mp * 0.40);
+    const newHp = Math.min(fresh.max_hp, fresh.hp + healHp);
+    const newMp = Math.min(fresh.max_mp, fresh.mp + healMp);
+    updatePlayerHpMp(ctx.userId, ctx.guildId, newHp, newMp);
+    return finish(ctx, simpleEmbed(COLORS.success,
+      `✨ Linh khí thánh địa chữa lành thân thể!\n❤️ +**${healHp} HP** (→ ${newHp}/${fresh.max_hp})\n💧 +**${healMp} MP** (→ ${newMp}/${fresh.max_mp})\n🗑️ Shrine Relic đã sử dụng.`
+    ), 'altar');
+  } else if (roll <= 65) {
+    // EXP lớn
+    const exp = Math.floor(fresh.exp_next * 0.35);
+    const lvResult = grantExp(ctx.userId, ctx.guildId, exp);
+    return finish(ctx, simpleEmbed(COLORS.gold,
+      `✨ Hào quang cổ vật thấm vào tâm trí bạn!\n⭐ +**${exp} EXP**${lvResult.leveledUp ? ` → **Level ${lvResult.newLevel}!**` : ''}\n🗑️ Shrine Relic đã sử dụng.`
+    ), 'altar');
+  } else if (roll <= 85) {
+    // Soul Shards
+    grantSoulShards(ctx.userId, ctx.guildId, 3);
+    return finish(ctx, simpleEmbed(COLORS.gold,
+      `✨ Linh hồn cổ vật tan ra thành mảnh linh hồn!\n💠 +**3 Soul Shards**\n🗑️ Shrine Relic đã sử dụng.`
+    ), 'altar');
+  } else {
+    // Nguyền — -20% HP
+    const { dmg, hp } = safeHpLoss(fresh, 0.20);
+    updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
+    return finish(ctx, simpleEmbed(COLORS.danger,
+      `💀 Cổ vật phát nổ với năng lượng tối tăm!\n❤️ -**${dmg} HP** (→ ${hp}/${fresh.max_hp})\n🗑️ Shrine Relic đã sử dụng.`
+    ), 'altar');
+  }
+}
+
+async function showForgottenCrownEvent(ctx: RunExploreEventInput): Promise<void> {
+  const embed = new EmbedBuilder()
+    .setColor(0x9B59B6)
+    .setTitle('👑 Tiếng Gọi Của Kẻ Bị Lãng Quên')
+    .setDescription(
+      '*Vương miện cũ rỉ sét trong túi bạn bắt đầu rung động nhẹ, như thể ai đó từ xa đang gọi tên chủ cũ...*\n\n' +
+      '**Đội vương miện lên** có thể triệu gọi điều gì đó hùng mạnh — hoặc cực kỳ nguy hiểm.\n' +
+      '**Ném đi** để đổi lấy vàng từ tay buôn phế liệu đang đi qua.'
+    );
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`crown_wear_${ctx.userId}`).setLabel('Đội lên').setEmoji('👑').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`crown_toss_${ctx.userId}`).setLabel('Ném đi').setEmoji('💰').setStyle(ButtonStyle.Secondary)
+  );
+  const cid = await awaitButton(ctx, row, embed, 'altar');
+
+  // Ném đi — consume, gold 200-400
+  if (!cid || cid === `crown_toss_${ctx.userId}`) {
+    removeItem(ctx.userId, ctx.guildId, 'forgotten_crown', 1);
+    const gold = randInt(200, 400);
+    grantGold(ctx.userId, ctx.guildId, gold);
+    return finish(ctx, simpleEmbed(COLORS.gold,
+      `💰 Một gã buôn phế liệu trả **${gold} Gold** cho chiếc vương miện cũ.\n🗑️ Forgotten Crown đã bán.`
+    ), 'merchant');
+  }
+
+  // Đội lên — consume và random
+  removeItem(ctx.userId, ctx.guildId, 'forgotten_crown', 1);
+  const roll = randInt(1, 100);
+
+  if (roll <= 40) {
+    // Legendary equipment drop
+    const legendaryWeapons = ['dragon_slayer', 'moonlight_katana', 'bloodfang_dagger', 'sunforged_hammer'];
+    const legendaryArmors  = ['dragon_scale_armor', 'paladin_armor', 'nightwalker_cloak'];
+    const pool = [...legendaryWeapons, ...legendaryArmors];
+    const reward = pick(pool);
+    addItem(ctx.userId, ctx.guildId, reward, 1);
+    return finish(ctx, simpleEmbed(COLORS.gold,
+      `👑 Vương miện sáng lên và biến thành một báu vật!\n${displayItem(reward)} đã thêm vào túi đồ.\n🗑️ Forgotten Crown đã sử dụng.`
+    ), 'altar');
+  } else if (roll <= 70) {
+    // Nguyền nặng — -30% HP
+    const fresh = applyPassiveStats(getPlayer(ctx.userId, ctx.guildId)!);
+    const { dmg, hp } = safeHpLoss(fresh, 0.30);
+    updatePlayerHpMp(ctx.userId, ctx.guildId, hp, fresh.mp);
+    return finish(ctx, simpleEmbed(COLORS.danger,
+      `💀 Vương miện trút toàn bộ oán hận của chủ cũ vào đầu bạn!\n❤️ -**${dmg} HP** (→ ${hp}/${fresh.max_hp})\n🗑️ Forgotten Crown đã sử dụng.`
+    ), 'altar');
+  } else {
+    // Ghost knight fight
+    if (!ctx.enemies.length) {
+      // Nếu không có combat — đổi sang drop gold
+      const gold = randInt(100, 200);
+      grantGold(ctx.userId, ctx.guildId, gold);
+      return finish(ctx, simpleEmbed(COLORS.gold,
+        `👻 Bóng ma hiệp sĩ xuất hiện rồi biến mất, để lại **${gold} Gold**.\n🗑️ Forgotten Crown đã sử dụng.`
+      ), 'altar');
+    }
+    const base = pick(ctx.enemies);
+    const ghost = eventEnemy(ctx, base, {
+      id: 'ghost_knight', name: 'Hồn Ma Hiệp Sĩ', icon: '👻',
+      hp: Math.floor((base.hp ?? 80) * 1.4),
+      atk: Math.floor((base.atk ?? ctx.player.atk) * 1.2),
+      def: Math.floor((base.def ?? ctx.player.def) * 1.1),
+      expReward: Math.floor(ctx.player.exp_next * 0.25), goldMin: 80, goldMax: 180,
+      drops: [{ itemId: 'mysterious_shard', chance: 40 }, { itemId: 'iron_ore', chance: 30 }],
+      lore: 'Người giữ vương miện một thời, nay chỉ còn là bóng tối.',
+    });
+    await ctx.interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(0x9B59B6).setTitle('👻 Hồn Ma Hiệp Sĩ Xuất Hiện!')
+        .setDescription('Vương miện tan chảy — một bóng ma hiệp sĩ hiện ra với ánh mắt rực lửa xanh!\n🗑️ Forgotten Crown đã sử dụng.')],
+      components: []
+    });
+    return startCombatFlowWithEnemy(
+      ctx.interaction, ctx.userId, ctx.guildId, ghost, undefined,
+      async (_int, btn, _uid, _gid, _p, e, state) => grantCombatReward(ctx, btn, e, state, {
+        title: '👻 Hồn Ma Bị Giải Thoát',
+        description: 'Hồn ma hiệp sĩ tan biến với nụ cười nhẹ nhõm.',
+        exp: Math.floor(ctx.player.exp_next * 0.28), gold: randInt(100, 220),
+        items: [pick(['mysterious_shard', 'iron_ore'])],
+      }),
+      ctx.callbacks.handleDeath,
+      ctx.callbacks.handleFlee
+    );
+  }
+}
+
+async function showFlowerCrownEvent(ctx: RunExploreEventInput): Promise<void> {
+  const embed = new EmbedBuilder()
+    .setColor(0x2ECC71)
+    .setTitle('🌸 Hương Rừng Quen Thuộc')
+    .setDescription(
+      '*Mùi hoa rừng từ chiếc vương miện lan ra, hòa vào không khí cây cối quanh bạn. Khu rừng dường như... nhận ra bạn.*\n\n' +
+      '**Đặt xuống** để cảm ơn khu rừng và nhận ân huệ tự nhiên.\n' +
+      '**Mang về** làm kỷ niệm nhỏ.'
+    );
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`flower_place_${ctx.userId}`).setLabel('Đặt xuống').setEmoji('🌸').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`flower_keep_${ctx.userId}`).setLabel('Mang về').setEmoji('🤲').setStyle(ButtonStyle.Secondary)
+  );
+  const cid = await awaitButton(ctx, row, embed, 'forest');
+
+  if (!cid || cid === `flower_keep_${ctx.userId}`) {
+    const lvResult = grantExp(ctx.userId, ctx.guildId, 30);
+    return finish(ctx, simpleEmbed(COLORS.info,
+      `🌸 Bạn giữ lại vương miện hoa và tiếp tục.\n⭐ +**30 EXP**${lvResult.leveledUp ? ` → **Level ${lvResult.newLevel}!**` : ''}`
+    ), 'forest');
+  }
+
+  // Đặt xuống — consume, heal 35% HP + luck buff 5 lần
+  removeItem(ctx.userId, ctx.guildId, 'flower_crown', 1);
+  const fresh = applyPassiveStats(getPlayer(ctx.userId, ctx.guildId)!);
+  const healHp = Math.floor(fresh.max_hp * 0.35);
+  const newHp = Math.min(fresh.max_hp, fresh.hp + healHp);
+  updatePlayerHpMp(ctx.userId, ctx.guildId, newHp, fresh.mp);
+  setBuff(ctx.userId, ctx.guildId, 'luck', 1, 5, 7200);
+  return finish(ctx, simpleEmbed(COLORS.success,
+    `🌸 Vương miện hoa tan ra thành ánh sáng xanh nhạt.\n❤️ +**${healHp} HP** (→ ${newHp}/${fresh.max_hp})\n🍀 **May mắn** +5 lần khám phá tiếp theo\n🗑️ Flower Crown đã sử dụng.`
+  ), 'forest');
+}
+
+async function showKnightEmblemEvent(ctx: RunExploreEventInput): Promise<void> {
+  const embed = new EmbedBuilder()
+    .setColor(0x3498DB)
+    .setTitle('🏅 Lời Thề Cũ')
+    .setDescription(
+      '*Huy hiệu hiệp sĩ trong tay bạn vẫn còn chút ấm của người đã mang nó. Phía xa bạn thấy trạm canh của đội tuần tra hoàng gia...*\n\n' +
+      '**Trả lại** cho tuần tra — họ có thể thưởng bạn.\n' +
+      '**Giữ làm kỷ niệm** — ít nhất bạn có một vật nhắc nhở.'
+    );
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`emblem_return_${ctx.userId}`).setLabel('Trả lại').setEmoji('🏅').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`emblem_keep_${ctx.userId}`).setLabel('Giữ kỷ niệm').setEmoji('🤲').setStyle(ButtonStyle.Secondary)
+  );
+  const cid = await awaitButton(ctx, row, embed, 'merchant');
+
+  if (!cid || cid === `emblem_keep_${ctx.userId}`) {
+    const lvResult = grantExp(ctx.userId, ctx.guildId, 35);
+    return finish(ctx, simpleEmbed(COLORS.info,
+      `🤲 Bạn giữ lại huy hiệu. Một ngày nào đó nó có thể hữu ích.\n⭐ +**35 EXP**${lvResult.leveledUp ? ` → **Level ${lvResult.newLevel}!**` : ''}`
+    ), 'merchant');
+  }
+
+  // Trả lại — consume, rare equipment hoặc reputation
+  removeItem(ctx.userId, ctx.guildId, 'knight_emblem', 1);
+  const roll = randInt(1, 100);
+
+  if (roll <= 55) {
+    // Rare equipment
+    const rarePool = ['iron_sword', 'knight_spear', 'arcane_wand', 'assassin_dagger', 'recurve_bow'];
+    const reward = pick(rarePool);
+    addItem(ctx.userId, ctx.guildId, reward, 1);
+    const rep = adjustReputation(ctx.userId, ctx.guildId, 5);
+    return finish(ctx, simpleEmbed(COLORS.success,
+      `🏅 Sĩ quan tuần tra cúi đầu cảm ơn và trao cho bạn một vũ khí cũ của đội.\n${displayItem(reward)} đã thêm vào túi đồ.\n🤝 Reputation: **${rep}** (+5)\n🗑️ Knight Emblem đã trao trả.`
+    ), 'merchant');
+  } else {
+    // Reputation +2
+    const rep = adjustReputation(ctx.userId, ctx.guildId, 8);
+    const gold = randInt(60, 120);
+    grantGold(ctx.userId, ctx.guildId, gold);
+    return finish(ctx, simpleEmbed(COLORS.success,
+      `🏅 Đội trưởng tuần tra bắt tay bạn thật chặt và thưởng tiền.\n🪙 +**${gold} Gold**\n🤝 Reputation: **${rep}** (+8)\n🗑️ Knight Emblem đã trao trả.`
+    ), 'merchant');
+  }
+}
+
+async function showBardSongEvent(ctx: RunExploreEventInput): Promise<void> {
+  const embed = new EmbedBuilder()
+    .setColor(0xE67E22)
+    .setTitle('🎵 Giai Điệu Vang Lên')
+    .setDescription(
+      '*Tờ ghi chép bài hát trong túi bạn — một giai điệu cũ của người bán hàng rong từng đi qua vùng này. Bạn đột nhiên cảm thấy muốn hát...*\n\n' +
+      '**Hát theo** để cảm nhận sức mạnh bài hát — vũ khí bạn sẽ sáng lên!\n' +
+      '**Ghi lại lời bài hát** và đổi tờ nhạc lấy vàng.'
+    );
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`bard_sing_${ctx.userId}`).setLabel('Hát theo').setEmoji('🎵').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`bard_sell_${ctx.userId}`).setLabel('Ghi lại & bán').setEmoji('💰').setStyle(ButtonStyle.Secondary)
+  );
+  const cid = await awaitButton(ctx, row, embed, 'merchant');
+
+  if (!cid || cid === `bard_sell_${ctx.userId}`) {
+    // Consume, gold 50-150 + EXP
+    removeItem(ctx.userId, ctx.guildId, 'bard_song', 1);
+    const gold = randInt(50, 150);
+    grantGold(ctx.userId, ctx.guildId, gold);
+    const exp = 45;
+    const lvResult = grantExp(ctx.userId, ctx.guildId, exp);
+    return finish(ctx, simpleEmbed(COLORS.gold,
+      `🎵 Bạn ghi lại lời bài hát và bán tờ nhạc cho quán trọ gần đây.\n🪙 +**${gold} Gold**\n⭐ +**${exp} EXP**${lvResult.leveledUp ? ` → **Level ${lvResult.newLevel}!**` : ''}\n🗑️ Bard Song đã sử dụng.`
+    ), 'merchant');
+  }
+
+  // Hát theo — consume, weapon_oil buff charges=3 value=15
+  removeItem(ctx.userId, ctx.guildId, 'bard_song', 1);
+  setBuff(ctx.userId, ctx.guildId, 'weapon_oil', 15, 3, 7200);
+  return finish(ctx, simpleEmbed(COLORS.success,
+    `🎵 Bạn cất giọng hát — ánh sáng vàng nhẹ bao quanh vũ khí bạn!\n⚔️ **Weapon Oil** x3 lượt: +15% ATK trong 3 combat tiếp theo\n🗑️ Bard Song đã sử dụng.`
+  ), 'merchant');
+}

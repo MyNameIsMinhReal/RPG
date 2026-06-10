@@ -4,7 +4,7 @@ import {
   StringSelectMenuInteraction,
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder
 } from 'discord.js';
-import { registerCombat, unregisterCombat, getCombatEntry } from './combatRegistry';
+import { registerCombat, unregisterCombat, getCombatEntry, getCombatFallbackHandlers } from './combatRegistry';
 import { getPlayer, getLoadout, applyPassiveStats, getItemQty, removeItem } from './player';
 import {
   getCombatByUser, saveCombat, deleteCombat,
@@ -244,6 +244,31 @@ function applyShopkeeperStockUse(enemy: any, result: any): void {
   state.combat_log = JSON.stringify(logs.slice(-6));
 }
 
+// Reconstructs { enemy, icon } for a registry entry from a persisted active_combats
+// row, used when the bot restarted and the in-memory registry was wiped.
+function rebuildCombatEntryFromState(current: NonNullable<ReturnType<typeof getCombatByUser>>): { enemy: any; icon: string } | null {
+  if (current.enemies_json) {
+    try {
+      const group = JSON.parse(current.enemies_json) as CombatEnemy[];
+      const fullEnemies = group.map(e => getEnemy(e.id)).filter(Boolean) as any[];
+      if (fullEnemies.length) {
+        const enemy = fullEnemies.length > 1
+          ? {
+              id: fullEnemies[0].id,
+              name: fullEnemies.map(e => e.name).join(' & '),
+              icon: '⚔️',
+              level: Math.max(...fullEnemies.map(e => e.level)),
+              _groupEnemies: fullEnemies,
+            }
+          : fullEnemies[0];
+        return { enemy, icon: enemy.icon ?? '⚔️' };
+      }
+    } catch { /* fall through to single-enemy lookup */ }
+  }
+  const enemy = getEnemy(current.enemy_id);
+  return enemy ? { enemy, icon: enemy.icon } : null;
+}
+
 // ── Global combat interaction dispatcher ─────────────────────────────────────
 // Called from the global interactionCreate handler for any rpg_* or shopmercy_* button.
 // Returns true if the interaction was handled (even on error), false if no active registry entry.
@@ -252,8 +277,26 @@ export async function dispatchCombatInteraction(
   userId: string,
   guildId: string
 ): Promise<boolean> {
-  const entry = getCombatEntry(userId, guildId);
-  if (!entry) return false;
+  let entry = getCombatEntry(userId, guildId);
+
+  if (!entry) {
+    const current = getCombatByUser(userId, guildId);
+    if (!current) return false;
+
+    const fallback = getCombatFallbackHandlers();
+    const rebuilt  = fallback ? rebuildCombatEntryFromState(current) : null;
+    if (!rebuilt || !fallback) {
+      await compInt.editReply({
+        embeds: [simpleEmbed(COLORS.warning, '⚠️ Phiên combat bị gián đoạn (bot vừa khởi động lại). Dùng `/explore` hoặc `rpg e` để tiếp tục trận chiến.')],
+        components: []
+      }).catch(() => {});
+      return true;
+    }
+
+    registerCombat(userId, guildId, { ...rebuilt, ...fallback });
+    entry = getCombatEntry(userId, guildId)!;
+  }
+
   if (entry.processing) return true;
   entry.processing = true;
 

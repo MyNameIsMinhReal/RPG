@@ -125,6 +125,11 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     description: 'Gậy gỗ đơn giản cho người mới học phép.',
     stats: { atk: 2, maxMp: 5 }, sellPrice: 15, buyPrice: 40, minZone: 'village'
   },
+  training_dagger: {
+    id: 'training_dagger', name: 'Training Dagger', icon: '🔪', slot: 'weapon', rarity: 'common',
+    description: 'Dao găm tập luyện cho Thích Khách/Assassin. Nhẹ, dễ ra chí mạng.',
+    stats: { atk: 3, critChance: 4 }, sellPrice: 20, buyPrice: 60, minZone: 'village'
+  },
   hunter_dagger: {
     id: 'hunter_dagger', name: 'Hunter Dagger', icon: '🔪', slot: 'weapon', rarity: 'common',
     description: 'Dao săn nhỏ, nhẹ và nhanh. +3% Crit.',
@@ -445,6 +450,11 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     id: 'traveler_coat', name: 'Traveler Coat', icon: '🧥', slot: 'armor', rarity: 'common',
     description: 'Áo choàng lữ hành. HP và chút né đòn.',
     stats: { maxHp: 15, dodgeChance: 2 }, sellPrice: 18, buyPrice: 70, minZone: 'village'
+  },
+  scout_cloak: {
+    id: 'scout_cloak', name: 'Scout Cloak', icon: '🥷', slot: 'armor', rarity: 'common',
+    description: 'Áo choàng trinh sát cho Assassin đầu game. Tập trung né và crit.',
+    stats: { maxHp: 10, dodgeChance: 3, critChance: 2 }, sellPrice: 20, buyPrice: 85, minZone: 'village'
   },
   wooden_buckler: {
     id: 'wooden_buckler', name: 'Wooden Buckler', icon: '🛡️', slot: 'armor', rarity: 'common',

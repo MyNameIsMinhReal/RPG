@@ -11,6 +11,7 @@ import { getSkill } from '../data/skills';
 import { getZone } from '../data/zones';
 import { getSelectedTitle, getUnlockedTitles } from '../systems/titles';
 import { formatWornGear } from '../systems/equipment';
+import { CLASSES } from '../data/classes';
 
 // ── Color palette ───────────────────────────────────────────────────────────
 export const COLORS = {
@@ -33,6 +34,7 @@ export interface PlayerRow {
   atk: number; def: number; gold: number; soul_shards: number;
   zone_id: string; deaths: number; kills: number; created_at: number;
   last_explore?: number;
+  class?: string;
   reputation?: number;
   wanted_level?: number;
   bonus_stat_points?: number;
@@ -58,6 +60,7 @@ export function buildProfileEmbed(
   achievementSummary?: { unlocked: number; total: number }
 ): EmbedBuilder {
   const zone          = getZone(player.zone_id);
+  const cls           = CLASSES[player.class ?? 'warrior'] ?? CLASSES.warrior;
   const selectedTitle = getSelectedTitle(player.user_id, player.guild_id);
   const unlockedCount = getUnlockedTitles(player.user_id, player.guild_id).length;
 
@@ -75,7 +78,7 @@ export function buildProfileEmbed(
   const hpDot = hpPct > 0.6 ? '🟢' : hpPct > 0.3 ? '🟡' : '🔴';
 
   const descLines = [
-    `${zone?.icon ?? '❓'} **${zone?.name ?? player.zone_id}**  ·  ${player.alive ? '🟢 Đang sống' : '💀 Đã chết'}`,
+    `${zone?.icon ?? '❓'} **${zone?.name ?? player.zone_id}**  ·  ${cls.icon} **${cls.name}**  ·  ${player.alive ? '🟢 Đang sống' : '💀 Đã chết'}`,
     selectedTitle ? `${selectedTitle.icon} *${selectedTitle.name}*` : '',
   ].filter(Boolean).join('\n');
 

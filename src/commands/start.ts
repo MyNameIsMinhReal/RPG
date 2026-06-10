@@ -1,6 +1,6 @@
 import {
   SlashCommandBuilder, ChatInputCommandInteraction,
-  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType
+  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, StringSelectMenuBuilder, StringSelectMenuOptionBuilder
 } from 'discord.js';
 import { getPlayer, createPlayer, resetPlayer, getLoadout, applyPassiveStats } from '../systems/player';
 import { getCombatByUser } from '../systems/combat';
@@ -29,6 +29,34 @@ function exploreRow(userId: string) {
   );
 }
 
+
+function classColor(classId: string): number {
+  if (classId === 'mage') return COLORS.magic;
+  if (classId === 'rogue' || classId === 'assassin') return COLORS.dark;
+  if (classId === 'cleric' || classId === 'paladin') return COLORS.gold;
+  if (classId === 'berserker') return COLORS.danger;
+  if (classId === 'ranger') return COLORS.success;
+  return COLORS.info;
+}
+
+function isUnknownInteractionError(err: any): boolean {
+  return err?.code === 10062 || err?.rawError?.code === 10062;
+}
+
+async function safeDeferComponent(component: { deferUpdate: () => Promise<any>; customId?: string }): Promise<boolean> {
+  return component.deferUpdate()
+    .then(() => true)
+    .catch((err: any) => {
+      if (isUnknownInteractionError(err)) {
+        console.warn(`[START] Interaction đã hết hạn trước khi bot kịp phản hồi: ${component.customId ?? 'unknown'}`);
+        return false;
+      }
+
+      console.error('[START] Không thể defer component interaction:', err);
+      return false;
+    });
+}
+
 async function waitAndRoute(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string
@@ -48,7 +76,8 @@ async function waitAndRoute(
     return;
   }
 
-  await btn.deferUpdate();
+  const acknowledged = await safeDeferComponent(btn);
+  if (!acknowledged) return;
 
   if (btn.customId === `start_explore_${userId}`) {
     await showExploreMenu(interaction, userId, guildId);
@@ -89,7 +118,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     await interaction.editReply({
       embeds: [new EmbedBuilder()
-        .setColor(cls.id === 'mage' ? COLORS.magic : cls.id === 'rogue' ? COLORS.dark : COLORS.info)
+        .setColor(classColor(cls.id))
         .setTitle(`${cls.icon} ${player.name}`)
         .setDescription(
           `Lv.**${player.level}** ${cls.name}` +
@@ -136,14 +165,19 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   // ── New player — class selection ──────────────────────────────────────────
   const classEntries = Object.values(CLASSES);
-  const classRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    ...classEntries.map(cls =>
-      new ButtonBuilder()
-        .setCustomId(`class_${cls.id}`)
-        .setLabel(cls.name)
-        .setEmoji(cls.icon)
-        .setStyle(ButtonStyle.Secondary)
-    )
+  const classRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`class_select_${userId}`)
+      .setPlaceholder('Chọn class khởi đầu...')
+      .addOptions(
+        classEntries.slice(0, 25).map(cls =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(cls.name)
+            .setValue(cls.id)
+            .setDescription(cls.passiveLine.slice(0, 100))
+            .setEmoji(cls.icon)
+        )
+      )
   );
 
   const selectEmbed = new EmbedBuilder()
@@ -155,13 +189,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         `${cls.icon} **${cls.name}**\n> ${cls.description}\n> ✦ *${cls.passiveLine}*`
       ).join('\n\n')
     )
-    .setFooter({ text: 'Class có thể đổi khi Prestige (Lv.20)' });
+    .setFooter({ text: 'Hiện tại chưa có lệnh đổi class. Hãy chọn class khởi đầu thật kỹ.' });
 
   const msg = await interaction.editReply({ embeds: [selectEmbed], components: [classRow] });
 
   const sel = await msg.awaitMessageComponent({
-    filter: i => i.user.id === userId && i.customId.startsWith('class_'),
-    componentType: ComponentType.Button,
+    filter: i => i.user.id === userId && i.customId === `class_select_${userId}`,
+    componentType: ComponentType.StringSelect,
     time: 120_000
   }).catch(() => null);
 
@@ -173,15 +207,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  await sel.deferUpdate();
-  const chosenId  = sel.customId.replace('class_', '');
+  const acknowledged = await safeDeferComponent(sel);
+  if (!acknowledged) return;
+
+  const chosenId  = sel.values[0];
   const chosenCls = CLASSES[chosenId] ?? CLASSES.warrior;
 
   createPlayer(userId, guildId, username, chosenId);
 
   await interaction.editReply({
     embeds: [new EmbedBuilder()
-      .setColor(chosenCls.id === 'mage' ? COLORS.magic : chosenCls.id === 'rogue' ? COLORS.dark : COLORS.info)
+      .setColor(classColor(chosenCls.id))
       .setTitle(`${chosenCls.icon} ${username} — Nhân Vật Mới!`)
       .setDescription(
         `Chào mừng đến **🏘️ Làng Ashveil**!\n\n` +
