@@ -22,7 +22,7 @@ export function buildHelpGuideEmbeds(): EmbedBuilder[] {
         name: '🚀 Bắt đầu',
         value:
           '`/start` hoặc `rpg s` — tạo nhân vật / hồi sinh nếu đã chết\n' +
-          '`/profile` hoặc `rpg p` — xem chỉ số, level, gold, trang bị\n' +
+          '`/profile` hoặc `rpg p` — xem chỉ số, cộng STR/VIT/END/AGI/LUK, level, gold, trang bị\n' +
           '`/chapter` hoặc `rpg ch` — xem nhiệm vụ cốt truyện chính',
         inline: false,
       },
@@ -84,6 +84,12 @@ export function buildHelpGuideEmbeds(): EmbedBuilder[] {
     .setColor(COLORS.gold)
     .setTitle('📈 Progression — mạnh lên bằng cách nào?')
     .addFields(
+      {
+        name: '🧬 Level & Stats',
+        value:
+          'Mỗi lần lên level nhận **+3 Stat Points**. Mở `/profile` để cộng điểm bằng nút: **STR** tăng ATK, **VIT** tăng HP, **END** tăng DEF, **AGI** tăng crit/dodge, **LUK** tăng gold/drop. Có **1 lần reset stats miễn phí** sau update.',
+        inline: false,
+      },
       {
         name: '🎒 Đồ & vật phẩm',
         value:

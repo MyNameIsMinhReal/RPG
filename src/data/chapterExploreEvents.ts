@@ -95,19 +95,19 @@ export const CHAPTER_EXPLORE_EVENTS: ChapterExploreEventDef[] = [
     },
   },
   {
-    id: 'ch2_rune_after_guardian',
+    id: 'ch2_rune_after_echo_demon',
     chapterId: 2,
-    title: '⛩️ Chuông Lặng Trong Đền Cổ',
+    title: '⛩️ Sau Khi Tiếng Vọng Im Lặng',
     color: 0x8a2be2,
     lore:
-      'Shrine Guardian tan thành những mảnh bụi sáng. Chiếc chuông khổng lồ phía sau nó rung lên một lần duy nhất, nhưng không phát ra âm thanh.\n\n' +
-      'Trên nền đá hiện ra ba ký hiệu cổ: **Mắt**, **Chuông**, và **Mỏ Neo**. Một trong số đó đang gọi bạn.',
+      'Echo Demon tan thành một vòng tiếng vọng đen. Chiếc chuông khổng lồ phía sau phong ấn rung lên một lần duy nhất, nhưng không phát ra âm thanh.\n\n' +
+      'Trên nền đá hiện ra ba ký hiệu cổ: **Mắt**, **Chuông**, và **Mỏ Neo**. Phong ấn đã mở đường xuống lòng núi, nhưng chỉ một phù văn dẫn tới lối an toàn.',
     continueLabel: 'Chạm vào phù văn',
     continueEmoji: '📜',
     action: {
       type: 'choice',
-      title: '📜 Phù Văn Dẫn Đường',
-      description: 'Bạn cần chọn phù văn cộng hưởng với tiếng chuông lặng.',
+      title: '📜 Phù Văn Dẫn Xuống Hầm Mỏ',
+      description: 'Bạn cần chọn phù văn cộng hưởng với tiếng chuông lặng để mở lối sang Zone 3.',
       choices: [
         {
           id: 'eye',

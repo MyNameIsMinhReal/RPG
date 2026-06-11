@@ -105,14 +105,14 @@ export const ITEMS: Record<string, ItemDef> = {
   moonwater: {
     id: 'moonwater', name: 'Moonwater', icon: '🌙',
     type: 'consumable', stackable: true,
-    description: 'Nước ánh trăng. Hồi **20% MP** + xóa **poison** và **burn** trong combat.',
+    description: 'Nước ánh trăng. Hồi **20% MP**, xóa **poison/burn** và giảm nhẹ **Ô Nhiễm Linh Hồn**.',
     effect: { mpPercent: 0.20, removeEffects: ['poison', 'burn'] }, sellPrice: 30, buyPrice: 80
   },
   purifying_salt: {
     id: 'purifying_salt', name: 'Purifying Salt', icon: '🧂',
     type: 'consumable', stackable: true,
-    description: 'Muối thanh tẩy. Xóa **curse** trong combat.',
-    effect: { removeEffect: 'curse', combatOnly: true }, sellPrice: 18, buyPrice: 45
+    description: 'Muối thanh tẩy. Xóa **curse** trong combat, hoặc dùng ngoài combat để giảm **Ô Nhiễm Linh Hồn**.',
+    effect: { removeEffect: 'curse' }, sellPrice: 18, buyPrice: 45
   },
   blood_vial: {
     id: 'blood_vial', name: 'Blood Vial', icon: '🩸',
@@ -135,7 +135,7 @@ export const ITEMS: Record<string, ItemDef> = {
   holy_water: {
     id: 'holy_water', name: 'Holy Water', icon: '💧',
     type: 'consumable', stackable: true,
-    description: 'Nước thánh từ đền thờ. Hồi **20% HP** + xóa **curse**.',
+    description: 'Nước thánh từ đền thờ. Hồi **20% HP**, xóa **curse** và giảm **Ô Nhiễm Linh Hồn**.',
     effect: { hpPercent: 0.20, removeEffect: 'curse' }, sellPrice: 22, buyPrice: 55
   },
   strange_mushroom: {
@@ -245,7 +245,7 @@ export const ITEMS: Record<string, ItemDef> = {
   bone_broth: {
     id: 'bone_broth', name: 'Bone Broth', icon: '🦴',
     type: 'consumable', stackable: true,
-    description: 'Canh xương hầm lâu. Trận kế tiếp: **DEF +10%** + hồi **15% HP**.',
+    description: 'Canh xương hầm lâu. Hồi **15% HP** và chuẩn bị **DEF +10%** cho trận kế tiếp.',
     effect: { hpPercent: 0.15 }, sellPrice: 20, buyPrice: 50
   },
   stone_skin_draught: {
@@ -293,8 +293,8 @@ export const ITEMS: Record<string, ItemDef> = {
   blood_sacrifice_vial: {
     id: 'blood_sacrifice_vial', name: 'Blood Sacrifice Vial', icon: '⚗️',
     type: 'consumable', stackable: true,
-    description: 'Tế máu đổi mana. Dùng **10% HP hiện tại** để hồi **40% MP tối đa** trong combat.',
-    effect: { mpPercent: 0.40, combatOnly: true }, sellPrice: 35, buyPrice: 90
+    description: 'Tế máu đổi mana. Trong combat: mất **10% HP hiện tại** để hồi **40% MP tối đa**.',
+    effect: { combatOnly: true }, sellPrice: 35, buyPrice: 90
   },
 
   // ══════════════════════════════════════════════════════════════════════
@@ -327,13 +327,13 @@ export const ITEMS: Record<string, ItemDef> = {
   scroll_mirror: {
     id: 'scroll_mirror', name: 'Scroll of Mirror', icon: '🪞',
     type: 'consumable', stackable: true,
-    description: 'Cuộn phản chiếu. **1 lần** trong combat: trả lại **50%** đòn tấn công kế tiếp cho enemy.',
+    description: 'Cuộn phản chiếu. Trong combat: phản lại **50% sát thương** từ đòn kế tiếp của enemy.',
     effect: { combatOnly: true }, sellPrice: 55, buyPrice: 145
   },
   scroll_fortune: {
     id: 'scroll_fortune', name: 'Scroll of Fortune', icon: '🍀',
     type: 'consumable', stackable: true,
-    description: 'Cuộn may mắn. Lượt explore kế tiếp: **tỉ lệ nhận item tốt tăng 20%**.',
+    description: 'Cuộn may mắn. Lượt explore kế tiếp: tăng cơ hội event/phần thưởng tốt.',
     effect: {}, sellPrice: 40, buyPrice: 110
   },
 
@@ -349,7 +349,7 @@ export const ITEMS: Record<string, ItemDef> = {
   chaos_flask: {
     id: 'chaos_flask', name: 'Chaos Flask', icon: '🌪️',
     type: 'consumable', stackable: true,
-    description: 'Bình hỗn loạn. Hiệu ứng **hoàn toàn ngẫu nhiên** — có thể rất tốt hoặc tệ hại.',
+    description: 'Bình hỗn loạn. Random hiệu ứng mạnh: hồi phục, buff lớn, nhận gold — hoặc tự chuốc rủi ro.',
     effect: {}, sellPrice: 50, buyPrice: 130
   },
 
@@ -393,8 +393,8 @@ export const ITEMS: Record<string, ItemDef> = {
   assassins_smoke: {
     id: 'assassins_smoke', name: "Assassin's Smoke", icon: '💨',
     type: 'consumable', stackable: true,
-    description: 'Khói ám sát. Dùng trước combat: enemy bị **blind** lượt đầu — giảm độ chính xác.',
-    effect: { combatOnly: true }, sellPrice: 60, buyPrice: 180
+    description: 'Khói ám sát. Dùng trước khi cướp shopkeeper: shopkeeper bị giảm DEF lúc mở combat.',
+    effect: {}, sellPrice: 60, buyPrice: 180
   },
   black_market_token: {
     id: 'black_market_token', name: 'Black Market Token', icon: '🌑',
@@ -521,13 +521,13 @@ export const ITEMS: Record<string, ItemDef> = {
   discount_token: {
     id: 'discount_token', name: 'Discount Token', icon: '🎟️',
     type: 'consumable', stackable: true,
-    description: 'Token thương nhân. Có thể mở rộng để giảm giá shop trong lần mua sau.',
+    description: 'Token thương nhân. Lần gặp shop kế tiếp: giảm giá **15%**.',
     sellPrice: 80
   },
   rune_charm: {
     id: 'rune_charm', name: 'Rune Charm', icon: '🧿',
     type: 'consumable', stackable: true,
-    description: 'Bùa rune dùng một lần, có thể mở rộng để chặn debuff trong combat.',
+    description: 'Bùa rune dùng một lần. Trận combat kế tiếp: tự động chặn **1 debuff**.',
     sellPrice: 75
   },
   ancient_bark: {
@@ -541,6 +541,32 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'key_item', stackable: false,
     description: 'Tàn tích thiêng liêng của đền cổ, tỏa ra hào quang yếu ớt.',
     sellPrice: 200
+  },
+
+  echo_trace: {
+    id: 'echo_trace', name: 'Echo Trace', icon: '👁️',
+    type: 'key_item', stackable: false,
+    description: 'Dấu tiếng vọng khắc vào ký ức. Một trong ba chìa khóa mở Cổng Phong Ấn Echo Demon.',
+    sellPrice: 120
+  },
+  soul_candle: {
+    id: 'soul_candle', name: 'Soul Candle', icon: '🕯️',
+    type: 'key_item', stackable: false,
+    description: 'Ngọn nến linh hồn không tắt. Một trong ba chìa khóa mở Cổng Phong Ấn Echo Demon.',
+    sellPrice: 120
+  },
+  mirror_sigil: {
+    id: 'mirror_sigil', name: 'Mirror Sigil', icon: '🪞',
+    type: 'key_item', stackable: false,
+    description: 'Ấn gương đen phản chiếu lời nói dối. Một trong ba chìa khóa mở Cổng Phong Ấn Echo Demon.',
+    sellPrice: 120
+  },
+
+  mirror_ring_fragment: {
+    id: 'mirror_ring_fragment', name: 'Mirror Ring Fragment', icon: '💍',
+    type: 'key_item', stackable: true,
+    description: 'Mảnh công thức của nhẫn gương. Thương nhân dưới ánh nến đôi khi bán vật này.',
+    sellPrice: 180, buyPrice: 520
   },
   forgotten_crown: {
     id: 'forgotten_crown', name: 'Forgotten Crown', icon: '👑',
@@ -659,7 +685,7 @@ export const ITEMS: Record<string, ItemDef> = {
   soul_anchor: {
     id: 'soul_anchor', name: 'Soul Anchor', icon: '⚓',
     type: 'consumable', stackable: false,
-    description: '**Passive:** Khi chết, hồi sinh với **1 HP** thay vì mất nhân vật (1 lần/mang theo).',
+    description: '**Passive:** Khi chết, tự vỡ để hồi sinh với **1 HP** và tránh mất tiến trình nặng.',
     sellPrice: 300
   },
   purification_stone: {
@@ -895,19 +921,19 @@ export const ITEMS: Record<string, ItemDef> = {
   spell_fragment: {
     id: 'spell_fragment', name: 'Spell Fragment', icon: '🔮',
     type: 'material', stackable: true,
-    description: 'Mảnh ma thuật vỡ vụn. Chế tạo **5 mảnh** → **Sealed Tome T1** (học spell ngẫu nhiên Tier 1).',
+    description: 'Mảnh ma thuật vỡ vụn. Chế tạo **5 mảnh** → **Ancient Book**.',
     sellPrice: 8
   },
   rare_spell_fragment: {
     id: 'rare_spell_fragment', name: 'Rare Spell Fragment', icon: '💜',
     type: 'material', stackable: true,
-    description: 'Mảnh ma thuật hiếm. Chế tạo **3 mảnh** → **Sealed Tome T2** (học spell ngẫu nhiên Tier 2).',
+    description: 'Mảnh ma thuật hiếm. Chế tạo **3 mảnh** → **Ancient Book**.',
     sellPrice: 28
   },
   legendary_spell_fragment: {
     id: 'legendary_spell_fragment', name: 'Legendary Spell Fragment', icon: '⭐',
     type: 'material', stackable: true,
-    description: 'Mảnh ma thuật từ boss cổ đại. Chế tạo **1 mảnh** → **Sealed Tome T3** (học spell ngẫu nhiên Tier 3).',
+    description: 'Mảnh ma thuật từ boss cổ đại. Chế tạo **1 mảnh** → **2 Ancient Book**.',
     sellPrice: 85
   },
 

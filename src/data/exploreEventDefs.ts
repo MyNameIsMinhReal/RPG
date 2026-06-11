@@ -7,6 +7,8 @@ export type DataEventAction =
   | { type: 'gold'; min: number; max: number }
   | { type: 'exp'; min: number; max: number }
   | { type: 'item'; itemId: string; min?: number; max?: number }
+  | { type: 'consume_item'; itemId: string; amount?: number }
+  | { type: 'corruption'; amount: number }
   | { type: 'damage_percent'; min: number; max: number }
   | { type: 'heal_percent'; min: number; max: number }
   | { type: 'mp_percent'; min: number; max: number }
@@ -283,6 +285,135 @@ export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = 
       { id: 'inhale', label: 'Hít khói', emoji: '🌫️', style: 'danger', outcomes: [{ chance: 45, text: 'Bạn nhìn thấy một ký ức cũ của ngôi đền.', actions: [{ type: 'exp', min: 12, max: 24 }, { type: 'mp_percent', min: 5, max: 10 }] }, { chance: 55, text: 'Khói hương làm đầu bạn đau nhói.', actions: [{ type: 'damage_percent', min: 6, max: 12 }] }] },
     ],
   },
+  {
+    id: 'dd_shrine_soul_mirror',
+    title: '🪞 Gương Linh Hồn Nứt Vỡ',
+    description: 'Một chiếc gương đặt giữa hành lang đền. Trong gương, bóng bạn mỉm cười chậm hơn nửa nhịp và đưa tay chạm vào mặt kính.',
+    color: 0x8a2be2,
+    image: 'mysterious',
+    weight: 4,
+    zones: ['shrine'],
+    timeoutText: '🪞 Bạn phủ vải lên gương và rời đi. Sau lưng vẫn vang tiếng móng tay cào nhẹ vào kính.',
+    choices: [
+      {
+        id: 'look', label: 'Nhìn thẳng vào gương', emoji: '👁️', style: 'danger',
+        outcomes: [
+          { chance: 45, text: 'Bạn nhìn thấy một lối đi ẩn sau chính bóng mình. Tri thức tràn vào đầu, nhưng linh hồn bị nhuốm lạnh.', actions: [{ type: 'exp', min: 24, max: 44 }, { type: 'item', itemId: 'mirror_shard', min: 1, max: 1 }, { type: 'corruption', amount: 6 }] },
+          { chance: 55, text: 'Bóng trong gương bước lệch ra khỏi bạn. Nó để lại một vết nứt hình con mắt trên linh hồn.', actions: [{ type: 'damage_percent', min: 8, max: 15 }, { type: 'corruption', amount: 8 }] },
+        ],
+      },
+      {
+        id: 'cover', label: 'Che gương bằng muối thánh', emoji: '🧂', style: 'success', requires: { itemId: 'purifying_salt' },
+        outcomes: [{ chance: 100, text: 'Muối thanh tẩy cháy thành khói trắng. Bóng trong gương lùi lại, để rơi một mảnh kính lạnh.', actions: [{ type: 'consume_item', itemId: 'purifying_salt', amount: 1 }, { type: 'item', itemId: 'mirror_shard', min: 1, max: 2 }, { type: 'corruption', amount: -12 }, { type: 'exp', min: 14, max: 26 }] }],
+      },
+      {
+        id: 'break', label: 'Đập vỡ', emoji: '🔨', style: 'primary',
+        outcomes: [
+          { chance: 60, text: 'Gương vỡ thành hàng trăm mảnh. Mỗi mảnh thì thầm một lời cảnh báo khác nhau.', actions: [{ type: 'item', itemId: 'mirror_shard', min: 1, max: 2 }, { type: 'damage_percent', min: 4, max: 8 }] },
+          { chance: 40, text: 'Tiếng kính vỡ đánh thức một cái bóng canh gương.', actions: [{ type: 'corruption', amount: 4 }, { type: 'combat_random' }] },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'dd_shrine_bound_spirit',
+    title: '⛓️ Linh Hồn Bị Xích',
+    description: 'Một linh hồn quỳ trước cột đá, bị xích bởi phù văn cổ. Nó không cầu cứu, chỉ lặp lại: “Đừng để tiếng vọng học được tên ngươi.”',
+    color: 0x6d5dfc,
+    image: 'legacy',
+    weight: 4,
+    zones: ['shrine'],
+    choices: [
+      { id: 'free', label: 'Giải thoát', emoji: '🕯️', style: 'success', outcomes: [{ chance: 75, text: 'Bạn phá mắt xích cuối cùng. Linh hồn cúi đầu, để lại tro thánh trước khi tan đi.', actions: [{ type: 'reputation', amount: 3 }, { type: 'item', itemId: 'holy_ash', min: 1, max: 2 }, { type: 'corruption', amount: -6 }] }, { chance: 25, text: 'Xích vỡ, nhưng lời nguyền bắn ngược vào tay bạn.', actions: [{ type: 'damage_percent', min: 7, max: 13 }, { type: 'item', itemId: 'holy_ash', min: 1, max: 1 }] }] },
+      { id: 'absorb', label: 'Hấp thụ linh lực', emoji: '🌑', style: 'danger', outcomes: [{ chance: 100, text: 'Bạn kéo phần linh lực còn lại vào cơ thể. Sức mạnh tăng lên trong giây lát, nhưng đền cổ cũng nhớ mùi linh hồn của bạn.', actions: [{ type: 'mp_percent', min: 15, max: 28 }, { type: 'soul_shard', amount: 1 }, { type: 'corruption', amount: 12 }, { type: 'reputation', amount: -2 }] }] },
+    ],
+  },
+  {
+    id: 'dd_shrine_seal_tablet',
+    title: '📜 Bia Đá Phong Ấn',
+    description: 'Một bia đá chặn giữa đường, trên mặt khắc ba vòng tròn: Chuông, Mắt và Nến. Chữ cổ chuyển động như muốn thử trí nhớ của bạn.',
+    color: 0x7c3aed,
+    image: 'altar',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '📜 Giải Phù Văn Đền Cổ',
+      introText: 'Bia đá yêu cầu bạn chọn đúng biểu tượng theo lời thì thầm. Sai quá nhiều sẽ kích hoạt bẫy linh hồn.',
+      startLabel: 'Đọc phù văn',
+      startEmoji: '📜',
+      options: [
+        { id: 'bell', label: 'Chuông', emoji: '🔔', style: 'primary' },
+        { id: 'eye', label: 'Mắt', emoji: '👁️', style: 'secondary' },
+        { id: 'candle', label: 'Nến', emoji: '🕯️', style: 'success' },
+      ],
+      rounds: [
+        { prompt: '“Ta vang lên nhưng không ai nghe.”', correctOptionId: 'bell', successLine: 'Chuông Lặng sáng lên.', failureLine: 'Bia đá rung mạnh, như thất vọng.' },
+        { prompt: '“Ta nhìn thấy tội lỗi cả khi ngươi nhắm mắt.”', correctOptionId: 'eye', successLine: 'Mắt Cổ khép lại.', failureLine: 'Một con mắt mở ra trên nền đá.' },
+        { prompt: '“Ta cháy khi không còn người sống.”', correctOptionId: 'candle', successLine: 'Ngọn nến xanh cúi thấp.', failureLine: 'Lửa xanh liếm qua đầu ngón tay bạn.' },
+      ],
+      successNeeded: 2,
+      successText: 'Bia đá tách làm đôi. Một ngăn nhỏ bên trong còn giữ mảnh phong ấn cổ.',
+      failureText: 'Bia đá khóa lại. Phù văn phản phệ, nhưng bạn vẫn nhớ được một phần thứ tự cổ tự.',
+      onSuccess: [{ type: 'item', itemId: 'ancient_seal', min: 1, max: 1 }, { type: 'exp', min: 24, max: 42 }, { type: 'corruption', amount: -4 }],
+      onFailure: [{ type: 'damage_percent', min: 8, max: 14 }, { type: 'exp', min: 10, max: 18 }, { type: 'corruption', amount: 5 }],
+      timeoutText: '⏳ Chữ trên bia đá nguội đi. Cánh cửa ẩn khép lại trong tiếng đá nghiến.',
+    },
+  },
+  {
+    id: 'dd_shrine_cleansing_pool',
+    title: '💧 Hồ Thanh Tẩy Cạn Nước',
+    description: 'Một hồ đá khô nằm dưới mái vòm sập. Đáy hồ vẫn còn vài giọt nước sáng như trăng non.',
+    color: 0x60a5fa,
+    image: 'spring',
+    weight: 3,
+    zones: ['shrine'],
+    choices: [
+      { id: 'drink', label: 'Uống giọt trăng', emoji: '🌙', style: 'primary', outcomes: [{ chance: 70, text: 'Nước trăng làm cổ họng lạnh buốt, nhưng linh hồn nhẹ đi rõ rệt.', actions: [{ type: 'mp_percent', min: 12, max: 22 }, { type: 'corruption', amount: -8 }] }, { chance: 30, text: 'Giọt nước đã bị nhiễm tà khí. Bạn hồi mana nhưng lời thì thầm bám theo.', actions: [{ type: 'mp_percent', min: 8, max: 16 }, { type: 'corruption', amount: 6 }] }] },
+      { id: 'bottle', label: 'Hứng vào bình', emoji: '🫙', style: 'success', outcomes: [{ chance: 100, text: 'Bạn gom được ít nước trăng còn sạch.', actions: [{ type: 'item', itemId: 'moonwater', min: 1, max: 1 }] }] },
+    ],
+  },
+  {
+    id: 'dd_shrine_offering_scale',
+    title: '⚖️ Cân Hiến Tế Bằng Đá',
+    description: 'Một chiếc cân đá đặt trước bàn thờ. Một bên có khắc chữ “Ký Ức”, bên còn lại là “Máu”.',
+    color: 0xa16207,
+    image: 'altar',
+    weight: 3,
+    zones: ['shrine'],
+    choices: [
+      { id: 'memory', label: 'Dâng Ancient Book', emoji: '📖', style: 'success', requires: { itemId: 'ancient_book' }, outcomes: [{ chance: 100, text: 'Cổ thư tan thành bụi sáng. Chiếc cân nghiêng về phía bạn, để lộ một vật cúng bị giấu.', actions: [{ type: 'consume_item', itemId: 'ancient_book', amount: 1 }, { type: 'item', itemId: 'ancient_seal', min: 1, max: 1 }, { type: 'corruption', amount: -10 }, { type: 'exp', min: 18, max: 32 }] }] },
+      { id: 'blood', label: 'Dâng máu', emoji: '🩸', style: 'danger', outcomes: [{ chance: 60, text: 'Máu rơi xuống cân. Bàn thờ mở ra, nhưng tiếng vọng học được mùi của bạn.', actions: [{ type: 'damage_percent', min: 10, max: 18 }, { type: 'item', itemId: 'curse_shard', min: 1, max: 2 }, { type: 'corruption', amount: 10 }] }, { chance: 40, text: 'Cân đá từ chối máu sống và gọi hộ vệ tới.', actions: [{ type: 'corruption', amount: 6 }, { type: 'combat_random' }] }] },
+    ],
+  },
+  {
+    id: 'dd_shrine_guardian_footsteps',
+    title: '🗿 Bước Chân Hộ Vệ',
+    description: 'Nền đền rung theo nhịp chậm. Từ hành lang phía trước, bụi đá rơi xuống từng mảng như có thứ nặng nề đang đến gần.',
+    color: 0x78716c,
+    image: 'combat',
+    weight: 3,
+    zones: ['shrine'],
+    requiresCombat: true,
+    timeoutText: '🗿 Bạn né vào một hốc tường. Bước chân đi qua, để lại mùi đá ẩm và hương trầm cháy.',
+    choices: [
+      { id: 'face', label: 'Đối mặt', emoji: '⚔️', style: 'danger', outcomes: [{ chance: 100, text: 'Bạn bước ra giữa hành lang. Tượng hộ vệ quay đầu, đôi mắt đá sáng lên.', actions: [{ type: 'combat_random' }] }] },
+      { id: 'hide', label: 'Ẩn sau cột đá', emoji: '🫥', style: 'secondary', outcomes: [{ chance: 65, text: 'Bạn đợi hộ vệ đi qua và nhặt được mảnh đá phù văn rơi lại.', actions: [{ type: 'item', itemId: 'shrine_stone', min: 1, max: 1 }, { type: 'exp', min: 8, max: 16 }] }, { chance: 35, text: 'Cột đá phản chiếu bóng bạn. Hộ vệ phát hiện ra dấu hơi thở.', actions: [{ type: 'combat_random' }] }] },
+    ],
+  },
+  {
+    id: 'dd_shrine_echo_whisper',
+    title: '👁️ Tiếng Vọng Gọi Tên',
+    description: 'Một giọng nói từ sau tường gọi đúng tên bạn. Nó không đe dọa, chỉ nhắc lại những câu bạn từng nói trong lúc sắp chết.',
+    color: 0x4c1d95,
+    image: 'mysterious',
+    weight: 3,
+    zones: ['shrine'],
+    choices: [
+      { id: 'answer', label: 'Trả lời tiếng gọi', emoji: '🗣️', style: 'danger', outcomes: [{ chance: 45, text: 'Tiếng vọng cười khẽ và tặng lại một mảnh lõi âm. Nhưng giờ nó nhớ rõ giọng của bạn hơn.', actions: [{ type: 'item', itemId: 'echo_core', min: 1, max: 1 }, { type: 'corruption', amount: 14 }] }, { chance: 55, text: 'Bạn vừa mở miệng, tiếng vọng đã lặp lại câu trả lời bằng giọng của người thân đã mất.', actions: [{ type: 'damage_percent', min: 8, max: 15 }, { type: 'corruption', amount: 10 }] }] },
+      { id: 'silence', label: 'Giữ im lặng', emoji: '🤫', style: 'success', outcomes: [{ chance: 100, text: 'Bạn không đáp lại. Sau một lúc, bức tường tự nứt ra để lộ một lối đi phụ.', actions: [{ type: 'exp', min: 16, max: 30 }, { type: 'corruption', amount: -3 }] }] },
+    ],
+  },
+
   {
     id: 'dd_mines_gas_pocket',
     title: '💨 Túi Khí Độc',
@@ -6020,5 +6151,4578 @@ export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = 
     }
   },
   // EXTRA_50_MIXED_EVENTS_END
+
+  // ZONE2_50_SHRINE_EVENTS_START
+  {
+    "id": "dd_z2_echo_crack",
+    "title": "👁️ Vết Nứt Có Mắt",
+    "description": "Một vết nứt trên tường đá mở ra như mí mắt. Nó không nhìn hành lang — nó nhìn thẳng vào ký ức của bạn.",
+    "color": 7153881,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "trace",
+        "label": "Đặt tay lên vết nứt",
+        "emoji": "✋",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Vết nứt lạnh buốt, nhưng để lại một mảnh ký ức có hình con mắt.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "lost_memory",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 18,
+                "max": 34
+              },
+              {
+                "type": "corruption",
+                "amount": 4
+              }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Con mắt trong đá chớp một lần. Bạn quên mất vài nhịp thở.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 6,
+                "max": 12
+              },
+              {
+                "type": "corruption",
+                "amount": 7
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "salt",
+        "label": "Rắc muối lên mắt đá",
+        "emoji": "🧂",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Muối trắng kéo con mắt khép lại. Một mảnh đá phù văn rơi xuống chân bạn.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "purifying_salt",
+                "amount": 1
+              },
+              {
+                "type": "item",
+                "itemId": "shrine_stone",
+                "min": 1,
+                "max": 2
+              },
+              {
+                "type": "corruption",
+                "amount": -8
+              },
+              {
+                "type": "exp",
+                "min": 10,
+                "max": 18
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "purifying_salt"
+        }
+      },
+      {
+        "id": "leave",
+        "label": "Lùi lại",
+        "emoji": "🚪",
+        "style": "secondary",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn rời khỏi vết nứt trước khi nó học được khuôn mặt mình.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 3,
+                "max": 8
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_silver_ash_bowl",
+    "title": "⚱️ Bát Tro Bạc",
+    "description": "Một bát tro bạc đặt dưới tượng thần mất đầu. Mỗi hạt tro phản chiếu một mảnh trần đền khác nhau.",
+    "color": 12105937,
+    "image": "altar",
+    "weight": 3,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "gather",
+        "label": "Gom tro bạc",
+        "emoji": "⚱️",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 75,
+            "text": "Bạn gom được tro thánh còn ấm, đủ để dùng trong nghi lễ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 2
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 18
+              }
+            ]
+          },
+          {
+            "chance": 25,
+            "text": "Tro bạc bám vào da như sương độc.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 9
+              },
+              {
+                "type": "corruption",
+                "amount": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bless",
+        "label": "Nhỏ Holy Water",
+        "emoji": "💧",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Nước thánh làm bát tro sáng lên. Một lời cầu cũ được đánh thức.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "holy_water",
+                "amount": 1
+              },
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 2,
+                "max": 3
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "corruption",
+                "amount": -6
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "holy_water"
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_bell_without_sound",
+    "title": "🔔 Chuông Không Tiếng",
+    "description": "Một quả chuông đồng treo giữa hành lang, nhưng dây chuông đã mục. Dù vậy, bạn vẫn cảm thấy tiếng ngân trong xương.",
+    "color": 12616956,
+    "image": "legacy",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "touch",
+        "label": "Chạm vào chuông",
+        "emoji": "🔔",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 55,
+            "text": "Chuông không vang, nhưng một phù văn hiện trên lòng bàn tay bạn.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 22,
+                "max": 42
+              },
+              {
+                "type": "item",
+                "itemId": "rune_ink",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          },
+          {
+            "chance": 45,
+            "text": "Âm thanh không phát ra ngoài mà nổ trong đầu bạn.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 7,
+                "max": 13
+              },
+              {
+                "type": "corruption",
+                "amount": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bow",
+        "label": "Cúi chào rồi đi qua",
+        "emoji": "🙏",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn tôn trọng sự im lặng. Hành lang phía trước bớt lạnh.",
+            "actions": [
+              {
+                "type": "reputation",
+                "amount": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -3
+              },
+              {
+                "type": "mp_percent",
+                "min": 4,
+                "max": 10
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_broken_komainu",
+    "title": "🗿 Tượng Hộ Pháp Gãy Sừng",
+    "description": "Một tượng đá canh cổng bị gãy mất sừng. Dưới chân nó có vết cào mới, như thứ gì đó vừa cố đi qua.",
+    "color": 7893356,
+    "image": "legacy",
+    "weight": 3,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "repair",
+        "label": "Gắn đá phù văn",
+        "emoji": "🧩",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn đặt mảnh đá vào vết nứt. Tượng hộ pháp cúi đầu rất chậm.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "shrine_stone",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 14,
+                "max": 28
+              },
+              {
+                "type": "corruption",
+                "amount": -4
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "challenge",
+        "label": "Gõ vào khiên đá",
+        "emoji": "🛡️",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Tượng đá chuyển động. Bài kiểm tra của hộ pháp bắt đầu.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "search",
+        "label": "Tìm quanh chân tượng",
+        "emoji": "🔍",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Bạn tìm thấy mảnh thánh tích bị che dưới bụi đá.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "shrine_relic",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "gold",
+                "min": 12,
+                "max": 28
+              }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Một con dơi nguyền rít lên từ hốc tượng.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_red_thread_hall",
+    "title": "🧵 Hành Lang Chỉ Đỏ",
+    "description": "Những sợi chỉ đỏ nối từ trần xuống nền đá, mỗi sợi buộc vào một chiếc chuông nhỏ không phát tiếng.",
+    "color": 14427686,
+    "image": "trap",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "crawl",
+        "label": "Luồn qua khe chỉ",
+        "emoji": "🫥",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Bạn luồn qua được và nhặt một mảnh gương dưới nền.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "mirror_shard",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 10,
+                "max": 18
+              }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Một sợi chỉ chạm vai. Chuông câm ngân thẳng vào máu.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 5,
+                "max": 11
+              },
+              {
+                "type": "corruption",
+                "amount": 4
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cut",
+        "label": "Cắt chỉ",
+        "emoji": "✂️",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 50,
+            "text": "Chỉ đứt, để lộ hộp nhỏ giấu sau tường.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "mysterious_shard",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "gold",
+                "min": 18,
+                "max": 44
+              }
+            ]
+          },
+          {
+            "chance": 50,
+            "text": "Tất cả chuông cùng rung, gọi thứ canh đền tỉnh giấc.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_moonlit_roof_gap",
+    "title": "🌙 Khe Trăng Trên Mái Đền",
+    "description": "Một khe nứt trên mái để ánh trăng rơi thành vệt mỏng. Bụi trong vệt sáng bay ngược lên trời.",
+    "color": 9684477,
+    "image": "spring",
+    "weight": 3,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "stand",
+        "label": "Đứng dưới ánh trăng",
+        "emoji": "🌙",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Ánh trăng rửa sạch hơi lạnh bám trên linh hồn.",
+            "actions": [
+              {
+                "type": "heal_percent",
+                "min": 8,
+                "max": 16
+              },
+              {
+                "type": "mp_percent",
+                "min": 8,
+                "max": 16
+              },
+              {
+                "type": "corruption",
+                "amount": -5
+              }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Ánh trăng chiếu qua bạn như qua một cái bóng rỗng.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": 6
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 16
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bottle",
+        "label": "Hứng ánh trăng",
+        "emoji": "🫙",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn hứng được vài giọt Moonwater trong bình cũ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "moonwater",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_name_scratched_pillar",
+    "title": "✍️ Cột Đá Khắc Tên",
+    "description": "Một cột đá phủ đầy tên người. Ở gần chân cột, bạn thấy tên mình đang dần hiện ra dù chưa ai khắc.",
+    "color": 8266446,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "scratch",
+        "label": "Cạo tên mình đi",
+        "emoji": "🪨",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 60,
+            "text": "Bạn cạo được dòng tên trước khi nó hoàn tất.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 18,
+                "max": 36
+              },
+              {
+                "type": "corruption",
+                "amount": -3
+              }
+            ]
+          },
+          {
+            "chance": 40,
+            "text": "Cái tên chảy thành mực đen và bám vào tay.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 6,
+                "max": 12
+              },
+              {
+                "type": "corruption",
+                "amount": 7
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ink",
+        "label": "Hứng mực đen",
+        "emoji": "🪄",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn hứng được thứ mực rune nguy hiểm.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "rune_ink",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "corruption",
+                "amount": 8
+              },
+              {
+                "type": "reputation",
+                "amount": -1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_child_laugh_echo",
+    "title": "👂 Tiếng Cười Trẻ Nhỏ",
+    "description": "Tiếng cười trẻ nhỏ vang lên từ phòng thờ bỏ hoang. Mỗi lần bạn quay lại, âm thanh lại đến từ phía trước.",
+    "color": 10980346,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "follow",
+        "label": "Đi theo tiếng cười",
+        "emoji": "👣",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 55,
+            "text": "Tiếng cười dẫn bạn đến một túi lễ vật cũ.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": 20,
+                "max": 48
+              },
+              {
+                "type": "item",
+                "itemId": "holy_water",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          },
+          {
+            "chance": 45,
+            "text": "Tiếng cười biến thành tiếng khóc của quái linh.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "whisper",
+        "label": "Thì thầm lời ru",
+        "emoji": "🤫",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Tiếng cười dịu lại. Có thứ gì đó đặt mảnh ký ức vào tay bạn.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "lost_memory",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "corruption",
+                "amount": -4
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_bloodless_footprints",
+    "title": "👣 Dấu Chân Không Máu",
+    "description": "Dấu chân ướt in trên nền đá, nhưng không có nước hay máu. Chúng đi vòng quanh bạn ba lần rồi dừng lại.",
+    "color": 4674921,
+    "image": "trap",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "track",
+        "label": "Lần theo dấu chân",
+        "emoji": "🔍",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 60,
+            "text": "Dấu chân dẫn đến một hốc tường chứa đá đền cổ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "shrine_stone",
+                "min": 1,
+                "max": 2
+              },
+              {
+                "type": "exp",
+                "min": 10,
+                "max": 20
+              }
+            ]
+          },
+          {
+            "chance": 40,
+            "text": "Bạn nhận ra dấu chân đang lần theo chính mình.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "salt_circle",
+        "label": "Rắc muối thành vòng",
+        "emoji": "🧂",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Vòng muối làm dấu chân tan thành hơi trắng.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "purifying_salt",
+                "amount": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -10
+              },
+              {
+                "type": "exp",
+                "min": 12,
+                "max": 22
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "purifying_salt"
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_sutra_moth_swarm",
+    "title": "🦋 Bầy Bướm Kinh Văn",
+    "description": "Một đàn bướm giấy bay ra từ cuộn kinh mục nát. Trên cánh chúng có những chữ cổ chỉ hiện dưới ánh nến.",
+    "color": 16436245,
+    "image": "legacy",
+    "weight": 3,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "catch",
+        "label": "Bắt một con bướm",
+        "emoji": "🦋",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Cánh bướm hóa thành mảnh cổ tự khi chạm vào tay bạn.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "ancient_book",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 16
+              }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Bướm giấy cắt qua da như lưỡi dao mỏng.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 8
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "let_go",
+        "label": "Thả chúng bay",
+        "emoji": "🕊️",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bầy bướm bay thành hình vòng phong ấn rồi tan biến.",
+            "actions": [
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "corruption",
+                "amount": -4
+              },
+              {
+                "type": "mp_percent",
+                "min": 5,
+                "max": 12
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_sealed_well",
+    "title": "🕳️ Giếng Phong Ấn",
+    "description": "Một miệng giếng bị bịt bằng ba lớp dây bùa. Từ dưới sâu vọng lên tiếng nước chảy dù đền đã khô cạn.",
+    "color": 561586,
+    "image": "spring",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "lower",
+        "label": "Thả dây xuống giếng",
+        "emoji": "🪢",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 55,
+            "text": "Bạn kéo lên một bình nước trăng còn nguyên nắp.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "moonwater",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 14
+              }
+            ]
+          },
+          {
+            "chance": 45,
+            "text": "Thứ kéo dây từ dưới giếng mạnh hơn bạn.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "seal",
+        "label": "Gia cố dây bùa",
+        "emoji": "🔒",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn siết lại phong ấn. Tiếng nước im dần.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": -7
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_ceramic_masks",
+    "title": "🎭 Mặt Nạ Gốm Trên Tường",
+    "description": "Nhiều mặt nạ gốm treo thành hàng. Chỉ có một chiếc quay theo chuyển động của bạn.",
+    "color": 16109822,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "wear",
+        "label": "Đeo mặt nạ",
+        "emoji": "🎭",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 45,
+            "text": "Mặt nạ cho bạn thấy lối đi bí mật sau bàn thờ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "shrine_relic",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 20,
+                "max": 38
+              },
+              {
+                "type": "corruption",
+                "amount": 5
+              }
+            ]
+          },
+          {
+            "chance": 55,
+            "text": "Mặt nạ dính chặt trong vài nhịp thở, hút mất hơi ấm.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 8,
+                "max": 14
+              },
+              {
+                "type": "corruption",
+                "amount": 7
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "turn",
+        "label": "Quay mặt nạ vào tường",
+        "emoji": "↩️",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Những mặt nạ thôi nhìn bạn. Một mảnh gốm rơi xuống như lời cảm ơn.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "mysterious_shard",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -3
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_frozen_prayer_room",
+    "title": "❄️ Phòng Cầu Nguyện Đóng Băng",
+    "description": "Cả căn phòng bị phủ sương trắng. Trên nền đá, dấu quỳ gối vẫn còn như vừa có người rời đi.",
+    "color": 6809849,
+    "image": "spring",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "kneel",
+        "label": "Quỳ vào dấu cũ",
+        "emoji": "🙏",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Bạn nghe được lời cầu cuối cùng của người canh đền.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 22,
+                "max": 40
+              },
+              {
+                "type": "mp_percent",
+                "min": 8,
+                "max": 18
+              },
+              {
+                "type": "corruption",
+                "amount": -2
+              }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Lời cầu bị ngắt giữa chừng và biến thành gai lạnh.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 5,
+                "max": 10
+              },
+              {
+                "type": "corruption",
+                "amount": 4
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "water",
+        "label": "Rưới Moonwater",
+        "emoji": "🌙",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Sương trắng tan thành ánh trăng mỏng.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "moonwater",
+                "amount": 1
+              },
+              {
+                "type": "heal_percent",
+                "min": 12,
+                "max": 22
+              },
+              {
+                "type": "corruption",
+                "amount": -8
+              },
+              {
+                "type": "reputation",
+                "amount": 1
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "moonwater"
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_inverted_torii",
+    "title": "⛩️ Cổng Torii Lộn Ngược",
+    "description": "Một cổng torii nhỏ mọc ngược từ trần xuống. Bóng của nó trên nền lại đứng đúng chiều.",
+    "color": 15680580,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "pass_shadow",
+        "label": "Đi qua bóng cổng",
+        "emoji": "🌑",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 60,
+            "text": "Bạn bước qua cái bóng và thấy một phòng phụ bị che giấu.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": 18,
+                "max": 42
+              },
+              {
+                "type": "item",
+                "itemId": "mirror_shard",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          },
+          {
+            "chance": 40,
+            "text": "Cái bóng đóng lại sau lưng bạn, nhốt bạn với hộ vệ đền.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "pray_gate",
+        "label": "Cúi đầu trước cổng",
+        "emoji": "🙏",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Cổng torii rung nhẹ, rồi để rơi một dải bùa cũ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "corruption",
+                "amount": -3
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_white_snake_relic",
+    "title": "🐍 Rắn Trắng Cuộn Quanh Thánh Tích",
+    "description": "Một con rắn trắng ngủ quanh hộp thánh tích. Trên lưng nó có hoa văn giống vòng phong ấn.",
+    "color": 14870768,
+    "image": "chest",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "feed",
+        "label": "Đặt lễ vật nhỏ",
+        "emoji": "🍞",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Rắn trắng mở mắt, nuốt lễ vật vô hình rồi nhường đường.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": -20,
+                "max": -20
+              },
+              {
+                "type": "item",
+                "itemId": "shrine_relic",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -2
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "gold": 20
+        }
+      },
+      {
+        "id": "take",
+        "label": "Lấy thánh tích ngay",
+        "emoji": "✋",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 50,
+            "text": "Bạn lấy được thánh tích trước khi rắn thức dậy.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "shrine_relic",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "corruption",
+                "amount": 4
+              }
+            ]
+          },
+          {
+            "chance": 50,
+            "text": "Rắn trắng cắn vào cổ tay, truyền lời nguyền lạnh.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 7,
+                "max": 13
+              },
+              {
+                "type": "corruption",
+                "amount": 8
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_ashen_kimono",
+    "title": "👘 Áo Lễ Phủ Tro",
+    "description": "Một bộ áo lễ treo trong tủ gỗ mục. Tro rơi từ tay áo dù không ai chạm vào.",
+    "color": 9741240,
+    "image": "legacy",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "shake",
+        "label": "Phủi tro khỏi áo",
+        "emoji": "👘",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Tro rơi xuống thành một nắm Holy Ash tinh sạch.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 2
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 15
+              }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Bàn tay vô hình kéo tay áo lại.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 5,
+                "max": 9
+              },
+              {
+                "type": "corruption",
+                "amount": 4
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "burn",
+        "label": "Đốt áo lễ",
+        "emoji": "🔥",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 50,
+            "text": "Áo cháy thành bùa tro, để lại mảnh curse shard.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "curse_shard",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "corruption",
+                "amount": 5
+              }
+            ]
+          },
+          {
+            "chance": 50,
+            "text": "Khói đen gọi linh hồn chủ cũ tỉnh dậy.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_singing_floor_tiles",
+    "title": "🎼 Nền Đá Biết Hát",
+    "description": "Mỗi bước chân làm một viên đá ngân lên. Một đoạn giai điệu phong ấn còn thiếu nốt cuối.",
+    "color": 3718648,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "hum",
+        "label": "Ngân theo giai điệu",
+        "emoji": "🎵",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Bạn bắt đúng nốt cuối. Nền đá mở ra một hốc nhỏ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "mana_crystal",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 18,
+                "max": 32
+              }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Bạn lệch nhịp, giai điệu trở thành tiếng rít.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 5,
+                "max": 10
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "silence",
+        "label": "Giữ im lặng",
+        "emoji": "🤫",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Khi bạn im lặng, nền đá tự hoàn thành đoạn nhạc.",
+            "actions": [
+              {
+                "type": "mp_percent",
+                "min": 10,
+                "max": 20
+              },
+              {
+                "type": "corruption",
+                "amount": -3
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_moth_eaten_banner",
+    "title": "🏳️ Lá Cờ Bị Mối Ăn",
+    "description": "Một lá cờ cũ mang biểu tượng đền cổ. Phần bị mối ăn tạo thành hình con mắt mở nửa chừng.",
+    "color": 16498468,
+    "image": "legacy",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "fold",
+        "label": "Gấp cờ lại",
+        "emoji": "🏳️",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn gấp lá cờ theo nghi thức cũ. Một lời chúc phúc yếu ớt còn sót lại.",
+            "actions": [
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "heal_percent",
+                "min": 6,
+                "max": 12
+              },
+              {
+                "type": "corruption",
+                "amount": -2
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tear",
+        "label": "Xé phần có mắt",
+        "emoji": "👁️",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 60,
+            "text": "Bạn xé được mảnh vải phù văn.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "mysterious_shard",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 16
+              }
+            ]
+          },
+          {
+            "chance": 40,
+            "text": "Con mắt trên vải chảy thành mực đen.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": 6
+              },
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 8
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_hollow_drum",
+    "title": "🥁 Trống Rỗng Ruột",
+    "description": "Một chiếc trống lễ đã rách mặt, nhưng bên trong vẫn có tiếng tim đập đều đều.",
+    "color": 9584654,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "beat",
+        "label": "Gõ ba nhịp",
+        "emoji": "🥁",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 55,
+            "text": "Ba nhịp trống mở khóa một ngăn bí mật.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": 20,
+                "max": 55
+              },
+              {
+                "type": "item",
+                "itemId": "rune_ink",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          },
+          {
+            "chance": 45,
+            "text": "Nhịp thứ ba bị thứ gì đó gõ đáp lại từ sau lưng.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "seal_drum",
+        "label": "Niêm phong mặt trống",
+        "emoji": "🔒",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn dùng tro thánh bịt lại mặt trống.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "holy_ash",
+                "amount": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -9
+              },
+              {
+                "type": "exp",
+                "min": 16,
+                "max": 30
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "holy_ash"
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_sunless_garden",
+    "title": "🌿 Vườn Không Có Mặt Trời",
+    "description": "Một khu vườn nhỏ mọc dưới lòng đền. Lá cây màu bạc, còn rễ thì quấn quanh các mảnh bùa mục.",
+    "color": 2278750,
+    "image": "spring",
+    "weight": 3,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "harvest",
+        "label": "Hái lá bạc",
+        "emoji": "🌿",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 75,
+            "text": "Lá bạc có thể dùng làm thuốc thanh tẩy nhẹ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "purifying_salt",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 5,
+                "max": 12
+              }
+            ]
+          },
+          {
+            "chance": 25,
+            "text": "Rễ cây siết cổ tay bạn như dây bùa sống.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 8
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "water",
+        "label": "Tưới Moonwater",
+        "emoji": "🌙",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Cây bạc rung nhẹ và thả xuống giọt nước trăng mới.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "moonwater",
+                "amount": 1
+              },
+              {
+                "type": "item",
+                "itemId": "moonwater",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -4
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "moonwater"
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_cracked_oracle_eye",
+    "title": "🔮 Mắt Tiên Tri Nứt",
+    "description": "Một viên thủy tinh lớn nằm trong lòng tượng. Bên trong là hình ảnh bạn đang đứng ở đúng nơi này, chậm hơn vài giây.",
+    "color": 9133302,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "ask",
+        "label": "Hỏi về phong ấn",
+        "emoji": "❔",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Mắt tiên tri cho bạn thấy một đoạn đường an toàn.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 22,
+                "max": 44
+              },
+              {
+                "type": "corruption",
+                "amount": -2
+              }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Hình ảnh trong thủy tinh nhìn ngược lại bạn và mỉm cười.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": 8
+              },
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 9
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "break_eye",
+        "label": "Đập viên mắt",
+        "emoji": "🔨",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 50,
+            "text": "Thủy tinh vỡ, rơi ra mảnh gương lạnh.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "mirror_shard",
+                "min": 1,
+                "max": 2
+              }
+            ]
+          },
+          {
+            "chance": 50,
+            "text": "Vết nứt lan vào không khí, gọi bóng canh gương.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_ink_black_lotus",
+    "title": "🪷 Sen Mực Đen",
+    "description": "Một đóa sen đen mọc trong chậu đá khô. Cánh hoa nhỏ mực xuống nền thành các ký tự cấm.",
+    "color": 1120295,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "collect_ink",
+        "label": "Lấy mực sen",
+        "emoji": "🪄",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Bạn thu được mực rune từ cánh sen.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "rune_ink",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 16
+              }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Mực đen bò ngược lên tay bạn.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": 6
+              },
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 9
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "purify_lotus",
+        "label": "Thanh tẩy bằng Holy Water",
+        "emoji": "💧",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Nước thánh làm đóa sen hóa trắng trong khoảnh khắc.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "holy_water",
+                "amount": 1
+              },
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -8
+              },
+              {
+                "type": "reputation",
+                "amount": 1
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "holy_water"
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_sleeping_guardian_core",
+    "title": "💠 Lõi Hộ Vệ Ngủ Quên",
+    "description": "Một lõi đá nhỏ phát sáng dưới đống giáp vỡ. Nó đập nhịp chậm như trái tim của tượng hộ pháp.",
+    "color": 6333946,
+    "image": "chest",
+    "weight": 1,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "take_core",
+        "label": "Nhấc lõi đá",
+        "emoji": "💠",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 45,
+            "text": "Bạn lấy được lõi đá trước khi nó thức dậy.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "shrine_stone",
+                "min": 2,
+                "max": 3
+              },
+              {
+                "type": "corruption",
+                "amount": 4
+              }
+            ]
+          },
+          {
+            "chance": 55,
+            "text": "Lõi đá bừng sáng và kéo giáp vỡ đứng dậy.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "lull",
+        "label": "Đọc chú ngủ",
+        "emoji": "📜",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn đọc chú ngủ. Lõi đá dịu xuống và tách ra một mảnh an toàn.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "shrine_stone",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 18,
+                "max": 30
+              },
+              {
+                "type": "corruption",
+                "amount": -3
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_cold_coin_fountain",
+    "title": "🪙 Đài Phun Đồng Lạnh",
+    "description": "Một đài phun nước khô chứa đầy đồng xu lạnh buốt. Mỗi đồng xu có khắc một lời ước chưa thành.",
+    "color": 13938487,
+    "image": "spring",
+    "weight": 3,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "take_coins",
+        "label": "Nhặt đồng xu",
+        "emoji": "🪙",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 60,
+            "text": "Bạn nhặt được vài đồng xu cổ còn giá trị.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": 25,
+                "max": 70
+              },
+              {
+                "type": "corruption",
+                "amount": 4
+              }
+            ]
+          },
+          {
+            "chance": 40,
+            "text": "Một lời ước chết bám vào túi bạn.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 8
+              },
+              {
+                "type": "corruption",
+                "amount": 7
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "offer_coin",
+        "label": "Đặt lại một đồng xu",
+        "emoji": "🙏",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn trả lại một lời ước cho đài phun. Nước sáng lên một nhịp.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": -15,
+                "max": -15
+              },
+              {
+                "type": "corruption",
+                "amount": -5
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "mp_percent",
+                "min": 4,
+                "max": 10
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "gold": 15
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_unfinished_mural",
+    "title": "🎨 Bức Họa Chưa Hoàn Tất",
+    "description": "Bức tường vẽ cảnh phong ấn Echo Demon, nhưng khuôn mặt con quỷ bị bỏ trống như chờ người tô tiếp.",
+    "color": 16347926,
+    "image": "legacy",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "paint_seal",
+        "label": "Tô vòng phong ấn",
+        "emoji": "🖌️",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Bạn tô lại vòng phong ấn. Bức họa sáng lên vài giây.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 20,
+                "max": 38
+              },
+              {
+                "type": "corruption",
+                "amount": -4
+              }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Màu vẽ chảy thành mắt đen trên tường.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": 6
+              },
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 9
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "use_ink",
+        "label": "Dùng Rune Ink",
+        "emoji": "🪄",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Mực rune hoàn tất nét vẽ bị thiếu. Một cổ tự rơi khỏi tường.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "rune_ink",
+                "amount": 1
+              },
+              {
+                "type": "item",
+                "itemId": "ancient_book",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 16,
+                "max": 28
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "rune_ink"
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_silent_monk_bowl",
+    "title": "🥣 Bát Của Tu Sĩ Im Lặng",
+    "description": "Một chiếc bát gỗ đặt giữa đường. Bên trong không có gì, nhưng khi bạn nhìn kỹ, bóng bạn lại đang bỏ lễ vật vào đó.",
+    "color": 7877903,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "donate",
+        "label": "Bỏ 40 Gold",
+        "emoji": "💰",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Đồng vàng biến mất trước khi chạm đáy bát. Một hơi ấm đáp lại.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": -40,
+                "max": -40
+              },
+              {
+                "type": "heal_percent",
+                "min": 10,
+                "max": 18
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "corruption",
+                "amount": -3
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "gold": 40
+        }
+      },
+      {
+        "id": "steal_shadow",
+        "label": "Lấy bóng trong bát",
+        "emoji": "🌑",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 55,
+            "text": "Bạn kéo ra một mảnh ký ức lạc.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "lost_memory",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "soul_shard",
+                "amount": 1
+              },
+              {
+                "type": "corruption",
+                "amount": 8
+              }
+            ]
+          },
+          {
+            "chance": 45,
+            "text": "Bóng của bạn bị kéo dài, đau như vết thương thật.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 8,
+                "max": 15
+              },
+              {
+                "type": "corruption",
+                "amount": 6
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_torn_seal_rope",
+    "title": "🪢 Dây Phong Ấn Bị Xé",
+    "description": "Một sợi dây phong ấn treo ngang cửa đã bị xé một nửa. Mép dây vẫn rỉ ra bụi đỏ như máu khô.",
+    "color": 12131356,
+    "image": "trap",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "tie",
+        "label": "Buộc lại dây",
+        "emoji": "🪢",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn buộc lại dây phong ấn. Cánh cửa phía sau thôi run rẩy.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": -6
+              },
+              {
+                "type": "exp",
+                "min": 12,
+                "max": 24
+              },
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "pull",
+        "label": "Kéo đứt hoàn toàn",
+        "emoji": "💢",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 45,
+            "text": "Sau cửa là một hòm nhỏ bị bỏ quên.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": 30,
+                "max": 80
+              },
+              {
+                "type": "item",
+                "itemId": "mysterious_shard",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          },
+          {
+            "chance": 55,
+            "text": "Phong ấn đứt hẳn. Thứ sau cửa lao ra.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_mirror_dust_stairs",
+    "title": "🪞 Cầu Thang Phủ Bụi Gương",
+    "description": "Bậc thang xuống tầng dưới phủ đầy bụi sáng như kính nghiền. Mỗi dấu chân phản chiếu một phiên bản khác của bạn.",
+    "color": 12891645,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "descend",
+        "label": "Đi xuống",
+        "emoji": "⬇️",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 60,
+            "text": "Bạn xuống được tầng phụ và nhặt mảnh gương ở chiếu nghỉ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "mirror_shard",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 12,
+                "max": 22
+              }
+            ]
+          },
+          {
+            "chance": 40,
+            "text": "Một phiên bản trong bụi gương bước nhanh hơn bạn một nhịp.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 5,
+                "max": 10
+              },
+              {
+                "type": "corruption",
+                "amount": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "scroll",
+        "label": "Dùng Scroll of Mirror",
+        "emoji": "📜",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Cuộn phép gom các phản chiếu lại thành một lối đi rõ ràng.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "scroll_mirror",
+                "amount": 1
+              },
+              {
+                "type": "item",
+                "itemId": "mirror_shard",
+                "min": 2,
+                "max": 2
+              },
+              {
+                "type": "corruption",
+                "amount": -6
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "scroll_mirror"
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_withered_blessing_tree",
+    "title": "🌳 Cây Phước Lành Héo",
+    "description": "Một cây nhỏ mọc trong sân đền, cành treo đầy bùa giấy đã ngả vàng. Dưới gốc có tro thánh lẫn đất đen.",
+    "color": 6660877,
+    "image": "spring",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "clean_roots",
+        "label": "Dọn gốc cây",
+        "emoji": "🌿",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn gỡ bùa mục và dọn tro đen. Cây rung nhẹ như vừa thở lại.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "corruption",
+                "amount": -5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "take_branch",
+        "label": "Bẻ cành khô",
+        "emoji": "🪵",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Cành khô hóa thành vật liệu rune khi rời cây.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "rune_ink",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 15
+              }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Cây héo rít lên trong tiếng gió không có thật.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": 6
+              },
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 8
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_ancient_wardrobe",
+    "title": "🚪 Tủ Áo Cổ Bị Niêm Phong",
+    "description": "Một tủ áo gỗ đứng đơn độc trong phòng phụ. Từ khe cửa thò ra một dải bùa đã cháy mất nửa chữ.",
+    "color": 8736014,
+    "image": "chest",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "requiresCombat": true,
+    "choices": [
+      {
+        "id": "open",
+        "label": "Mở tủ",
+        "emoji": "🚪",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 55,
+            "text": "Trong tủ có hộp lễ vật còn nguyên.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "holy_water",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "gold",
+                "min": 12,
+                "max": 34
+              }
+            ]
+          },
+          {
+            "chance": 45,
+            "text": "Bộ áo lễ bên trong tự mặc vào một cái bóng.",
+            "actions": [
+              {
+                "type": "combat_random"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "read_tag",
+        "label": "Đọc bùa cháy",
+        "emoji": "📜",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn đọc phần chữ còn sót lại và ghi nhớ cách khóa tà khí.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 18,
+                "max": 34
+              },
+              {
+                "type": "corruption",
+                "amount": -2
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_omen_crows_inside",
+    "title": "🐦 Quạ Đậu Trong Đền",
+    "description": "Ba con quạ đen đậu trên xà ngang dù mọi cửa sổ đều đóng kín. Con giữa ngậm một mảnh giấy trắng.",
+    "color": 2042167,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "take_note",
+        "label": "Lấy mảnh giấy",
+        "emoji": "📄",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Mảnh giấy hiện chữ khi chạm vào tay bạn.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 16,
+                "max": 30
+              },
+              {
+                "type": "item",
+                "itemId": "lost_memory",
+                "min": 1,
+                "max": 1
+              }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Quạ giữa mổ vào bóng của bạn, đau hơn mổ vào da.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 9
+              },
+              {
+                "type": "corruption",
+                "amount": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "feed_crows",
+        "label": "Cho quạ ăn lễ vật",
+        "emoji": "🍞",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Ba con quạ cúi đầu rồi bay xuyên qua mái đền.",
+            "actions": [
+              {
+                "type": "gold",
+                "min": -25,
+                "max": -25
+              },
+              {
+                "type": "corruption",
+                "amount": -5
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "gold": 25
+        }
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_lantern_oil_puddle",
+    "title": "🛢️ Vũng Dầu Đèn Xanh",
+    "description": "Dầu đèn màu xanh đọng trên nền, không bốc cháy nhưng phản chiếu trần đền như mặt nước sâu.",
+    "color": 1357990,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "scoop",
+        "label": "Múc dầu đèn",
+        "emoji": "🛢️",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 75,
+            "text": "Bạn múc được dầu linh hồn dùng cho nghi lễ nhỏ.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "rune_ink",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "mp_percent",
+                "min": 4,
+                "max": 10
+              }
+            ]
+          },
+          {
+            "chance": 25,
+            "text": "Dầu xanh dính vào tay và lạnh đến tận xương.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 5,
+                "max": 9
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ignite",
+        "label": "Châm lửa thử",
+        "emoji": "🔥",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 50,
+            "text": "Lửa xanh cháy thành vòng bảo hộ ngắn ngủi.",
+            "actions": [
+              {
+                "type": "heal_percent",
+                "min": 8,
+                "max": 14
+              },
+              {
+                "type": "corruption",
+                "amount": -3
+              }
+            ]
+          },
+          {
+            "chance": 50,
+            "text": "Lửa xanh bùng ngược vào mặt bạn.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 8,
+                "max": 14
+              },
+              {
+                "type": "corruption",
+                "amount": 4
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_buried_priest_bones",
+    "title": "🦴 Xương Tu Sĩ Dưới Sàn",
+    "description": "Một mảng gạch lỏng để lộ bộ xương ôm chặt một túi tro. Hộp sọ quay về phía cổng phong ấn.",
+    "color": 15067115,
+    "image": "legacy",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "rebury",
+        "label": "Chôn lại tử tế",
+        "emoji": "🕯️",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn chôn lại bộ xương và đọc lời tiễn ngắn.",
+            "actions": [
+              {
+                "type": "reputation",
+                "amount": 3
+              },
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -6
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "take_ash",
+        "label": "Lấy túi tro",
+        "emoji": "⚱️",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Bạn lấy được túi tro thánh.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 2
+              },
+              {
+                "type": "corruption",
+                "amount": 3
+              }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Xương tay khép lại quanh cổ tay bạn.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 6,
+                "max": 12
+              },
+              {
+                "type": "corruption",
+                "amount": 6
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_ritual_salt_line",
+    "title": "🧂 Đường Muối Đứt Đoạn",
+    "description": "Một đường muối trắng chạy quanh phòng tế lễ nhưng bị đứt ở ba điểm. Bóng tối đang rỉ qua những chỗ hở.",
+    "color": 16317180,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "repair_salt",
+        "label": "Vá đường muối",
+        "emoji": "🧂",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn dùng muối thanh tẩy nối lại vòng bảo hộ.",
+            "actions": [
+              {
+                "type": "consume_item",
+                "itemId": "purifying_salt",
+                "amount": 1
+              },
+              {
+                "type": "corruption",
+                "amount": -12
+              },
+              {
+                "type": "reputation",
+                "amount": 2
+              },
+              {
+                "type": "exp",
+                "min": 10,
+                "max": 20
+              }
+            ]
+          }
+        ],
+        "requires": {
+          "itemId": "purifying_salt"
+        }
+      },
+      {
+        "id": "step_over",
+        "label": "Bước qua đường muối",
+        "emoji": "🚶",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 60,
+            "text": "Bạn vượt qua và thấy một hốc cất lễ vật.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "shrine_relic",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "gold",
+                "min": 12,
+                "max": 30
+              }
+            ]
+          },
+          {
+            "chance": 40,
+            "text": "Bóng tối chạm vào gót chân bạn.",
+            "actions": [
+              {
+                "type": "corruption",
+                "amount": 8
+              },
+              {
+                "type": "damage_percent",
+                "min": 4,
+                "max": 8
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_twisted_incense_smoke",
+    "title": "🌫️ Khói Hương Xoắn Ngược",
+    "description": "Khói từ ba cây hương đã tắt vẫn cuộn lên trần, rồi rơi ngược xuống như tóc đen.",
+    "color": 6583435,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "choices": [
+      {
+        "id": "breathe",
+        "label": "Hít một hơi",
+        "emoji": "🌫️",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 50,
+            "text": "Bạn thấy ký ức về nghi lễ phong ấn đầu tiên.",
+            "actions": [
+              {
+                "type": "exp",
+                "min": 28,
+                "max": 52
+              },
+              {
+                "type": "corruption",
+                "amount": 6
+              }
+            ]
+          },
+          {
+            "chance": 50,
+            "text": "Khói hương biến thành gai trong phổi.",
+            "actions": [
+              {
+                "type": "damage_percent",
+                "min": 7,
+                "max": 13
+              },
+              {
+                "type": "corruption",
+                "amount": 5
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "fan",
+        "label": "Quạt khói ra cửa",
+        "emoji": "🪭",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn dẫn khói ra khỏi phòng. Một mảnh tro sáng còn lại trên bàn.",
+            "actions": [
+              {
+                "type": "item",
+                "itemId": "holy_ash",
+                "min": 1,
+                "max": 1
+              },
+              {
+                "type": "exp",
+                "min": 8,
+                "max": 16
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_z2_mg_mirror_alignment",
+    "title": "🪞 Căn Gương Tam Diện",
+    "description": "Ba chiếc gương đen phản chiếu ba hướng khác nhau. Cần xoay đúng hướng để ánh trăng chạm vào cổng phụ.",
+    "color": 10980346,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🪞 Căn Gương",
+      "introText": "Xoay đúng gương theo dấu hiệu ở ít nhất 2/3 lượt.",
+      "startLabel": "Căn gương",
+      "startEmoji": "🪞",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "left",
+          "label": "Gương Trái",
+          "emoji": "⬅️",
+          "style": "secondary"
+        },
+        {
+          "id": "middle",
+          "label": "Gương Giữa",
+          "emoji": "⬆️",
+          "style": "primary"
+        },
+        {
+          "id": "right",
+          "label": "Gương Phải",
+          "emoji": "➡️",
+          "style": "secondary"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Vệt trăng chạm mép trái trước.",
+          "correctOptionId": "left",
+          "successLine": "Gương trái bắt ánh trăng.",
+          "failureLine": "Ánh trăng trượt khỏi mặt kính."
+        },
+        {
+          "prompt": "Bóng người trong gương giữa cúi đầu.",
+          "correctOptionId": "middle",
+          "successLine": "Gương giữa đứng yên.",
+          "failureLine": "Bóng người quay đi."
+        },
+        {
+          "prompt": "Vết nứt trên gương phải sáng lên.",
+          "correctOptionId": "right",
+          "successLine": "Gương phải khóa tia sáng cuối.",
+          "failureLine": "Vết nứt lan rộng."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Ba gương thẳng hàng, ánh trăng mở ra một hốc thánh tích.",
+      "failureText": "Gương lệch hướng, bóng tối tràn qua khe nứt.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "mirror_shard",
+          "min": 2,
+          "max": 3
+        },
+        {
+          "type": "exp",
+          "min": 18,
+          "max": 34
+        },
+        {
+          "type": "corruption",
+          "amount": -5
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "damage_percent",
+          "min": 5,
+          "max": 10
+        },
+        {
+          "type": "corruption",
+          "amount": 6
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_candle_breath",
+    "title": "🕯️ Giữ Lửa Nến Xanh",
+    "description": "Một ngọn nến xanh sắp tắt. Bạn phải điều chỉnh hơi thở để ngọn lửa không bị tiếng vọng nuốt mất.",
+    "color": 16436245,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🕯️ Giữ Lửa Nến",
+      "introText": "Chọn đúng nhịp ở ít nhất 2/3 lượt.",
+      "startLabel": "Giữ lửa",
+      "startEmoji": "🕯️",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "slow",
+          "label": "Thở Chậm",
+          "emoji": "🐢",
+          "style": "secondary"
+        },
+        {
+          "id": "hold",
+          "label": "Nín Thở",
+          "emoji": "🤫",
+          "style": "primary"
+        },
+        {
+          "id": "quick",
+          "label": "Thở Nhanh",
+          "emoji": "💨",
+          "style": "danger"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Lửa rung nhỏ nhưng đều.",
+          "correctOptionId": "slow",
+          "successLine": "Bạn thở chậm theo nhịp lửa.",
+          "failureLine": "Hơi thở làm lửa lệch."
+        },
+        {
+          "prompt": "Tiếng vọng gọi tên bạn ngay sát tai.",
+          "correctOptionId": "hold",
+          "successLine": "Bạn nín thở, tiếng gọi trôi qua.",
+          "failureLine": "Bạn đáp lại bằng hơi thở run."
+        },
+        {
+          "prompt": "Khói xanh tụ lại quá dày.",
+          "correctOptionId": "quick",
+          "successLine": "Bạn thổi nhanh để tản khói.",
+          "failureLine": "Khói xanh bám vào mắt."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Ngọn nến đứng thẳng. Sáp chảy thành một dấu ấn nhỏ.",
+      "failureText": "Ngọn nến tắt phụt, để lại mùi tro lạnh.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "holy_ash",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "type": "mp_percent",
+          "min": 10,
+          "max": 18
+        },
+        {
+          "type": "corruption",
+          "amount": -4
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "corruption",
+          "amount": 7
+        },
+        {
+          "type": "damage_percent",
+          "min": 4,
+          "max": 8
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_salt_circle",
+    "title": "🧂 Vòng Muối Nứt",
+    "description": "Vòng muối quanh bàn thờ bị nứt ở ba điểm. Bóng tối đang rỉ vào như nước đen.",
+    "color": 16317180,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🧂 Vá Vòng Muối",
+      "introText": "Chọn đúng điểm vá ở ít nhất 2/3 lượt.",
+      "startLabel": "Vá vòng",
+      "startEmoji": "🧂",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "north",
+          "label": "Điểm Bắc",
+          "emoji": "⬆️",
+          "style": "primary"
+        },
+        {
+          "id": "east",
+          "label": "Điểm Đông",
+          "emoji": "➡️",
+          "style": "secondary"
+        },
+        {
+          "id": "south",
+          "label": "Điểm Nam",
+          "emoji": "⬇️",
+          "style": "secondary"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Vết nứt có hơi lạnh thổi từ phía trên bản đồ nghi lễ.",
+          "correctOptionId": "north",
+          "successLine": "Muối ở điểm Bắc sáng lại.",
+          "failureLine": "Bạn vá nhầm điểm im lặng."
+        },
+        {
+          "prompt": "Bóng tối rỉ nhanh nhất về phía chuông đồng.",
+          "correctOptionId": "east",
+          "successLine": "Điểm Đông khép lại.",
+          "failureLine": "Bóng tối trườn qua kẽ hở."
+        },
+        {
+          "prompt": "Tro dưới chân tụ về phía cửa thấp.",
+          "correctOptionId": "south",
+          "successLine": "Điểm Nam được khóa.",
+          "failureLine": "Tro đen phồng lên."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Vòng muối khép kín, đẩy lùi ô nhiễm linh hồn.",
+      "failureText": "Vòng muối vỡ thêm, lời nguyền thoát ra.",
+      "onSuccess": [
+        {
+          "type": "consume_item",
+          "itemId": "purifying_salt",
+          "amount": 1
+        },
+        {
+          "type": "corruption",
+          "amount": -14
+        },
+        {
+          "type": "exp",
+          "min": 14,
+          "max": 26
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "corruption",
+          "amount": 10
+        },
+        {
+          "type": "damage_percent",
+          "min": 4,
+          "max": 8
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_echo_names",
+    "title": "👁️ Ba Tên Vọng Âm",
+    "description": "Ba cái tên vang ra từ sau cửa đá. Chỉ một tên là tiếng vọng thật ở mỗi lượt.",
+    "color": 9133302,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "👁️ Nhận Diện Tiếng Vọng",
+      "introText": "Chọn đúng tiếng vọng ở ít nhất 2/3 lượt.",
+      "startLabel": "Lắng nghe",
+      "startEmoji": "👁️",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "near",
+          "label": "Gần",
+          "emoji": "👂",
+          "style": "primary"
+        },
+        {
+          "id": "far",
+          "label": "Xa",
+          "emoji": "🌫️",
+          "style": "secondary"
+        },
+        {
+          "id": "inside",
+          "label": "Trong Đầu",
+          "emoji": "🧠",
+          "style": "danger"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Âm đầu tiên vang gần nhưng không có hơi thở.",
+          "correctOptionId": "near",
+          "successLine": "Bạn nhận ra tiếng gần là thật.",
+          "failureLine": "Bạn nghe nhầm tiếng vang phụ."
+        },
+        {
+          "prompt": "Âm thứ hai vọng từ cuối hành lang nhưng bóng lại ở trước mặt.",
+          "correctOptionId": "far",
+          "successLine": "Bạn chọn đúng tiếng xa.",
+          "failureLine": "Bạn nhìn bóng thay vì nghe âm."
+        },
+        {
+          "prompt": "Âm cuối không vang ngoài tai mà xuất hiện trong đầu.",
+          "correctOptionId": "inside",
+          "successLine": "Bạn khóa đúng tiếng trong đầu.",
+          "failureLine": "Nó học thêm một mảnh tên bạn."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Bạn phân biệt được tiếng vọng thật và nhận lại một mảnh ký ức.",
+      "failureText": "Bạn gọi nhầm tiếng vọng giả.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "lost_memory",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "exp",
+          "min": 20,
+          "max": 38
+        },
+        {
+          "type": "corruption",
+          "amount": -3
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "corruption",
+          "amount": 9
+        },
+        {
+          "type": "damage_percent",
+          "min": 5,
+          "max": 10
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_seal_rhythm",
+    "title": "🥁 Nhịp Trống Phong Ấn",
+    "description": "Chiếc trống rỗng ruột đòi ba nhịp đúng để đánh thức vòng phong ấn cũ.",
+    "color": 9584654,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🥁 Đánh Nhịp Phong Ấn",
+      "introText": "Chọn đúng nhịp ở ít nhất 2/3 lượt.",
+      "startLabel": "Đánh trống",
+      "startEmoji": "🥁",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "one",
+          "label": "Một Nhịp",
+          "emoji": "1️⃣",
+          "style": "secondary"
+        },
+        {
+          "id": "two",
+          "label": "Hai Nhịp",
+          "emoji": "2️⃣",
+          "style": "primary"
+        },
+        {
+          "id": "three",
+          "label": "Ba Nhịp",
+          "emoji": "3️⃣",
+          "style": "success"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Dây bùa rung một lần rồi đứng yên.",
+          "correctOptionId": "one",
+          "successLine": "Một nhịp khóa dây bùa.",
+          "failureLine": "Bạn đánh quá nhiều."
+        },
+        {
+          "prompt": "Hai ngọn nến xanh sáng cùng lúc.",
+          "correctOptionId": "two",
+          "successLine": "Hai nhịp giữ được lửa.",
+          "failureLine": "Nhịp của bạn lệch nến."
+        },
+        {
+          "prompt": "Ba vòng tròn trên trống hiện lên.",
+          "correctOptionId": "three",
+          "successLine": "Ba nhịp đóng vòng tròn.",
+          "failureLine": "Vòng tròn bị bỏ dở."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Trống ngân không thành tiếng, nhưng phong ấn mạnh lên.",
+      "failureText": "Nhịp sai gọi một thứ phía sau tường.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "shrine_stone",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "type": "exp",
+          "min": 18,
+          "max": 32
+        },
+        {
+          "type": "corruption",
+          "amount": -4
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "combat_random"
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_knot_prayer",
+    "title": "🪢 Thắt Dây Cầu Nguyện",
+    "description": "Dây bùa bị tháo rời thành ba đoạn. Bạn phải thắt lại đúng kiểu để khóa căn phòng.",
+    "color": 15680580,
+    "image": "legacy",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🪢 Thắt Dây Bùa",
+      "introText": "Chọn đúng nút thắt ở ít nhất 2/3 lượt.",
+      "startLabel": "Thắt dây",
+      "startEmoji": "🪢",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "loop",
+          "label": "Vòng",
+          "emoji": "➰",
+          "style": "secondary"
+        },
+        {
+          "id": "cross",
+          "label": "Chéo",
+          "emoji": "❌",
+          "style": "primary"
+        },
+        {
+          "id": "seal",
+          "label": "Khóa",
+          "emoji": "🔒",
+          "style": "success"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Đoạn đầu cần tạo vòng để giữ tro.",
+          "correctOptionId": "loop",
+          "successLine": "Vòng đầu giữ được tro thánh.",
+          "failureLine": "Tro rơi khỏi dây."
+        },
+        {
+          "prompt": "Đoạn giữa có hai vệt máu giao nhau.",
+          "correctOptionId": "cross",
+          "successLine": "Nút chéo khớp dấu cũ.",
+          "failureLine": "Dây xoắn sai chiều."
+        },
+        {
+          "prompt": "Đoạn cuối phải khóa bằng lời chú.",
+          "correctOptionId": "seal",
+          "successLine": "Nút khóa siết lại.",
+          "failureLine": "Dây tự nới ra."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Dây bùa sáng lên và để lại một ít tro thánh.",
+      "failureText": "Dây bùa đứt, bóng tối ùa ra.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "holy_ash",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "reputation",
+          "amount": 2
+        },
+        {
+          "type": "corruption",
+          "amount": -5
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "corruption",
+          "amount": 8
+        },
+        {
+          "type": "damage_percent",
+          "min": 4,
+          "max": 9
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_black_lotus_pulse",
+    "title": "🪷 Mạch Sen Đen",
+    "description": "Đóa sen mực đen nở theo nhịp lạ. Chọn đúng cánh hoa để lấy mực mà không đánh thức lời nguyền.",
+    "color": 1120295,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🪷 Hái Cánh Sen",
+      "introText": "Chọn đúng cánh ở ít nhất 2/3 lượt.",
+      "startLabel": "Hái sen",
+      "startEmoji": "🪷",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "cold",
+          "label": "Cánh Lạnh",
+          "emoji": "❄️",
+          "style": "secondary"
+        },
+        {
+          "id": "warm",
+          "label": "Cánh Ấm",
+          "emoji": "🔥",
+          "style": "primary"
+        },
+        {
+          "id": "silent",
+          "label": "Cánh Im",
+          "emoji": "🤫",
+          "style": "success"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Cánh lạnh không nhỏ mực.",
+          "correctOptionId": "cold",
+          "successLine": "Bạn lấy đúng cánh an toàn.",
+          "failureLine": "Bạn chạm vào cánh có gai mực."
+        },
+        {
+          "prompt": "Cánh ấm đập theo nhịp tim.",
+          "correctOptionId": "warm",
+          "successLine": "Bạn cắt đúng lúc cánh mở.",
+          "failureLine": "Mực nóng bắn vào tay."
+        },
+        {
+          "prompt": "Cánh im lặng không phản chiếu bóng bạn.",
+          "correctOptionId": "silent",
+          "successLine": "Bạn nhận ra cánh thật.",
+          "failureLine": "Bạn bị bóng giả lừa."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Bạn thu được mực rune sạch từ sen đen.",
+      "failureText": "Sen đen khép lại và phun mực nguyền.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "rune_ink",
+          "min": 1,
+          "max": 2
+        },
+        {
+          "type": "exp",
+          "min": 14,
+          "max": 26
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "corruption",
+          "amount": 7
+        },
+        {
+          "type": "damage_percent",
+          "min": 4,
+          "max": 9
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_tile_steps",
+    "title": "🎼 Bước Trên Nền Hát",
+    "description": "Nền đá ngân lên theo bước chân. Nếu bước đúng chuỗi, cửa phụ sẽ mở.",
+    "color": 3718648,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🎼 Bước Đúng Nhịp",
+      "introText": "Chọn đúng ô đá ở ít nhất 2/3 lượt.",
+      "startLabel": "Bắt đầu bước",
+      "startEmoji": "🎼",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "white",
+          "label": "Ô Trắng",
+          "emoji": "⬜",
+          "style": "secondary"
+        },
+        {
+          "id": "black",
+          "label": "Ô Đen",
+          "emoji": "⬛",
+          "style": "danger"
+        },
+        {
+          "id": "blue",
+          "label": "Ô Xanh",
+          "emoji": "🟦",
+          "style": "primary"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Nốt đầu trong trẻo như chuông bạc.",
+          "correctOptionId": "white",
+          "successLine": "Ô trắng ngân đúng nốt.",
+          "failureLine": "Nốt đầu bị đục."
+        },
+        {
+          "prompt": "Nốt giữa trầm và tối.",
+          "correctOptionId": "black",
+          "successLine": "Ô đen giữ nhịp trầm.",
+          "failureLine": "Bạn bước sai cao độ."
+        },
+        {
+          "prompt": "Nốt cuối có ánh xanh trên mép đá.",
+          "correctOptionId": "blue",
+          "successLine": "Ô xanh khóa đoạn nhạc.",
+          "failureLine": "Giai điệu vỡ ở nốt cuối."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Cửa phụ mở ra, để lộ vật liệu nghi lễ.",
+      "failureText": "Nền đá im bặt rồi phản chấn lên chân bạn.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "mana_crystal",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "item",
+          "itemId": "shrine_stone",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "exp",
+          "min": 12,
+          "max": 24
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "damage_percent",
+          "min": 5,
+          "max": 11
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_spirit_ferry",
+    "title": "🛶 Đưa Linh Hồn Qua Hồ Cạn",
+    "description": "Một linh hồn đứng trước hồ đá cạn, chờ bạn chọn đúng hướng gió để đưa nó rời khỏi đền.",
+    "color": 6333946,
+    "image": "spring",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🛶 Dẫn Hồn Qua Hồ",
+      "introText": "Chọn đúng hướng ở ít nhất 2/3 lượt.",
+      "startLabel": "Dẫn hồn",
+      "startEmoji": "🛶",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "north",
+          "label": "Gió Bắc",
+          "emoji": "⬆️",
+          "style": "secondary"
+        },
+        {
+          "id": "west",
+          "label": "Gió Tây",
+          "emoji": "⬅️",
+          "style": "primary"
+        },
+        {
+          "id": "moon",
+          "label": "Ánh Trăng",
+          "emoji": "🌙",
+          "style": "success"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Tro trên mặt hồ bay về phía Bắc.",
+          "correctOptionId": "north",
+          "successLine": "Bạn theo đúng luồng tro.",
+          "failureLine": "Tro xoáy ngược lại."
+        },
+        {
+          "prompt": "Tiếng chuông chìm từ phía Tây.",
+          "correctOptionId": "west",
+          "successLine": "Bạn bắt đúng hướng chuông.",
+          "failureLine": "Bạn nghe nhầm tiếng nước."
+        },
+        {
+          "prompt": "Bóng linh hồn chỉ rõ về vệt trăng.",
+          "correctOptionId": "moon",
+          "successLine": "Ánh trăng mở lối cuối.",
+          "failureLine": "Linh hồn lạc khỏi vệt sáng."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Linh hồn qua được hồ, để lại lời chúc phúc.",
+      "failureText": "Linh hồn tan vào sương lạnh.",
+      "onSuccess": [
+        {
+          "type": "reputation",
+          "amount": 3
+        },
+        {
+          "type": "item",
+          "itemId": "holy_water",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "corruption",
+          "amount": -6
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "corruption",
+          "amount": 5
+        },
+        {
+          "type": "damage_percent",
+          "min": 3,
+          "max": 7
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_reliquary_locks",
+    "title": "🔐 Ba Khóa Thánh Tích",
+    "description": "Một hộp thánh tích có ba ổ khóa cổ. Mỗi ổ khóa phản ứng với một dấu hiệu khác nhau.",
+    "color": 14251782,
+    "image": "chest",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🔐 Mở Khóa Thánh Tích",
+      "introText": "Chọn đúng khóa ở ít nhất 2/3 lượt.",
+      "startLabel": "Mở khóa",
+      "startEmoji": "🔐",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "ash",
+          "label": "Khóa Tro",
+          "emoji": "⚱️",
+          "style": "secondary"
+        },
+        {
+          "id": "moon",
+          "label": "Khóa Trăng",
+          "emoji": "🌙",
+          "style": "primary"
+        },
+        {
+          "id": "mirror",
+          "label": "Khóa Gương",
+          "emoji": "🪞",
+          "style": "success"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Ổ đầu có bụi tro sáng quanh rìa.",
+          "correctOptionId": "ash",
+          "successLine": "Khóa Tro mở ra.",
+          "failureLine": "Bụi tro tắt phụt."
+        },
+        {
+          "prompt": "Ổ thứ hai lạnh như nước đêm.",
+          "correctOptionId": "moon",
+          "successLine": "Khóa Trăng xoay nhẹ.",
+          "failureLine": "Hơi lạnh cắn ngón tay."
+        },
+        {
+          "prompt": "Ổ cuối phản chiếu bạn không chớp mắt.",
+          "correctOptionId": "mirror",
+          "successLine": "Khóa Gương chịu mở.",
+          "failureLine": "Phản chiếu nhe răng cười."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Hộp mở ra, còn giữ thánh tích nhỏ.",
+      "failureText": "Hộp khóa chặt và phóng bùa phản vệ.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "shrine_relic",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "item",
+          "itemId": "ancient_seal",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "exp",
+          "min": 12,
+          "max": 22
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "damage_percent",
+          "min": 6,
+          "max": 12
+        },
+        {
+          "type": "corruption",
+          "amount": 5
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_demon_whisper_filter",
+    "title": "📣 Lọc Tiếng Quỷ",
+    "description": "Echo Demon thả ba tiếng thì thầm qua khe cửa. Bạn phải nhận ra tiếng nào là mồi nhử.",
+    "color": 8141549,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "📣 Lọc Tiếng Thì Thầm",
+      "introText": "Chọn đúng phản ứng ở ít nhất 2/3 lượt.",
+      "startLabel": "Lọc âm",
+      "startEmoji": "📣",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "answer",
+          "label": "Đáp Lại",
+          "emoji": "🗣️",
+          "style": "danger"
+        },
+        {
+          "id": "silence",
+          "label": "Im Lặng",
+          "emoji": "🤫",
+          "style": "success"
+        },
+        {
+          "id": "salt",
+          "label": "Rắc Muối",
+          "emoji": "🧂",
+          "style": "primary"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Tiếng đầu gọi đúng tên bạn.",
+          "correctOptionId": "silence",
+          "successLine": "Bạn im lặng, nó không học thêm gì.",
+          "failureLine": "Bạn để nó lấy thêm âm giọng."
+        },
+        {
+          "prompt": "Tiếng thứ hai bò sát nền đá.",
+          "correctOptionId": "salt",
+          "successLine": "Muối làm âm thanh tan ra.",
+          "failureLine": "Tiếng vọng len qua kẽ muối."
+        },
+        {
+          "prompt": "Tiếng cuối giả làm đồng đội cầu cứu.",
+          "correctOptionId": "silence",
+          "successLine": "Bạn nhận ra đó là mồi nhử.",
+          "failureLine": "Bạn suýt đáp lại tiếng giả."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Bạn lọc được lời quỷ, cổng phong ấn yếu đi một chút.",
+      "failureText": "Bạn bị tiếng quỷ đánh dấu.",
+      "onSuccess": [
+        {
+          "type": "exp",
+          "min": 22,
+          "max": 40
+        },
+        {
+          "type": "corruption",
+          "amount": -5
+        },
+        {
+          "type": "item",
+          "itemId": "curse_shard",
+          "min": 1,
+          "max": 1
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "corruption",
+          "amount": 10
+        },
+        {
+          "type": "damage_percent",
+          "min": 5,
+          "max": 11
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_offering_scale",
+    "title": "⚖️ Cân Lễ Vật Cũ",
+    "description": "Chiếc cân đá đòi bạn đặt đúng thứ tự lễ vật vô hình: ký ức, tro và ánh trăng.",
+    "color": 16436245,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "⚖️ Cân Lễ Vật",
+      "introText": "Chọn đúng lễ vật ở ít nhất 2/3 lượt.",
+      "startLabel": "Cân lễ",
+      "startEmoji": "⚖️",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "memory",
+          "label": "Ký Ức",
+          "emoji": "🧠",
+          "style": "secondary"
+        },
+        {
+          "id": "ash",
+          "label": "Tro",
+          "emoji": "⚱️",
+          "style": "primary"
+        },
+        {
+          "id": "moon",
+          "label": "Ánh Trăng",
+          "emoji": "🌙",
+          "style": "success"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Đĩa cân bên trái khắc hình con mắt.",
+          "correctOptionId": "memory",
+          "successLine": "Ký ức làm cân cân bằng.",
+          "failureLine": "Cân nghiêng về bóng tối."
+        },
+        {
+          "prompt": "Đĩa cân giữa phủ bụi bạc.",
+          "correctOptionId": "ash",
+          "successLine": "Tro bạc nằm đúng chỗ.",
+          "failureLine": "Tro rơi qua kẽ đá."
+        },
+        {
+          "prompt": "Đĩa cân cuối có vết trăng non.",
+          "correctOptionId": "moon",
+          "successLine": "Ánh trăng khóa nghi lễ.",
+          "failureLine": "Ánh trăng bị nuốt mất."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Cân đá cân bằng, trả lại phần thưởng nhỏ.",
+      "failureText": "Cân đá đổ nghiêng, lời nguyền tràn ra.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "holy_ash",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "item",
+          "itemId": "moonwater",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "exp",
+          "min": 14,
+          "max": 26
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "corruption",
+          "amount": 7
+        },
+        {
+          "type": "damage_percent",
+          "min": 5,
+          "max": 10
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_sigil_drawing",
+    "title": "✍️ Vẽ Lại Phù Ấn",
+    "description": "Một vòng phù ấn trên sàn đã mờ. Bạn phải vẽ lại đúng nét để nó không biến thành cổng nguyền.",
+    "color": 8490232,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "✍️ Vẽ Phù Ấn",
+      "introText": "Chọn đúng nét ở ít nhất 2/3 lượt.",
+      "startLabel": "Vẽ ấn",
+      "startEmoji": "✍️",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "circle",
+          "label": "Vòng Tròn",
+          "emoji": "⭕",
+          "style": "primary"
+        },
+        {
+          "id": "slash",
+          "label": "Nét Chém",
+          "emoji": "➖",
+          "style": "secondary"
+        },
+        {
+          "id": "eye",
+          "label": "Mắt",
+          "emoji": "👁️",
+          "style": "danger"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Nét mở đầu bao lấy vùng tro.",
+          "correctOptionId": "circle",
+          "successLine": "Vòng tròn khép đúng chỗ.",
+          "failureLine": "Vòng bị méo."
+        },
+        {
+          "prompt": "Nét thứ hai cắt qua đường nứt.",
+          "correctOptionId": "slash",
+          "successLine": "Nét chém khóa kẽ nứt.",
+          "failureLine": "Nét chém lệch khỏi vết nứt."
+        },
+        {
+          "prompt": "Nét cuối là con mắt bị khép.",
+          "correctOptionId": "eye",
+          "successLine": "Mắt khép lại.",
+          "failureLine": "Mắt mở to hơn."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Phù ấn sáng lại, để rơi một mảnh cổ tự.",
+      "failureText": "Phù ấn biến dạng và cắn ngược vào tay bạn.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "ancient_book",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "exp",
+          "min": 16,
+          "max": 30
+        },
+        {
+          "type": "corruption",
+          "amount": -4
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "damage_percent",
+          "min": 6,
+          "max": 12
+        },
+        {
+          "type": "corruption",
+          "amount": 6
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_bone_chimes",
+    "title": "💀 Chuông Xương",
+    "description": "Ba mảnh xương treo trên dây bùa. Gió không thổi, nhưng chúng vẫn rung theo câu hỏi của đền.",
+    "color": 15067115,
+    "image": "legacy",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "💀 Chọn Chuông Xương",
+      "introText": "Chọn đúng mảnh xương ở ít nhất 2/3 lượt.",
+      "startLabel": "Nghe chuông",
+      "startEmoji": "💀",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "finger",
+          "label": "Xương Tay",
+          "emoji": "✋",
+          "style": "secondary"
+        },
+        {
+          "id": "rib",
+          "label": "Xương Sườn",
+          "emoji": "🦴",
+          "style": "primary"
+        },
+        {
+          "id": "skull",
+          "label": "Hộp Sọ",
+          "emoji": "💀",
+          "style": "danger"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Âm đầu nhỏ như tiếng gõ cửa.",
+          "correctOptionId": "finger",
+          "successLine": "Xương tay rung đúng âm.",
+          "failureLine": "Bạn chọn âm quá nặng."
+        },
+        {
+          "prompt": "Âm giữa vang từ lồng ngực rỗng.",
+          "correctOptionId": "rib",
+          "successLine": "Xương sườn ngân đúng nhịp.",
+          "failureLine": "Nhịp bị lệch."
+        },
+        {
+          "prompt": "Âm cuối thì thầm từ hộp sọ.",
+          "correctOptionId": "skull",
+          "successLine": "Hộp sọ khép miệng.",
+          "failureLine": "Nó cười thành tiếng."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Chuông xương dịu lại, thả xuống tro thánh.",
+      "failureText": "Chuông xương ré lên, gọi bóng chết.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "holy_ash",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "soul_shard",
+          "amount": 1
+        },
+        {
+          "type": "corruption",
+          "amount": -2
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "combat_random"
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+  {
+    "id": "dd_z2_mg_shadow_lantern_path",
+    "title": "🏮 Lối Đèn Bóng",
+    "description": "Một dãy đèn tạo ra ba cái bóng khác nhau. Chọn đúng bóng để đi qua hành lang mà không đánh thức hộ vệ.",
+    "color": 16096779,
+    "image": "altar",
+    "weight": 2,
+    "zones": [
+      "shrine"
+    ],
+    "miniGame": {
+      "title": "🏮 Đi Theo Bóng Đèn",
+      "introText": "Chọn đúng bóng ở ít nhất 2/3 lượt.",
+      "startLabel": "Đi theo",
+      "startEmoji": "🏮",
+      "startStyle": "primary",
+      "options": [
+        {
+          "id": "short",
+          "label": "Bóng Ngắn",
+          "emoji": "➖",
+          "style": "secondary"
+        },
+        {
+          "id": "long",
+          "label": "Bóng Dài",
+          "emoji": "〰️",
+          "style": "danger"
+        },
+        {
+          "id": "broken",
+          "label": "Bóng Đứt",
+          "emoji": "💔",
+          "style": "primary"
+        }
+      ],
+      "rounds": [
+        {
+          "prompt": "Bóng đầu ngắn dù đèn ở xa.",
+          "correctOptionId": "short",
+          "successLine": "Bạn theo bóng ngắn an toàn.",
+          "failureLine": "Bạn theo bóng giả."
+        },
+        {
+          "prompt": "Bóng thứ hai kéo dài về cửa cấm.",
+          "correctOptionId": "long",
+          "successLine": "Bạn nhận ra hướng thử thách.",
+          "failureLine": "Bóng dài quấn chân bạn."
+        },
+        {
+          "prompt": "Bóng cuối bị đứt ở giữa nền đá.",
+          "correctOptionId": "broken",
+          "successLine": "Bạn bước qua đoạn đứt đúng lúc.",
+          "failureLine": "Bạn đạp lên kẽ nứt."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Bạn vượt qua lối đèn và tìm được vật liệu cũ.",
+      "failureText": "Đèn tắt cùng lúc, bóng tối cắn vào chân bạn.",
+      "onSuccess": [
+        {
+          "type": "item",
+          "itemId": "shrine_stone",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "item",
+          "itemId": "mirror_shard",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "exp",
+          "min": 10,
+          "max": 20
+        }
+      ],
+      "onFailure": [
+        {
+          "type": "damage_percent",
+          "min": 5,
+          "max": 10
+        },
+        {
+          "type": "corruption",
+          "amount": 4
+        }
+      ],
+      "timeoutText": "⏳ Bạn phản ứng quá chậm nên mini game thất bại."
+    }
+  },
+
+  // ZONE2_SPECIAL_MINIGAMES_START
+  {
+    id: 'dd_z2_special_blue_candle_vigil',
+    title: '🕯️ Canh Lửa Nến Xanh',
+    description: 'Bạn gặp một bệ đá có ngọn nến xanh đang thở từng nhịp. Nếu giữ được lửa qua ba dấu hiệu, đền cổ sẽ để lại tro thánh.',
+    color: 0xF59E0B,
+    image: 'altar',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '🕯️ Giữ Lửa Nến Xanh',
+      introText: 'Đây là mini game canh dấu hiệu. Mỗi lượt hãy đọc hiện tượng của ngọn nến rồi chọn hành động hợp lý.',
+      startLabel: 'Bắt đầu canh lửa',
+      startEmoji: '🕯️',
+      startStyle: 'primary',
+      options: [
+        { id: 'shield', label: 'Che Gió', emoji: '🛡️', style: 'primary' },
+        { id: 'salt', label: 'Rắc Muối', emoji: '🧂', style: 'success' },
+        { id: 'silence', label: 'Giữ Im Lặng', emoji: '🤫', style: 'secondary' },
+        { id: 'chant', label: 'Đọc Chú Văn', emoji: '📜', style: 'primary' },
+      ],
+      rounds: [
+        { prompt: 'Ngọn nến nghiêng mạnh như có gió lùa từ khe cửa đá.', correctOptionId: 'shield', successLine: 'Bạn che gió đúng lúc, lửa xanh đứng thẳng trở lại.', failureLine: 'Lửa xanh bị gió đẩy lệch khỏi bấc.' },
+        { prompt: 'Sáp nến chuyển sang màu đen và bò xuống bệ đá như mực sống.', correctOptionId: 'salt', successLine: 'Muối thanh tẩy làm sáp đen đông lại.', failureLine: 'Sáp đen chạm vào tay bạn, lạnh như lời nguyền.' },
+        { prompt: 'Tiếng vọng gọi tên bạn từ trong ngọn lửa.', correctOptionId: 'silence', successLine: 'Bạn không đáp lại. Tiếng gọi mất đường bám.', failureLine: 'Một hơi thở vô thức khiến tiếng vọng học được nhịp của bạn.' },
+        { prompt: 'Chữ cổ quanh bệ đá sáng lên rồi tắt dần.', correctOptionId: 'chant', successLine: 'Chú văn nối lại vòng chữ cổ.', failureLine: 'Chữ cổ vỡ thành tàn lửa.' },
+      ],
+      successNeeded: 3,
+      successText: 'Ngọn nến cháy ổn định đến cuối nghi lễ. Tro thánh rơi xuống như tuyết mỏng.',
+      failureText: 'Ngọn nến phụt tắt. Căn phòng tối đi và tiếng vọng cười rất khẽ.',
+      onSuccess: [{ type: 'item', itemId: 'holy_ash', min: 2, max: 3 }, { type: 'mp_percent', min: 10, max: 18 }, { type: 'corruption', amount: -8 }, { type: 'exp', min: 18, max: 34 }],
+      onFailure: [{ type: 'corruption', amount: 8 }, { type: 'damage_percent', min: 5, max: 10 }, { type: 'exp', min: 8, max: 14 }],
+      timeoutText: '⏳ Bạn chần chừ quá lâu. Ngọn nến tắt trước khi nghi lễ bắt đầu.',
+    },
+  },
+  {
+    id: 'dd_z2_special_mirror_memory_sequence',
+    title: '🪞 Gương Phản Chiếu Sai Lệch',
+    description: 'Một chiếc gương đen chiếu ra chuỗi biểu tượng rồi lập tức xóa sạch. Bạn phải nhớ lại thứ tự mà chiếc gương vừa nói dối.',
+    color: 0x7C3AED,
+    image: 'mysterious',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '🪞 Ghi Nhớ Ảnh Gương',
+      introText: 'Gương sẽ đưa ra từng đoạn ký ức. Chọn biểu tượng đúng theo dấu hiệu, sai quá nhiều sẽ làm tăng Corruption.',
+      startLabel: 'Nhìn vào gương',
+      startEmoji: '🪞',
+      startStyle: 'primary',
+      options: [
+        { id: 'candle', label: 'Nến', emoji: '🕯️', style: 'secondary' },
+        { id: 'mirror', label: 'Gương', emoji: '🪞', style: 'primary' },
+        { id: 'salt', label: 'Muối', emoji: '🧂', style: 'success' },
+        { id: 'eye', label: 'Mắt', emoji: '👁️', style: 'danger' },
+      ],
+      rounds: [
+        { prompt: 'Chuỗi phản chiếu hiện ra: 🕯️ → 🪞 → 🧂. Biểu tượng đầu tiên là gì?', correctOptionId: 'candle', successLine: 'Bạn giữ được biểu tượng nến trong trí nhớ.', failureLine: 'Hình phản chiếu cười khi bạn nhớ sai biểu tượng đầu.' },
+        { prompt: 'Chuỗi phản chiếu hiện ra: 👁️ → 🧂 → 🪞. Biểu tượng cuối cùng là gì?', correctOptionId: 'mirror', successLine: 'Bạn bắt đúng điểm kết của chuỗi gương.', failureLine: 'Mặt kính đổi chỗ biểu tượng cuối.' },
+        { prompt: 'Chuỗi phản chiếu hiện ra: 🧂 → 🕯️ → 👁️. Biểu tượng ở giữa là gì?', correctOptionId: 'candle', successLine: 'Bạn không để gương tráo ký ức giữa chuỗi.', failureLine: 'Ký ức giữa chuỗi bị bẻ cong.' },
+        { prompt: 'Chuỗi phản chiếu hiện ra: 🪞 → 👁️ → 🧂. Biểu tượng nào khóa lời nguyền?', correctOptionId: 'salt', successLine: 'Muối hiện đúng lúc, lời nguyền tắt tiếng.', failureLine: 'Bạn chọn nhầm thứ chỉ phản chiếu lời nguyền.' },
+      ],
+      successNeeded: 3,
+      successText: 'Mặt gương trong lại. Một mảnh kính đen rơi xuống tay bạn mà không cắt da.',
+      failureText: 'Gương ghi nhớ sai lầm của bạn và trả lại một tiếng cười méo mó.',
+      onSuccess: [{ type: 'item', itemId: 'mirror_shard', min: 2, max: 3 }, { type: 'item', itemId: 'scroll_mirror', min: 1, max: 1 }, { type: 'exp', min: 20, max: 38 }],
+      onFailure: [{ type: 'corruption', amount: 10 }, { type: 'damage_percent', min: 5, max: 11 }],
+      timeoutText: '⏳ Ký hiệu tan khỏi mặt kính. Bạn không còn nhớ chuỗi ban đầu.',
+    },
+  },
+  {
+    id: 'dd_z2_special_seal_bell_timing',
+    title: '🔔 Chuông Phong Ấn',
+    description: 'Một chiếc chuông đồng treo giữa hành lang không có gió. Nó chỉ được gõ khi âm vang tự tìm đúng nhịp.',
+    color: 0xD97706,
+    image: 'altar',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '🔔 Canh Nhịp Chuông',
+      introText: 'Không phải lúc nào cũng được gõ. Hãy chọn đúng thời điểm khi chuông đạt nhịp phong ấn.',
+      startLabel: 'Đứng chờ nhịp',
+      startEmoji: '🔔',
+      startStyle: 'primary',
+      options: [
+        { id: 'wait', label: 'Chờ', emoji: '⏳', style: 'secondary' },
+        { id: 'strike', label: 'Gõ Chuông', emoji: '🔔', style: 'primary' },
+        { id: 'mute', label: 'Giữ Chuông', emoji: '🤫', style: 'success' },
+      ],
+      rounds: [
+        { prompt: 'Chuông im phăng phắc. Không khí quanh nó còn chưa rung.', correctOptionId: 'wait', successLine: 'Bạn chờ đúng nhịp đầu.', failureLine: 'Bạn làm âm vang lệch trước khi nó thành hình.' },
+        { prompt: 'Miệng chuông sáng lên một vòng mỏng. Đây là nhịp đẹp nhất.', correctOptionId: 'strike', successLine: 'Tiếng chuông vang sạch, mở một lớp phong ấn.', failureLine: 'Bạn bỏ lỡ khoảnh khắc chuông sáng.' },
+        { prompt: 'Chuông rung méo tiếng, như có thứ bên trong muốn hét.', correctOptionId: 'mute', successLine: 'Bạn giữ chuông lại trước khi tiếng hét thoát ra.', failureLine: 'Tiếng méo xé qua tai bạn.' },
+        { prompt: 'Âm vang trở lại đúng một nhịp, ngắn và trong.', correctOptionId: 'strike', successLine: 'Bạn gõ nhịp cuối, hành lang lặng xuống.', failureLine: 'Nhịp cuối trôi qua không được khóa.' },
+      ],
+      successNeeded: 3,
+      successText: 'Chuông phong ấn ngân ba nhịp trọn vẹn. Một thánh tích nhỏ rơi khỏi dây treo.',
+      failureText: 'Chuông vang sai nhịp, gọi về một luồng lạnh từ dưới nền đá.',
+      onSuccess: [{ type: 'item', itemId: 'shrine_relic', min: 1, max: 1 }, { type: 'item', itemId: 'ancient_seal', min: 1, max: 1 }, { type: 'corruption', amount: -5 }, { type: 'exp', min: 22, max: 42 }],
+      onFailure: [{ type: 'corruption', amount: 9 }, { type: 'damage_percent', min: 6, max: 12 }],
+      timeoutText: '⏳ Nhịp chuông tắt dần. Cơ hội gõ đúng đã qua.',
+    },
+  },
+  {
+    id: 'dd_z2_special_salt_circle_repair',
+    title: '🧂 Vòng Muối Đứt Đoạn',
+    description: 'Một vòng muối trắng bao quanh bàn thờ, nhưng bốn điểm đã bị gió đen xóa mất. Bạn phải vá đúng loại vết nứt.',
+    color: 0xE5E7EB,
+    image: 'altar',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '🧂 Sửa Vòng Phong Ấn',
+      introText: 'Mỗi vết hỏng cần một cách xử lý khác nhau. Chọn đúng để đẩy lùi Corruption.',
+      startLabel: 'Kiểm tra vòng muối',
+      startEmoji: '🧂',
+      startStyle: 'success',
+      options: [
+        { id: 'salt', label: 'Rắc Muối', emoji: '🧂', style: 'success' },
+        { id: 'moonwater', label: 'Rửa Bằng Moonwater', emoji: '🌙', style: 'primary' },
+        { id: 'candle', label: 'Đặt Nến', emoji: '🕯️', style: 'secondary' },
+        { id: 'leave', label: 'Không Đụng', emoji: '🚶', style: 'secondary' },
+      ],
+      rounds: [
+        { prompt: 'Đoạn phía Bắc bị vỡ thành khoảng trống sạch.', correctOptionId: 'salt', successLine: 'Muối mới khớp vào đường vỡ.', failureLine: 'Vết vỡ không cần thứ bạn vừa dùng.' },
+        { prompt: 'Đoạn phía Đông chuyển đen và chảy như mực.', correctOptionId: 'moonwater', successLine: 'Moonwater rửa sạch mảng đen.', failureLine: 'Mực đen lan rộng hơn.' },
+        { prompt: 'Đoạn phía Nam lạnh đến mức muối đóng băng.', correctOptionId: 'candle', successLine: 'Nến làm băng tan mà không phá vòng.', failureLine: 'Lạnh buốt ăn sâu vào vòng muối.' },
+        { prompt: 'Đoạn phía Tây vẫn ổn định và sáng nhẹ.', correctOptionId: 'leave', successLine: 'Bạn không chạm vào phần còn ổn.', failureLine: 'Bạn sửa nhầm điểm đang hoạt động.' },
+      ],
+      successNeeded: 3,
+      successText: 'Vòng muối liền lại. Bóng tối bị ép khỏi bàn thờ như khói tan.',
+      failureText: 'Vòng muối vỡ thêm một đoạn, để tiếng vọng chui qua.',
+      onSuccess: [{ type: 'item', itemId: 'purifying_salt', min: 1, max: 2 }, { type: 'corruption', amount: -16 }, { type: 'exp', min: 18, max: 34 }],
+      onFailure: [{ type: 'corruption', amount: 12 }, { type: 'damage_percent', min: 4, max: 9 }],
+      timeoutText: '⏳ Bạn đứng quá lâu. Vòng muối tự vỡ thêm một đoạn.',
+    },
+  },
+  {
+    id: 'dd_z2_special_true_echo_filter',
+    title: '👁️ Lọc Tiếng Vọng',
+    description: 'Ba giọng nói vang ra từ sau cửa đá. Có giọng dẫn đường, có giọng muốn học tên bạn, và có giọng chỉ lặp lại nỗi sợ.',
+    color: 0x4C1D95,
+    image: 'mysterious',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '👁️ Chọn Giọng An Toàn',
+      introText: 'Quy tắc: giọng an toàn không gọi tên bạn, không bảo bạn chạm vào gương, và thường khuyên im lặng.',
+      startLabel: 'Lắng nghe ba giọng',
+      startEmoji: '👂',
+      startStyle: 'primary',
+      options: [
+        { id: 'leave', label: '“Rời khỏi đây.”', emoji: '🚪', style: 'secondary' },
+        { id: 'touch', label: '“Chạm vào gương.”', emoji: '🪞', style: 'danger' },
+        { id: 'silent', label: '“Đừng trả lời nó.”', emoji: '🤫', style: 'success' },
+        { id: 'name', label: '“Ta biết tên ngươi.”', emoji: '👁️', style: 'danger' },
+      ],
+      rounds: [
+        { prompt: 'Giọng thứ nhất nói rất nhỏ: “Đừng trả lời nó.”', correctOptionId: 'silent', successLine: 'Bạn chọn giọng biết giữ im lặng.', failureLine: 'Bạn nghe theo tiếng vọng thích gọi tên.' },
+        { prompt: 'Giọng thứ hai đẩy bạn lùi khỏi cánh cửa: “Rời khỏi đây.”', correctOptionId: 'leave', successLine: 'Bạn nhận ra lời cảnh báo thật.', failureLine: 'Bạn bỏ qua lời cảnh báo.' },
+        { prompt: 'Giọng thứ ba thì thầm: “Chạm vào gương, nó sẽ mở đường.”', correctOptionId: 'touch', successLine: 'Bạn nhận diện được bẫy gương và khóa nó lại.', failureLine: 'Gương bắt được sự chú ý của bạn.' },
+        { prompt: 'Giọng cuối cùng nói: “Ta biết tên ngươi.”', correctOptionId: 'name', successLine: 'Bạn nhận diện đúng giọng nguyền và không đáp lại.', failureLine: 'Tên của bạn vang lên trong hành lang.' },
+      ],
+      successNeeded: 3,
+      successText: 'Bạn tách được giọng thật khỏi tiếng quỷ. Một mảnh ký ức rơi ra khỏi tường đá.',
+      failureText: 'Tiếng vọng trộn vào giọng của bạn. Đền cổ nhớ bạn rõ hơn.',
+      onSuccess: [{ type: 'item', itemId: 'lost_memory', min: 1, max: 1 }, { type: 'item', itemId: 'echo_core', min: 1, max: 1 }, { type: 'corruption', amount: -6 }, { type: 'exp', min: 20, max: 40 }],
+      onFailure: [{ type: 'corruption', amount: 12 }, { type: 'mp_percent', min: 1, max: 3 }],
+      timeoutText: '⏳ Các giọng hòa vào nhau. Bạn không còn phân biệt được giọng nào là thật.',
+    },
+  },
+  {
+    id: 'dd_z2_special_soul_lake_crossing',
+    title: '🛶 Dẫn Hồn Qua Hồ',
+    description: 'Một linh hồn nhỏ đứng bên hồ đen, không nhớ đường sang bờ nến xanh. Nó sẽ đi theo lựa chọn của bạn.',
+    color: 0x60A5FA,
+    image: 'spring',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '🛶 Dẫn Hồn Qua Hồ',
+      introText: 'Dẫn linh hồn qua ba đoạn hồ. Đừng đi theo tiếng gọi hoặc bóng phản chiếu sai.',
+      startLabel: 'Dẫn hồn',
+      startEmoji: '🛶',
+      startStyle: 'primary',
+      options: [
+        { id: 'candle', label: 'Theo Ánh Nến', emoji: '🕯️', style: 'success' },
+        { id: 'reflection', label: 'Theo Bóng Nước', emoji: '🪞', style: 'danger' },
+        { id: 'voice', label: 'Theo Tiếng Gọi', emoji: '👂', style: 'danger' },
+        { id: 'still', label: 'Đứng Yên', emoji: '🤫', style: 'secondary' },
+      ],
+      rounds: [
+        { prompt: 'Sương mù che kín mặt hồ, chỉ còn một ngọn nến xanh ở xa.', correctOptionId: 'candle', successLine: 'Linh hồn đi theo ánh nến và không lạc.', failureLine: 'Bóng nước kéo linh hồn lệch khỏi bờ.' },
+        { prompt: 'Mặt nước phản chiếu một con đường quá đẹp, quá thẳng.', correctOptionId: 'still', successLine: 'Bạn đứng yên cho đến khi phản chiếu giả tan đi.', failureLine: 'Bạn tin vào con đường trong nước.' },
+        { prompt: 'Một giọng thân quen gọi từ phía sau: “Lối này.”', correctOptionId: 'candle', successLine: 'Bạn bỏ qua tiếng gọi và tiếp tục theo nến.', failureLine: 'Tiếng gọi kéo linh hồn quay đầu.' },
+        { prompt: 'Bờ nến xanh đã gần, nhưng mặt hồ bỗng im lặng tuyệt đối.', correctOptionId: 'still', successLine: 'Bạn chờ mặt hồ thở lại rồi mới bước tiếp.', failureLine: 'Bạn vội bước vào khoảng im lặng.' },
+      ],
+      successNeeded: 3,
+      successText: 'Linh hồn sang được bờ bên kia. Nó cúi đầu, để lại một cây nến nhỏ và tro thánh.',
+      failureText: 'Linh hồn tan vào mặt hồ. Nước đen dâng lên tận mắt cá chân bạn.',
+      onSuccess: [{ type: 'item', itemId: 'soul_candle', min: 1, max: 1 }, { type: 'item', itemId: 'holy_ash', min: 1, max: 2 }, { type: 'reputation', amount: 3 }, { type: 'corruption', amount: -10 }],
+      onFailure: [{ type: 'corruption', amount: 10 }, { type: 'combat_random' }],
+      timeoutText: '⏳ Linh hồn chờ quá lâu rồi tan thành đốm sáng trên mặt hồ.',
+    },
+  },
+  {
+    id: 'dd_z2_special_stone_seal_carving',
+    title: '🗿 Khắc Lại Ấn Đá',
+    description: 'Một phiến đá hộ vệ mất gần hết phù văn. Nếu khắc lại đúng thứ tự, Ấn Đá sẽ yếu đi trước khi Broken Guardian xuất hiện.',
+    color: 0x78716C,
+    image: 'altar',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '🗿 Khắc Phù Văn Đá',
+      introText: 'Chọn đúng nét khắc theo vết mờ trên phiến đá. Đây là mini game chuẩn bị cho Ấn Đá.',
+      startLabel: 'Bắt đầu khắc',
+      startEmoji: '🗿',
+      startStyle: 'primary',
+      options: [
+        { id: 'stone', label: 'Dấu Đá', emoji: '🗿', style: 'secondary' },
+        { id: 'candle', label: 'Dấu Nến', emoji: '🕯️', style: 'primary' },
+        { id: 'mirror', label: 'Dấu Gương', emoji: '🪞', style: 'success' },
+        { id: 'eye', label: 'Dấu Mắt', emoji: '👁️', style: 'danger' },
+      ],
+      rounds: [
+        { prompt: 'Nét đầu nặng như chân tượng hộ vệ.', correctOptionId: 'stone', successLine: 'Dấu Đá ăn sâu vào phiến đá.', failureLine: 'Phiến đá rung lên vì nét sai.' },
+        { prompt: 'Nét thứ hai cần ánh lửa để không nứt.', correctOptionId: 'candle', successLine: 'Dấu Nến giữ vết khắc không vỡ.', failureLine: 'Vết khắc rạn thêm một đường.' },
+        { prompt: 'Nét cuối phải phản chiếu lại vết nứt.', correctOptionId: 'mirror', successLine: 'Dấu Gương khóa vết nứt cuối.', failureLine: 'Vết nứt phản chiếu ngược vào bạn.' },
+      ],
+      successNeeded: 2,
+      successText: 'Ấn Đá sáng lên. Bạn nhặt được đá đền và cảm thấy hộ vệ cổ yếu đi đôi chút.',
+      failureText: 'Phiến đá vỡ một góc. Tiếng bước chân hộ vệ vang lên gần hơn.',
+      onSuccess: [{ type: 'item', itemId: 'shrine_stone', min: 2, max: 3 }, { type: 'exp', min: 16, max: 30 }, { type: 'corruption', amount: -3 }],
+      onFailure: [{ type: 'corruption', amount: 6 }, { type: 'combat_random' }],
+      timeoutText: '⏳ Phù văn nguội đi. Phiến đá không còn nhận nét khắc.',
+    },
+  },
+  {
+    id: 'dd_z2_special_ceramic_mask_trial',
+    title: '🎭 Mặt Nạ Gốm Biết Cười',
+    description: 'Bốn mặt nạ gốm treo trên tường. Chúng đổi cảm xúc mỗi khi bạn chớp mắt, nhưng chỉ một chiếc nói thật.',
+    color: 0xB45309,
+    image: 'mysterious',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '🎭 Chọn Mặt Nạ Thật',
+      introText: 'Đền cổ để lại gợi ý: mặt nạ thật không phô cảm xúc, không dụ dỗ và không khóc thay bạn.',
+      startLabel: 'Quan sát mặt nạ',
+      startEmoji: '🎭',
+      startStyle: 'primary',
+      options: [
+        { id: 'smile', label: 'Cười', emoji: '🙂', style: 'danger' },
+        { id: 'cry', label: 'Khóc', emoji: '😢', style: 'secondary' },
+        { id: 'silent', label: 'Im Lặng', emoji: '😐', style: 'success' },
+        { id: 'anger', label: 'Giận Dữ', emoji: '😠', style: 'danger' },
+      ],
+      rounds: [
+        { prompt: 'Một mặt nạ cười trước khi bạn hỏi.', correctOptionId: 'silent', successLine: 'Bạn không tin nụ cười quá sớm.', failureLine: 'Nụ cười giả dính vào khóe miệng bạn.' },
+        { prompt: 'Một mặt nạ khóc bằng giọng của người quen.', correctOptionId: 'silent', successLine: 'Bạn nhận ra nước mắt vay mượn.', failureLine: 'Nước mắt gốm rơi xuống tay bạn.' },
+        { prompt: 'Một mặt nạ im lặng dù cả tường đang thì thầm.', correctOptionId: 'silent', successLine: 'Bạn chọn đúng chiếc không bị tiếng vọng chi phối.', failureLine: 'Bạn bỏ qua sự im lặng thật.' },
+      ],
+      successNeeded: 2,
+      successText: 'Mặt nạ im lặng rơi xuống, để lộ một ngăn giấu sau tường.',
+      failureText: 'Các mặt nạ cười cùng lúc. Một lời nguyền bám vào sau gáy bạn.',
+      onSuccess: [{ type: 'item', itemId: 'ancient_seal', min: 1, max: 1 }, { type: 'gold', min: 25, max: 55 }, { type: 'exp', min: 18, max: 34 }],
+      onFailure: [{ type: 'corruption', amount: 8 }, { type: 'damage_percent', min: 4, max: 9 }],
+      timeoutText: '⏳ Mặt nạ đổi chỗ quá nhanh. Bạn không kịp chọn chiếc thật.',
+    },
+  },
+  {
+    id: 'dd_z2_special_lantern_shadow_path',
+    title: '🏮 Lối Đèn Bóng Lệch',
+    description: 'Hành lang phía trước có ba lối, mỗi lối treo một chiếc đèn. Ánh sáng không chỉ đường — bóng mới là thứ cần đọc.',
+    color: 0xF97316,
+    image: 'altar',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '🏮 Đọc Bóng Đèn',
+      introText: 'Đi qua ba đoạn hành lang. Đèn xanh không luôn an toàn; hãy đọc dấu hiệu của bóng.',
+      startLabel: 'Bước vào hành lang',
+      startEmoji: '🏮',
+      startStyle: 'primary',
+      options: [
+        { id: 'green', label: 'Đèn Xanh', emoji: '🟢', style: 'success' },
+        { id: 'white', label: 'Đèn Trắng', emoji: '⚪', style: 'secondary' },
+        { id: 'dark', label: 'Đèn Tắt', emoji: '⚫', style: 'danger' },
+        { id: 'broken', label: 'Bóng Đứt', emoji: '💔', style: 'primary' },
+      ],
+      rounds: [
+        { prompt: 'Lối trái có đèn xanh, nhưng bóng của nó kéo ngược về sau.', correctOptionId: 'broken', successLine: 'Bạn đi theo bóng đứt, không theo màu đèn.', failureLine: 'Màu xanh chỉ là mồi nhử.' },
+        { prompt: 'Lối giữa có đèn trắng, bóng đứng yên dưới chân.', correctOptionId: 'white', successLine: 'Bóng đứng yên nghĩa là lối ổn định.', failureLine: 'Bạn bỏ qua lối ổn định duy nhất.' },
+        { prompt: 'Lối phải tắt đèn, nhưng không có bóng nào ở đó.', correctOptionId: 'dark', successLine: 'Không bóng nghĩa là không có thứ gì bám theo.', failureLine: 'Bạn bước vào lối có bóng chờ sẵn.' },
+        { prompt: 'Ở cuối hành lang, một bóng bị cắt ngang bởi vết nứt.', correctOptionId: 'broken', successLine: 'Bạn nhảy qua phần bóng bị cắt.', failureLine: 'Bóng nắm lấy gót chân bạn.' },
+      ],
+      successNeeded: 3,
+      successText: 'Bạn vượt qua hành lang đèn bóng và tìm được lối phụ chứa vật liệu cổ.',
+      failureText: 'Đèn tắt cùng lúc. Hành lang cắn vào bước chân bạn.',
+      onSuccess: [{ type: 'item', itemId: 'mirror_shard', min: 1, max: 2 }, { type: 'item', itemId: 'shrine_relic', min: 1, max: 1 }, { type: 'exp', min: 18, max: 34 }],
+      onFailure: [{ type: 'damage_percent', min: 6, max: 12 }, { type: 'corruption', amount: 8 }],
+      timeoutText: '⏳ Đèn đổi màu quá nhanh. Bạn buộc phải quay lại.',
+    },
+  },
+  {
+    id: 'dd_z2_special_ancient_tablet_riddle',
+    title: '📜 Bia Đá Cổ Không Bóng',
+    description: 'Một bia đá không hắt bóng dưới ánh nến. Trên mặt đá có câu hỏi cũ, như thể nó đã chờ người đọc hàng trăm năm.',
+    color: 0x8B5CF6,
+    image: 'altar',
+    weight: 3,
+    zones: ['shrine'],
+    miniGame: {
+      title: '📜 Giải Bia Đá Cổ',
+      introText: 'Chọn đáp án đúng cho các câu đố ngắn của đền. Câu trả lời nằm trong theme Zone 2: tiếng vọng, gương, bóng và muối.',
+      startLabel: 'Đọc bia đá',
+      startEmoji: '📜',
+      startStyle: 'primary',
+      options: [
+        { id: 'fire', label: 'Lửa', emoji: '🔥', style: 'danger' },
+        { id: 'shadow', label: 'Bóng', emoji: '🌑', style: 'primary' },
+        { id: 'mirror', label: 'Gương', emoji: '🪞', style: 'secondary' },
+        { id: 'salt', label: 'Muối', emoji: '🧂', style: 'success' },
+      ],
+      rounds: [
+        { prompt: '“Không phải ánh sáng mở cửa, mà là thứ còn lại sau khi ánh sáng tắt.”', correctOptionId: 'shadow', successLine: 'Bia đá nhận câu trả lời: Bóng.', failureLine: 'Ánh sáng trên bia đá tắt phụt.' },
+        { prompt: '“Thứ nói bằng giọng của ngươi, nhưng không có linh hồn.”', correctOptionId: 'mirror', successLine: 'Mặt gương trên bia đá khép lại.', failureLine: 'Tiếng vọng mượn giọng bạn.' },
+        { prompt: '“Thứ không giết quỷ, nhưng khiến quỷ không bước qua.”', correctOptionId: 'salt', successLine: 'Một vòng muối hiện quanh chân bia.', failureLine: 'Vòng muối bị xóa đi.' },
+        { prompt: '“Thứ cháy càng lâu càng để lộ bóng tối.”', correctOptionId: 'fire', successLine: 'Ngọn lửa xanh lóe lên đúng nhịp.', failureLine: 'Lửa xanh cháy ngược vào chữ cổ.' },
+      ],
+      successNeeded: 3,
+      successText: 'Bia đá mở ra một khe nhỏ. Cổ thư và kinh nghiệm nghi lễ nằm bên trong.',
+      failureText: 'Bia đá khép lại. Một phần câu đố khắc ngược lên da tay bạn.',
+      onSuccess: [{ type: 'item', itemId: 'ancient_book', min: 1, max: 1 }, { type: 'item', itemId: 'ancient_seal', min: 1, max: 1 }, { type: 'exp', min: 24, max: 46 }, { type: 'corruption', amount: -4 }],
+      onFailure: [{ type: 'damage_percent', min: 5, max: 10 }, { type: 'corruption', amount: 7 }, { type: 'exp', min: 8, max: 16 }],
+      timeoutText: '⏳ Chữ cổ chạy khỏi mặt bia. Câu hỏi khép lại.',
+    },
+  },
+  // ZONE2_SPECIAL_MINIGAMES_END
+
+  // ZONE2_50_SHRINE_EVENTS_END
 
 ] as const;

@@ -38,12 +38,12 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     id: 2,
-    title: '⛩️ Chương 2: Bí Mật Đền Cổ',
-    lore: 'Rừng tối đã sạch hơn một chút. Nhưng đền cổ phía tây đang phát ra ánh sáng kỳ lạ vào ban đêm...',
+    title: '⛩️ Chương 2: Tiếng Vọng Trong Đền Cổ',
+    lore: 'Sau Rừng Bóng Tối là một tàn tích ngàn năm. Mỗi ngọn nến xanh trong đền đều thì thầm tên người sống...',
     objectives: [
-      { id: 'explore_shrine',  desc: 'Khám phá Đền Cổ Hoang Phế 5 lần',  type: 'explore_zone', target: 5, zoneId: 'shrine' },
-      { id: 'kill_shrine',     desc: 'Tiêu diệt 8 quái tại Đền Cổ',      type: 'kill_in_zone', target: 8, zoneId: 'shrine' },
-      { id: 'kill_guardian',   desc: 'Tiêu diệt Shrine Guardian',         type: 'kill_boss',    target: 1, enemyId: 'shrine_guardian' },
+      { id: 'explore_shrine',  desc: 'Khám phá Đền Cổ Bị Lãng Quên 6 lần',  type: 'explore_zone', target: 6, zoneId: 'shrine' },
+      { id: 'kill_shrine',     desc: 'Tiêu diệt 8 linh thể/hộ vệ tại Đền Cổ', type: 'kill_in_zone', target: 8, zoneId: 'shrine' },
+      { id: 'kill_echo_demon', desc: 'Phong ấn Echo Demon',              type: 'kill_boss',    target: 1, enemyId: 'echo_demon' },
     ],
     reward: { titleId: 'ruin_seeker', gold: 1000, exp: 600 },
   },

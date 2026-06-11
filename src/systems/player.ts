@@ -4,6 +4,7 @@ import { SKILLS, getSkill } from '../data/skills';
 import { getEquipmentStats } from './equipment';
 import { CLASSES, getClass } from '../data/classes';
 import type { PlayerRow } from '../utils/embeds';
+import { deriveBaseStats, getAvailableStatPoints, isStatKey, type StatKey } from './statSystem';
 
 export interface SkillPoolEntry { skill_id: string; learned_at: number; }
 export interface LoadoutEntry   { slot: number; skill_id: string; }
@@ -46,23 +47,19 @@ export function changePlayerClass(userId: string, guildId: string, classId: stri
   if (!newCls) return { ok: false, reason: 'invalid_class' };
   if (oldCls.id === newCls.id) return { ok: false, reason: 'same_class', oldClassId: oldCls.id, newClassId: newCls.id };
 
-  const hpDiff  = newCls.hpBonus  - oldCls.hpBonus;
-  const mpDiff  = newCls.mpBonus  - oldCls.mpBonus;
-  const atkDiff = newCls.atkBonus - oldCls.atkBonus;
-  const defDiff = newCls.defBonus - oldCls.defBonus;
-
-  const nextMaxHp = Math.max(1, player.max_hp + hpDiff);
-  const nextMaxMp = Math.max(0, player.max_mp + mpDiff);
-  const nextHp    = Math.max(1, Math.min(nextMaxHp, player.hp + hpDiff));
-  const nextMp    = Math.max(0, Math.min(nextMaxMp, player.mp + mpDiff));
-  const nextAtk   = Math.max(1, player.atk + atkDiff);
-  const nextDef   = Math.max(0, player.def + defDiff);
+  const before = applyPassiveStats(player);
+  const missingHp = Math.max(0, before.max_hp - before.hp);
+  const missingMp = Math.max(0, before.max_mp - before.mp);
+  const projected = { ...player, class: classId } as PlayerRow;
+  const next = deriveBaseStats(projected);
+  const nextHp = Math.max(1, Math.min(next.maxHp, next.maxHp - missingHp));
+  const nextMp = Math.max(0, Math.min(next.maxMp, next.maxMp - missingMp));
 
   db.prepare(`
     UPDATE players SET
       class = ?, hp = ?, max_hp = ?, mp = ?, max_mp = ?, atk = ?, def = ?
     WHERE user_id = ? AND guild_id = ?
-  `).run(classId, nextHp, nextMaxHp, nextMp, nextMaxMp, nextAtk, nextDef, userId, guildId);
+  `).run(classId, nextHp, next.maxHp, nextMp, next.maxMp, next.atk, next.def, userId, guildId);
 
   return { ok: true, oldClassId: oldCls.id, newClassId: newCls.id };
 }
@@ -70,24 +67,31 @@ export function changePlayerClass(userId: string, guildId: string, classId: stri
 export function resetPlayer(userId: string, guildId: string): void {
   // Keep soul_shards, deaths, learned skills and permanent soul upgrades.
   const current = getPlayer(userId, guildId) as any;
-  const pAtk = current?.permanent_atk_bonus ?? 0;
-  const pDef = current?.permanent_def_bonus ?? 0;
-  const pHp  = current?.permanent_max_hp_bonus ?? 0;
-  const pMp  = current?.permanent_max_mp_bonus ?? 0;
   const blessing = current?.rebirth_blessing ? 1 : 0;
-  const cls = getClass(current?.class ?? 'warrior') ?? CLASSES.warrior;
-  const baseHp  = 100 + pHp  + blessing * 20 + cls.hpBonus;
-  const baseMp  = 50  + pMp  + blessing * 10 + cls.mpBonus;
-  const baseAtk = 10  + pAtk + blessing * 2  + cls.atkBonus;
-  const baseDef = 5   + pDef + blessing      + cls.defBonus;
+  const clsId = current?.class ?? 'warrior';
+  const projected = {
+    ...current,
+    level: 1,
+    class: clsId,
+    stat_str: 0,
+    stat_vit: 0,
+    stat_end: 0,
+    stat_agi: 0,
+    stat_luk: 0,
+    rebirth_blessing: Math.max(0, (current?.rebirth_blessing ?? 0) - blessing),
+  } as PlayerRow;
+  const base = deriveBaseStats(projected);
+
   db.prepare(`
     UPDATE players SET
       alive = 1, level = 1, exp = 0, exp_next = 100,
       hp = ?, max_hp = ?, mp = ?, max_mp = ?,
       atk = ?, def = ?, gold = ?, zone_id = 'village', kills = 0,
+      stat_str = 0, stat_vit = 0, stat_end = 0, stat_agi = 0, stat_luk = 0,
+      free_stat_reset = 1,
       rebirth_blessing = MAX(0, COALESCE(rebirth_blessing,0) - ?)
     WHERE user_id = ? AND guild_id = ?
-  `).run(baseHp, baseHp, baseMp, baseMp, baseAtk, baseDef, 50 + blessing * 50, blessing, userId, guildId);
+  `).run(base.maxHp, base.maxHp, base.maxMp, base.maxMp, base.atk, base.def, 50 + blessing * 50, blessing, userId, guildId);
   // Clear combat skill loadout only. Skill pool is kept, so players can attune skills again.
   db.prepare('DELETE FROM skill_loadout WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
 
@@ -99,6 +103,17 @@ export function resetPlayer(userId: string, guildId: string): void {
 
 // ── Stat helpers ──────────────────────────────────────────────────────────
 export function applyPassiveStats(player: PlayerRow): PlayerRow {
+  const derivedBase = deriveBaseStats(player);
+  const normalized: PlayerRow = {
+    ...player,
+    hp: Math.min(player.hp, derivedBase.maxHp),
+    mp: Math.min(player.mp, derivedBase.maxMp),
+    max_hp: derivedBase.maxHp,
+    max_mp: derivedBase.maxMp,
+    atk: derivedBase.atk,
+    def: derivedBase.def,
+  };
+
   const loadout = getLoadout(player.user_id, player.guild_id);
   let bonusDef = 0, bonusAtk = 0, bonusMaxHp = 0, bonusMaxMp = 0;
 
@@ -129,10 +144,10 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
       if (petDef) {
         const pct = petPassiveValue(petDef, petRow.level) / 100;
         switch (petDef.passiveType) {
-          case 'atk_pct': bonusAtk   += Math.floor(player.atk    * pct); break;
-          case 'def_pct': bonusDef   += Math.floor(player.def    * pct); break;
-          case 'hp_pct':  bonusMaxHp += Math.floor(player.max_hp * pct); break;
-          case 'mp_pct':  bonusMaxMp += Math.floor(player.max_mp * pct); break;
+          case 'atk_pct': bonusAtk   += Math.floor(normalized.atk    * pct); break;
+          case 'def_pct': bonusDef   += Math.floor(normalized.def    * pct); break;
+          case 'hp_pct':  bonusMaxHp += Math.floor(normalized.max_hp * pct); break;
+          case 'mp_pct':  bonusMaxMp += Math.floor(normalized.max_mp * pct); break;
         }
       }
     }
@@ -148,22 +163,22 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
     for (const b of buffs) {
       const pct = b.value / 100;
       switch (b.buff_type) {
-        case 'atk':  bonusAtk   += Math.floor(player.atk    * pct); break;
-        case 'def':  bonusDef   += Math.floor(player.def    * pct); break;
-        case 'hp':   bonusMaxHp += Math.floor(player.max_hp * pct); break;
-        case 'mp':   bonusMaxMp += Math.floor(player.max_mp * pct); break;
+        case 'atk':  bonusAtk   += Math.floor(normalized.atk    * pct); break;
+        case 'def':  bonusDef   += Math.floor(normalized.def    * pct); break;
+        case 'hp':   bonusMaxHp += Math.floor(normalized.max_hp * pct); break;
+        case 'mp':   bonusMaxMp += Math.floor(normalized.max_mp * pct); break;
       }
     }
   }
 
-  const virtualMaxHp = Math.max(10, player.max_hp + bonusMaxHp);
-  const virtualMaxMp = Math.max(5,  player.max_mp + bonusMaxMp);
+  const virtualMaxHp = Math.max(10, normalized.max_hp + bonusMaxHp);
+  const virtualMaxMp = Math.max(5,  normalized.max_mp + bonusMaxMp);
   return {
-    ...player,
-    hp:     Math.min(player.hp, virtualMaxHp),
-    mp:     Math.min(player.mp, virtualMaxMp),
-    atk:    player.atk    + bonusAtk,
-    def:    Math.max(0, player.def + bonusDef),
+    ...normalized,
+    hp:     Math.min(normalized.hp, virtualMaxHp),
+    mp:     Math.min(normalized.mp, virtualMaxMp),
+    atk:    normalized.atk + bonusAtk,
+    def:    Math.max(0, normalized.def + bonusDef),
     max_hp: virtualMaxHp,
     max_mp: virtualMaxMp,
   };
@@ -203,6 +218,96 @@ export interface LevelUpResult {
   mpGain: number;
   atkGain: number;
   defGain: number;
+  statPointsGain: number;
+}
+
+export function syncDerivedBaseStats(userId: string, guildId: string, preserveMissing = true): PlayerRow | undefined {
+  const player = getPlayer(userId, guildId);
+  if (!player) return undefined;
+  const before = applyPassiveStats(player);
+  const missingHp = preserveMissing ? Math.max(0, before.max_hp - before.hp) : 0;
+  const missingMp = preserveMissing ? Math.max(0, before.max_mp - before.mp) : 0;
+  const base = deriveBaseStats(player);
+  const nextHp = Math.max(player.alive ? 1 : 0, Math.min(base.maxHp, base.maxHp - missingHp));
+  const nextMp = Math.max(0, Math.min(base.maxMp, base.maxMp - missingMp));
+
+  db.prepare(`
+    UPDATE players SET hp=?, max_hp=?, mp=?, max_mp=?, atk=?, def=?
+    WHERE user_id=? AND guild_id=?
+  `).run(nextHp, base.maxHp, nextMp, base.maxMp, base.atk, base.def, userId, guildId);
+  return getPlayer(userId, guildId);
+}
+
+export function spendStatPoint(userId: string, guildId: string, stat: StatKey): { ok: boolean; reason?: string; player?: PlayerRow } {
+  const player = getPlayer(userId, guildId);
+  if (!player) return { ok: false, reason: 'not_found' };
+  if (!isStatKey(stat)) return { ok: false, reason: 'invalid_stat' };
+  if (getAvailableStatPoints(player) <= 0) return { ok: false, reason: 'no_points', player };
+
+  const col = `stat_${stat}`;
+  db.prepare(`UPDATE players SET ${col} = COALESCE(${col},0) + 1 WHERE user_id=? AND guild_id=?`)
+    .run(userId, guildId);
+  const synced = syncDerivedBaseStats(userId, guildId, true);
+  return { ok: true, player: synced };
+}
+
+export function spendStatPointsBulk(
+  userId: string,
+  guildId: string,
+  allocation: Partial<Record<StatKey, number>>
+): { ok: boolean; reason?: string; spent?: number; player?: PlayerRow } {
+  const player = getPlayer(userId, guildId);
+  if (!player) return { ok: false, reason: 'not_found' };
+
+  const entries = Object.entries(allocation)
+    .map(([key, value]) => [key, Number(value ?? 0)] as const)
+    .filter(([key, value]) => isStatKey(key) && Number.isFinite(value) && value > 0)
+    .map(([key, value]) => [key as StatKey, Math.floor(value)] as const);
+
+  if (!entries.length) return { ok: false, reason: 'empty', player };
+
+  const spent = entries.reduce((sum, [, value]) => sum + value, 0);
+  if (spent <= 0) return { ok: false, reason: 'empty', player };
+  if (spent > getAvailableStatPoints(player)) return { ok: false, reason: 'no_points', spent, player };
+
+  const setSql = entries.map(([key]) => `stat_${key} = COALESCE(stat_${key},0) + ?`).join(', ');
+  const params = entries.map(([, value]) => value);
+  db.prepare(`UPDATE players SET ${setSql} WHERE user_id=? AND guild_id=?`)
+    .run(...params, userId, guildId);
+
+  const synced = syncDerivedBaseStats(userId, guildId, true);
+  return { ok: true, spent, player: synced };
+}
+
+export function resetAllocatedStats(userId: string, guildId: string, consumeFreeReset = true): { ok: boolean; reason?: string; player?: PlayerRow } {
+  const player = getPlayer(userId, guildId);
+  if (!player) return { ok: false, reason: 'not_found' };
+  if (consumeFreeReset && ((player as any).free_stat_reset ?? 1) !== 1) return { ok: false, reason: 'no_free_reset', player };
+
+  const before = applyPassiveStats(player);
+  const hpRatio = before.max_hp > 0 ? Math.max(0, before.hp / before.max_hp) : 1;
+  const mpRatio = before.max_mp > 0 ? Math.max(0, before.mp / before.max_mp) : 1;
+
+  const projected = {
+    ...player,
+    stat_str: 0,
+    stat_vit: 0,
+    stat_end: 0,
+    stat_agi: 0,
+    stat_luk: 0,
+  } as PlayerRow;
+  const base = deriveBaseStats(projected);
+  const nextHp = Math.max(player.alive ? 1 : 0, Math.min(base.maxHp, Math.floor(base.maxHp * hpRatio)));
+  const nextMp = Math.max(0, Math.min(base.maxMp, Math.floor(base.maxMp * mpRatio)));
+
+  db.prepare(`
+    UPDATE players SET
+      stat_str=0, stat_vit=0, stat_end=0, stat_agi=0, stat_luk=0,
+      free_stat_reset = CASE WHEN ? THEN 0 ELSE free_stat_reset END,
+      hp=?, max_hp=?, mp=?, max_mp=?, atk=?, def=?
+    WHERE user_id=? AND guild_id=?
+  `).run(consumeFreeReset ? 1 : 0, nextHp, base.maxHp, nextMp, base.maxMp, base.atk, base.def, userId, guildId);
+  return { ok: true, player: getPlayer(userId, guildId) };
 }
 
 export function grantExp(userId: string, guildId: string, amount: number): LevelUpResult {
@@ -211,44 +316,45 @@ export function grantExp(userId: string, guildId: string, amount: number): Level
   const missingHp = Math.max(0, effectiveBefore.max_hp - effectiveBefore.hp);
   const missingMp = Math.max(0, effectiveBefore.max_mp - effectiveBefore.mp);
 
-  let { level, exp, exp_next, max_hp, max_mp, atk, def } = player;
+  const oldBase = deriveBaseStats(player);
+  const oldLevel = player.level;
+  let { level, exp, exp_next } = player;
   exp += amount;
 
   let leveledUp = false;
-  let hpGain = 0, mpGain = 0, atkGain = 0, defGain = 0;
-
   while (exp >= exp_next) {
     exp -= exp_next;
     level++;
     exp_next = expNext(level);
-    // Stat gains on level up
-    const hg = Math.floor(10 + level * 2);
-    const mg = Math.floor(5 + level);
-    const ag = Math.floor(2 + level * 0.5);
-    const dg = Math.floor(1 + level * 0.3);
-    max_hp += hg;
-    max_mp += mg;
-    atk    += ag;
-    def    += dg;
-    hpGain += hg; mpGain += mg; atkGain += ag; defGain += dg;
     leveledUp = true;
   }
 
+  const projected = { ...player, level, exp, exp_next } as PlayerRow;
+  const newBase = deriveBaseStats(projected);
   let hp = player.hp;
   let mp = player.mp;
   if (leveledUp) {
-    const afterBase = { ...player, level, exp, exp_next, max_hp, max_mp, atk, def } as PlayerRow;
-    const effectiveAfter = applyPassiveStats(afterBase);
-    hp = Math.max(1, Math.min(effectiveAfter.max_hp, effectiveAfter.max_hp - missingHp));
-    mp = Math.max(0, Math.min(effectiveAfter.max_mp, effectiveAfter.max_mp - missingMp));
+    hp = Math.max(1, Math.min(newBase.maxHp, newBase.maxHp - missingHp));
+    mp = Math.max(0, Math.min(newBase.maxMp, newBase.maxMp - missingMp));
+  } else {
+    hp = Math.max(0, Math.min(hp, newBase.maxHp));
+    mp = Math.max(0, Math.min(mp, newBase.maxMp));
   }
 
   db.prepare(`
     UPDATE players SET level=?, exp=?, exp_next=?, hp=?, max_hp=?, mp=?, max_mp=?, atk=?, def=?
     WHERE user_id=? AND guild_id=?
-  `).run(level, exp, exp_next, Math.floor(hp), max_hp, Math.floor(mp), max_mp, atk, def, userId, guildId);
+  `).run(level, exp, exp_next, Math.floor(hp), newBase.maxHp, Math.floor(mp), newBase.maxMp, newBase.atk, newBase.def, userId, guildId);
 
-  return { leveledUp, newLevel: level, hpGain, mpGain, atkGain, defGain };
+  return {
+    leveledUp,
+    newLevel: level,
+    hpGain: Math.max(0, newBase.maxHp - oldBase.maxHp),
+    mpGain: Math.max(0, newBase.maxMp - oldBase.maxMp),
+    atkGain: Math.max(0, newBase.atk - oldBase.atk),
+    defGain: Math.max(0, newBase.def - oldBase.def),
+    statPointsGain: Math.max(0, level - oldLevel) * 3,
+  };
 }
 
 // ── Gold ──────────────────────────────────────────────────────────────────

@@ -18,7 +18,7 @@ export const ZONES: Record<string, ZoneDef> = {
     id: 'village', name: 'Làng Ashveil', icon: '🏘️',
     description: 'Ngôi làng nhỏ yên bình, nơi mọi hành trình bắt đầu. Người ta nói rừng phía đông đang thay đổi...',
     minLevel: 0, safe: true, travelCost: 0,
-    enemyIds: [], shopItems: ['bread', 'minor_healing_potion', 'health_potion', 'mana_potion', 'quick_salve', 'focus_tonic', 'ancient_book'],
+    enemyIds: [], shopItems: ['bread', 'minor_healing_potion', 'health_potion', 'mana_potion', 'quick_salve', 'weapon_oil', 'armor_polish', 'scroll_detection', 'ancient_book'],
     color: 0x57F287,
     ambiance: [
       'Gió thổi nhẹ qua những mái nhà tranh.',
@@ -33,7 +33,7 @@ export const ZONES: Record<string, ZoneDef> = {
     minLevel: 1, safe: false, travelCost: 0,
     enemyIds: ['forest_sprite', 'cursed_wolf', 'vine_golem', 'moss_lurker', 'thornhound', 'cursed_treant', 'will_o_wisp', 'ember_bloom', 'hollow_stag', 'spore_kin', 'briar_witch', 'alpha_thornmaw', 'moss_crowned_stag'],
     bossId: 'ancient_oak',
-    shopItems: ['health_potion', 'mana_potion', 'antidote', 'cooling_salve', 'forest_tonic', 'quick_salve', 'ancient_book'],
+    shopItems: ['forest_fruit', 'honey', 'health_potion', 'mana_potion', 'antidote', 'cooling_salve', 'forest_tonic', 'bone_broth', 'quickstep_tea', 'scroll_escape', 'ancient_book'],
     color: 0x2ECC71,
     ambiance: [
       'Những cành cây xào xạc trong bóng tối.',
@@ -44,19 +44,19 @@ export const ZONES: Record<string, ZoneDef> = {
     ]
   },
   shrine: {
-    id: 'shrine', name: 'Đền Cổ Hoang Phế', icon: '⛩️',
-    description: 'Ngôi đền ngàn năm bị bỏ hoang. Linh hồn của những tín đồ cũ vẫn còn đây.',
+    id: 'shrine', name: 'Đền Cổ Bị Lãng Quên', icon: '⛩️',
+    description: 'Tàn tích ngàn năm nằm sau Rừng Bóng Tối. Bẫy cổ, linh hồn canh đền và Ô Nhiễm Linh Hồn khiến mỗi bước đi đều có giá.',
     minLevel: 3, safe: false, travelCost: 20,
-    enemyIds: ['skeleton_archer', 'phantom', 'bone_mage', 'spirit_knight', 'cursed_idol', 'ash_acolyte', 'grave_hound', 'bell_specter', 'scripture_mimic', 'pale_confessor', 'bell_wraith'],
-    bossId: 'shrine_guardian',
-    shopItems: ['health_potion', 'mana_potion', 'holy_water', 'purifying_salt', 'moonwater', 'warding_charm', 'ancient_book'],
-    color: 0xE67E22,
+    enemyIds: ['wandering_spirit', 'stone_guardian', 'curse_bat', 'candle_wraith', 'shrine_watcher', 'possessed_relic', 'shrine_guardian', 'wraith_priest', 'mirror_shade'],
+    bossId: 'echo_demon',
+    shopItems: ['health_potion', 'mana_flask', 'holy_water', 'purifying_salt', 'moonwater', 'warding_charm', 'scroll_silence', 'scroll_mirror', 'purification_stone', 'ancient_book'],
+    color: 0x8A2BE2,
     ambiance: [
-      'Ngọn đèn thắp sáng không ai thắp lên.',
-      'Tiếng chuông vọng lại dù không có chuông.',
-      'Cảm giác bị theo dõi không dứt.',
-      'Những chữ khắc trên đá bỗng dưng phát sáng.',
-      'Hương trầm tỏa ra từ đâu đó rất sâu trong đền.'
+      'Hàng nến xanh cháy không cần bấc, ánh lửa nghiêng về phía người sống.',
+      'Tiếng chuông không âm vang lên trong xương, như gọi tên một tội lỗi cũ.',
+      'Bóng bạn kéo dài ngược hướng ánh sáng rồi chậm rãi đứng thẳng.',
+      'Những phù văn trên nền đá sáng lên khi bạn bước qua.',
+      'Mùi hương trầm lạnh lẽo bám vào phổi, kéo theo lời thì thầm của người đã khuất.'
     ]
   },
   mines: {
@@ -65,7 +65,7 @@ export const ZONES: Record<string, ZoneDef> = {
     minLevel: 5, safe: false, travelCost: 50,
     enemyIds: ['cave_troll', 'shadow_bat', 'lava_crab', 'crystal_spider', 'iron_sentinel', 'coal_imp', 'ore_devourer', 'soot_harpy', 'molten_jailer', 'slag_brute', 'rustbound_foreman'],
     bossId: 'mine_colossus',
-    shopItems: ['health_potion', 'mana_flask', 'elixir', 'greater_health_potion', 'iron_will_tonic', 'vitality_brew', 'ancient_book'],
+    shopItems: ['health_potion', 'mana_flask', 'vitality_brew', 'elixir', 'greater_health_potion', 'iron_will_tonic', 'blood_sacrifice_vial', 'arson_bottle', 'ancient_book'],
     color: 0x95A5A6,
     ambiance: [
       'Tiếng nước nhỏ giọt vọng khắp hang.',
@@ -79,9 +79,9 @@ export const ZONES: Record<string, ZoneDef> = {
     id: 'wastes', name: 'Hoang Nguyên Tiếng Vọng', icon: '🌌',
     description: 'Nơi thực tại bị bóng tối ăn mòn. Chỉ những kẻ mạnh nhất mới đến được đây.',
     minLevel: 8, safe: false, travelCost: 100,
-    enemyIds: ['void_wraith', 'echo_demon', 'mirage_hunter', 'mind_leech', 'abyss_fiend', 'glass_serpent', 'memory_moth', 'void_hound', 'dust_prophet', 'eclipse_reaver', 'mirror_knight'],
+    enemyIds: ['void_wraith', 'abyss_watcher', 'mirage_hunter', 'mind_leech', 'abyss_fiend', 'glass_serpent', 'memory_moth', 'void_hound', 'dust_prophet', 'eclipse_reaver', 'mirror_knight'],
     bossId: 'the_forgotten',
-    shopItems: ['elixir', 'grand_restoration', 'supreme_elixir', 'void_mana_flask', 'purification_potion', 'berserker_draught', 'ancient_book'],
+    shopItems: ['elixir', 'grand_restoration', 'supreme_elixir', 'void_mana_flask', 'purification_potion', 'crystallized_faith', 'berserker_draught', 'life_crystal_shard', 'rage_elixir', 'ancient_book'],
     color: 0x9B59B6,
     ambiance: [
       'Tiếng vọng của chính mình từ tương lai.',

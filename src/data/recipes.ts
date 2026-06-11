@@ -196,9 +196,14 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
   },
   {
     id: 'craft_demon_fang', resultItemId: 'demon_fang', resultAmount: 1,
-    category: 'weapon', resultRarity: 'cursed', goldCost: 900, levelRequired: 9,
-    successRate: 55, craftingExp: 150,
-    ingredients: [{ itemId: 'demon_horn', amount: 3 }, { itemId: 'void_fragment', amount: 3 }, { itemId: 'cursed_blood', amount: 3 }],
+    category: 'weapon', resultRarity: 'cursed', goldCost: 850, levelRequired: 9,
+    successRate: 60, craftingExp: 150,
+    ingredients: [
+      { itemId: 'demon_horn', amount: 2 },
+      { itemId: 'demon_seal', amount: 2 },
+      { itemId: 'echo_core', amount: 1 },
+      { itemId: 'curse_shard', amount: 3 }
+    ],
     recipeRequired: true, unlockedBy: 'echo_demon'
   },
   {
@@ -481,11 +486,11 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     unlockedBy: 'default'
   },
 
-  // ════════════ SEALED TOMES (fragment combining) ══════════════════════════
+  // ════════════ ANCIENT BOOKS (fragment combining) ════════════════════════
 
   {
-    id: 'craft_sealed_tome_t1',
-    resultItemId: 'sealed_tome_t1', resultAmount: 1,
+    id: 'craft_ancient_book_t1',
+    resultItemId: 'ancient_book', resultAmount: 1,
     category: 'potion', resultRarity: 'common',
     goldCost: 30, levelRequired: 1, successRate: 100, craftingExp: 15,
     ingredients: [
@@ -494,8 +499,8 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     unlockedBy: 'default'
   },
   {
-    id: 'craft_sealed_tome_t2',
-    resultItemId: 'sealed_tome_t2', resultAmount: 1,
+    id: 'craft_ancient_book_t2',
+    resultItemId: 'ancient_book', resultAmount: 1,
     category: 'potion', resultRarity: 'rare',
     goldCost: 80, levelRequired: 3, successRate: 100, craftingExp: 35,
     ingredients: [
@@ -504,14 +509,160 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     unlockedBy: 'default'
   },
   {
-    id: 'craft_sealed_tome_t3',
-    resultItemId: 'sealed_tome_t3', resultAmount: 1,
+    id: 'craft_ancient_book_t3',
+    resultItemId: 'ancient_book', resultAmount: 2,
     category: 'potion', resultRarity: 'epic',
     goldCost: 150, levelRequired: 5, successRate: 100, craftingExp: 80,
     ingredients: [
       { itemId: 'legendary_spell_fragment', amount: 1 },
     ],
     unlockedBy: 'default'
+  },
+
+
+  // Echo Demon upgrade recipes — mở sau khi phong ấn Echo Demon
+  {
+    id: 'craft_mirror_ring_plus', resultItemId: 'mirror_ring_plus', resultAmount: 1,
+    category: 'accessory', resultRarity: 'legendary', goldCost: 1150, levelRequired: 9,
+    successRate: 78, craftingExp: 105,
+    ingredients: [
+      { itemId: 'mirror_shard', amount: 6 }, { itemId: 'mirror_ring_fragment', amount: 1 },
+      { itemId: 'echo_core', amount: 1 }, { itemId: 'shrine_relic', amount: 2 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+  {
+    id: 'craft_warding_charm_plus', resultItemId: 'warding_charm_plus', resultAmount: 1,
+    category: 'accessory', resultRarity: 'epic', goldCost: 620, levelRequired: 8,
+    successRate: 88, craftingExp: 60,
+    ingredients: [
+      { itemId: 'holy_ash', amount: 5 }, { itemId: 'purifying_salt', amount: 2 },
+      { itemId: 'ancient_seal', amount: 1 }, { itemId: 'warding_charm', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+  {
+    id: 'craft_demon_fang_plus', resultItemId: 'demon_fang_plus', resultAmount: 1,
+    category: 'weapon', resultRarity: 'cursed', goldCost: 1250, levelRequired: 10,
+    successRate: 58, craftingExp: 160,
+    ingredients: [
+      { itemId: 'demon_fang', amount: 1 }, { itemId: 'demon_horn', amount: 2 },
+      { itemId: 'demon_seal', amount: 2 }, { itemId: 'lost_memory', amount: 3 }, { itemId: 'echo_core', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+  {
+    id: 'craft_shrine_cloak', resultItemId: 'shrine_cloak', resultAmount: 1,
+    category: 'armor', resultRarity: 'epic', goldCost: 720, levelRequired: 8,
+    successRate: 86, craftingExp: 65,
+    ingredients: [
+      { itemId: 'cursed_cloth', amount: 4 }, { itemId: 'holy_ash', amount: 4 },
+      { itemId: 'mirror_shard', amount: 2 }, { itemId: 'soul_candle', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+  {
+    id: 'craft_echo_staff', resultItemId: 'echo_staff', resultAmount: 1,
+    category: 'weapon', resultRarity: 'legendary', goldCost: 1180, levelRequired: 9,
+    successRate: 76, craftingExp: 110,
+    ingredients: [
+      { itemId: 'echo_core', amount: 2 }, { itemId: 'mana_crystal', amount: 8 },
+      { itemId: 'ancient_seal', amount: 1 }, { itemId: 'lost_memory', amount: 2 }, { itemId: 'ancient_book', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+
+
+  // Mage equipment recipes — pháp sư Đền Cổ
+  {
+    id: 'craft_moonwater_wand', resultItemId: 'moonwater_wand', resultAmount: 1,
+    category: 'weapon', resultRarity: 'rare', goldCost: 260, levelRequired: 5,
+    successRate: 100, craftingExp: 24,
+    ingredients: [
+      { itemId: 'mana_crystal', amount: 4 }, { itemId: 'silver_ore', amount: 3 },
+      { itemId: 'moonwater', amount: 1 }, { itemId: 'wood', amount: 4 }
+    ],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_sealbinder_circlet', resultItemId: 'sealbinder_circlet', resultAmount: 1,
+    category: 'accessory', resultRarity: 'rare', goldCost: 300, levelRequired: 5,
+    successRate: 100, craftingExp: 26,
+    ingredients: [
+      { itemId: 'silver_ore', amount: 4 }, { itemId: 'purifying_salt', amount: 1 },
+      { itemId: 'holy_ash', amount: 2 }, { itemId: 'mana_crystal', amount: 2 }
+    ],
+    unlockedBy: 'default'
+  },
+  {
+    id: 'craft_candle_sage_staff', resultItemId: 'candle_sage_staff', resultAmount: 1,
+    category: 'weapon', resultRarity: 'epic', goldCost: 780, levelRequired: 8,
+    successRate: 86, craftingExp: 70,
+    ingredients: [
+      { itemId: 'soul_candle', amount: 1 }, { itemId: 'holy_ash', amount: 5 },
+      { itemId: 'mana_crystal', amount: 6 }, { itemId: 'silver_ore', amount: 4 }
+    ],
+    recipeRequired: true, unlockedBy: 'wraith_priest'
+  },
+  {
+    id: 'craft_soul_candle_robe', resultItemId: 'soul_candle_robe', resultAmount: 1,
+    category: 'armor', resultRarity: 'epic', goldCost: 760, levelRequired: 8,
+    successRate: 86, craftingExp: 68,
+    ingredients: [
+      { itemId: 'soul_candle', amount: 1 }, { itemId: 'cursed_cloth', amount: 3 },
+      { itemId: 'holy_ash', amount: 5 }, { itemId: 'moonwater', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'wraith_priest'
+  },
+  {
+    id: 'craft_mirror_focus_orb', resultItemId: 'mirror_focus_orb', resultAmount: 1,
+    category: 'accessory', resultRarity: 'epic', goldCost: 820, levelRequired: 8,
+    successRate: 84, craftingExp: 72,
+    ingredients: [
+      { itemId: 'mirror_sigil', amount: 1 }, { itemId: 'mirror_shard', amount: 5 },
+      { itemId: 'mana_crystal', amount: 5 }, { itemId: 'mirror_ring_fragment', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'mirror_shade'
+  },
+  {
+    id: 'craft_echo_grimoire', resultItemId: 'echo_grimoire', resultAmount: 1,
+    category: 'weapon', resultRarity: 'legendary', goldCost: 1400, levelRequired: 10,
+    successRate: 74, craftingExp: 125,
+    ingredients: [
+      { itemId: 'echo_core', amount: 2 }, { itemId: 'lost_memory', amount: 3 },
+      { itemId: 'ancient_book', amount: 1 }, { itemId: 'mana_crystal', amount: 10 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+  {
+    id: 'craft_voicebound_mantle', resultItemId: 'voicebound_mantle', resultAmount: 1,
+    category: 'armor', resultRarity: 'legendary', goldCost: 1360, levelRequired: 10,
+    successRate: 74, craftingExp: 120,
+    ingredients: [
+      { itemId: 'ancient_seal', amount: 1 }, { itemId: 'cursed_cloth', amount: 5 },
+      { itemId: 'holy_ash', amount: 5 }, { itemId: 'echo_core', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+  {
+    id: 'craft_oracle_moon_ring', resultItemId: 'oracle_moon_ring', resultAmount: 1,
+    category: 'accessory', resultRarity: 'legendary', goldCost: 1280, levelRequired: 10,
+    successRate: 76, craftingExp: 118,
+    ingredients: [
+      { itemId: 'mirror_shard', amount: 6 }, { itemId: 'lost_memory', amount: 2 },
+      { itemId: 'moonwater', amount: 2 }, { itemId: 'echo_core', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+  {
+    id: 'craft_abyss_mage_codex', resultItemId: 'abyss_mage_codex', resultAmount: 1,
+    category: 'weapon', resultRarity: 'cursed', goldCost: 1160, levelRequired: 10,
+    successRate: 58, craftingExp: 155,
+    ingredients: [
+      { itemId: 'echo_core', amount: 1 }, { itemId: 'curse_shard', amount: 5 },
+      { itemId: 'cursed_blood', amount: 3 }, { itemId: 'lost_memory', amount: 3 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
   },
 
 ];

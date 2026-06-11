@@ -105,6 +105,35 @@ export const PETS: Record<string, PetDef> = {
     releaseItem: 'stardust',
     obtainHint: 'Phần thưởng Prestige lần 3 trở lên',
   },
+
+  candle_wisp: {
+    id: 'candle_wisp', name: 'Candle Wisp', icon: '🕯️',
+    rarity: 'epic',
+    description: 'Đốm lửa linh hồn từ Đền Cổ. Tăng Max MP và giúp hành trình trong Shrine bền bỉ hơn.',
+    passiveType: 'mp_pct', passiveBase: 12, passivePerLv: 1.6,
+    maxLevel: 20, feedGold: 560,
+    releaseItem: 'holy_ash',
+    obtainHint: 'Rơi cực hiếm từ mini game hoàn hảo hoặc Echo Demon tại Đền Cổ',
+  },
+  mirror_imp: {
+    id: 'mirror_imp', name: 'Mirror Imp', icon: '🪞',
+    rarity: 'epic',
+    description: 'Tiểu quỷ sống trong mặt gương nứt. Tăng ATK và đôi khi tìm thêm Mirror Shard.',
+    passiveType: 'atk_pct', passiveBase: 8, passivePerLv: 1.3,
+    maxLevel: 20, feedGold: 620,
+    releaseItem: 'mirror_shard',
+    obtainHint: 'Rơi cực hiếm từ mini game gương hoàn hảo hoặc Echo Demon',
+  },
+  echo_sprite: {
+    id: 'echo_sprite', name: 'Echo Sprite', icon: '👁️',
+    rarity: 'legendary',
+    description: 'Một mảnh tiếng vọng đã được thuần hóa. Tăng EXP và đôi khi kéo material Shrine từ kẽ đá.',
+    passiveType: 'exp_pct', passiveBase: 16, passivePerLv: 2.1,
+    maxLevel: 25, feedGold: 1100,
+    releaseItem: 'echo_core',
+    obtainHint: 'Rơi cực hiếm từ Echo Demon hoặc nghi lễ tiếng vọng hoàn hảo',
+  },
+
 };
 
 export function getPet(id: string): PetDef | undefined {
@@ -127,4 +156,6 @@ export const RARITY_LABEL: Record<string, string> = {
   rare:      'Hiếm',
   epic:      'Sử Thi',
   legendary: 'Huyền Thoại',
+
+
 };

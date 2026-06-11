@@ -14,6 +14,9 @@ import { getFactionRewardMods } from './factions';
 import { getPetRewardMods, applyActivePetAfterVictory, grantPetDropAfterVictory } from './petRoles';
 import type { PlayerRow } from '../utils/embeds';
 import type { EnemyDef } from '../data/enemies';
+import { getSecondaryStatBonuses } from './statSystem';
+import { getEquipmentStats } from './equipment';
+import { getCorruptionDropBonus } from './corruption';
 
 
 function combatRewardMultipliers(enemy: EnemyDef): { exp: number; gold: number } {
@@ -42,6 +45,7 @@ export function processVictoryRewards(
   enemy: EnemyDef
 ): VictoryRewardResult {
   const dropBonus = getDropBonus(guildId, player.zone_id);
+  const corruptionDropBonus = getCorruptionDropBonus(player);
   const rewardMult = combatRewardMultipliers(enemy);
   const rolledGold = randInt(enemy.goldMin, enemy.goldMax);
   const baseGold  = scaleReward(rolledGold, rewardMult.gold, 0);
@@ -49,8 +53,14 @@ export function processVictoryRewards(
   const greedGoldBonus = getGreedGoldBonusPercent(userId, guildId);
   const factionMods = getFactionRewardMods(userId, guildId);
   const petMods = getPetRewardMods(userId, guildId);
-  const goldBonusPct = greedGoldBonus + factionMods.goldPct + petMods.goldPct;
-  const expBonusPct = factionMods.expPct + petMods.expPct;
+  const statMods = getSecondaryStatBonuses(player);
+  const eqStats = getEquipmentStats(userId, guildId);
+  const gearGoldBonus = eqStats.goldBonus ?? 0;
+  const gearExpBonus = eqStats.expBonus ?? 0;
+  const gearDropBonus = eqStats.dropBonus ?? 0;
+  const goldBonusPct = greedGoldBonus + factionMods.goldPct + petMods.goldPct + statMods.goldBonusPct + gearGoldBonus;
+  const expBonusPct = factionMods.expPct + petMods.expPct + gearExpBonus;
+  const totalDropBonusPct = dropBonus + corruptionDropBonus + factionMods.dropPct + statMods.dropBonusPct + gearDropBonus;
   const gold      = Math.max(0, Math.floor(baseGold * (1 + goldBonusPct / 100)));
   const exp       = Math.max(1, Math.floor(baseExp * (1 + expBonusPct / 100)));
   const drops: string[] = [];
@@ -63,7 +73,7 @@ export function processVictoryRewards(
   const lvRes = grantExp(userId, guildId, exp);
 
   for (const drop of (Array.isArray(enemy.drops) ? enemy.drops : [])) {
-    if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * (dropBonus + factionMods.dropPct) / 100)) {
+    if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * totalDropBonusPct / 100)) {
       addItem(userId, guildId, drop.itemId, 1);
       const it = getItem(drop.itemId) ?? getMaterial(drop.itemId);
       if (it) drops.push(`${it.icon} ${it.name}`);
@@ -76,7 +86,7 @@ export function processVictoryRewards(
   );
   for (const eq of eqDrops) {
     const roll = Math.random() * 100;
-    const adjustedChance = (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * (dropBonus + factionMods.dropPct) / 100);
+    const adjustedChance = (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * totalDropBonusPct / 100);
     if (roll <= adjustedChance) {
       addItem(userId, guildId, eq.id, 1);
       drops.push(`${eq.icon} **${eq.name}** *(${['common','rare','epic','legendary'][['common','rare','epic','legendary'].indexOf(eq.rarity)]})*`);
@@ -88,6 +98,9 @@ export function processVictoryRewards(
   const bonusParts = [
     greedGoldBonus > 0 ? `📜 Scroll of Greed: gold +${greedGoldBonus}% (**${baseGold} → ${gold}**)` : null,
     ...factionMods.lines,
+    statMods.goldBonusPct > 0 || statMods.dropBonusPct > 0 ? `🍀 LUK: gold +${statMods.goldBonusPct}% · drop +${statMods.dropBonusPct}%` : null,
+    corruptionDropBonus > 0 ? `🌘 Ô Nhiễm Linh Hồn: drop +${corruptionDropBonus}%` : null,
+    gearGoldBonus > 0 || gearExpBonus > 0 || gearDropBonus > 0 ? `🎒 Gear: gold +${gearGoldBonus}% · exp +${gearExpBonus}% · drop +${gearDropBonus}%` : null,
     ...petMods.lines,
     ...petLines,
     ...(unlockedRecipes.length ? [`📜 Mở khóa công thức craft: **${unlockedRecipes.length} recipe**`] : []),

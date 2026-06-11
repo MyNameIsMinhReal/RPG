@@ -34,3 +34,12 @@ try { db.exec(`ALTER TABLE players ADD COLUMN active_pet TEXT DEFAULT NULL`); } 
 
 // Pet EXP for companion progression
 try { db.exec(`ALTER TABLE player_pets ADD COLUMN exp INTEGER DEFAULT 0`); } catch {}
+
+
+// ── Manual level/stat allocation ─────────────────────────────────────────
+try { db.exec(`ALTER TABLE players ADD COLUMN stat_str INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN stat_vit INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN stat_end INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN stat_agi INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN stat_luk INTEGER DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN free_stat_reset INTEGER DEFAULT 1`); } catch {}

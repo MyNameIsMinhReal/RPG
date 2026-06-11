@@ -61,7 +61,7 @@ export const MATERIALS: Record<string, MaterialDef> = {
     id: 'bone_shard', name: 'Bone Shard', icon: '🦴', rarity: 'common',
     description: 'Mảnh xương từ chiến binh đã khuất.',
     sellPrice: 5, dropZones: ['shrine'],
-    dropFrom: ['skeleton_archer'], dropChance: 55
+    dropFrom: ['shrine_guardian', 'possessed_relic'], dropChance: 35
   },
 
   // ── Rare ───────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export const MATERIALS: Record<string, MaterialDef> = {
     id: 'mana_crystal', name: 'Mana Crystal', icon: '🔷', rarity: 'rare',
     description: 'Tinh thể chứa ma lực dồi dào.',
     sellPrice: 25, dropZones: ['shrine'],
-    dropFrom: ['phantom', 'shrine_guardian'], dropChance: 15
+    dropFrom: ['shrine_watcher', 'candle_wraith'], dropChance: 15
   },
   shadow_essence: {
     id: 'shadow_essence', name: 'Shadow Essence', icon: '🌑', rarity: 'rare',
@@ -87,7 +87,7 @@ export const MATERIALS: Record<string, MaterialDef> = {
     id: 'ancient_bone', name: 'Ancient Bone', icon: '💀', rarity: 'rare',
     description: 'Xương cổ đại, cứng như kim loại.',
     sellPrice: 25, dropZones: ['shrine'],
-    dropFrom: ['skeleton_archer', 'shrine_guardian'], dropChance: 15
+    dropFrom: ['shrine_guardian', 'stone_guardian'], dropChance: 18
   },
   burning_core: {
     id: 'burning_core', name: 'Burning Core', icon: '🔥', rarity: 'rare',
@@ -105,7 +105,37 @@ export const MATERIALS: Record<string, MaterialDef> = {
     id: 'ectoplasm', name: 'Ectoplasm', icon: '🫧', rarity: 'rare',
     description: 'Tinh chất linh hồn.',
     sellPrice: 30, dropZones: ['shrine'],
-    dropFrom: ['phantom'], dropChance: 60
+    dropFrom: ['wandering_spirit', 'candle_wraith'], dropChance: 45
+  },
+  holy_ash: {
+    id: 'holy_ash', name: 'Holy Ash', icon: '⚱️', rarity: 'rare',
+    description: 'Tro hương còn sót từ nghi lễ thanh tẩy trong Đền Cổ. Dùng để craft bùa và trang bị chống nguyền.',
+    sellPrice: 34, dropZones: ['shrine'],
+    dropFrom: ['candle_wraith', 'wraith_priest'], dropChance: 22
+  },
+  shrine_stone: {
+    id: 'shrine_stone', name: 'Shrine Stone', icon: '🗿', rarity: 'rare',
+    description: 'Mảnh đá khắc phù văn từ tượng hộ vệ cổ. Rất hợp để rèn giáp và giáo hộ vệ.',
+    sellPrice: 38, dropZones: ['shrine'],
+    dropFrom: ['stone_guardian', 'shrine_guardian'], dropChance: 25
+  },
+  mirror_shard: {
+    id: 'mirror_shard', name: 'Mirror Shard', icon: '🪞', rarity: 'rare',
+    description: 'Mảnh gương linh hồn phản chiếu một khuôn mặt không hoàn toàn giống bạn.',
+    sellPrice: 42, dropZones: ['shrine'],
+    dropFrom: ['mirror_shade', 'possessed_relic'], dropChance: 18
+  },
+  ancient_seal: {
+    id: 'ancient_seal', name: 'Ancient Seal', icon: '🔏', rarity: 'epic',
+    description: 'Mảnh phong ấn giữ Echo Demon trong đền. Dùng cho craft trang bị đền cổ cấp cao.',
+    sellPrice: 125, dropZones: ['shrine'],
+    dropFrom: ['echo_demon'], dropChance: 18
+  },
+  echo_core: {
+    id: 'echo_core', name: 'Echo Core', icon: '🔮', rarity: 'epic',
+    description: 'Lõi tiếng vọng lạnh buốt, vẫn lặp lại âm thanh cuối cùng trước khi boss gục xuống.',
+    sellPrice: 135, dropZones: ['shrine'],
+    dropFrom: ['echo_demon'], dropChance: 20
   },
   troll_hide: {
     id: 'troll_hide', name: 'Troll Hide', icon: '🧱', rarity: 'rare',
@@ -129,9 +159,9 @@ export const MATERIALS: Record<string, MaterialDef> = {
   },
   demon_horn: {
     id: 'demon_horn', name: 'Demon Horn', icon: '😈', rarity: 'epic',
-    description: 'Sừng quỷ, thấm đẫm năng lượng hắc ám.',
-    sellPrice: 110, dropZones: ['wastes'],
-    dropFrom: ['echo_demon'], dropChance: 12
+    description: 'Sừng quỷ vỡ ra từ Echo Demon. Đây là vật liệu chủ chốt của trang bị nguyền Zone 2.',
+    sellPrice: 110, dropZones: ['shrine'],
+    dropFrom: ['echo_demon'], dropChance: 22
   },
   abyss_core: {
     id: 'abyss_core', name: 'Abyss Core', icon: '⚫', rarity: 'epic',
@@ -175,15 +205,15 @@ export const MATERIALS: Record<string, MaterialDef> = {
     id: 'curse_shard', name: 'Curse Shard', icon: '🔻', rarity: 'cursed',
     description: 'Mảnh nguyền lực dùng để nghiên cứu Ancient Book và mở khóa kỹ năng cổ.',
     sellPrice: 65, dropZones: ['shrine', 'wastes'],
-    dropFrom: ['pale_confessor', 'echo_demon', 'the_forgotten'], dropChance: 10
+    dropFrom: ['curse_bat', 'wraith_priest', 'echo_demon', 'the_forgotten'], dropChance: 10
   },
 
 
   cursed_blood: {
     id: 'cursed_blood', name: 'Cursed Blood', icon: '🩸', rarity: 'cursed',
-    description: 'Máu nguyền rủa không thể rửa sạch.',
-    sellPrice: 80, dropZones: ['wastes'],
-    dropFrom: ['echo_demon', 'the_forgotten'], dropChance: 8
+    description: 'Máu nguyền rủa không thể rửa sạch. Có thể xuất hiện từ Echo Demon hoặc những thực thể hư không về sau.',
+    sellPrice: 80, dropZones: ['shrine', 'wastes'],
+    dropFrom: ['echo_demon', 'wraith_priest', 'the_forgotten'], dropChance: 10
   },
   broken_soul: {
     id: 'broken_soul', name: 'Broken Soul', icon: '💔', rarity: 'cursed',
@@ -211,9 +241,9 @@ export const MATERIALS: Record<string, MaterialDef> = {
   },
   demon_seal: {
     id: 'demon_seal', name: 'Demon Seal', icon: '🔮', rarity: 'epic',
-    description: 'Con dấu của Echo Demon.',
-    sellPrice: 100, dropZones: ['wastes'],
-    dropFrom: ['echo_demon'], dropChance: 45
+    description: 'Con dấu nứt vỡ của Echo Demon. Dùng để craft và mở nhánh trang bị Đền Cổ.',
+    sellPrice: 100, dropZones: ['shrine'],
+    dropFrom: ['echo_demon'], dropChance: 60
   },
 
   mysterious_shard: {

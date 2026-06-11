@@ -124,6 +124,35 @@ const ACHIEVEMENTS: AchievementDef[] = [
     badge: '💀',
     rewardGold: 100
   },
+
+  {
+    id: 'shrine_echo_silence',
+    name: 'Không Trả Lời Tiếng Vọng',
+    description: 'Hoàn thành Lọc Tiếng Vọng 3 lần hoàn hảo',
+    badge: '👁️',
+    rewardGold: 180
+  },
+  {
+    id: 'shrine_salt_warder',
+    name: 'Kẻ Vá Phong Ấn',
+    description: 'Hoàn thành Vòng Muối Đứt Đoạn 5 lần',
+    badge: '🧂',
+    rewardGold: 220
+  },
+  {
+    id: 'shrine_no_shadow',
+    name: 'Người Không Có Bóng',
+    description: 'Đánh bại Mirror Shade sau khi chạm tới nghi lễ gương',
+    badge: '🪞',
+    rewardGold: 260
+  },
+  {
+    id: 'shrine_gate_opener',
+    name: 'Kẻ Mở Cổng',
+    description: 'Hoàn thành nghi lễ mở Cổng Phong Ấn Echo Demon lần đầu',
+    badge: '⛩️',
+    rewardGold: 320
+  },
 ];
 
 function ensureAchievementTables(): void {

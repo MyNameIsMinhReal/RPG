@@ -40,6 +40,7 @@ export interface EquipStats {
   lifesteal?:  number;   // %
   expBonus?:   number;   // %
   goldBonus?:  number;   // %
+  dropBonus?:  number;   // % bonus drop chance
 }
 
 export interface EquipmentDef {
@@ -99,6 +100,18 @@ export const SETS: Record<string, SetDef> = {
     bonus2: { effects: ['mp_regen_3t'] },
     bonus3: { effects: ['celestial_revive'] }
   },
+  shrine_mage_set: {
+    id: 'shrine_mage_set', name: 'Shrine Mage Set',
+    pieces: ['candle_sage_staff', 'soul_candle_robe', 'mirror_focus_orb'],
+    bonus2: { maxMp: 18 },
+    bonus3: { effects: ['mp_regen_3t'] }
+  },
+  echo_mage_set: {
+    id: 'echo_mage_set', name: 'Echo Mage Set',
+    pieces: ['echo_grimoire', 'voicebound_mantle', 'oracle_moon_ring'],
+    bonus2: { maxMp: 28, expBonus: 4 },
+    bonus3: { effects: ['kill_mp_regen'] }
+  },
   abyssal_set: {
     id: 'abyssal_set', name: 'Abyssal Set',
     pieces: ['abyssal_scythe', 'abyssal_armor', 'void_core'],
@@ -108,7 +121,7 @@ export const SETS: Record<string, SetDef> = {
 };
 
 // ── Equipment definitions ─────────────────────────────────────────────────────
-export const EQUIPMENT: Record<string, EquipmentDef> = {
+const EQUIPMENT_RAW: Record<string, EquipmentDef> = {
 
   // ════════════════════════════════════════════════════
   //  WEAPONS
@@ -306,7 +319,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     id: 'dragon_slayer', name: 'Dragon Slayer', icon: '🐉', slot: 'weapon', rarity: 'legendary',
     description: 'Gây thêm 20% damage lên boss.',
     stats: { atk: 20 }, effects: ['boss_damage'], setId: 'dragon_set',
-    sellPrice: 600, dropFrom: ['mine_colossus', 'shrine_guardian'], dropChance: 5, minZone: 'mines'
+    sellPrice: 600, dropFrom: ['mine_colossus'], dropChance: 5, minZone: 'mines'
   },
   moonlight_katana: {
     id: 'moonlight_katana', name: 'Moonlight Katana', icon: '🌙', slot: 'weapon', rarity: 'legendary',
@@ -318,7 +331,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     id: 'staff_of_ancient_mana', name: 'Staff of Ancient Mana', icon: '✨', slot: 'weapon', rarity: 'legendary',
     description: 'Mỗi 3 lượt hồi 5 MP.',
     stats: { atk: 12, maxMp: 35 }, effects: ['mp_regen_3t'],
-    sellPrice: 550, dropFrom: ['echo_demon'], dropChance: 6, minZone: 'wastes'
+    sellPrice: 550, dropFrom: ['echo_demon'], dropChance: 6, minZone: 'shrine'
   },
   bloodfang_dagger: {
     id: 'bloodfang_dagger', name: 'Bloodfang Dagger', icon: '🩸', slot: 'weapon', rarity: 'legendary',
@@ -375,14 +388,14 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   demon_fang: {
     id: 'demon_fang', name: 'Demon Fang', icon: '😈', slot: 'weapon', rarity: 'cursed',
     description: 'Không thể dùng healing potion trong combat.',
-    stats: { atk: 26, critChance: 20 }, effects: ['no_healing'],
-    sellPrice: 800, dropFrom: ['echo_demon'], dropChance: 5, minZone: 'wastes'
+    stats: { atk: 21, critChance: 14 }, effects: ['no_healing'],
+    sellPrice: 800, dropFrom: ['echo_demon'], dropChance: 5, minZone: 'shrine'
   },
   soul_eater: {
     id: 'soul_eater', name: 'Soul Eater', icon: '💀', slot: 'weapon', rarity: 'cursed',
     description: 'Khi giết enemy, nhận Soul Stack (+1 ATK/stack). Mất khi chết.',
-    stats: { atk: 22 }, effects: ['soul_stack'],
-    sellPrice: 700, dropFrom: ['void_wraith', 'echo_demon'], dropChance: 5, minZone: 'wastes'
+    stats: { atk: 18 }, effects: ['soul_stack'],
+    sellPrice: 700, dropFrom: ['echo_demon', 'void_wraith'], dropChance: 5, minZone: 'shrine'
   },
   broken_hero_sword: {
     id: 'broken_hero_sword', name: 'Broken Hero Sword', icon: '⚔️', slot: 'weapon', rarity: 'cursed',
@@ -411,14 +424,14 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   greed_spear: {
     id: 'greed_spear', name: 'Greed Spear', icon: '💰', slot: 'weapon', rarity: 'cursed',
     description: '+15% Gold nhận được. Nhưng -10% EXP.',
-    stats: { atk: 18, goldBonus: 15, expBonus: -10 },
-    sellPrice: 650, dropFrom: ['echo_demon'], dropChance: 4, minZone: 'wastes'
+    stats: { atk: 15, goldBonus: 10, expBonus: -8 },
+    sellPrice: 650, dropFrom: ['echo_demon'], dropChance: 4, minZone: 'shrine'
   },
   hollow_staff: {
     id: 'hollow_staff', name: 'Hollow Staff', icon: '👻', slot: 'weapon', rarity: 'cursed',
     description: 'MP rất cao, không thể dùng Health Potion.',
-    stats: { atk: 14, maxMp: 80 }, effects: ['no_healing'],
-    sellPrice: 650, dropFrom: ['void_wraith', 'echo_demon'], dropChance: 4, minZone: 'wastes'
+    stats: { atk: 12, maxMp: 65 }, effects: ['no_healing'],
+    sellPrice: 650, dropFrom: ['echo_demon', 'void_wraith'], dropChance: 4, minZone: 'shrine'
   },
 
   // ── Extra weapon expansion ─────────────────────────
@@ -566,8 +579,8 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   oathkeeper_blade: {
     id: 'oathkeeper_blade', name: 'Oathkeeper Blade', icon: '⚔️', slot: 'weapon', rarity: 'legendary',
     description: 'Kiếm thệ ước. Cân bằng ATK/DEF, đáng tin khi đánh boss.',
-    stats: { atk: 18, def: 6 }, effects: ['boss_damage'],
-    sellPrice: 680, dropFrom: ['mirror_knight', 'shrine_guardian'], dropChance: 5, minZone: 'wastes'
+    stats: { atk: 16, def: 5 }, effects: ['boss_damage'],
+    sellPrice: 680, dropFrom: ['mirror_knight', 'shrine_guardian'], dropChance: 5, minZone: 'shrine'
   },
   volcanic_greataxe: {
     id: 'volcanic_greataxe', name: 'Volcanic Greataxe', icon: '🌋', slot: 'weapon', rarity: 'legendary',
@@ -590,8 +603,8 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   saint_lance: {
     id: 'saint_lance', name: 'Saint Lance', icon: '🌟', slot: 'weapon', rarity: 'legendary',
     description: 'Thánh thương. Tăng HP/DEF, hợp paladin/cleric đánh lâu.',
-    stats: { atk: 16, def: 10, maxHp: 35 }, effects: ['potion_bonus'],
-    sellPrice: 680, dropFrom: ['pale_confessor', 'shrine_guardian'], dropChance: 5, minZone: 'wastes'
+    stats: { atk: 14, def: 8, maxHp: 30 }, effects: ['potion_bonus'],
+    sellPrice: 680, dropFrom: ['pale_confessor', 'shrine_guardian'], dropChance: 5, minZone: 'shrine'
   },
 
   nightfall_katana: {
@@ -835,8 +848,8 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   nightwalker_cloak: {
     id: 'nightwalker_cloak', name: 'Nightwalker Cloak', icon: '🌙', slot: 'armor', rarity: 'legendary',
     description: '+15% Dodge. Sau khi né, đòn tiếp theo +20% damage.',
-    stats: { maxHp: 55, def: 8, dodgeChance: 15 }, effects: ['dodge_then_dmg'],
-    sellPrice: 650, dropFrom: ['echo_demon'], dropChance: 6, minZone: 'wastes'
+    stats: { maxHp: 50, def: 7, dodgeChance: 12 }, effects: ['dodge_then_dmg'],
+    sellPrice: 650, dropFrom: ['echo_demon'], dropChance: 6, minZone: 'shrine'
   },
   titan_shield: {
     id: 'titan_shield', name: 'Titan Shield', icon: '🛡️', slot: 'armor', rarity: 'legendary',
@@ -883,8 +896,8 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   hollow_robe: {
     id: 'hollow_robe', name: 'Hollow Robe', icon: '👻', slot: 'armor', rarity: 'cursed',
     description: 'Max HP giảm 20%. Skill damage tăng 15%.',
-    stats: { maxHp: -20, maxMp: 150 },
-    sellPrice: 800, dropFrom: ['echo_demon'], dropChance: 5, minZone: 'wastes'
+    stats: { maxHp: -30, maxMp: 85 },
+    sellPrice: 800, dropFrom: ['echo_demon'], dropChance: 5, minZone: 'shrine'
   },
   blood_armor: {
     id: 'blood_armor', name: 'Blood Armor', icon: '🩸', slot: 'armor', rarity: 'cursed',
@@ -907,8 +920,8 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   blood_pact_armor: {
     id: 'blood_pact_armor', name: 'Blood Pact Armor', icon: '🩸', slot: 'armor', rarity: 'cursed',
     description: 'Mỗi lần giết hồi nhiều HP, nhưng không dùng được potion.',
-    stats: { maxHp: 80, def: 12 }, effects: ['blood_kill_regen', 'no_healing'],
-    sellPrice: 650, dropFrom: ['echo_demon', 'void_wraith'], dropChance: 3, minZone: 'wastes'
+    stats: { maxHp: 70, def: 10 }, effects: ['blood_kill_regen', 'no_healing'],
+    sellPrice: 650, dropFrom: ['echo_demon', 'void_wraith'], dropChance: 3, minZone: 'shrine'
   },
   hollow_plate: {
     id: 'hollow_plate', name: 'Hollow Plate', icon: '🪨', slot: 'armor', rarity: 'cursed',
@@ -919,14 +932,14 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   robe_of_empty_moon: {
     id: 'robe_of_empty_moon', name: 'Robe of Empty Moon', icon: '🌚', slot: 'armor', rarity: 'cursed',
     description: 'MP rất cao nhưng hoàn toàn không thể hồi HP.',
-    stats: { maxHp: 30, maxMp: 120 }, effects: ['no_healing'],
-    sellPrice: 600, dropFrom: ['echo_demon'], dropChance: 4, minZone: 'wastes'
+    stats: { maxHp: 25, maxMp: 90 }, effects: ['no_healing'],
+    sellPrice: 600, dropFrom: ['echo_demon'], dropChance: 4, minZone: 'shrine'
   },
   thorned_regret_armor: {
     id: 'thorned_regret_armor', name: 'Thorned Regret Armor', icon: '🥀', slot: 'armor', rarity: 'cursed',
     description: 'Mỗi lượt mất 3% HP. Khi HP cạn dần, ATK tăng mạnh.',
     stats: { maxHp: 120, def: 15 }, effects: ['curse_hp_drain', 'low_hp_atk'],
-    sellPrice: 800, dropFrom: ['the_forgotten', 'echo_demon'], dropChance: 3, minZone: 'wastes'
+    sellPrice: 800, dropFrom: ['the_forgotten'], dropChance: 3, minZone: 'wastes'
   },
 
   // ════════════════════════════════════════════════════
@@ -1118,8 +1131,8 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   archmage_crystal: {
     id: 'archmage_crystal', name: 'Archmage Crystal', icon: '🔮', slot: 'accessory1', rarity: 'legendary',
     description: '+50 MP. MP regen +3 mỗi lượt.',
-    stats: { maxMp: 50 }, effects: ['mp_regen_3t'],
-    sellPrice: 600, dropFrom: ['echo_demon'], dropChance: 6, minZone: 'wastes'
+    stats: { maxMp: 45 }, effects: ['mp_regen_3t'],
+    sellPrice: 600, dropFrom: ['echo_demon'], dropChance: 6, minZone: 'shrine'
   },
   ring_of_blood_pact: {
     id: 'ring_of_blood_pact', name: 'Ring of Blood Pact', icon: '🩸', slot: 'accessory1', rarity: 'legendary',
@@ -1129,7 +1142,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
   },
   crown_fragment: {
     id: 'crown_fragment', name: 'Crown Fragment', icon: '👑', slot: 'accessory1', rarity: 'legendary',
-    description: 'EXP +10%. Tăng cơ hội nhận skill book.',
+    description: 'EXP +10%. Tăng cơ hội nhận Ancient Book.',
     stats: { expBonus: 10 },
     sellPrice: 600, dropFrom: ['the_forgotten'], dropChance: 8, minZone: 'wastes'
   },
@@ -1196,6 +1209,94 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     sellPrice: 1500, dropFrom: ['the_forgotten'], dropChance: 5, minZone: 'wastes'
   },
 
+  mirror_ring_plus: {
+    id: 'mirror_ring_plus', name: 'Mirror Ring+', icon: '💍', slot: 'accessory1', rarity: 'legendary',
+    description: 'Nhẫn gương đã được khắc lại bằng mảnh kính linh hồn. Tăng crit, drop và làm ảo ảnh yếu hơn trong các trận boss.',
+    stats: { critChance: 10, dropBonus: 6, maxMp: 30 }, effects: ['block_one_crit'],
+    sellPrice: 760, dropFrom: ['echo_demon'], dropChance: 3, minZone: 'shrine'
+  },
+  warding_charm_plus: {
+    id: 'warding_charm_plus', name: 'Warding Charm+', icon: '🧿', slot: 'accessory1', rarity: 'epic',
+    description: 'Bùa hộ mệnh được phủ tro thánh. Tăng DEF/MP và giúp sống sót tốt hơn trước lời nguyền.',
+    stats: { def: 5, maxMp: 35, dodgeChance: 4 }, effects: ['block_one_crit'],
+    sellPrice: 520, minZone: 'shrine'
+  },
+  demon_fang_plus: {
+    id: 'demon_fang_plus', name: 'Demon Fang+', icon: '😈', slot: 'weapon', rarity: 'cursed',
+    description: 'Nanh quỷ được rèn lại bằng Echo Core. Sát thương cao, hút máu nhẹ, nhưng vẫn mang cảm giác lạnh của phong ấn.',
+    stats: { atk: 27, critChance: 9, lifesteal: 6 }, effects: ['low_hp_atk'],
+    sellPrice: 1100, dropFrom: ['echo_demon'], dropChance: 2, minZone: 'shrine'
+  },
+  shrine_cloak: {
+    id: 'shrine_cloak', name: 'Shrine Cloak', icon: '⛩️', slot: 'armor', rarity: 'epic',
+    description: 'Áo choàng may bằng vải cúng và bụi gương. Hợp cho build né và farm Đền Cổ.',
+    stats: { maxHp: 45, def: 6, dodgeChance: 8, dropBonus: 4 },
+    sellPrice: 560, dropFrom: ['wraith_priest', 'mirror_shade'], dropChance: 4, minZone: 'shrine'
+  },
+  echo_staff: {
+    id: 'echo_staff', name: 'Echo Staff', icon: '🔮', slot: 'weapon', rarity: 'legendary',
+    description: 'Trượng lặp lại tiếng chú văn cuối cùng. Tăng MP, EXP và sức đánh phép thuật.',
+    stats: { atk: 21, maxMp: 70, expBonus: 8 }, effects: ['mp_regen_3t'],
+    sellPrice: 820, dropFrom: ['echo_demon'], dropChance: 3, minZone: 'shrine'
+  },
+
+
+  // ── Mage progression expansion ─────────────────────────────────────────
+  moonwater_wand: {
+    id: 'moonwater_wand', name: 'Moonwater Wand', icon: '🌙', slot: 'weapon', rarity: 'rare',
+    description: 'Đũa phép ngâm dưới ánh trăng. Dành cho pháp sư mới vào Đền Cổ: ATK vừa, MP ổn định.',
+    stats: { atk: 7, maxMp: 28 }, effects: ['mp_regen_3t'],
+    sellPrice: 120, buyPrice: 420, dropFrom: ['candle_wraith', 'shrine_watcher'], dropChance: 6, minZone: 'shrine'
+  },
+  sealbinder_circlet: {
+    id: 'sealbinder_circlet', name: 'Sealbinder Circlet', icon: '👑', slot: 'accessory2', rarity: 'rare',
+    description: 'Vòng trán khắc muối bạc. Tăng MP và giúp pháp sư giữ nhịp khi gặp lời nguyền.',
+    stats: { maxMp: 26, def: 2, dodgeChance: 3 }, effects: ['block_one_crit'],
+    sellPrice: 135, buyPrice: 520, dropFrom: ['shrine_watcher', 'possessed_relic'], dropChance: 5, minZone: 'shrine'
+  },
+  candle_sage_staff: {
+    id: 'candle_sage_staff', name: 'Candle Sage Staff', icon: '🕯️', slot: 'weapon', rarity: 'epic',
+    description: 'Trượng của hiền giả nến xanh. Mạnh hơn khi đi đường phép, hồi MP theo nhịp combat.',
+    stats: { atk: 15, maxMp: 58, expBonus: 4 }, effects: ['mp_regen_3t'], setId: 'shrine_mage_set',
+    sellPrice: 430, buyPrice: 1250, dropFrom: ['wraith_priest', 'candle_wraith'], dropChance: 4, minZone: 'shrine'
+  },
+  soul_candle_robe: {
+    id: 'soul_candle_robe', name: 'Soul Candle Robe', icon: '🧥', slot: 'armor', rarity: 'epic',
+    description: 'Áo choàng dệt bằng sợi khói nến. Ít giáp hơn plate, nhưng nhiều MP và né nhẹ.',
+    stats: { maxHp: 48, maxMp: 68, def: 5, dodgeChance: 6 }, setId: 'shrine_mage_set',
+    sellPrice: 420, buyPrice: 1180, dropFrom: ['wraith_priest', 'candle_wraith'], dropChance: 4, minZone: 'shrine'
+  },
+  mirror_focus_orb: {
+    id: 'mirror_focus_orb', name: 'Mirror Focus Orb', icon: '🪞', slot: 'accessory1', rarity: 'epic',
+    description: 'Quả cầu gương dùng để ổn định ma lực. Tăng crit phép, MP và tỉ lệ rơi vật phẩm Shrine.',
+    stats: { critChance: 9, maxMp: 46, dropBonus: 5 }, effects: ['block_one_crit'], setId: 'shrine_mage_set',
+    sellPrice: 460, buyPrice: 1320, dropFrom: ['mirror_shade', 'possessed_relic'], dropChance: 4, minZone: 'shrine'
+  },
+  echo_grimoire: {
+    id: 'echo_grimoire', name: 'Echo Grimoire', icon: '📖', slot: 'weapon', rarity: 'legendary',
+    description: 'Sách phép ghi lại âm cuối của Echo Demon. MP lớn, ATK phép cao và hồi MP sau khi hạ địch.',
+    stats: { atk: 22, maxMp: 92, expBonus: 8 }, effects: ['kill_mp_regen'], setId: 'echo_mage_set',
+    sellPrice: 920, dropFrom: ['echo_demon'], dropChance: 3, minZone: 'shrine'
+  },
+  voicebound_mantle: {
+    id: 'voicebound_mantle', name: 'Voicebound Mantle', icon: '👘', slot: 'armor', rarity: 'legendary',
+    description: 'Áo choàng giữ lại tiếng nói của kẻ bị phong ấn. Tăng MP, HP và giảm rủi ro bị áp đảo bởi boss.',
+    stats: { maxHp: 80, maxMp: 88, def: 8 }, effects: ['boss_dmg_redux'], setId: 'echo_mage_set',
+    sellPrice: 900, dropFrom: ['echo_demon'], dropChance: 3, minZone: 'shrine'
+  },
+  oracle_moon_ring: {
+    id: 'oracle_moon_ring', name: 'Oracle Moon Ring', icon: '🌘', slot: 'accessory2', rarity: 'legendary',
+    description: 'Nhẫn trăng non của pháp sư tiên tri. Tăng EXP, drop và giữ nhịp mana trong các trận dài.',
+    stats: { maxMp: 55, expBonus: 10, dropBonus: 7 }, effects: ['mp_regen_3t'], setId: 'echo_mage_set',
+    sellPrice: 860, dropFrom: ['echo_demon', 'mirror_shade'], dropChance: 3, minZone: 'shrine'
+  },
+  abyss_mage_codex: {
+    id: 'abyss_mage_codex', name: 'Abyss Mage Codex', icon: '📕', slot: 'weapon', rarity: 'cursed',
+    description: 'Cấm thư hút lời cầu nguyện thành mana. ATK/MP rất cao, nhưng không thể dùng potion hồi máu trong combat.',
+    stats: { atk: 25, maxMp: 95, critChance: 8 }, effects: ['no_healing'],
+    sellPrice: 780, dropFrom: ['echo_demon', 'void_wraith'], dropChance: 3, minZone: 'shrine'
+  },
+
   // ── Special / Promo-only ─────────────────────────────────────────────────
   early_access_ring: {
     id: 'early_access_ring', name: 'Early Access Ring', icon: '💫', slot: 'accessory2', rarity: 'epic',
@@ -1204,7 +1305,130 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     effects: ['kill_hp_regen'],
     sellPrice: 1,
   },
+
 };
+
+// ── Equipment balance v2 ────────────────────────────────────────────────────
+export const EQUIPMENT_BALANCE_VERSION = 'equipment-v2';
+
+const RARITY_POWER_ORDER: Record<Rarity, number> = {
+  common: 1,
+  rare: 2,
+  epic: 3,
+  legendary: 4,
+  mythic: 5,
+  cursed: 5,
+};
+
+const ZONE_POWER_ORDER: Record<string, number> = {
+  village: 1,
+  forest: 2,
+  shrine: 3,
+  mines: 4,
+  wastes: 5,
+};
+
+const STAT_CAPS: Record<Rarity, Required<Pick<EquipStats,
+  'atk' | 'def' | 'maxHp' | 'maxMp' | 'critChance' | 'dodgeChance' | 'lifesteal' | 'expBonus' | 'goldBonus' | 'dropBonus'
+>>> = {
+  common:    { atk: 6,  def: 4,  maxHp: 25,  maxMp: 20,  critChance: 5,  dodgeChance: 4,  lifesteal: 0,  expBonus: 5,  goldBonus: 5,  dropBonus: 3 },
+  rare:      { atk: 11, def: 10, maxHp: 60,  maxMp: 45,  critChance: 12, dodgeChance: 8,  lifesteal: 3,  expBonus: 8,  goldBonus: 8,  dropBonus: 5 },
+  epic:      { atk: 17, def: 14, maxHp: 85,  maxMp: 75,  critChance: 16, dodgeChance: 10, lifesteal: 6,  expBonus: 12, goldBonus: 12, dropBonus: 8 },
+  legendary: { atk: 23, def: 18, maxHp: 110, maxMp: 95,  critChance: 18, dodgeChance: 12, lifesteal: 8,  expBonus: 15, goldBonus: 15, dropBonus: 10 },
+  mythic:    { atk: 30, def: 24, maxHp: 150, maxMp: 110, critChance: 18, dodgeChance: 12, lifesteal: 10, expBonus: 15, goldBonus: 15, dropBonus: 12 },
+  cursed:    { atk: 32, def: 26, maxHp: 150, maxMp: 95,  critChance: 20, dodgeChance: 10, lifesteal: 8,  expBonus: 12, goldBonus: 15, dropBonus: 8 },
+};
+
+const SLOT_STAT_MULTIPLIER: Record<EquipSlot, Partial<Record<keyof EquipStats, number>>> = {
+  weapon:     { atk: 1.00, def: 0.55, maxHp: 0.40, maxMp: 0.70, critChance: 1.00, dodgeChance: 0.80, lifesteal: 1.00, expBonus: 0.75, goldBonus: 0.75, dropBonus: 0.75 },
+  armor:      { atk: 0.45, def: 1.00, maxHp: 1.00, maxMp: 0.80, critChance: 0.55, dodgeChance: 0.90, lifesteal: 0.50, expBonus: 0.70, goldBonus: 0.70, dropBonus: 0.70 },
+  accessory1: { atk: 0.55, def: 0.55, maxHp: 0.55, maxMp: 0.70, critChance: 0.80, dodgeChance: 0.80, lifesteal: 0.80, expBonus: 1.00, goldBonus: 1.00, dropBonus: 1.00 },
+  accessory2: { atk: 0.55, def: 0.55, maxHp: 0.55, maxMp: 0.70, critChance: 0.80, dodgeChance: 0.80, lifesteal: 0.80, expBonus: 1.00, goldBonus: 1.00, dropBonus: 1.00 },
+};
+
+const LUCK_DROP_BONUS: Record<string, number> = {
+  lucky_charm: 2,
+  rabbit_foot: 2,
+  lucky_silver_coin: 4,
+  hunter_mark: 3,
+  hunter_emblem: 5,
+  merchant_coin: 4,
+  golden_scarab: 6,
+  boss_hunter_badge: 4,
+  royal_tax_seal: 5,
+  soul_merchant_coin: 6,
+  crown_fragment: 5,
+  broken_crown_fragment: 7,
+  soul_crown: 7,
+  legacy_pendant: 10,
+};
+
+function statCap(def: EquipmentDef, key: keyof EquipStats): number {
+  const base = STAT_CAPS[def.rarity][key] ?? Number.POSITIVE_INFINITY;
+  const mult = SLOT_STAT_MULTIPLIER[def.slot][key] ?? 1;
+  return Math.max(0, Math.round(base * mult));
+}
+
+function clampSigned(value: number | undefined, cap: number): number | undefined {
+  if (value === undefined || value === 0) return value;
+  if (value > 0) return Math.min(value, cap);
+  return value;
+}
+
+function cleanStats(stats: EquipStats): EquipStats {
+  const out: EquipStats = {};
+  for (const [key, value] of Object.entries(stats) as Array<[keyof EquipStats, number | undefined]>) {
+    if (value === undefined || value === 0) continue;
+    const rounded = Number.isInteger(value) ? value : Number(value.toFixed(2));
+    if (rounded !== 0) (out as any)[key] = rounded;
+  }
+  return out;
+}
+
+function balanceEquipmentStats(def: EquipmentDef): EquipStats {
+  const stats: EquipStats = { ...def.stats };
+
+  if (LUCK_DROP_BONUS[def.id]) {
+    stats.dropBonus = Math.max(stats.dropBonus ?? 0, LUCK_DROP_BONUS[def.id]);
+  }
+
+  for (const key of ['atk','def','maxHp','maxMp','critChance','dodgeChance','lifesteal','expBonus','goldBonus','dropBonus'] as Array<keyof EquipStats>) {
+    const cap = statCap(def, key);
+    (stats as any)[key] = clampSigned(stats[key], cap);
+  }
+
+  // High-impact effects are intentionally priced through slightly lower raw stats.
+  const heavyEffects = new Set<EquipEffect>(['revive_once', 'celestial_revive', 'boss_damage', 'boss_dmg_redux', 'soul_stack']);
+  const hasHeavyEffect = (def.effects ?? []).some(e => heavyEffects.has(e));
+  if (hasHeavyEffect && def.rarity !== 'common') {
+    if ((stats.atk ?? 0) > 0) stats.atk = Math.max(1, Math.floor((stats.atk ?? 0) * 0.92));
+    if ((stats.def ?? 0) > 0) stats.def = Math.max(1, Math.floor((stats.def ?? 0) * 0.92));
+    if ((stats.maxHp ?? 0) > 0) stats.maxHp = Math.max(5, Math.floor((stats.maxHp ?? 0) * 0.92));
+  }
+
+  // Cursed gear should feel powerful, but never become strictly better than mythic.
+  if (def.rarity === 'cursed') {
+    if ((stats.goldBonus ?? 0) > 0 && (stats.expBonus ?? 0) > 0) {
+      stats.goldBonus = Math.min(stats.goldBonus ?? 0, 12);
+      stats.expBonus = Math.min(stats.expBonus ?? 0, 8);
+    }
+  }
+
+  return cleanStats(stats);
+}
+
+function normalizeEquipment(raw: Record<string, EquipmentDef>): Record<string, EquipmentDef> {
+  const normalized: Record<string, EquipmentDef> = {};
+  for (const [id, def] of Object.entries(raw)) {
+    normalized[id] = {
+      ...def,
+      stats: balanceEquipmentStats(def),
+    };
+  }
+  return normalized;
+}
+
+export const EQUIPMENT: Record<string, EquipmentDef> = normalizeEquipment(EQUIPMENT_RAW);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 export const RARITY_COLORS: Record<Rarity, number> = {
@@ -1237,20 +1461,69 @@ export const SLOT_LABELS: Record<EquipSlot, string> = {
   armor:      'Giáp',
   accessory1: 'Phụ Kiện 1',
   accessory2: 'Phụ Kiện 2',
+
+
 };
 
 export function getEquipment(id: string): EquipmentDef | undefined {
   return EQUIPMENT[id];
 }
 
-export function getZoneEquipment(zoneId: string): EquipmentDef[] {
-  const order = ['village', 'forest', 'shrine', 'mines', 'wastes'];
-  const zoneIdx = order.indexOf(zoneId);
-  return Object.values(EQUIPMENT).filter(e => {
-    if (!e.buyPrice) return false;
-    const minIdx = order.indexOf(e.minZone ?? 'village');
-    return minIdx <= zoneIdx && e.rarity !== 'mythic' && e.rarity !== 'cursed';
+export function equipmentProgressionScore(e: EquipmentDef): number {
+  const zone = ZONE_POWER_ORDER[e.minZone ?? 'village'] ?? 1;
+  const rarity = RARITY_POWER_ORDER[e.rarity] ?? 1;
+  return zone * 100 + rarity * 10 + (e.buyPrice ?? e.sellPrice ?? 0) / 1000;
+}
+
+export function sortEquipmentForProgression(items: EquipmentDef[]): EquipmentDef[] {
+  return [...items].sort((a, b) => {
+    const zoneDiff = (ZONE_POWER_ORDER[a.minZone ?? 'village'] ?? 1) - (ZONE_POWER_ORDER[b.minZone ?? 'village'] ?? 1);
+    if (zoneDiff !== 0) return zoneDiff;
+    const rarityDiff = (RARITY_POWER_ORDER[a.rarity] ?? 1) - (RARITY_POWER_ORDER[b.rarity] ?? 1);
+    if (rarityDiff !== 0) return rarityDiff;
+    return (a.buyPrice ?? a.sellPrice ?? 0) - (b.buyPrice ?? b.sellPrice ?? 0);
   });
+}
+
+export function getZoneEquipment(zoneId: string): EquipmentDef[] {
+  const zoneIdx = ZONE_POWER_ORDER[zoneId] ?? 1;
+  return sortEquipmentForProgression(Object.values(EQUIPMENT).filter(e => {
+    if (!e.buyPrice) return false;
+    const minIdx = ZONE_POWER_ORDER[e.minZone ?? 'village'] ?? 1;
+    return minIdx <= zoneIdx && e.rarity !== 'mythic' && e.rarity !== 'cursed';
+  }));
+}
+
+export function getShopEquipment(zoneId: string, limit = 25): EquipmentDef[] {
+  const zoneIdx = ZONE_POWER_ORDER[zoneId] ?? 1;
+  const allowedRarityByZone: Record<number, Rarity[]> = {
+    1: ['common'],
+    2: ['common', 'rare'],
+    3: ['rare', 'epic'],
+    4: ['rare', 'epic'],
+    5: ['epic', 'legendary'],
+  };
+  const allowed = new Set(allowedRarityByZone[zoneIdx] ?? ['common']);
+  const pool = Object.values(EQUIPMENT).filter(e => {
+    if (!e.buyPrice) return false;
+    if (e.rarity === 'mythic' || e.rarity === 'cursed') return false;
+    if (!allowed.has(e.rarity)) return false;
+    const minIdx = ZONE_POWER_ORDER[e.minZone ?? 'village'] ?? 1;
+    return minIdx <= zoneIdx;
+  });
+  return pool.sort((a, b) => {
+    const az = ZONE_POWER_ORDER[a.minZone ?? 'village'] ?? 1;
+    const bz = ZONE_POWER_ORDER[b.minZone ?? 'village'] ?? 1;
+    // Shops prioritize gear from the current/latest unlocked zone, then older backup gear.
+    if (az !== bz) return bz - az;
+    const ar = RARITY_POWER_ORDER[a.rarity] ?? 1;
+    const br = RARITY_POWER_ORDER[b.rarity] ?? 1;
+    if (ar !== br) return ar - br;
+    const slotOrder: Record<EquipSlot, number> = { weapon: 1, armor: 2, accessory1: 3, accessory2: 4 };
+    const slotDiff = slotOrder[a.slot] - slotOrder[b.slot];
+    if (slotDiff !== 0) return slotDiff;
+    return (a.buyPrice ?? a.sellPrice ?? 0) - (b.buyPrice ?? b.sellPrice ?? 0);
+  }).slice(0, limit);
 }
 
 /** Get active set bonuses for a list of worn equipment IDs */

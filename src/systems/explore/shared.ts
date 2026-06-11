@@ -16,11 +16,13 @@ import { getEnemy } from '../../data/enemies';
 import { onlyUser } from '../../utils/collectors';
 import { showExploreMenu } from './menu';
 import { handleSearch } from './search';
+import { handleOakFight } from './boss';
 import { handleVictory, handleDeath, handleFlee } from './callbacks';
+import { polishGameText } from '../../utils/textPolish';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 export function simpleEmbed(color: number, desc: string) {
-  return new EmbedBuilder().setColor(color).setDescription(desc);
+  return new EmbedBuilder().setColor(color).setDescription(polishGameText(desc));
 }
 
 export async function clearStaleCombat(
@@ -52,11 +54,29 @@ export function buildContinueExploreRow(userId: string) {
   return [new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`continue_explore_${userId}`)
-      .setLabel('🔎 Khám phá tiếp')
+      .setLabel('Khám phá tiếp')
+      .setEmoji('🔎')
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`continue_menu_${userId}`)
-      .setLabel('📍 Menu chính')
+      .setLabel('Menu chính')
+      .setEmoji('📍')
+      .setStyle(ButtonStyle.Secondary)
+  )];
+}
+
+
+export function buildOakSummonedRow(userId: string) {
+  return [new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`continue_oak_fight_${userId}`)
+      .setLabel('Công kích ngay')
+      .setEmoji('⚔️')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`continue_menu_${userId}`)
+      .setLabel('Menu chính')
+      .setEmoji('📍')
       .setStyle(ButtonStyle.Secondary)
   )];
 }
@@ -96,7 +116,8 @@ export async function attachContinueExploreHandler(
   collector.on('collect', async (i) => {
     if (
       i.customId !== `continue_explore_${userId}` &&
-      i.customId !== `continue_menu_${userId}`
+      i.customId !== `continue_menu_${userId}` &&
+      i.customId !== `continue_oak_fight_${userId}`
     ) {
       return;
     }
@@ -122,6 +143,8 @@ export async function attachContinueExploreHandler(
       } else {
         await handleSearch(interaction, userId, guildId);
       }
+    } else if (i.customId === `continue_oak_fight_${userId}`) {
+      await handleOakFight(interaction, userId, guildId);
     } else {
       await showExploreMenu(interaction, userId, guildId);
     }
@@ -179,7 +202,7 @@ export async function blockIfPartyMember(
   if (party && party.leaderId !== userId && (party.memberIds.length ?? 0) > 1) {
     const leaderName = getPlayer(party.leaderId, guildId)?.name ?? 'Leader';
     await interaction.editReply({
-      embeds: [simpleEmbed(COLORS.warning, `👥 Bạn đang trong party. Chỉ **${leaderName}** (leader) mới có thể khám phá và di chuyển cho cả nhóm.`)],
+      embeds: [simpleEmbed(COLORS.warning, `👥 Bạn đang trong party. Chỉ **${leaderName}** (leader) mới có thể khám phá và di chuyển cho cả nhóm. Nếu muốn chơi riêng, dùng \`/party leave\`.`)],
       components: []
     });
     return true;

@@ -73,7 +73,7 @@ export function onBossKilled(guildId: string, bossId: string, playerName: string
   // Each boss death has cascading world consequences
   const consequences: Record<string, string> = {
     ancient_oak_slain:      '🌳 Ancient Oak đã ngã xuống — rừng bị bóng tối lấn chiếm, drop rate tăng 20% trong rừng.',
-    shrine_guardian_slain:  '⛩️ Shrine Guardian đã bị tiêu diệt — lời nguyền của đền cổ lan ra, enemy ATK +10% toàn server.',
+    echo_demon_slain:       '👁️ Echo Demon đã bị phong ấn lại — Ô Nhiễm Linh Hồn trong Đền Cổ dịu xuống, shop giảm 10% trong 24h.',
     mine_colossus_slain:    '⛏️ Mine Colossus đã sụp đổ — mạch quặng mở ra, giá shop giảm 15% trong 24h.',
     the_forgotten_slain:    '❓ The Forgotten đã bị lãng quên — thực tại ổn định, toàn bộ player được +10% EXP trong 48h.'
   };
@@ -83,9 +83,9 @@ export function onBossKilled(guildId: string, bossId: string, playerName: string
     setFlag(guildId, 'forest_drop_bonus', '20', 86400);
     setWorldEvent(guildId, 'ancient_oak_fall', consequences['ancient_oak_slain'] ?? 'Ancient Oak đã bị tiêu diệt.', 86400);
   }
-  if (bossId === 'shrine_guardian') {
-    setFlag(guildId, 'global_enemy_atk_up', '10', 86400);
-    setWorldEvent(guildId, 'shrine_guardian_curse', consequences['shrine_guardian_slain'] ?? 'Shrine Guardian đã bị tiêu diệt.', 86400);
+  if (bossId === 'echo_demon') {
+    setFlag(guildId, 'shop_discount', '10', 86400);
+    setWorldEvent(guildId, 'echo_demon_sealed', consequences['echo_demon_slain'] ?? 'Echo Demon đã bị phong ấn lại.', 86400);
   }
   if (bossId === 'mine_colossus') {
     setFlag(guildId, 'shop_discount', '15', 86400);
@@ -193,7 +193,7 @@ export function getWorldSummary(guildId: string): WorldSummary {
   const activeBonuses: string[] = [];
 
   if (getFlag(guildId, 'global_enemy_atk_up'))
-    activeDebuffs.push('💀 ATK địch +10% toàn server (Shrine Guardian đã ngã)');
+    activeDebuffs.push('💀 ATK địch +10% toàn server (di sản bóng tối cũ vẫn còn hiệu lực)');
 
   if (getFlag(guildId, 'shop_discount'))
     activeBonuses.push(`🛒 Giảm giá shop ${getShopDiscount(guildId)}% (Mine Colossus đã ngã)`);

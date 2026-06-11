@@ -7,10 +7,11 @@ import {
 } from './player';
 import { getFlag, setFlag } from './world';
 import { MATERIALS } from '../data/materials';
-import { EQUIPMENT } from '../data/equipment';
+import { EQUIPMENT, RARITY_LABELS, SLOT_ICONS } from '../data/equipment';
 import { randInt, pick } from '../utils/format';
 import type { PlayerRow } from '../utils/embeds';
 import { getEquipmentStats } from './equipment';
+import { cleanseCorruption } from './corruption';
 
 export type BuffKey =
   | 'weapon_oil'
@@ -41,6 +42,33 @@ export interface PlayerBuff {
 }
 
 function now(): number { return Math.floor(Date.now() / 1000); }
+
+function formatEquipmentStatsForReward(eq: { stats?: any }): string {
+  const stats = eq.stats ?? {};
+  const parts: string[] = [];
+  if (stats.atk) parts.push(`⚔️ ATK +${stats.atk}`);
+  if (stats.def) parts.push(`🛡️ DEF +${stats.def}`);
+  if (stats.maxHp) parts.push(`❤️ HP +${stats.maxHp}`);
+  if (stats.maxMp) parts.push(`💧 MP +${stats.maxMp}`);
+  if (stats.critChance) parts.push(`🎯 Crit +${stats.critChance}%`);
+  if (stats.dodgeChance) parts.push(`💨 Dodge +${stats.dodgeChance}%`);
+  if (stats.lifesteal) parts.push(`🩸 Hút máu +${stats.lifesteal}%`);
+  if (stats.expBonus) parts.push(`✨ EXP +${stats.expBonus}%`);
+  if (stats.goldBonus) parts.push(`🪙 Vàng +${stats.goldBonus}%`);
+  if (stats.dropBonus) parts.push(`📦 Drop +${stats.dropBonus}%`);
+  return parts.length ? parts.join(' · ') : 'Không có chỉ số phụ.';
+}
+
+function formatEquipmentReward(eq: typeof EQUIPMENT[keyof typeof EQUIPMENT]): string[] {
+  const rarityLabel = RARITY_LABELS[eq.rarity] ?? eq.rarity;
+  const slotLabel = SLOT_ICONS[eq.slot] ?? '🎒';
+  return [
+    `${eq.icon} **${eq.name}**`,
+    `${slotLabel} Slot: **${eq.slot}** · Độ hiếm: **${rarityLabel}**`,
+    formatEquipmentStatsForReward(eq),
+    `*Trang bị đã được cất vào túi. Vào tab **Trang Bị** để mặc nếu muốn.*`
+  ];
+}
 
 export function cleanupExpiredBuffs(userId: string, guildId: string): void {
   db.prepare('DELETE FROM player_buffs WHERE user_id=? AND guild_id=? AND expires_at IS NOT NULL AND expires_at <= ?')
@@ -222,12 +250,29 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
     case 'weapon_oil': setBuff(userId, guildId, 'weapon_oil', 10, 1, 7200); lines.push('🔩 Trận combat kế tiếp: **ATK +10%**.'); break;
     case 'armor_polish': setBuff(userId, guildId, 'armor_polish', 10, 1, 7200); lines.push('🧼 Trận combat kế tiếp: **DEF +10%**.'); break;
     case 'hunter_meal': setBuff(userId, guildId, 'hunter_meal', 10, 1, 7200); lines.push('🥩 Trận combat kế tiếp: **ATK +10%**.'); break;
+    case 'bone_broth': setBuff(userId, guildId, 'stone_skin', 10, 1, 7200); lines.push('🦴 Trận combat kế tiếp: **DEF +10%**.'); break;
     case 'stone_skin_draught': setBuff(userId, guildId, 'stone_skin', 15, 1, 7200); lines.push('🛡️ Trận combat kế tiếp: **DEF +15%**.'); break;
     case 'quickstep_tea': setBuff(userId, guildId, 'quickstep_tea', 15, 1, 7200); lines.push('⚡ Trận combat kế tiếp: né đòn đầu tiên tốt hơn.'); break;
     case 'rage_elixir': setBuff(userId, guildId, 'rage_elixir', 25, 1, 7200); lines.push('🔥 Trận combat kế tiếp: **ATK +25%**, nhưng nhận thêm sát thương.'); break;
     case 'focus_tonic': setBuff(userId, guildId, 'focus_tonic', 20, 1, 7200); lines.push('💠 Trận combat kế tiếp: tiết kiệm MP, nhưng DEF giảm nhẹ.'); break;
     case 'scroll_detection': setBuff(userId, guildId, 'scroll_detection', 1, 1, 7200); lines.push('📜 Lượt explore kế tiếp: tăng tỉ lệ event tốt, giảm ambush.'); break;
+    case 'scroll_fortune': setBuff(userId, guildId, 'luck', 1, 1, 7200); lines.push('🍀 Lượt explore kế tiếp: cơ hội gặp event/phần thưởng tốt cao hơn.'); break;
     case 'scroll_greed': setBuff(userId, guildId, 'scroll_greed', 30, 1, 7200); lines.push('📜 Trận combat kế tiếp: **Gold +30%**, nhưng địch **ATK +15%**.'); break;
+    case 'holy_water': {
+      const clean = cleanseCorruption(userId, guildId, 10);
+      if (clean.reduced > 0) lines.push(`💧 Thanh tẩy Ô Nhiễm Linh Hồn -**${clean.reduced}** → **${clean.after}/100**.`);
+      break;
+    }
+    case 'purifying_salt': {
+      const clean = cleanseCorruption(userId, guildId, 15);
+      lines.push(clean.reduced > 0 ? `🧂 Muối thánh cháy trắng. Ô Nhiễm -**${clean.reduced}** → **${clean.after}/100**.` : '🧂 Linh hồn bạn hiện không bị ô nhiễm, nhưng lớp muối vẫn tạo cảm giác an toàn.');
+      break;
+    }
+    case 'moonwater': {
+      const clean = cleanseCorruption(userId, guildId, 5);
+      if (clean.reduced > 0) lines.push(`🌙 Ánh trăng rửa nhẹ linh hồn. Ô Nhiễm -**${clean.reduced}** → **${clean.after}/100**.`);
+      break;
+    }
     case 'fake_identity': setBuff(userId, guildId, 'fake_identity', 10, 1, 7200); lines.push('🎭 Shop kế tiếp: **giảm giá 10%**.'); break;
     case 'black_market_token': setBuff(userId, guildId, 'black_market_access', 1, 1, 7200); lines.push('🌑 Chợ Đen sẽ dễ xuất hiện trong lần khám phá tới.'); break;
     case 'assassins_smoke': setBuff(userId, guildId, 'assassins_smoke', 20, 1, 7200); lines.push('🗡️ Lần cướp shopkeeper kế tiếp: shopkeeper **DEF -20%** lúc mở combat.'); break;
@@ -239,12 +284,25 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
     case 'fate_dice': {
       const roll = randInt(1, 6);
       lines.push(`🎲 Xúc xắc định mệnh rơi vào mặt **${roll}**.`);
-      if (roll === 1) { const h = Math.floor(player.max_hp * 0.25); newHp = Math.min(player.max_hp, newHp + h); lines.push(`❤️ +**${h} HP**`); }
-      if (roll === 2) { const m = Math.floor(player.max_mp * 0.25); newMp = Math.min(player.max_mp, newMp + m); lines.push(`💧 +**${m} MP**`); }
+      if (roll === 1) { const h = Math.floor(player.max_hp * 0.25); const gain = Math.min(h, player.max_hp - newHp); newHp = Math.min(player.max_hp, newHp + h); lines.push(`❤️ +**${gain} HP**`); }
+      if (roll === 2) { const m = Math.floor(player.max_mp * 0.25); const gain = Math.min(m, player.max_mp - newMp); newMp = Math.min(player.max_mp, newMp + m); lines.push(`💧 +**${gain} MP**`); }
       if (roll === 3) { const g = randInt(20, 90); grantGold(userId, guildId, g); lines.push(`🪙 +**${g} Gold**`); }
       if (roll === 4) { setBuff(userId, guildId, 'scroll_greed', 20, 1, 3600); lines.push('⚠️ Lần combat tới nguy hiểm hơn, nhưng phần thưởng tốt hơn.'); }
       if (roll === 5) { const loss = Math.min(player.gold, randInt(15, 60)); if (loss > 0) grantGold(userId, guildId, -loss); lines.push(`💸 Mất **${loss} Gold**.`); }
       if (roll === 6) { setBuff(userId, guildId, 'luck', 1, 1, 3600); lines.push('🍀 May mắn tăng trong lượt explore kế tiếp.'); }
+      break;
+    }
+    case 'chaos_flask': {
+      const roll = randInt(1, 8);
+      lines.push(`🌪️ Hỗn loạn xoáy vào mặt **${roll}**.`);
+      if (roll === 1) { const h = Math.floor(player.max_hp * 0.55); const gain = Math.min(h, player.max_hp - newHp); newHp = Math.min(player.max_hp, newHp + h); lines.push(`❤️ Hồi mạnh: +**${gain} HP**.`); }
+      if (roll === 2) { const m = Math.floor(player.max_mp * 0.55); const gain = Math.min(m, player.max_mp - newMp); newMp = Math.min(player.max_mp, newMp + m); lines.push(`💧 Mana bùng nổ: +**${gain} MP**.`); }
+      if (roll === 3) { setBuff(userId, guildId, 'rage_elixir', 20, 1, 3600); lines.push('🔥 Nhận buff trận tới: **ATK +20%**, nhưng nguy hiểm hơn.'); }
+      if (roll === 4) { setBuff(userId, guildId, 'stone_skin', 20, 1, 3600); lines.push('🛡️ Nhận buff trận tới: **DEF +20%**.'); }
+      if (roll === 5) { setBuff(userId, guildId, 'luck', 1, 1, 3600); lines.push('🍀 Lượt explore kế tiếp may mắn hơn.'); }
+      if (roll === 6) { const g = randInt(80, 180); grantGold(userId, guildId, g); lines.push(`🪙 Hỗn loạn nhả ra **${g} Gold**.`); }
+      if (roll === 7) { const dmg = Math.max(1, Math.floor(player.max_hp * 0.22)); newHp = Math.max(1, newHp - dmg); lines.push(`💥 Phản ứng ngược: -**${dmg} HP**.`); }
+      if (roll === 8) { setBuff(userId, guildId, 'scroll_greed', 25, 1, 3600); lines.push('⚠️ Trận tới phần thưởng cao hơn, nhưng địch đánh đau hơn.'); }
       break;
     }
     case 'strange_mushroom':
@@ -285,7 +343,8 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
         addItem(userId, guildId, mat.id, 1);
         got.push(`${mat.icon} ${mat.name}`);
       }
-      lines.push(`📦 Mở rương nhận: ${got.join(', ')}.`);
+      lines.push('📦 **Rương Nguyên Liệu đã mở.**');
+      lines.push(`Bạn nhận được: ${got.join(', ')}.`);
       break;
     }
     case 'gear_box': {
@@ -305,7 +364,8 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
       const fallback = Object.values(EQUIPMENT).filter(e => isGacha(e));
       const eq = pick(pool.length ? pool : fallback);
       addItem(userId, guildId, eq.id, 1);
-      lines.push(`🎰 Gear Box mở ra: ${eq.icon} **${eq.name}** *(${eq.rarity})*!`);
+      lines.push('🎰 **Gear Box nứt ra, ánh sáng rơi xuống tay bạn...**');
+      lines.push(...formatEquipmentReward(eq));
       break;
     }
     case 'cursed_equipment_box': {
@@ -314,13 +374,16 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
       const fallback = Object.values(EQUIPMENT).filter(e => ['rare','epic','legendary','mythic','cursed'].includes(e.rarity));
       const eq = pick(pool.length ? pool : fallback);
       addItem(userId, guildId, eq.id, 1);
-      lines.push(`🎁 Mở hộp nhận trang bị: ${eq.icon} **${eq.name}**.`);
+      lines.push('🎁 **Hộp nguyền rủa bật mở. Một món trang bị lạnh buốt hiện ra...**');
+      lines.push(...formatEquipmentReward(eq));
       break;
     }
     case 'purification_stone': {
       db.prepare(`DELETE FROM player_buffs WHERE user_id=? AND guild_id=? AND buff_key IN ('scroll_greed','rage_elixir','blood_vial','assassins_smoke')`)
         .run(userId, guildId);
+      const clean = cleanseCorruption(userId, guildId, 30);
       lines.push('💎 Đã xóa các hiệu ứng bất lợi đang chờ: Greed/Rage/Blood/Smoke.');
+      if (clean.reduced > 0) lines.push(`🌘 Ô Nhiễm Linh Hồn -**${clean.reduced}** → **${clean.after}/100**.`);
       break;
     }
     case 'bribe_coin':
@@ -333,5 +396,6 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
 
   removeItem(userId, guildId, itemId, 1);
   updatePlayerHpMp(userId, guildId, newHp, newMp);
-  return { ok: true, consumed: true, title: `${item.icon} Đã dùng ${item.name}`, lines };
+  const boxTitle = itemId === 'gear_box' ? '🎰 Gear Box đã mở' : itemId === 'cursed_equipment_box' ? '🎁 Cursed Equipment Box đã mở' : itemId === 'material_chest' ? '📦 Material Chest đã mở' : `${item.icon} Đã dùng ${item.name}`;
+  return { ok: true, consumed: true, title: boxTitle, lines };
 }

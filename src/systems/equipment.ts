@@ -53,6 +53,53 @@ export function removeEquipment(userId: string, guildId: string, slot: EquipSlot
     .run(userId, guildId, slot);
 }
 
+
+export function describeUpgradeBonus(slot: EquipSlot, def?: EquipmentDef): string {
+  if (slot === 'weapon') return '+2 ATK';
+  if (slot === 'armor') return '+2 DEF, +6 HP';
+  if (!def) return '+1 chỉ số phụ';
+  if ((def.stats.goldBonus ?? 0) > 0) return '+1% Gold';
+  if ((def.stats.expBonus ?? 0) > 0) return '+1% EXP';
+  if ((def.stats.dropBonus ?? 0) > 0) return '+1% Drop';
+  if ((def.stats.maxMp ?? 0) >= Math.max(def.stats.maxHp ?? 0, 0)) return '+5 MP';
+  if ((def.stats.maxHp ?? 0) > 0 || (def.stats.def ?? 0) > 0) return '+5 HP';
+  if ((def.stats.critChance ?? 0) > 0) return '+0.5% Crit';
+  if ((def.stats.dodgeChance ?? 0) > 0) return '+0.5% Dodge';
+  return '+1 ATK';
+}
+
+function applyUpgradeStatBonus(stats: FullEquipStats, slot: EquipSlot, def: EquipmentDef, level: number): void {
+  if (slot === 'weapon') {
+    stats.atk! += level * 2;
+    return;
+  }
+  if (slot === 'armor') {
+    stats.def! += level * 2;
+    stats.maxHp! += level * 6;
+    return;
+  }
+
+  // Accessory upgrades now follow the accessory identity instead of always adding ATK.
+  if ((def.stats.goldBonus ?? 0) > 0) stats.goldBonus! += level;
+  else if ((def.stats.expBonus ?? 0) > 0) stats.expBonus! += level;
+  else if ((def.stats.dropBonus ?? 0) > 0) stats.dropBonus! += level;
+  else if ((def.stats.maxMp ?? 0) >= Math.max(def.stats.maxHp ?? 0, 0)) stats.maxMp! += level * 5;
+  else if ((def.stats.maxHp ?? 0) > 0 || (def.stats.def ?? 0) > 0) stats.maxHp! += level * 5;
+  else if ((def.stats.critChance ?? 0) > 0) stats.critChance! += level * 0.5;
+  else if ((def.stats.dodgeChance ?? 0) > 0) stats.dodgeChance! += level * 0.5;
+  else stats.atk! += level;
+}
+
+function applyEquipmentStatCaps(stats: FullEquipStats): FullEquipStats {
+  stats.critChance = Math.min(25, stats.critChance ?? 0);
+  stats.dodgeChance = Math.min(15, stats.dodgeChance ?? 0);
+  stats.lifesteal = Math.min(12, stats.lifesteal ?? 0);
+  stats.expBonus = Math.min(35, stats.expBonus ?? 0);
+  stats.goldBonus = Math.min(35, stats.goldBonus ?? 0);
+  stats.dropBonus = Math.min(20, stats.dropBonus ?? 0);
+  return stats;
+}
+
 // ── Full stat computation with set bonuses ────────────────────────────────
 export function getEquipmentStats(userId: string, guildId: string): FullEquipStats {
   const worn     = getWornEquipment(userId, guildId);
@@ -60,7 +107,7 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
   const stats: FullEquipStats = {
     atk: 0, def: 0, maxHp: 0, maxMp: 0,
     critChance: 0, dodgeChance: 0, lifesteal: 0,
-    expBonus: 0, goldBonus: 0,
+    expBonus: 0, goldBonus: 0, dropBonus: 0,
     effects: [], activeSetNames: []
   };
 
@@ -77,6 +124,7 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
     stats.lifesteal!  += def.stats.lifesteal   ?? 0;
     stats.expBonus!   += def.stats.expBonus    ?? 0;
     stats.goldBonus!  += def.stats.goldBonus   ?? 0;
+    stats.dropBonus!  += def.stats.dropBonus   ?? 0;
     if (def.effects) def.effects.forEach(e => {
       if (!stats.effects.includes(e)) stats.effects.push(e);
     });
@@ -85,9 +133,7 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
       .get(userId, guildId, entry.slot) as any;
     const upLv = upRow?.upgrade_level ?? 0;
     if (upLv > 0) {
-      if (entry.slot === 'weapon') stats.atk! += upLv * 2;
-      else if (entry.slot === 'armor') stats.def! += upLv * 2;
-      else stats.atk! += upLv; // accessory: +1 ATK per level
+      applyUpgradeStatBonus(stats, entry.slot, def, upLv);
     }
   }
 
@@ -100,9 +146,12 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
   stats.critChance! += setBonuses.critChance  ?? 0;
   stats.dodgeChance!+= setBonuses.dodgeChance ?? 0;
   stats.lifesteal!  += setBonuses.lifesteal   ?? 0;
+  stats.expBonus!   += setBonuses.expBonus    ?? 0;
+  stats.goldBonus!  += setBonuses.goldBonus   ?? 0;
+  stats.dropBonus!  += setBonuses.dropBonus   ?? 0;
   setEffects.forEach(e => { if (!stats.effects.includes(e)) stats.effects.push(e); });
 
-  return stats;
+  return applyEquipmentStatCaps(stats);
 }
 
 // ── Inventory helpers ─────────────────────────────────────────────────────
@@ -131,6 +180,9 @@ export function formatWornGear(userId: string, guildId: string): string {
       def.stats.critChance ? `+${def.stats.critChance}% Crit` : '',
       def.stats.dodgeChance? `+${def.stats.dodgeChance}% Dodge`: '',
       def.stats.lifesteal  ? `+${def.stats.lifesteal}% LS`    : '',
+      def.stats.expBonus   ? `+${def.stats.expBonus}% EXP`     : '',
+      def.stats.goldBonus  ? `+${def.stats.goldBonus}% Gold`   : '',
+      def.stats.dropBonus  ? `+${def.stats.dropBonus}% Drop`   : '',
     ].filter(Boolean).join(', ');
     return `${def.icon} **${def.name}** [${RARITY_LABELS[def.rarity]}]\n  └ ${statsStr || '*no stats*'}`;
   }).join('\n');

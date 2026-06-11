@@ -1,11 +1,10 @@
 import {
-  SlashCommandBuilder, ChatInputCommandInteraction
+  SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder
 } from 'discord.js';
 import { getPlayer, getLoadout, applyPassiveStats } from '../systems/player';
-import { buildProfileEmbed } from '../utils/embeds';
+import { buildProfileEmbed, COLORS } from '../utils/embeds';
 import { getAchievementSummary } from '../systems/achievements';
-import { EmbedBuilder } from 'discord.js';
-import { COLORS } from '../utils/embeds';
+import { buildStatControlRows, attachProfileStatCollector } from '../systems/profileStatsUi';
 
 export const data = new SlashCommandBuilder()
   .setName('profile')
@@ -38,8 +37,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const withPassive = applyPassiveStats(player);
   const avatar     = target.displayAvatarURL({ size: 128 });
   const achievementSummary = getAchievementSummary(target.id, guildId);
+  const canEditStats = target.id === interaction.user.id;
 
   await interaction.editReply({
-    embeds: [buildProfileEmbed(withPassive, loadout, avatar, achievementSummary)]
+    embeds: [buildProfileEmbed(withPassive, loadout, avatar, achievementSummary)],
+    components: canEditStats ? buildStatControlRows(target.id, guildId) : []
   });
+
+  if (canEditStats) {
+    await attachProfileStatCollector(interaction, target, guildId);
+  }
 }

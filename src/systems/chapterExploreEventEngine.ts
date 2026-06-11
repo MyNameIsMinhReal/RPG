@@ -11,6 +11,7 @@ import { getChapterExploreEvent, describeChapterReward, type ChapterButtonStyle,
 import { completePendingChapterExploreEvent, getPendingChapterExploreEvent } from './chapter';
 import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, updatePlayerHpMp } from './player';
 import { COLORS, simpleEmbed } from '../utils/embeds';
+import { eventIntro, eventResult } from '../utils/textPolish';
 import { onlyUser } from '../utils/collectors';
 import { randInt } from '../utils/format';
 
@@ -72,14 +73,14 @@ function applyEffects(userId: string, guildId: string, effects: ChapterEventEffe
     if (effect.type === 'gold') {
       const amount = randInt(effect.min, effect.max);
       grantGold(userId, guildId, amount);
-      lines.push(`🪙 +**${amount} Gold**`);
+      lines.push(`🪙 Nhận **${amount} Gold**`);
       continue;
     }
 
     if (effect.type === 'exp') {
       const amount = randInt(effect.min, effect.max);
       grantExp(userId, guildId, amount);
-      lines.push(`⭐ +**${amount} EXP**`);
+      lines.push(`⭐ Nhận **${amount} EXP**`);
       continue;
     }
 
@@ -92,7 +93,7 @@ function applyEffects(userId: string, guildId: string, effects: ChapterEventEffe
     if (effect.type === 'item') {
       const qty = randInt(effect.min ?? 1, effect.max ?? effect.min ?? 1);
       addItem(userId, guildId, effect.itemId, qty);
-      lines.push(`🎁 +**${qty}× ${effect.itemId}**`);
+      lines.push(`🎁 Nhận **${qty}× ${effect.itemId}**`);
       continue;
     }
 
@@ -101,7 +102,7 @@ function applyEffects(userId: string, guildId: string, effects: ChapterEventEffe
       const dmg = Math.max(1, Math.floor(player.max_hp * pct / 100));
       const hp = Math.max(1, player.hp - dmg);
       updatePlayerHpMp(userId, guildId, hp, player.mp);
-      lines.push(`❤️ HP mất **${dmg}** (${hp}/${player.max_hp})`);
+      lines.push(`❤️ Mất **${dmg} HP** (${hp}/${player.max_hp})`);
       continue;
     }
 
@@ -119,13 +120,13 @@ function applyEffects(userId: string, guildId: string, effects: ChapterEventEffe
       const gain = Math.max(1, Math.floor(player.max_mp * pct / 100));
       const mp = Math.min(player.max_mp, player.mp + gain);
       updatePlayerHpMp(userId, guildId, player.hp, mp);
-      lines.push(`🔮 Hồi **${gain} MP** (${mp}/${player.max_mp})`);
+      lines.push(`💧 Hồi **${gain} MP** (${mp}/${player.max_mp})`);
       continue;
     }
 
     if (effect.type === 'reputation') {
       const rep = adjustReputation(userId, guildId, effect.amount);
-      lines.push(`${effect.amount >= 0 ? '📈' : '📉'} Reputation: **${rep}** (${effect.amount >= 0 ? '+' : ''}${effect.amount})`);
+      lines.push(`${effect.amount >= 0 ? '📈' : '📉'} Danh vọng: **${rep}** (${effect.amount >= 0 ? '+' : ''}${effect.amount})`);
       continue;
     }
   }
@@ -154,11 +155,14 @@ async function finishChapterEvent(input: RunChapterExploreEventInput, resultText
     .setColor(COLORS.success)
     .setTitle(`✅ ${claim.chapter.title} hoàn tất`)
     .setDescription(
-      `${resultText}\n\n` +
-      (effectLines.length ? `**Kết quả sự kiện:**\n${effectLines.join('\n')}\n\n` : '') +
-      `**Thưởng chương:**\n${rewardText}\n\n` +
-      nextText
+      eventResult([resultText], [
+        ...(effectLines.length ? effectLines : []),
+        `🎁 Thưởng chương:
+${rewardText}`,
+        nextText,
+      ])
     );
+
 
   const reply = await input.interaction.editReply({
     embeds: [embed],
@@ -184,7 +188,7 @@ async function runChoiceAction(input: RunChapterExploreEventInput, def: NonNulla
   const embed = new EmbedBuilder()
     .setColor(def.color ?? COLORS.magic)
     .setTitle(def.action.title)
-    .setDescription(def.action.description);
+    .setDescription(eventIntro(def.action.description));
 
   const btn = await waitButton(input, row, [embed]);
   if (!btn) {
@@ -215,9 +219,7 @@ async function runTrackMinigame(input: RunChapterExploreEventInput, def: NonNull
       .setColor(def.color ?? COLORS.info)
       .setTitle(`${def.action.title} — Bước ${i + 1}/${sequence.length}`)
       .setDescription(
-        `${def.action.description}\n\n` +
-        `✅ Đúng: **${correct}/${def.action.requiredCorrect}**\n` +
-        'Chọn hướng tiếp theo:'
+        eventIntro(`${def.action.description}\n\n✅ Đúng: **${correct}/${def.action.requiredCorrect}**`, 'Chọn hướng tiếp theo.')
       );
 
     const btn = await waitButton(input, row, [embed], 45_000);
@@ -267,7 +269,7 @@ export async function runPendingChapterExploreEvent(input: RunChapterExploreEven
   const loreEmbed = new EmbedBuilder()
     .setColor(def.color ?? COLORS.magic)
     .setTitle(def.title)
-    .setDescription(def.lore);
+    .setDescription(eventIntro(def.lore, 'Bấm tiếp tục để bước vào đoạn truyện.'));
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()

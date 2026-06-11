@@ -56,7 +56,7 @@ export function getRecipeUnlockHint(recipe: CraftRecipe): string {
   const source = recipe.unlockedBy ?? 'unknown';
   const labels: Record<string, string> = {
     ancient_oak: 'Hạ Ancient Oak Guardian',
-    shrine_guardian: 'Hạ Shrine Guardian',
+    shrine_guardian: 'Hạ Broken Guardian',
     mine_colossus: 'Hạ Mine Colossus',
     the_forgotten: 'Hạ The Forgotten',
     deaths_5: 'Chết đủ 5 lần để thức tỉnh công thức nguyền',

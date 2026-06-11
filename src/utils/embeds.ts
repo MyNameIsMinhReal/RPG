@@ -12,6 +12,9 @@ import { getZone } from '../data/zones';
 import { getSelectedTitle, getUnlockedTitles } from '../systems/titles';
 import { formatWornGear } from '../systems/equipment';
 import { CLASSES } from '../data/classes';
+import { getStatSummary } from '../systems/statSystem';
+import { polishGameText } from './textPolish';
+import { describeCorruption } from '../systems/corruption';
 
 // ── Color palette ───────────────────────────────────────────────────────────
 export const COLORS = {
@@ -45,11 +48,14 @@ export interface PlayerRow {
   merchant_mercy?: number;
   permanent_atk_bonus?: number; permanent_def_bonus?: number;
   permanent_max_hp_bonus?: number; permanent_max_mp_bonus?: number;
+  stat_str?: number; stat_vit?: number; stat_end?: number; stat_agi?: number; stat_luk?: number;
+  free_stat_reset?: number;
+  corruption?: number;
 }
 
 // ── Simple embeds ───────────────────────────────────────────────────────────
 export function simpleEmbed(color: number, desc: string) {
-  return new EmbedBuilder().setColor(color).setDescription(desc);
+  return new EmbedBuilder().setColor(color).setDescription(polishGameText(desc));
 }
 
 // ── Profile embed ─────────────────────────────────────────────────────────
@@ -63,6 +69,9 @@ export function buildProfileEmbed(
   const cls           = CLASSES[player.class ?? 'warrior'] ?? CLASSES.warrior;
   const selectedTitle = getSelectedTitle(player.user_id, player.guild_id);
   const unlockedCount = getUnlockedTitles(player.user_id, player.guild_id).length;
+  const statSummary = getStatSummary(player);
+  const b = statSummary.build;
+  const sec = statSummary.secondary;
 
   const maxSkillSlots = 4 + Math.min(2, player.extra_skill_slots ?? 0);
   const skillSlots = Array.from({ length: maxSkillSlots }, (_, i) => i + 1).map(slot => {
@@ -84,12 +93,12 @@ export function buildProfileEmbed(
 
   return new EmbedBuilder()
     .setColor(player.alive ? COLORS.success : COLORS.death)
-    .setTitle(`${player.alive ? '⚔️' : '💀'} ${player.name}${selectedTitle ? `  ${selectedTitle.icon}` : ''}`)
+    .setTitle(`${player.alive ? '🧭' : '💀'} Hồ Sơ Mạo Hiểm · ${player.name}${selectedTitle ? `  ${selectedTitle.icon}` : ''}`)
     .setDescription(descLines)
     .setThumbnail(avatarURL ?? null)
     .addFields(
       {
-        name: '📊 Chỉ Số',
+        name: '📊 Sinh Lực & Năng Lượng',
         value: [
           `${hpDot} HP  \`${bar(player.hp, player.max_hp)}\` **${player.hp}**/${player.max_hp}`,
           `💧 MP  \`${bar(player.mp, player.max_mp)}\` **${player.mp}**/${player.max_mp}`,
@@ -100,21 +109,23 @@ export function buildProfileEmbed(
       { name: '⚔️ ATK',   value: `**${player.atk}**`,                  inline: true },
       { name: '🛡️ DEF',   value: `**${player.def}**`,                  inline: true },
       { name: '🏅 Level', value: `**${player.level}**`,                  inline: true },
+      { name: '🧬 Điểm Tiềm Năng', value: `**${statSummary.availablePoints}** còn / **${statSummary.totalPoints}** tổng`, inline: true },
       { name: '🪙 Gold',  value: `**${player.gold.toLocaleString()}**`, inline: true },
       { name: '💀 Soul',  value: `**${player.soul_shards}**`,            inline: true },
       { name: '🤝 Rep',   value: `**${player.reputation ?? 0}**`,        inline: true },
-      { name: '📜 Wanted',      value: `**${player.wanted_level ?? 0}/5**`,                             inline: true },
-      { name: '✨ Soul Perks',  value: `+${player.bonus_stat_points ?? 0} stat · +${player.extra_skill_slots ?? 0} slot`, inline: true },
+      { name: '📜 Truy Nã',      value: `**${player.wanted_level ?? 0}/5**`,                             inline: true },
+      ...(player.zone_id === 'shrine' || (player.corruption ?? 0) > 0 ? [{ name: '🌘 Ô Nhiễm', value: describeCorruption(player.corruption ?? 0), inline: true }] : []),
+      { name: '✨ Dấu Ấn Linh Hồn',  value: `+${player.bonus_stat_points ?? 0} stat · +${player.extra_skill_slots ?? 0} slot`, inline: true },
       { name: '☠️ Chết / 🗡️ Kill', value: `**${player.deaths}** / **${player.kills}**`,                inline: true },
       {
         name: '🏆 Thành Tựu',
         value: `**${achievementSummary?.unlocked ?? 0}**/**${achievementSummary?.total ?? 0}** đã mở  ·  🏅 **${unlockedCount}** danh hiệu`,
         inline: false,
       },
-      { name: '🎽 Trang Bị',     value: gearStr || '*Chưa trang bị gì*',        inline: false },
-      { name: '🔮 Skill Loadout', value: skillSlots || '*Chưa equip skill nào*', inline: false }
+      { name: '🎽 Trang Bị Đang Mặc',     value: gearStr || '*Chưa trang bị gì*',        inline: false },
+      { name: '🔮 Kỹ Năng Đang Mang', value: skillSlots || '*Chưa gắn kỹ năng nào*', inline: false }
     )
-    .setFooter({ text: `Nhân vật tạo từ <t:${player.created_at}:D>` });
+    .setFooter({ text: `Chọn nút bên dưới để xem túi đồ, trang bị, pet hoặc cộng điểm · Tạo từ <t:${player.created_at}:D>` });
 }
 
 // ── Combat embed ──────────────────────────────────────────────────────────
@@ -203,8 +214,8 @@ export function buildCombatEmbed(
 
   const embed = new EmbedBuilder()
     .setColor(embedColor)
-    .setTitle(`⚔️ Trận Chiến · Lượt ${state.turn}`)
-    .setDescription(desc);
+    .setTitle(`⚔️ Chiến Trường · Lượt ${state.turn}`)
+    .setDescription(`${desc}\n\n🎯 **Mục tiêu:** hạ gục kẻ địch hoặc sống sót để rút lui.`);
 
   // Player field
   embed.addFields({
@@ -221,7 +232,7 @@ export function buildCombatEmbed(
       const col = pct > 0.6 ? '🟢' : pct > 0.3 ? '🟡' : '🔴';
       return `${col} **[${i + 1}] ${e.icon} ${e.name}**\n❤️ \`${bar(e.hp, e.max_hp, 8)}\` **${e.hp}**/${e.max_hp}`;
     }).join('\n');
-    embed.addFields({ name: `👹 Kẻ Thù (${aliveCount} còn sống)`, value: enemyLines, inline: false });
+    embed.addFields({ name: `👹 Kẻ Địch (${aliveCount} còn sống)`, value: enemyLines, inline: false });
   } else {
     const ePct = state.enemy_hp / state.enemy_max_hp;
     const eStatus = ePct > 0.6 ? '🟢' : ePct > 0.3 ? '🟡' : '🔴';
@@ -246,15 +257,15 @@ export function buildCombatEmbed(
     const effectStr = effects.map((e: any) =>
       `${effectIcons[e.name] ?? '✨'} **${effectNames[e.name] ?? e.name}**${valTag(e)} ×${e.duration}${targetTag(e)}`
     ).join('  ');
-    embed.addFields({ name: '✨ Hiệu ứng', value: effectStr, inline: false });
+    embed.addFields({ name: '✨ Hiệu Ứng Đang Tác Động', value: effectStr, inline: false });
   }
 
   // Log
-  embed.addFields({ name: '📋 Diễn biến', value: logStr, inline: false });
+  embed.addFields({ name: '📜 Diễn Biến Gần Nhất', value: logStr, inline: false });
 
   // Footer: defending hint
   if (state.is_defending) {
-    embed.setFooter({ text: '🛡️ Đang phòng thủ — giảm sát thương nhận vào lượt này' });
+    embed.setFooter({ text: '🛡️ Đang phòng thủ — sát thương nhận vào sẽ giảm trong lượt này' });
   }
 
   return embed;
@@ -296,7 +307,7 @@ export function buildCombatButtons(
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(`rpg_attack_${userId}`)
-      .setLabel(exhausted ? 'Kiệt sức!' : 'Tấn công')
+      .setLabel(exhausted ? 'Kiệt sức' : 'Tấn công')
       .setEmoji('⚔️')
       .setStyle(ButtonStyle.Danger)
       .setDisabled(exhausted),
@@ -313,13 +324,13 @@ export function buildCombatButtons(
       .setStyle(exhausted ? ButtonStyle.Success : ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`rpg_item_${userId}`)
-      .setLabel('Dùng đồ')
+      .setLabel('Vật phẩm')
       .setEmoji('🎒')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(!hasItems),
     new ButtonBuilder()
       .setCustomId(`rpg_flee_${userId}`)
-      .setLabel(rooted ? 'Không thể chạy' : `Chạy (${fleeChance}%)`)
+      .setLabel(rooted ? 'Bị trói' : `Rút lui (${fleeChance}%)`)
       .setEmoji('🏃')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(rooted)
@@ -365,8 +376,8 @@ export function buildSkillSelectMenu(
   // Fallback bảo vệ nếu UI gọi nhầm khi người chơi không có active skill.
   if (!options.length) {
     options.push(new StringSelectMenuOptionBuilder()
-      .setLabel('Không có kỹ năng active')
-      .setDescription('Passive / world skill không dùng trong combat')
+      .setLabel('Không có kỹ năng chủ động')
+      .setDescription('Kỹ năng bị động / thế giới không dùng trong combat')
       .setValue(`rpg_useskill_${userId}__no_active`)
       .setEmoji('⚠️'));
   }
@@ -374,7 +385,7 @@ export function buildSkillSelectMenu(
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`rpg_skillmenu_${userId}`)
-      .setPlaceholder('Chọn kỹ năng active để sử dụng...')
+      .setPlaceholder('Chọn kỹ năng để tung đòn...')
       .addOptions(options.slice(0, 25))
   );
 }
@@ -389,27 +400,27 @@ export function buildVictoryEmbed(
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(COLORS.gold)
-    .setTitle('🏆 Chiến Thắng!')
-    .setDescription(`> ✦ **${playerName}** đã hạ gục **${enemyIcon} ${enemyName}**!`)
+    .setTitle('🏆 Chiến Thắng')
+    .setDescription(`> ✦ **${playerName}** đã hạ gục **${enemyIcon} ${enemyName}**. Màn sương tạm lùi lại.`)
     .addFields(
       { name: '⭐ EXP',   value: `+**${expGained}**`,                   inline: true },
       { name: '🪙 Gold',  value: `+**${goldGained.toLocaleString()}**`, inline: true },
       {
-        name: '📦 Loot',
-        value: drops.length ? drops.join('\n') : '*Không có gì rơi...*',
+        name: '📦 Chiến Lợi Phẩm',
+        value: drops.length ? drops.join('\n') : '*Không có chiến lợi phẩm.*',
         inline: false,
       }
     );
 
   if (leveledUp) {
     embed.addFields({
-      name: '🎉 LEVEL UP!',
-      value: `Chúc mừng! Bạn đạt **Lv. ${newLevel}** — bạn đã mạnh hơn!`,
+      name: '🎉 Lên Cấp',
+      value: `Bạn đạt **Lv.${newLevel}** và nhận **+3 Điểm Tiềm Năng**. Mở /profile để cộng STR/VIT/END/AGI/LUK.`,
       inline: false,
     });
   }
 
-  embed.setFooter({ text: '⚔️ Tiếp tục khám phá để tìm kiếm thêm phần thưởng' });
+  embed.setFooter({ text: 'Chọn Tiếp tục khám phá để rời chiến trường và tìm dấu vết mới' });
   return embed;
 }
 
@@ -417,15 +428,15 @@ export function buildVictoryEmbed(
 export function buildDeathEmbed(playerName: string, enemyName: string, goldLeft: number): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(COLORS.death)
-    .setTitle('☠️ Bạn Đã Ngã Xuống')
+    .setTitle('☠️ Mạo Hiểm Giả Đã Ngã Xuống')
     .setDescription(
-      `> *"Bóng tối nuốt chửng tất cả..."*\n\n` +
-      `**${playerName}** thất bại trước **${enemyName}**.`
+      `> *Ngọn lửa sinh mệnh lụi tàn giữa màn đêm.*\n\n` +
+      `**${playerName}** đã thất bại trước **${enemyName}**.`
     )
     .addFields(
-      { name: '🪙 Gold Rơi Lại', value: `**${goldLeft.toLocaleString()}** 🪙`, inline: true }
+      { name: '🪙 Vàng Còn Lại', value: `**${goldLeft.toLocaleString()}** 🪙`, inline: true }
     )
-    .setFooter({ text: 'Dùng /start để hồi sinh  ·  Kỹ năng đã học vẫn còn đó' });
+    .setFooter({ text: 'Dùng /start để hồi sinh · Kỹ năng đã học vẫn được giữ lại' });
 }
 
 // ── Explore embed ─────────────────────────────────────────────────────────
@@ -440,16 +451,16 @@ export function buildExploreEmbed(
   return new EmbedBuilder()
     .setColor(zone.color)
     .setTitle(`${zone.icon} ${zone.name}`)
-    .setDescription(`*${ambiance}*`)
+    .setDescription(`> *${ambiance}*\n\n🎯 **Chọn hướng đi tiếp theo.**`)
     .addFields(
       {
         name: '👻 Di Sản',
-        value: legacyCount > 0 ? `**${legacyCount}** legacy đang chờ` : '*Không có*',
+        value: legacyCount > 0 ? `**${legacyCount}** di sản đang chờ` : '*Chưa phát hiện*',
         inline: true,
       },
       {
         name: '👑 Boss',
-        value: bossSlain ? '✅ Đã bị tiêu diệt' : '⚠️ Vẫn đang rình rập',
+        value: bossSlain ? '✅ Đã bị đánh bại' : '⚠️ Vẫn đang rình rập',
         inline: true,
       }
     )
@@ -466,13 +477,13 @@ export function buildExploreButtons(userId: string, isSafe: boolean, hasBoss: bo
       .setDisabled(isSafe),
     new ButtonBuilder()
       .setCustomId(`rpg_exboss_${userId}`)
-      .setLabel('Thách Boss')
+      .setLabel('Thách đấu Boss')
       .setEmoji('👑')
       .setStyle(ButtonStyle.Danger)
       .setDisabled(isSafe || !hasBoss),
     new ButtonBuilder()
       .setCustomId(`rpg_exlegacy_${userId}`)
-      .setLabel('Di Sản')
+      .setLabel('Di sản')
       .setEmoji('👻')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()

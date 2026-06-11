@@ -16,12 +16,16 @@ import {
   grantSoulShards,
   spendGold,
   updatePlayerHpMp,
+  removeItem,
 } from './player';
 import { adjustWorldDanger } from './world';
+import { adjustCorruption } from './corruption';
 import { COLORS, simpleEmbed } from '../utils/embeds';
+import { combatStartLine, eventIntro, eventResult, polishGameText, section } from '../utils/textPolish';
 import { learnRandomSkillFromEvent, type AncientBookTier } from './skillLearning';
 import { pick, randInt } from '../utils/format';
 import { onlyParty, onlyUser } from '../utils/collectors';
+import { recordShrineMiniGameResult } from './shrineAchievements';
 import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
 import {
@@ -181,7 +185,7 @@ async function awaitEventButton(
       const cur = reply.embeds[0];
       if (!cur) return;
       await ctx.interaction.editReply({
-        embeds: [new EmbedBuilder(cur.toJSON()).setFooter({ text: `🗳️ Party vote: ${voted}/${total}` })]
+        embeds: [new EmbedBuilder(cur.toJSON()).setFooter({ text: `🗳️ Bình chọn tổ đội: ${voted}/${total} đã chọn` })]
       }).catch(() => {});
     };
 
@@ -274,27 +278,36 @@ function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line
       const amount = scaleEventGold(rolled);
       if (amount >= 0) {
         grantGold(ctx.userId, ctx.guildId, amount);
-        return { line: `💰 +**${amount} Gold**` };
+        return { line: `🪙 Nhận **${amount} Gold**` };
       }
       const cost = Math.abs(amount);
       spendGold(ctx.userId, ctx.guildId, cost);
-      return { line: `💰 -**${cost} Gold**` };
+      return { line: `🪙 Trả **${cost} Gold**` };
     }
     case 'exp': {
       const amount = scaleEventExp(randInt(action.min, action.max));
       const res = grantExp(ctx.userId, ctx.guildId, amount);
-      return { line: res.leveledUp ? `⭐ +**${amount} EXP** — lên **Lv.${res.newLevel}**!` : `⭐ +**${amount} EXP**` };
+      return { line: res.leveledUp ? `⭐ Nhận **${amount} EXP** — lên **Lv.${res.newLevel}**` : `⭐ Nhận **${amount} EXP**` };
     }
     case 'item': {
       const qty = randInt(action.min ?? 1, action.max ?? action.min ?? 1);
       addItem(ctx.userId, ctx.guildId, action.itemId, qty);
-      return { line: `🎁 +**${qty}×** ${displayNameForItem(action.itemId)}` };
+      return { line: `🎁 Nhận **${qty}×** ${displayNameForItem(action.itemId)}` };
+    }
+    case 'consume_item': {
+      const amount = Math.max(1, action.amount ?? 1);
+      removeItem(ctx.userId, ctx.guildId, action.itemId, amount);
+      return { line: `🎒 Dùng **${amount}×** ${displayNameForItem(action.itemId)}` };
+    }
+    case 'corruption': {
+      const next = adjustCorruption(ctx.userId, ctx.guildId, action.amount);
+      return { line: `🌘 Ô Nhiễm Linh Hồn ${action.amount >= 0 ? '+' : ''}${action.amount} → **${next}/100**` };
     }
     case 'damage_percent': {
       const dmg = Math.max(1, Math.floor(player.max_hp * randInt(action.min, action.max) / 100));
       const hp = Math.max(1, player.hp - dmg);
       updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
-      return { line: `❤️ HP mất **${dmg}** (${hp}/${player.max_hp})` };
+      return { line: `❤️ Mất **${dmg} HP** (${hp}/${player.max_hp})` };
     }
     case 'heal_percent': {
       const heal = Math.max(1, Math.floor(player.max_hp * randInt(action.min, action.max) / 100));
@@ -306,15 +319,15 @@ function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line
       const restore = Math.max(1, Math.floor(player.max_mp * randInt(action.min, action.max) / 100));
       const mp = Math.min(player.max_mp, player.mp + restore);
       updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp);
-      return { line: `🔵 Hồi **${restore} MP** (${mp}/${player.max_mp})` };
+      return { line: `💧 Hồi **${restore} MP** (${mp}/${player.max_mp})` };
     }
     case 'reputation': {
       const rep = adjustReputation(ctx.userId, ctx.guildId, action.amount);
-      return { line: `${action.amount >= 0 ? '📈' : '📉'} Reputation: **${rep}** (${action.amount >= 0 ? '+' : ''}${action.amount})` };
+      return { line: `${action.amount >= 0 ? '📈' : '📉'} Danh vọng: **${rep}** (${action.amount >= 0 ? '+' : ''}${action.amount})` };
     }
     case 'wanted': {
       const wanted = adjustWanted(ctx.userId, ctx.guildId, action.amount);
-      return { line: `🚨 Wanted: **${wanted}** (${action.amount >= 0 ? '+' : ''}${action.amount})` };
+      return { line: `🚨 Truy nã: **${wanted}** (${action.amount >= 0 ? '+' : ''}${action.amount})` };
     }
     case 'soul_shard': {
       grantSoulShards(ctx.userId, ctx.guildId, action.amount);
@@ -323,11 +336,11 @@ function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line
     case 'learn_random_skill': {
       const result = learnRandomSkillFromEvent(ctx.userId, ctx.guildId, action.tier as AncientBookTier);
       if (!result.ok) return { line: `📖 ${result.reason ?? 'Cổ thư không phản hồi.'}` };
-      return { line: `📖 Học được ${result.skillIcon} **${result.skillName}**` };
+      return { line: `📖 Lĩnh ngộ ${result.skillIcon} **${result.skillName}**` };
     }
     case 'world_danger': {
       adjustWorldDanger(ctx.guildId, action.amount);
-      return { line: `⚠️ World Danger ${action.amount >= 0 ? '+' : ''}${action.amount}` };
+      return { line: `⚠️ Nguy cơ thế giới ${action.amount >= 0 ? '+' : ''}${action.amount}` };
     }
     case 'combat_random':
       return { startsCombat: true };
@@ -351,19 +364,22 @@ async function resolveResultActions(
     if (result.startsCombat) shouldStartCombat = true;
   }
 
-  const descriptionParts = [...bodyLines];
-  if (rewardLines.length) descriptionParts.push('', ...rewardLines);
+  const resultDescription = eventResult(bodyLines, rewardLines);
 
   const resultEmbed = new EmbedBuilder()
     .setColor(shouldStartCombat ? COLORS.danger : color)
     .setTitle(title)
-    .setDescription(descriptionParts.join('\n'));
+    .setDescription(resultDescription);
 
   if (shouldStartCombat) {
     if (!ctx.enemies.length) {
-      return finish(ctx, simpleEmbed(COLORS.info, `${descriptionParts.join('\n')}\n\nNhưng khu vực này hiện không có kẻ địch phù hợp.`), event.image);
+      return finish(ctx, simpleEmbed(COLORS.info, `${resultDescription}
+
+🕊️ Khu vực này hiện không có kẻ địch phù hợp.`), event.image);
     }
-    await ctx.interaction.editReply({ embeds: [resultEmbed.setDescription(`${descriptionParts.join('\n')}\n\n*Chiến đấu bắt đầu...*`)], components: [] });
+    await ctx.interaction.editReply({ embeds: [resultEmbed.setDescription(`${resultDescription}
+
+${combatStartLine()}`)], components: [] });
     await new Promise(r => setTimeout(r, 600));
     return ctx.callbacks.startCombat(pick(ctx.enemies).id);
   }
@@ -375,13 +391,13 @@ async function runMiniGameEvent(ctx: RunExploreEventInput, event: DataDrivenExpl
   const startEmbed = new EmbedBuilder()
     .setColor(event.color ?? COLORS.info)
     .setTitle(miniGame.title ?? event.title)
-    .setDescription([event.description, miniGame.introText ? `\n${miniGame.introText}` : ''].join(''));
+    .setDescription(eventIntro([event.description, miniGame.introText ?? ''].filter(Boolean).join('\n\n'), 'Bấm bắt đầu để vào thử thách.'));
 
   const startReply = await ctx.interaction.editReply({ embeds: [startEmbed], components: [buildMiniGameStartRow(ctx, event, miniGame)] }) as Message<boolean>;
   const startCid = await awaitEventButton(ctx, startReply, new Set([miniGameStartButtonId(ctx, event.id)]), 30_000);
 
   if (!startCid) {
-    return finish(ctx, simpleEmbed(COLORS.info, miniGame.timeoutText ?? event.timeoutText ?? 'Bạn chần chừ quá lâu và cơ hội trôi qua.'), event.image);
+    return finish(ctx, simpleEmbed(COLORS.info, miniGame.timeoutText ?? event.timeoutText ?? 'Bạn do dự quá lâu. Cơ hội tan vào màn sương.'), event.image);
   }
 
   let successCount = 0;
@@ -391,8 +407,8 @@ async function runMiniGameEvent(ctx: RunExploreEventInput, event: DataDrivenExpl
     const round = miniGame.rounds[i];
     const roundEmbed = new EmbedBuilder()
       .setColor(event.color ?? COLORS.info)
-      .setTitle(miniGame.title ?? event.title)
-      .setDescription(`**Lượt ${i + 1}/${miniGame.rounds.length}**\n${round.prompt}`);
+      .setTitle(`🎮 ${miniGame.title ?? event.title}`)
+      .setDescription(`**Lượt ${i + 1}/${miniGame.rounds.length}**\n${polishGameText(round.prompt)}\n\n🎯 **Chọn đáp án bên dưới.**`);
 
     const roundReply = await ctx.interaction.editReply({
       embeds: [roundEmbed],
@@ -403,7 +419,7 @@ async function runMiniGameEvent(ctx: RunExploreEventInput, event: DataDrivenExpl
     const selectedCid = await awaitEventButton(ctx, roundReply, allowedRoundIds, 20_000);
 
     if (!selectedCid) {
-      const failLines = [miniGame.failureText, '', `🎯 Kết quả: **${successCount}/${miniGame.rounds.length}** lượt đúng`, miniGame.timeoutText ?? '⏳ Bạn phản ứng quá chậm nên mini game thất bại.'];
+      const failLines = [miniGame.failureText, '', `🎯 Kết quả: **${successCount}/${miniGame.rounds.length}** lượt đúng`, miniGame.timeoutText ?? '⏳ Bạn phản ứng quá chậm, thử thách khép lại.'];
       return resolveResultActions(ctx, event, miniGame.title ?? event.title, failLines, miniGame.onFailure, COLORS.warning);
     }
 
@@ -412,20 +428,25 @@ async function runMiniGameEvent(ctx: RunExploreEventInput, event: DataDrivenExpl
 
     if (correct) {
       successCount += 1;
-      roundLogs.push(`✅ ${round.successLine ?? 'Lượt này bạn chọn đúng.'}`);
+      roundLogs.push(`✅ ${round.successLine ?? 'Bạn chọn đúng nhịp của thử thách.'}`);
     } else {
       const correctOption = miniGame.options.find(opt => opt.id === round.correctOptionId);
-      roundLogs.push(`❌ ${round.failureLine ?? 'Lượt này bạn chọn sai.'}${correctOption ? ` (Đúng là: **${correctOption.label}**)` : ''}`);
+      roundLogs.push(`❌ ${round.failureLine ?? 'Bạn chọn sai dấu hiệu.'}${correctOption ? ` Đáp án đúng: **${correctOption.label}**.` : ''}`);
     }
   }
 
   const needed = miniGame.successNeeded ?? miniGame.rounds.length;
   const won = successCount >= needed;
+  const shrineExtraLines = event.zones?.includes('shrine')
+    ? recordShrineMiniGameResult(ctx.userId, ctx.guildId, event.id, successCount, miniGame.rounds.length, won)
+    : [];
+
   const summaryLines = [
     won ? miniGame.successText : miniGame.failureText,
     '',
     `🎯 Kết quả: **${successCount}/${miniGame.rounds.length}** lượt đúng${needed !== miniGame.rounds.length ? ` (cần ${needed})` : ''}`,
     ...roundLogs,
+    ...shrineExtraLines,
   ];
 
   return resolveResultActions(ctx, event, miniGame.title ?? event.title, summaryLines, won ? miniGame.onSuccess : miniGame.onFailure, won ? COLORS.success : COLORS.warning);
@@ -441,13 +462,13 @@ export async function runDataDrivenExploreEvent(ctx: RunExploreEventInput): Prom
   }
 
   if (!event.choices?.length) {
-    return finish(ctx, simpleEmbed(COLORS.info, 'Sự kiện này hiện chưa được cấu hình hoàn chỉnh.'), event.image);
+    return finish(ctx, simpleEmbed(COLORS.info, 'Sự kiện này chưa ổn định trong thế giới hiện tại.'), event.image);
   }
 
   const embed = new EmbedBuilder()
     .setColor(event.color ?? COLORS.info)
     .setTitle(event.title)
-    .setDescription(event.description);
+    .setDescription(eventIntro(event.description));
 
   const row = buildChoiceRow(ctx, event);
   const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] }) as Message<boolean>;
@@ -455,12 +476,12 @@ export async function runDataDrivenExploreEvent(ctx: RunExploreEventInput): Prom
   const selectedCid = await awaitEventButton(ctx, reply, allowedChoiceIds, 30_000);
 
   if (!selectedCid) {
-    return finish(ctx, simpleEmbed(COLORS.info, event.timeoutText ?? 'Bạn chần chừ quá lâu và sự kiện trôi qua.'), event.image);
+    return finish(ctx, simpleEmbed(COLORS.info, event.timeoutText ?? 'Bạn do dự quá lâu. Cơ hội tan vào màn sương.'), event.image);
   }
 
   const choice = event.choices.find(c => buttonId(ctx, event.id, c.id) === selectedCid);
   if (!choice) {
-    return finish(ctx, simpleEmbed(COLORS.info, 'Sự kiện đã trôi qua.'), event.image);
+    return finish(ctx, simpleEmbed(COLORS.info, 'Dấu vết của sự kiện đã biến mất.'), event.image);
   }
 
   const outcome = rollOutcome(choice.outcomes);

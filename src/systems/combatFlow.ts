@@ -23,6 +23,7 @@ import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumable
 import { incrementDaily, countsAsPotion } from '../commands/daily';
 import { applyBossLevelScaling } from './bossScaling';
 import { applyMonsterLevelScaling } from './monsterScaling';
+import { applyCombatEnemyModifiers } from './combat/modifiers';
 
 
 
@@ -63,6 +64,11 @@ function tuneNormalMobForCombat<T extends any>(enemy: T, playerLevel: number = 1
   };
 }
 
+
+function applyShrineCorruptionToEnemy<T extends any>(enemy: T, player: any): { enemy: T; lines: string[] } {
+  return applyCombatEnemyModifiers(enemy, player);
+}
+
 function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T {
   if (!raw) return fallback;
   try { return JSON.parse(raw) as T; } catch { return fallback; }
@@ -101,9 +107,14 @@ export type CombatFleeHandler = (
 
 
 const COMBAT_USABLE_ITEM_IDS = new Set([
-  'health_potion','minor_healing_potion','healing_potion','emergency_potion','mana_potion','mana_flask','elixir','moonwater',
-  'antidote','cooling_salve','purifying_salt','purification_stone','scroll_escape','scroll_silence','warding_charm','rune_charm','arson_bottle',
-  'weapon_oil','armor_polish','focus_tonic','stone_skin_draught','quickstep_tea','rage_elixir','blood_vial'
+  // HP / MP recovery
+  'minor_healing_potion','health_potion','healing_potion','greater_health_potion','emergency_potion','berserker_draught','life_crystal_shard','quick_salve',
+  'mana_potion','mana_flask','mana_vial','void_mana_flask','shadow_mana_vial','blood_sacrifice_vial',
+  'vitality_brew','elixir','grand_restoration','supreme_elixir',
+  // Cleanse / protection
+  'antidote','cooling_salve','purifying_salt','holy_water','forest_tonic','moonwater','crystallized_faith','iron_will_tonic','purification_potion','purification_stone','warding_charm','rune_charm',
+  // Tactical combat items
+  'scroll_escape','scroll_silence','scroll_mirror','arson_bottle','weapon_oil','armor_polish','focus_tonic','stone_skin_draught','quickstep_tea','rage_elixir','blood_vial'
 ]);
 
 export function isCombatUsableItem(itemId: string): boolean {
@@ -489,6 +500,8 @@ export async function startCombatFlow(
     return;
   }
   enemy = tuneNormalMobForCombat(enemy, player.level);
+  const corruptionAdjusted = applyShrineCorruptionToEnemy(enemy, player);
+  enemy = corruptionAdjusted.enemy;
   const loadout     = getLoadout(userId, guildId);
   const withPassiveRaw = applyPassiveStats(player);
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
@@ -505,7 +518,7 @@ export async function startCombatFlow(
     : `⚠️ **${enemy.icon} ${enemy.name}** (Lv.${enemy.level}) tấn công!`;
   const bossScaleDesc = enemy.boss ? enemy._bossLevelScaling?.desc : null;
   const monsterScaleDesc = !enemy.boss ? enemy._monsterLevelScaling?.desc : null;
-  const openingLogs = [log0, ...(bossScaleDesc ? [bossScaleDesc] : []), ...(monsterScaleDesc ? [monsterScaleDesc] : []), ...buffedStart.logs, ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
+  const openingLogs = [log0, ...(bossScaleDesc ? [bossScaleDesc] : []), ...(monsterScaleDesc ? [monsterScaleDesc] : []), ...corruptionAdjusted.lines, ...buffedStart.logs, ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
 
   const initState = {
     message_id: 'temp', channel_id: interaction.channelId,
@@ -561,6 +574,8 @@ export async function startCombatFlowWithEnemy(
     specialAttacks: Array.isArray(enemy?.specialAttacks) ? [...enemy.specialAttacks] : enemy?.specialAttacks,
   };
   enemy = tuneNormalMobForCombat(enemy, player.level);
+  const corruptionAdjusted = applyShrineCorruptionToEnemy(enemy, player);
+  enemy = corruptionAdjusted.enemy;
   if (bonus) enemy.combatBonus = bonus;
   if (enemy.id && !getEnemy(enemy.id)) {
     // register inline definition into the map for the duration of combat
@@ -584,6 +599,7 @@ export async function startCombatFlowWithEnemy(
     log0,
     ...(bossScaleDesc ? [bossScaleDesc] : []),
     ...(monsterScaleDesc ? [monsterScaleDesc] : []),
+    ...corruptionAdjusted.lines,
     ...buffedStart.logs,
     ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : []),
     ...(smokeBuff ? ['🗡️ Assassin’s Smoke: shopkeeper DEF -20% khi mở combat.'] : [])
@@ -637,7 +653,9 @@ export async function startGroupCombatFlow(
   const atkBonus       = getEnemyAtkBonus(guildId);
 
   const rawEnemies = enemyIds.map(id => getEnemy(id)!).filter(Boolean);
-  const tunedEnemies = rawEnemies.map(e => tuneNormalMobForCombat(e, player.level));
+  const tunedEnemyResults = rawEnemies.map(e => applyShrineCorruptionToEnemy(tuneNormalMobForCombat(e, player.level), player));
+  const tunedEnemies = tunedEnemyResults.map(r => r.enemy);
+  const corruptionLines = Array.from(new Set(tunedEnemyResults.flatMap(r => r.lines))).slice(0, 1);
   const combatEnemies: CombatEnemy[] = tunedEnemies.map(e => ({
     id: e.id, name: e.name, icon: e.icon,
     hp: e.hp, max_hp: e.hp,
@@ -649,7 +667,7 @@ export async function startGroupCombatFlow(
   const primary    = combatEnemies[0];
   const groupLabel = combatEnemies.map(e => `${e.icon} ${e.name}`).join(', ');
   const groupScaleLines = tunedEnemies.map((e: any) => e._monsterLevelScaling?.desc).filter(Boolean).slice(0, 2);
-  const openingLogs = [`⚠️ **Nhóm kẻ thù xuất hiện!** ${groupLabel}`, ...groupScaleLines, ...buffedStart.logs];
+  const openingLogs = [`⚠️ **Nhóm kẻ thù xuất hiện!** ${groupLabel}`, ...groupScaleLines, ...corruptionLines, ...buffedStart.logs];
 
   const baseState = {
     message_id: 'temp', channel_id: interaction.channelId,

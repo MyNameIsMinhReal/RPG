@@ -184,129 +184,120 @@ export const ENEMIES: Record<string, EnemyDef> = {
     lore: 'Linh hồn thủ hộ của rừng già. Nếu hắn ngã xuống, rừng sẽ không bao giờ như xưa.',
   },
 
-  // ── SHRINE ──────────────────────────────────────────────────────
-  skeleton_archer: {
-    id: 'skeleton_archer', name: 'Oathbound Archer', icon: '💀', level: 3,
-    hp: 70, atk: 18, def: 6, expReward: 60, goldMin: 15, goldMax: 35,
-    drops: [{ itemId: 'bone_shard', chance: 55 }, { itemId: 'ancient_bone', chance: 20 }, { itemId: 'silver_ore', chance: 15 }, { itemId: 'ancient_book', chance: 8 }],
-    specialAttacks: ['piercing_arrow'],
+  // ── ANCIENT SHRINE / ZONE 2 ─────────────────────────────────
+  wandering_spirit: {
+    id: 'wandering_spirit', name: 'Wandering Spirit', icon: '👻', level: 4,
+    hp: 78, atk: 20, def: 6, expReward: 88, goldMin: 20, goldMax: 42,
+    drops: [{ itemId: 'ectoplasm', chance: 55 }, { itemId: 'mana_crystal', chance: 22 }, { itemId: 'holy_ash', chance: 15 }, { itemId: 'ancient_book', chance: 8 }],
+    specialAttacks: ['phase_through', 'drain_mp'],
     zones: ['shrine'],
-    lore: 'Linh hồn lính canh cổ đền bị giam cầm, vẫn bảo vệ nơi thiêng liêng.'
+    lore: 'Một linh hồn lạc lối trong hành lang đền. Nó né tránh lưỡi kiếm như làn khói, nhưng tan rất nhanh khi bị chạm tới.'
   },
-  phantom: {
-    id: 'phantom', name: 'Veil Phantom', icon: '👻', level: 4,
-    hp: 80, atk: 20, def: 8, expReward: 85, goldMin: 25, goldMax: 50,
-    drops: [{ itemId: 'ectoplasm', chance: 60 }, { itemId: 'mana_crystal', chance: 25 }, { itemId: 'frost_shard', chance: 15 }, { itemId: 'ancient_book', chance: 10 }],
-    specialAttacks: ['drain_mp', 'phase_through'],
+  stone_guardian: {
+    id: 'stone_guardian', name: 'Stone Guardian', icon: '🗿', level: 5,
+    hp: 128, atk: 21, def: 18, expReward: 112, goldMin: 24, goldMax: 52,
+    drops: [{ itemId: 'shrine_stone', chance: 60 }, { itemId: 'ancient_rune', chance: 8 }, { itemId: 'stone', chance: 45 }, { itemId: 'ancient_book', chance: 7 }],
+    specialAttacks: ['shatter_guard', 'fortress_stance'],
     zones: ['shrine'],
-    lore: 'Bóng ma không đầu lang thang, tìm kiếm linh hồn để hoàn chỉnh bản thân.'
+    lore: 'Tượng đá hộ đền đã nứt, nhưng lời thề canh gác vẫn còn nguyên. Nó chậm, cứng và rất khó hạ bằng đòn thường.'
   },
-  bone_mage: {
-    id: 'bone_mage', name: 'Marrow Hexer', icon: '🧙', level: 5,
-    hp: 85, atk: 22, def: 7, expReward: 95, goldMin: 22, goldMax: 48,
-    drops: [{ itemId: 'bone_shard', chance: 55 }, { itemId: 'ancient_bone', chance: 30 }, { itemId: 'mana_crystal', chance: 20 }],
-    specialAttacks: ['bone_shards', 'death_curse'],
+  curse_bat: {
+    id: 'curse_bat', name: 'Curse Bat', icon: '🦇', level: 4,
+    hp: 72, atk: 24, def: 5, expReward: 92, goldMin: 18, goldMax: 45,
+    drops: [{ itemId: 'cursed_cloth', chance: 22 }, { itemId: 'curse_shard', chance: 9 }, { itemId: 'ectoplasm', chance: 30 }, { itemId: 'dark_wing', chance: 18 }],
+    specialAttacks: ['screech', 'death_curse'],
     zones: ['shrine'],
-    lore: 'Pháp sư xương chỉ còn lại bộ cốt, điều khiển xương tấn công từ xa.'
+    lore: 'Dơi nhỏ sống nhờ tiếng chuông chết. Vết cắn của nó để lại lời nguyền âm ỉ trong máu.'
   },
-  spirit_knight: {
-    id: 'spirit_knight', name: 'Spirit Knight', icon: '⚔️', level: 5,
-    hp: 110, atk: 20, def: 15, expReward: 100, goldMin: 25, goldMax: 55,
-    drops: [{ itemId: 'ancient_bone', chance: 35 }, { itemId: 'silver_ore', chance: 25 }, { itemId: 'bone_shard', chance: 40 }],
-    specialAttacks: ['spectral_slash', 'banish'],
+  candle_wraith: {
+    id: 'candle_wraith', name: 'Candle Wraith', icon: '🕯️', level: 5,
+    hp: 92, atk: 26, def: 8, expReward: 118, goldMin: 25, goldMax: 58,
+    drops: [{ itemId: 'holy_ash', chance: 45 }, { itemId: 'beeswax', chance: 28 }, { itemId: 'moonwater', chance: 8 }, { itemId: 'ancient_book', chance: 8 }],
+    specialAttacks: ['drain_mp', 'hex_bolt'],
     zones: ['shrine'],
-    lore: 'Chiến binh linh hồn còn mang vũ khí, trung thành bảo vệ đền ngay cả sau khi chết.'
+    lore: 'Bóng ma trú trong ngọn nến xanh, đốt cạn mana của kẻ dám thắp sáng hành lang cấm.'
   },
-  cursed_idol: {
-    id: 'cursed_idol', name: 'Cursed Idol', icon: '🗿', level: 4,
-    hp: 95, atk: 19, def: 10, expReward: 80, goldMin: 18, goldMax: 42,
-    drops: [{ itemId: 'ectoplasm', chance: 45 }, { itemId: 'mana_crystal', chance: 30 }, { itemId: 'frost_shard', chance: 20 }],
-    specialAttacks: ['idol_curse', 'hex_bolt'],
+  shrine_watcher: {
+    id: 'shrine_watcher', name: 'Shrine Watcher', icon: '🧿', level: 6,
+    hp: 108, atk: 31, def: 10, expReward: 145, goldMin: 32, goldMax: 70,
+    drops: [{ itemId: 'rune_stone', chance: 25 }, { itemId: 'mana_crystal', chance: 28 }, { itemId: 'ancient_rune', chance: 5 }, { itemId: 'ancient_book', chance: 9 }],
+    specialAttacks: ['mind_crush', 'hex_bolt'],
     zones: ['shrine'],
-    lore: 'Tượng thờ bị nhiễm tà khí, phóng ra các tia nguyền rủa vào kẻ xâm phạm.'
+    lore: 'Con mắt đá treo trên cổng đền. Nó không chớp mắt, nhưng mọi lỗi lầm của bạn đều bị nhìn thấy.'
   },
-
-  ash_acolyte: {
-    id: 'ash_acolyte', name: 'Ash Acolyte', icon: '🕯️', level: 4,
-    hp: 82, atk: 21, def: 7, expReward: 78, goldMin: 18, goldMax: 40,
-    drops: [{ itemId: 'ectoplasm', chance: 35 }, { itemId: 'bone_shard', chance: 40 }, { itemId: 'purifying_salt', chance: 18 }],
-    specialAttacks: ['hex_bolt', 'drain_mp'],
+  possessed_relic: {
+    id: 'possessed_relic', name: 'Possessed Relic', icon: '⚱️', level: 6,
+    hp: 118, atk: 27, def: 14, expReward: 150, goldMin: 34, goldMax: 74,
+    drops: [{ itemId: 'shrine_relic', chance: 7 }, { itemId: 'ancient_relic', chance: 8 }, { itemId: 'mirror_shard', chance: 12 }, { itemId: 'ancient_book', chance: 10 }],
+    specialAttacks: ['idol_curse', 'shatter_guard'],
     zones: ['shrine'],
-    lore: 'Tín đồ hóa tro vẫn quỳ trước bàn thờ, miệng lẩm nhẩm lời cầu đã mục nát.'
-  },
-  grave_hound: {
-    id: 'grave_hound', name: 'Grave Hound', icon: '🐕‍🦺', level: 4,
-    hp: 96, atk: 23, def: 9, expReward: 88, goldMin: 20, goldMax: 45,
-    drops: [{ itemId: 'ancient_bone', chance: 35 }, { itemId: 'bone_shard', chance: 55 }, { itemId: 'leather', chance: 25 }],
-    specialAttacks: ['savage_bite', 'banish'],
-    zones: ['shrine'],
-    lore: 'Chó canh mộ cắn vào bóng người sống, kéo linh hồn họ về dưới đất.'
-  },
-  bell_specter: {
-    id: 'bell_specter', name: 'Bell Specter', icon: '🔔', level: 5,
-    hp: 88, atk: 25, def: 7, expReward: 100, goldMin: 25, goldMax: 52,
-    drops: [{ itemId: 'ectoplasm', chance: 50 }, { itemId: 'mana_crystal', chance: 28 }, { itemId: 'bell_of_silence', chance: 4 }],
-    specialAttacks: ['screech', 'mind_crush'],
-    zones: ['shrine'],
-    lore: 'Bóng ma bị trói trong tiếng chuông, mỗi hồi ngân là một ký ức bị cắt mất.'
-  },
-  scripture_mimic: {
-    id: 'scripture_mimic', name: 'Scripture Mimic', icon: '📖', level: 5,
-    hp: 105, atk: 22, def: 13, expReward: 104, goldMin: 22, goldMax: 55,
-    drops: [{ itemId: 'rune_ink', chance: 28 }, { itemId: 'mana_crystal', chance: 32 }, { itemId: 'ancient_book', chance: 7 }],
-    specialAttacks: ['idol_curse', 'hex_bolt'],
-    zones: ['shrine'],
-    lore: 'Cuốn kinh biết nuốt người đọc. Chữ trên trang bò như kiến đen.'
-  },
-  pale_confessor: {
-    id: 'pale_confessor', name: 'Pale Confessor', icon: '🙏', level: 7,
-    hp: 212, atk: 35, def: 19, expReward: 190, goldMin: 70, goldMax: 130,
-    drops: [{ itemId: 'ancient_bone', chance: 60 }, { itemId: 'purification_stone', chance: 18 }, { itemId: 'shrine_relic', chance: 6 }, { itemId: 'ancient_book', chance: 10 }],
-    specialAttacks: ['divine_judgment', 'death_curse', 'banish'],
-    zones: ['shrine'], miniboss: true,
-    lore: 'Kẻ giải tội không còn mặt. Hắn bắt người sống thú nhận những tội chưa từng phạm.'
-  },
-  bell_wraith: {
-    id: 'bell_wraith', name: 'Tolling Bell Wraith', icon: '🔔', level: 7,
-    hp: 195, atk: 39, def: 15, expReward: 200, goldMin: 65, goldMax: 125,
-    drops: [{ itemId: 'ectoplasm', chance: 70 }, { itemId: 'frost_shard', chance: 30 }, { itemId: 'bell_of_silence', chance: 6 }, { itemId: 'ancient_book', chance: 10 }],
-    specialAttacks: ['screech', 'drain_mp', 'shatter_guard'],
-    zones: ['shrine'], miniboss: true,
-    lore: 'Oan hồn của người kéo chuông cuối cùng, tiếng ngân của nó làm giáp nứt vỡ.'
+    lore: 'Một cổ vật bị linh hồn bám vào. Mỗi vết nứt trên thân bình phản chiếu một khuôn mặt khác nhau.'
   },
   shrine_guardian: {
-    id: 'shrine_guardian', name: 'Shrine Guardian, Fallen Verdict', icon: '⛩️', level: 8,
-    hp: 620, atk: 48, def: 34, expReward: 520, goldMin: 180, goldMax: 300,
+    id: 'shrine_guardian', name: 'Broken Guardian', icon: '🗿', level: 7,
+    hp: 260, atk: 36, def: 25, expReward: 230, goldMin: 80, goldMax: 145,
+    drops: [{ itemId: 'shrine_stone', chance: 75 }, { itemId: 'ancient_bone', chance: 45 }, { itemId: 'purification_stone', chance: 22 }, { itemId: 'shrine_relic', chance: 10 }, { itemId: 'ancient_book', chance: 12 }],
+    guaranteedDrops: ['shrine_stone'],
+    specialAttacks: ['divine_judgment', 'shatter_guard', 'fortress_stance'],
+    zones: ['shrine'], miniboss: true,
+    lore: 'Hộ vệ đá đã vỡ một nửa, nhưng cánh tay còn lại vẫn đủ sức nghiền nát kẻ xâm phạm.'
+  },
+  wraith_priest: {
+    id: 'wraith_priest', name: 'Wraith Priest', icon: '🙏', level: 7,
+    hp: 225, atk: 40, def: 16, expReward: 240, goldMin: 85, goldMax: 155,
+    drops: [{ itemId: 'holy_ash', chance: 70 }, { itemId: 'cursed_cloth', chance: 35 }, { itemId: 'curse_shard', chance: 16 }, { itemId: 'ancient_book', chance: 12 }],
+    guaranteedDrops: ['holy_ash'],
+    specialAttacks: ['death_curse', 'drain_mp', 'banish'],
+    zones: ['shrine'], miniboss: true,
+    lore: 'Linh mục đã chết nhưng lời cầu chưa dứt. Mỗi câu kinh kéo máu và mana khỏi cơ thể người sống.'
+  },
+  mirror_shade: {
+    id: 'mirror_shade', name: 'Mirror Shade', icon: '🪞', level: 8,
+    hp: 238, atk: 43, def: 14, expReward: 255, goldMin: 90, goldMax: 165,
+    drops: [{ itemId: 'mirror_shard', chance: 80 }, { itemId: 'mysterious_shard', chance: 28 }, { itemId: 'curse_shard', chance: 14 }, { itemId: 'ancient_book', chance: 12 }],
+    guaranteedDrops: ['mirror_shard'],
+    specialAttacks: ['mirror_split', 'skill_echo', 'phase_through'],
+    zones: ['shrine'], miniboss: true,
+    lore: 'Cái bóng trong gương bước ra trước khi bạn kịp nhìn rõ. Nó dùng chính nỗi sợ của bạn làm vũ khí.'
+  },
+  echo_demon: {
+    id: 'echo_demon', name: 'Echo Demon, Voice Behind the Seal', icon: '👁️', level: 9,
+    hp: 760, atk: 56, def: 32, expReward: 760, goldMin: 240, goldMax: 390,
     drops: [
-      { itemId: 'ancient_book', chance: 35 },
-      { itemId: 'ancient_book', chance: 25 },
-      { itemId: 'shrine_relic', chance: 15 }
+      { itemId: 'demon_seal', chance: 60 },
+      { itemId: 'demon_horn', chance: 22 },
+      { itemId: 'demon_fang', chance: 18 },
+      { itemId: 'echo_core', chance: 28 },
+      { itemId: 'ancient_seal', chance: 22 },
+      { itemId: 'cursed_cloth', chance: 35 },
+      { itemId: 'ancient_book', chance: 35 }
     ],
-    specialAttacks: ['divine_judgment', 'shatter_guard', 'enrage'],
+    guaranteedDrops: ['echo_core', 'ancient_seal'],
+    specialAttacks: ['skill_echo', 'mind_crush', 'death_curse'],
     phases: [
       {
-        threshold: 0.55,
+        threshold: 0.62,
         phaseIndex: 2,
-        name: 'Shrine Guardian (Desecrated)',
-        icon: '🩸',
-        atkMult: 1.45,
-        specialAttacks: ['divine_judgment', 'shatter_guard', 'banish', 'screech'],
-        transitionMsg: '🩸 **Máu đen chảy từ các phù văn — Hộ Vệ Đền Cổ chuyển sang nghi thức trừng phạt!**',
+        name: 'Echo Demon (Unsealed Voice)',
+        icon: '🔔',
+        atkMult: 1.42,
+        specialAttacks: ['skill_echo', 'drain_mp', 'screech', 'mind_crush'],
+        transitionMsg: '🔔 **Phong ấn nứt ra — tiếng nói trong đền không còn thì thầm, mà hét thẳng vào linh hồn bạn!**',
         healOnTransition: 0.05,
       },
       {
-        threshold: 0.22,
+        threshold: 0.28,
         phaseIndex: 3,
-        name: 'Shrine Guardian (Final Verdict)',
-        icon: '⚖️',
+        name: 'Echo Demon (True Echo)',
+        icon: '👁️',
         atkMult: 1.95,
-        specialAttacks: ['enrage', 'divine_judgment', 'death_curse', 'shatter_guard'],
-        transitionMsg: '⚖️ **Tiếng chuông phán quyết vang lên — đòn đánh tiếp theo sẽ nặng hơn rất nhiều!**',
+        specialAttacks: ['skill_echo', 'mirror_split', 'death_curse', 'divine_judgment'],
+        transitionMsg: '👁️ **Tất cả tiếng vọng nhập làm một — Echo Demon bắt chước nhịp tim của bạn.**',
       },
     ],
     zones: ['shrine'], boss: true,
-    deathWorldFlag: 'shrine_guardian_slain',
-    lore: 'Thần hộ vệ bị tha hoá. Khi hắn ngã xuống, lời nguyền của đền cổ sẽ lan rộng.'
+    deathWorldFlag: 'echo_demon_slain',
+    lore: 'Thứ nằm sau phong ấn không có hình thật. Nó chỉ mượn tiếng nói, ký ức và nỗi sợ của người bước vào đền.'
   },
 
   // ── MINES ────────────────────────────────────────────────────────
@@ -446,13 +437,13 @@ export const ENEMIES: Record<string, EnemyDef> = {
     zones: ['wastes'],
     lore: 'Được sinh ra từ sự hư không, thứ còn lại sau khi linh hồn hoàn toàn tan biến.'
   },
-  echo_demon: {
-    id: 'echo_demon', name: 'Echoing Dreadfiend', icon: '👁️', level: 11,
-    hp: 220, atk: 42, def: 18, expReward: 320, goldMin: 70, goldMax: 130,
-    drops: [{ itemId: 'demon_seal', chance: 45 }, { itemId: 'demon_horn', chance: 20 }, { itemId: 'cursed_blood', chance: 12 }, { itemId: 'curse_shard', chance: 25 }, { itemId: 'ancient_book', chance: 15 }],
+  abyss_watcher: {
+    id: 'abyss_watcher', name: 'Abyss Watcher', icon: '👁️', level: 11,
+    hp: 225, atk: 43, def: 18, expReward: 320, goldMin: 70, goldMax: 130,
+    drops: [{ itemId: 'void_essence', chance: 42 }, { itemId: 'demon_seal', chance: 22 }, { itemId: 'curse_shard', chance: 18 }, { itemId: 'ancient_book', chance: 12 }],
     specialAttacks: ['skill_echo', 'mind_crush'],
     zones: ['wastes'],
-    lore: 'Phản chiếu nỗi sợ hãi của người đối diện, bắt chước từng động tác một cách hoàn hảo.'
+    lore: 'Con mắt vực sâu còn sót lại sau khi Echo Demon bị phong ấn. Nó quan sát người sống như đọc một cuốn sách mở.'
   },
   mirage_hunter: {
     id: 'mirage_hunter', name: 'Mirage Stalker', icon: '👤', level: 9,

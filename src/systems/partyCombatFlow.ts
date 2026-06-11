@@ -32,6 +32,8 @@ import { getMonsterLevelScaling } from './monsterScaling';
 import { getFactionRewardMods } from './factions';
 import { getPetRewardMods, applyActivePetAfterVictory, grantPetDropAfterVictory } from './petRoles';
 import { awardAchievements } from './achievements';
+import { getSecondaryStatBonuses } from './statSystem';
+import { getEquipmentStats } from './equipment';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -696,8 +698,14 @@ export async function startPartyCombatFlow(
   for (const m of survivors) {
     const factionMods = getFactionRewardMods(m.user_id, guildId);
     const petMods = getPetRewardMods(m.user_id, guildId);
-    const expReward = Math.max(1, Math.floor(baseExpReward * (1 + (factionMods.expPct + petMods.expPct) / 100)));
-    const goldReward = Math.max(0, Math.floor(baseGoldReward * (1 + (factionMods.goldPct + petMods.goldPct) / 100)));
+    const rawForStats = getPlayer(m.user_id, guildId);
+    const statMods = rawForStats ? getSecondaryStatBonuses(rawForStats) : { critChance: 0, dodgeChance: 0, goldBonusPct: 0, dropBonusPct: 0 };
+    const eqStats = getEquipmentStats(m.user_id, guildId);
+    const gearGoldBonus = eqStats.goldBonus ?? 0;
+    const gearExpBonus = eqStats.expBonus ?? 0;
+    const gearDropBonus = eqStats.dropBonus ?? 0;
+    const expReward = Math.max(1, Math.floor(baseExpReward * (1 + (factionMods.expPct + petMods.expPct + gearExpBonus) / 100)));
+    const goldReward = Math.max(0, Math.floor(baseGoldReward * (1 + (factionMods.goldPct + petMods.goldPct + statMods.goldBonusPct + gearGoldBonus) / 100)));
     grantExp(m.user_id, guildId, expReward);
     grantGold(m.user_id, guildId, goldReward);
     incrementKills(m.user_id, guildId);
@@ -713,10 +721,17 @@ export async function startPartyCombatFlow(
       }
       logEvent(guildId, m.user_id, fresh.name, baseDef.boss ? 'boss_kill' : 'kill', `cùng party tiêu diệt **${baseDef.icon} ${baseDef.name}**.`, fresh.zone_id);
     }
-    const drops = rollPartyDrops(m.user_id, guildId, baseDef, factionMods.dropPct);
+    const drops = rollPartyDrops(m.user_id, guildId, baseDef, factionMods.dropPct + statMods.dropBonusPct + gearDropBonus);
     const petLines = fresh ? [...applyActivePetAfterVictory(m.user_id, guildId, fresh, baseDef as any), ...grantPetDropAfterVictory(m.user_id, guildId, baseDef as any)] : [];
     const achievementLines = fresh ? awardAchievements(m.user_id, guildId) : [];
-    const bonusLines = [...factionMods.lines, ...petMods.lines, ...petLines, ...(unlockedRecipes.length ? [`📜 Mở khóa ${unlockedRecipes.length} recipe`] : [])];
+    const bonusLines = [
+      ...factionMods.lines,
+      (statMods.goldBonusPct > 0 || statMods.dropBonusPct > 0) ? `🍀 LUK: gold +${statMods.goldBonusPct}% · drop +${statMods.dropBonusPct}%` : null,
+      (gearGoldBonus > 0 || gearExpBonus > 0 || gearDropBonus > 0) ? `🎒 Gear: gold +${gearGoldBonus}% · exp +${gearExpBonus}% · drop +${gearDropBonus}%` : null,
+      ...petMods.lines,
+      ...petLines,
+      ...(unlockedRecipes.length ? [`📜 Mở khóa ${unlockedRecipes.length} recipe`] : [])
+    ].filter(Boolean) as string[];
     rewardLines.push(`⚔️ **${m.name}** — +**${expReward} EXP**, +**${goldReward} Gold**${drops.length ? `\n  📦 ${drops.join(', ')}` : ''}${bonusLines.length ? `\n  ✨ ${bonusLines.join(' · ')}` : ''}${achievementLines.length ? `\n  🏆 ${achievementLines.join(' · ')}` : ''}`);
   }
   if (baseDef.boss && survivors[0]) {

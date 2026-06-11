@@ -41,6 +41,7 @@ import { COLORS, simpleEmbed, type PlayerRow } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { withImage } from '../utils/eventImages';
 import { getBuff, consumeBuff, setBuff } from '../systems/consumables';
+import { getCorruptionLevel, getCorruptionTier, shouldForceCorruptionAmbush } from '../systems/corruption';
 import { startFishingMiniGame } from './fish';
 import { onlyParty, onlyUser } from '../utils/collectors';
 import { incrementChapterObjective } from '../systems/chapter';
@@ -61,7 +62,7 @@ import {
   showForestHerbForaging, showForestAnimalTracks, showForestRiverCrossing, showForestTreeClimbing, showForestFogMaze,
   showForestWaterfallCave, showForestDeadTreeOracle, showForestFlowerField, showForestCrowMessenger, showForestCampfireStranger,
 } from './exploreEvents.forest';
-import { showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp, showShrineWeepingStatue, showShrineForbiddenOffering, showShrineSealedReliquary } from './exploreEvents.shrine';
+import { showShrineEchoDoor, showShrineSoulCandle, showShrineBlackMirror, showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp, showShrineWeepingStatue, showShrineForbiddenOffering, showShrineSealedReliquary } from './exploreEvents.shrine';
 import { showMineCollapse, showMineRichOreVein, showMineEchoTunnel, showMineRustedLift, showMineRunawayCart, showMineLivingOre, showMineTrappedMiner } from './exploreEvents.mines';
 import { showWastesAshStorm, showWastesBoneCaravan, showWastesGlassMirage, showWastesFallenBanner, showWastesMirrorSelf, showWastesMemoryRain, showWastesFacelessMerchant } from './exploreEvents.wastes';
 import {
@@ -106,7 +107,7 @@ export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wande
   | 'forest_memory_tree' | 'forest_dream_flower' | 'forest_echo_grove' | 'forest_time_anomaly' | 'forest_lost_relic'
   | 'forest_herb_foraging' | 'forest_animal_tracks' | 'forest_river_crossing' | 'forest_tree_climbing' | 'forest_fog_maze'
   | 'forest_waterfall_cave' | 'forest_dead_tree_oracle' | 'forest_flower_field' | 'forest_crow_messenger' | 'forest_campfire_stranger'
-  | 'shrine_bell' | 'shrine_prayer_beads' | 'shrine_seal_door' | 'shrine_spirit_lamp'
+  | 'shrine_echo_door' | 'shrine_soul_candle' | 'shrine_black_mirror' | 'shrine_bell' | 'shrine_prayer_beads' | 'shrine_seal_door' | 'shrine_spirit_lamp'
   | 'mine_collapse' | 'mine_ore_vein' | 'mine_echo_tunnel' | 'mine_rusted_lift'
   | 'wastes_storm' | 'wastes_bone_caravan' | 'wastes_glass_mirage' | 'wastes_fallen_banner'
   // Time-of-day events (separate file)
@@ -198,6 +199,9 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
   const rep = player.reputation ?? 0;
   const wanted = getWantedLevel(player.user_id, guildId);
   const deaths = player.deaths ?? 0;
+  const corruption = player.zone_id === 'shrine' ? getCorruptionLevel(player.user_id, guildId) : 0;
+  const corruptionTier = getCorruptionTier(corruption);
+  if (hasCombat && shouldForceCorruptionAmbush({ ...player, corruption } as PlayerRow)) return 'ambush';
   const robberyCount = getShopkeeperRobberyCount(guildId, player.user_id);
   const markup = getShopMarkup(guildId);
   const missingChildStage = Number(getFlag(guildId, `missing_child_${player.user_id}`) ?? '0') || 0;
@@ -216,13 +220,13 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
 
   const base: Array<[ExploreEventType, number]> = [
     ...getDataDrivenEventWeights(input),
-    ['combat', hasCombat ? 15 : 0],
-    ['ambush', hasCombat ? Math.floor(tm('ambush', 7) * badPenalty) : 0],
+    ['combat', hasCombat ? 15 + corruptionTier * 3 : 0],
+    ['ambush', hasCombat ? Math.floor(tm('ambush', 7 + corruptionTier * 2) * badPenalty) : 0],
     ['legacy', hasLegacy ? 6 : 0],
     ['merchant', tm('merchant', 7 + goodBoost)],
     ['gear_buyer', player.zone_id !== 'village' && hasSellableSpareEquipment(player.user_id, guildId) ? tm('merchant', 4 + goodBoost) : 0],
     ['spring', tm('spring', 5 + goodBoost)],
-    ['trap', Math.floor(5 * badPenalty)],
+    ['trap', Math.floor((5 + corruptionTier) * badPenalty)],
     ['altar', 4],
     ['mysterious', tm('mysterious', 4)],
     ['villager', tm('villager', 4)],
@@ -352,6 +356,9 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['forest_flower_field',      player.zone_id === 'forest' ? 3 : 0],
     ['forest_crow_messenger',    player.zone_id === 'forest' ? 3 : 0],
     ['forest_campfire_stranger', player.zone_id === 'forest' ? 3 : 0],
+    ['shrine_echo_door',         player.zone_id === 'shrine' && getItemQty(player.user_id, guildId, 'echo_trace') <= 0 ? 7 : 0],
+    ['shrine_soul_candle',       player.zone_id === 'shrine' && getItemQty(player.user_id, guildId, 'soul_candle') <= 0 ? 7 : 0],
+    ['shrine_black_mirror',      player.zone_id === 'shrine' && getItemQty(player.user_id, guildId, 'mirror_sigil') <= 0 ? 7 : 0],
     ['shrine_bell',              player.zone_id === 'shrine' ? 4 : 0],
     ['shrine_prayer_beads',      player.zone_id === 'shrine' ? 3 : 0],
     ['shrine_seal_door',         player.zone_id === 'shrine' ? 3 : 0],
@@ -576,6 +583,9 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'forest_flower_field':      return showForestFlowerField(ctx);
     case 'forest_crow_messenger':    return showForestCrowMessenger(ctx);
     case 'forest_campfire_stranger': return showForestCampfireStranger(ctx);
+    case 'shrine_echo_door':         return showShrineEchoDoor(ctx);
+    case 'shrine_soul_candle':       return showShrineSoulCandle(ctx);
+    case 'shrine_black_mirror':      return showShrineBlackMirror(ctx);
     case 'shrine_bell':              return showShrineSilentBell(ctx);
     case 'shrine_prayer_beads':      return showShrinePrayerBeads(ctx);
     case 'shrine_seal_door':         return showShrineSealDoor(ctx);
@@ -1804,8 +1814,8 @@ async function showBlackMarket(ctx: RunExploreEventInput): Promise<void> {
     { id: 'soul_shard_pack', label: 'Soul Shard', price: 1200, desc: '+1 Soul Shard', emoji: '💀', special: 'soul_shard' },
     { id: 'material_chest', label: 'Material Chest', price: 1800, desc: 'Rương nguyên liệu ngẫu nhiên', emoji: '📦' },
     { id: 'cursed_equipment_box', label: 'Cursed Equipment Box', price: 2500, desc: 'Rương trang bị nguyền rủa', emoji: '🎁' },
-    { id: 'ancient_book', label: 'Rare Skill Book', price: 3000, desc: 'Execute — skill book hiếm', emoji: '📕' },
-    { id: 'ancient_book', label: 'Epic Skill Book', price: 10000, desc: 'Meteor Shower — skill book rất hiếm', emoji: '📙' },
+    { id: 'ancient_book', label: 'Ancient Book', price: 3000, desc: 'Cổ thư để nghiên cứu skill tier cao tại Hội Quán', emoji: '📖' },
+    { id: 'ancient_book', label: 'Ancient Book Bundle', price: 10000, desc: 'Cổ thư đắt đỏ dành cho route late-game', emoji: '📚' },
     { id: 'soul_anchor', label: 'Soul Anchor', price: 2500, desc: 'Bảo hộ khi chết', emoji: '⚓' },
     { id: 'blood_vial', label: 'Blood Vial', price: 400, desc: 'Hồi máu + ATK, giảm reputation', emoji: '🩸' },
     { id: 'assassins_smoke', label: "Assassin's Smoke", price: 650, desc: 'Hỗ trợ cướp shopkeeper', emoji: '💨' },

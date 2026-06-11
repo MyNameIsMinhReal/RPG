@@ -2,6 +2,7 @@ import { randInt, pick } from '../../utils/format';
 import { getSkill } from '../../data/skills';
 import { getEnemy, type EnemyDef } from '../../data/enemies';
 import { getLoadout, getPlayer, getClassPassives } from '../player';
+import { getSecondaryStatBonuses } from '../statSystem';
 import { getEquipmentStats } from '../equipment';
 import type { CombatState, CombatEnemy } from '../../utils/embeds';
 import { type Effect, parseEffects, hasEffect, tickEffects, addEffect } from './effects';
@@ -252,8 +253,9 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
 
   // Equipment stats
   const eqStats = getEquipmentStats(state.user_id, state.guild_id);
-  const totalCrit    = (eqStats.critChance   ?? 0);
-  const totalLifesteal = (eqStats.lifesteal  ?? 0) + passives.lifestealBonus;
+  const statMods = getPlayer(state.user_id, state.guild_id) ? getSecondaryStatBonuses(getPlayer(state.user_id, state.guild_id)!) : { critChance: 0, dodgeChance: 0, goldBonusPct: 0, dropBonusPct: 0 };
+  const totalCrit = Math.min(35, (eqStats.critChance ?? 0) + statMods.critChance);
+  const totalLifesteal = Math.min(20, (eqStats.lifesteal  ?? 0) + passives.lifestealBonus);
   if (eqStats.effects.includes('low_hp_atk') && player_hp / state.player_max_hp < 0.30) {
     effectiveAtk = Math.floor(effectiveAtk * 1.15);
     logs.push('🔥 Low HP ATK: HP thấp, ATK +15%.');
@@ -753,7 +755,8 @@ function enemyTurn(
   // ── Passive dodge chance (equipment + class) ────────────────────────
   const eqStatsET = getEquipmentStats(current.user_id, current.guild_id);
   const clsPassET  = getClassPassives(current.user_id, current.guild_id);
-  const passiveDodge = (eqStatsET.dodgeChance ?? 0) + clsPassET.dodgeBonus;
+  const statDodgeET = getPlayer(current.user_id, current.guild_id) ? getSecondaryStatBonuses(getPlayer(current.user_id, current.guild_id)!).dodgeChance : 0;
+  const passiveDodge = Math.min(20, (eqStatsET.dodgeChance ?? 0) + clsPassET.dodgeBonus + statDodgeET);
   if (passiveDodge > 0 && !hasEffect(effects, 'dodge') && randInt(1, 100) <= passiveDodge) {
     logs.push(`💨 **Dodge pasif (${passiveDodge}%)** — Tránh đòn!`);
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
@@ -873,6 +876,19 @@ function enemyTurn(
     logs.push(`${enemy.icon} **${enemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP còn lại)`);
   }
 
+  // ── Mirror scroll: reflect next hit ─────────────────────────────────────
+  if (dealDmg > 0 && hasEffect(effects, 'mirror')) {
+    const idx = effects.findIndex(e => e.name === 'mirror');
+    if (idx >= 0) effects.splice(idx, 1);
+    const reflect = Math.max(1, Math.floor(dealDmg * 0.5));
+    current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - reflect) };
+    logs.push(`🪞 **Mirror!** Phản lại **${reflect}** sát thương cho **${enemy.name}**.`);
+    if (current.enemy_hp <= 0) {
+      const { effects: ticked } = tickEffects(effects);
+      return makeResult(original, current, playerHp, playerMp, ticked, logs, false, true, false);
+    }
+  }
+
   // ── Counter reaction (on hit) ──────────────────────────────────────────
   if (passives.hasCounter && dealDmg > 0 && randInt(1, 100) <= 40) {
     const loadout    = getLoadout(current.user_id, current.guild_id);
@@ -971,6 +987,10 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
   }
 
   const blockedByBoss = !!enemy?.boss || String(state.enemy_id).includes('shopkeeper') || String(state.enemy_id).includes('bounty');
+  if (itemId === 'blood_sacrifice_vial' && player_hp <= 1) {
+    logs.push('⚗️ **Blood Sacrifice Vial** cần ít nhất 2 HP để hiến máu.');
+    return { newState: { ...state, combat_log: JSON.stringify(logs.slice(-4)) }, logLines: logs, playerDied: false, enemyDied: false, fled: false };
+  }
   if (itemId === 'scroll_escape') {
     if (blockedByBoss) {
       logs.push('📜 Scroll of Escape bị xé vụn — trận này không thể chạy trốn bằng scroll!');
@@ -1033,6 +1053,15 @@ export function processItemUse(state: CombatState, itemId: string): ActionResult
   if (itemId === 'quickstep_tea') { addEffect(effects, 'dodge', 1); logs.push('⚡ Quickstep Tea: né đòn tiếp theo.'); }
   if (itemId === 'rage_elixir') { addEffect(effects, 'rage_elixir', 999, 25); addEffect(effects, 'incoming_damage_up', 999, 15); logs.push('🔥 Rage Elixir: ATK +25%, nhưng nhận thêm 15% sát thương thường.'); }
   if (itemId === 'blood_vial') { addEffect(effects, 'blood_vial', 999, 10); logs.push('🩸 Blood Vial: ATK +10% trong trận này.'); }
+  if (itemId === 'blood_sacrifice_vial') {
+    const cost = Math.min(player_hp - 1, Math.max(1, Math.floor(player_hp * 0.10)));
+    const amount = Math.max(1, Math.floor(state.player_max_mp * 0.40));
+    const gain = Math.min(amount, state.player_max_mp - player_mp);
+    player_hp = Math.max(1, player_hp - cost);
+    player_mp = Math.min(state.player_max_mp, player_mp + amount);
+    logs.push(`⚗️ Blood Sacrifice: hiến **${cost} HP** để hồi **${gain} MP**.`);
+  }
+  if (itemId === 'scroll_mirror') { addEffect(effects, 'mirror', 1); logs.push('🪞 Scroll of Mirror: phản lại 50% sát thương từ đòn kế tiếp.'); }
   if (itemId === 'scroll_silence') {
     if (enemy?.boss) logs.push('📜 Boss chính kháng Silence! Scroll tan thành bụi.');
     else { addEffect(effects, 'silence', 2); logs.push('📜 Scroll of Silence: enemy không dùng skill trong 2 lượt.'); }
@@ -1093,7 +1122,8 @@ function groupEnemyTurn(
 
   const eqStatsGroup  = getEquipmentStats(current.user_id, current.guild_id);
   const clsPassGroup  = getClassPassives(current.user_id, current.guild_id);
-  const passiveDodge  = (eqStatsGroup.dodgeChance ?? 0) + clsPassGroup.dodgeBonus;
+  const statDodgeGroup = getPlayer(current.user_id, current.guild_id) ? getSecondaryStatBonuses(getPlayer(current.user_id, current.guild_id)!).dodgeChance : 0;
+  const passiveDodge  = Math.min(20, (eqStatsGroup.dodgeChance ?? 0) + clsPassGroup.dodgeBonus + statDodgeGroup);
   let dodgeConsumed = false;
 
   const aliveEnemies = enemies.filter(e => e.hp > 0);
@@ -1165,6 +1195,23 @@ function groupEnemyTurn(
       dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(getEnemy(combatEnemy.id)?.boss || getEnemy(combatEnemy.id)?.miniboss) });
       playerHp = Math.max(0, playerHp - dealDmg);
       logs.push(`${combatEnemy.icon} **${combatEnemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP)`);
+    }
+
+    // Mirror scroll: reflect the first incoming hit in group combat
+    if (dealDmg > 0 && hasEffect(effects, 'mirror')) {
+      const midx = effects.findIndex(e => e.name === 'mirror');
+      if (midx >= 0) effects.splice(midx, 1);
+      const reflect = Math.max(1, Math.floor(dealDmg * 0.5));
+      const eIdx = enemies.findIndex(e => e.id === combatEnemy.id && e.hp > 0);
+      if (eIdx >= 0) {
+        enemies[eIdx] = { ...enemies[eIdx], hp: Math.max(0, enemies[eIdx].hp - reflect) };
+        logs.push(`🪞 **Mirror!** Phản lại **${reflect}** sát thương cho **${combatEnemy.name}**.`);
+        if (enemies.every(e => e.hp <= 0)) {
+          const { effects: ticked } = tickEffects(effects);
+          const finalState = { ...current, enemies_json: JSON.stringify(enemies) };
+          return makeResult(original, finalState, playerHp, playerMp, ticked, logs, false, true, false);
+        }
+      }
     }
 
     // Counter reaction
