@@ -561,8 +561,27 @@ function buildEchoDemonEnemyForEncounter(encounter: BossEncounter): any {
   if (score >= 4) { enemy.hp = Math.floor(enemy.hp * 0.92); enemy.atk = Math.floor(enemy.atk * 0.95); lines.push('✨ Nghi lễ hoàn hảo: Boss mất một phần HP/ATK đầu trận.'); }
   else if (score < 2) { enemy.atk = Math.floor(enemy.atk * 1.12); enemy.specialAttacks = Array.from(new Set([...(enemy.specialAttacks ?? []), 'drain_mp'])); lines.push('🌘 Nghi lễ bất ổn: Boss được +ATK và có thêm MP drain.'); }
   const corruption = ritual?.corruption ?? 0;
-  if (corruption >= 60) { enemy.hp = Math.floor(enemy.hp * 1.12); enemy.atk = Math.floor(enemy.atk * 1.15); enemy.specialAttacks = Array.from(new Set([...(enemy.specialAttacks ?? []), 'drain_mp', 'death_curse'])); lines.push('🌘 Corruption cao: Phase cuối nguy hiểm hơn, boss +HP/+ATK.'); }
-  else if (corruption >= 30) { enemy.atk = Math.floor(enemy.atk * 1.08); enemy.specialAttacks = Array.from(new Set([...(enemy.specialAttacks ?? []), 'drain_mp'])); lines.push('🌗 Corruption trung bình: Boss +ATK nhẹ và có thêm MP drain.'); }
+  if (corruption >= 60) {
+    enemy.hp = Math.floor(enemy.hp * 1.18);
+    enemy.atk = Math.floor(enemy.atk * 1.22);
+    enemy.specialAttacks = Array.from(new Set([...(enemy.specialAttacks ?? []), 'drain_mp', 'death_curse', 'mind_crush']));
+    if (Array.isArray(enemy.phases)) {
+      enemy.phases = enemy.phases.map((phase: any) => phase.phaseIndex === 3
+        ? { ...phase, atkMult: Math.round((Number(phase.atkMult ?? 1) * 1.10) * 100) / 100, specialAttacks: Array.from(new Set([...(phase.specialAttacks ?? []), 'mind_crush'])) }
+        : phase);
+    }
+    lines.push('🌘 Corruption cao: Echo Demon +HP/+ATK mạnh hơn, Phase cuối nguy hiểm hơn.');
+  }
+  else if (corruption >= 30) {
+    enemy.atk = Math.floor(enemy.atk * 1.12);
+    enemy.specialAttacks = Array.from(new Set([...(enemy.specialAttacks ?? []), 'drain_mp']));
+    if (Array.isArray(enemy.phases)) {
+      enemy.phases = enemy.phases.map((phase: any) => phase.phaseIndex === 2
+        ? { ...phase, atkMult: Math.round((Number(phase.atkMult ?? 1) * 1.06) * 100) / 100 }
+        : phase);
+    }
+    lines.push('🌗 Corruption trung bình: Boss +ATK rõ hơn và có thêm MP drain.');
+  }
   else lines.push('🌕 Corruption thấp: Boss không nhận buff từ ô nhiễm.');
   const countRole = (role: EchoRoleId) => roles.filter(r => r === role).length;
   const sealKeepers = countRole('seal_keeper'), candleLighters = countRole('candle_lighter'), mirrorWardens = countRole('mirror_warden'), breakers = countRole('seal_breaker');

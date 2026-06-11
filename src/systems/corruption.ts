@@ -59,9 +59,9 @@ export function maybeGainShrineCorruption(player: PlayerRow): string | null {
   if (player.zone_id !== 'shrine') return null;
   const current = clampCorruption(player.corruption ?? getCorruptionLevel(player.user_id, player.guild_id));
   const tier = getCorruptionTier(current);
-  const chance = [40, 48, 56, 65][tier] ?? 40;
+  const chance = [42, 56, 65, 74][tier] ?? 42;
   if (randInt(1, 100) > chance) return null;
-  const gain = tier >= 2 ? randInt(2, 4) : randInt(1, 3);
+  const gain = tier >= 2 ? randInt(3, 5) : randInt(2, 4);
   const next = adjustCorruption(player.user_id, player.guild_id, gain);
   return `🌘 Ô Nhiễm Linh Hồn +${gain} → **${next}/100**`;
 }
@@ -71,9 +71,9 @@ export function getCorruptionCombatMods(player: PlayerRow): { atkPct: number; hp
   const corruption = clampCorruption(player.corruption ?? getCorruptionLevel(player.user_id, player.guild_id));
   const tier = getCorruptionTier(corruption);
   if (tier <= 0) return { atkPct: 0, hpPct: 0, dropPct: 0, lines: [] };
-  const atkPct = [0, 5, 10, 16][tier];
-  const hpPct = [0, 3, 7, 12][tier];
-  const dropPct = [0, 4, 9, 15][tier];
+  const atkPct = [0, 10, 16, 24][tier];
+  const hpPct = [0, 7, 12, 18][tier];
+  const dropPct = [0, 7, 12, 18][tier];
   return {
     atkPct,
     hpPct,
@@ -90,5 +90,5 @@ export function shouldForceCorruptionAmbush(player: PlayerRow): boolean {
   if (player.zone_id !== 'shrine') return false;
   const tier = getCorruptionTier(player.corruption ?? 0);
   if (tier <= 0) return false;
-  return randInt(1, 100) <= [0, 4, 8, 13][tier];
+  return randInt(1, 100) <= [0, 8, 13, 18][tier];
 }
