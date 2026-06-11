@@ -62,7 +62,7 @@ import {
   showForestHerbForaging, showForestAnimalTracks, showForestRiverCrossing, showForestTreeClimbing, showForestFogMaze,
   showForestWaterfallCave, showForestDeadTreeOracle, showForestFlowerField, showForestCrowMessenger, showForestCampfireStranger,
 } from './exploreEvents.forest';
-import { showShrineEchoDoor, showShrineSoulCandle, showShrineBlackMirror, showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp, showShrineWeepingStatue, showShrineForbiddenOffering, showShrineSealedReliquary } from './exploreEvents.shrine';
+import { showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp, showShrineWeepingStatue, showShrineForbiddenOffering, showShrineSealedReliquary } from './exploreEvents.shrine';
 import { showMineCollapse, showMineRichOreVein, showMineEchoTunnel, showMineRustedLift, showMineRunawayCart, showMineLivingOre, showMineTrappedMiner } from './exploreEvents.mines';
 import { showWastesAshStorm, showWastesBoneCaravan, showWastesGlassMirage, showWastesFallenBanner, showWastesMirrorSelf, showWastesMemoryRain, showWastesFacelessMerchant } from './exploreEvents.wastes';
 import {
@@ -107,7 +107,7 @@ export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wande
   | 'forest_memory_tree' | 'forest_dream_flower' | 'forest_echo_grove' | 'forest_time_anomaly' | 'forest_lost_relic'
   | 'forest_herb_foraging' | 'forest_animal_tracks' | 'forest_river_crossing' | 'forest_tree_climbing' | 'forest_fog_maze'
   | 'forest_waterfall_cave' | 'forest_dead_tree_oracle' | 'forest_flower_field' | 'forest_crow_messenger' | 'forest_campfire_stranger'
-  | 'shrine_echo_door' | 'shrine_soul_candle' | 'shrine_black_mirror' | 'shrine_bell' | 'shrine_prayer_beads' | 'shrine_seal_door' | 'shrine_spirit_lamp'
+  | 'shrine_bell' | 'shrine_prayer_beads' | 'shrine_seal_door' | 'shrine_spirit_lamp'
   | 'mine_collapse' | 'mine_ore_vein' | 'mine_echo_tunnel' | 'mine_rusted_lift'
   | 'wastes_storm' | 'wastes_bone_caravan' | 'wastes_glass_mirage' | 'wastes_fallen_banner'
   // Time-of-day events (separate file)
@@ -356,9 +356,6 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['forest_flower_field',      player.zone_id === 'forest' ? 3 : 0],
     ['forest_crow_messenger',    player.zone_id === 'forest' ? 3 : 0],
     ['forest_campfire_stranger', player.zone_id === 'forest' ? 3 : 0],
-    ['shrine_echo_door',         player.zone_id === 'shrine' && getItemQty(player.user_id, guildId, 'echo_trace') <= 0 ? 7 : 0],
-    ['shrine_soul_candle',       player.zone_id === 'shrine' && getItemQty(player.user_id, guildId, 'soul_candle') <= 0 ? 7 : 0],
-    ['shrine_black_mirror',      player.zone_id === 'shrine' && getItemQty(player.user_id, guildId, 'mirror_sigil') <= 0 ? 7 : 0],
     ['shrine_bell',              player.zone_id === 'shrine' ? 4 : 0],
     ['shrine_prayer_beads',      player.zone_id === 'shrine' ? 3 : 0],
     ['shrine_seal_door',         player.zone_id === 'shrine' ? 3 : 0],
@@ -583,9 +580,6 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'forest_flower_field':      return showForestFlowerField(ctx);
     case 'forest_crow_messenger':    return showForestCrowMessenger(ctx);
     case 'forest_campfire_stranger': return showForestCampfireStranger(ctx);
-    case 'shrine_echo_door':         return showShrineEchoDoor(ctx);
-    case 'shrine_soul_candle':       return showShrineSoulCandle(ctx);
-    case 'shrine_black_mirror':      return showShrineBlackMirror(ctx);
     case 'shrine_bell':              return showShrineSilentBell(ctx);
     case 'shrine_prayer_beads':      return showShrinePrayerBeads(ctx);
     case 'shrine_seal_door':         return showShrineSealDoor(ctx);

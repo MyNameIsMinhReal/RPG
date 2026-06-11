@@ -10,9 +10,9 @@ import { getZone } from '../../data/zones';
 import { getEnemy } from '../../data/enemies';
 import { setExploreCooldown } from '../economy';
 import {
-  startCombatFlow, startCombatFlowWithEnemy, type CombatVictoryHandler, type CombatDeathHandler, type CombatFleeHandler
+  startCombatFlow, type CombatVictoryHandler, type CombatDeathHandler, type CombatFleeHandler
 } from '../combatFlow';
-import { startPartyCombatFlow, startPartyCombatFlowWithEnemy } from '../partyCombatFlow';
+import { startPartyCombatFlow } from '../partyCombatFlow';
 import { processDeathPenalty } from '../rewards';
 import {
   logEvent, setFlag, deleteFlag, markPlayerClearedBoss, isBossSlain
@@ -33,19 +33,13 @@ import {
 } from './shared';
 import { getReadyPartyMemberIds } from './partyHelpers';
 import { awardAchievements } from '../achievements';
-import { recordEchoGateOpened, recordMirrorShadeAfterMirrorSigil, maybeRewardEchoDemonPet } from '../shrineAchievements';
 import { getCombatByUser } from '../combat';
 import {
-  BOSS_MAX_PARTICIPANTS, allBossEncounterParticipantsHaveRoles, clearBossEncounter, createBossEncounter, getBossEncounter,
+  BOSS_MAX_PARTICIPANTS, clearBossEncounter, createBossEncounter, getBossEncounter,
   getBossEncounterRemaining, isBossEncounterParticipant, joinBossEncounter, leaveBossEncounter,
-  setBossEncounterActive, setBossEncounterRole, type BossEncounter
+  setBossEncounterActive, type BossEncounter
 } from '../bossEncounter';
 import { unlockRecipesBySource } from '../crafting';
-import { adjustCorruption, getCorruptionLevel } from '../corruption';
-import {
-  ECHO_KEY_ITEMS, ECHO_ROLES, ECHO_SEALS, type EchoRoleId, type EchoSealId,
-  echoRoleLabel, getEchoRitualSnapshot, markEchoSealBroken
-} from '../echoDemonRitual';
 
 export async function handleBoss(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string
@@ -59,49 +53,30 @@ export async function handleBoss(
 function buildBossLobbyRow(userId: string, encounter: BossEncounter) {
   const joined = isBossEncounterParticipant(encounter, userId);
   const isSummoner = encounter.summonerId === userId;
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  const main = new ActionRowBuilder<ButtonBuilder>();
+  const row = new ActionRowBuilder<ButtonBuilder>();
 
   if (!joined) {
-    main.addComponents(
+    row.addComponents(
       new ButtonBuilder().setCustomId(`ex_boss_join_${userId}`)
         .setLabel('Tham Gia Đánh Boss').setEmoji('🤝').setStyle(ButtonStyle.Primary)
     );
   } else {
-    main.addComponents(
+    row.addComponents(
       new ButtonBuilder().setCustomId(`ex_boss_leave_${userId}`)
         .setLabel('Rời Đội').setEmoji('🚪').setStyle(ButtonStyle.Secondary)
     );
   }
 
-  const rolesReady = allBossEncounterParticipantsHaveRoles(encounter);
-  main.addComponents(
+  row.addComponents(
     new ButtonBuilder().setCustomId(`ex_boss_start_${userId}`)
-      .setLabel(isSummoner ? (rolesReady ? 'Bắt Đầu Boss Fight' : 'Chờ Chọn Vai Trò') : 'Chờ Người Gọi Boss')
-      .setEmoji('⚔️').setStyle(ButtonStyle.Danger).setDisabled(!isSummoner || !rolesReady)
+      .setLabel(isSummoner ? 'Bắt Đầu Boss Fight' : 'Chờ Người Gọi Boss')
+      .setEmoji('⚔️').setStyle(ButtonStyle.Danger).setDisabled(!isSummoner)
   );
-  rows.push(main);
 
-  if (encounter.bossId === 'echo_demon' && joined) {
-    const roleRow = new ActionRowBuilder<ButtonBuilder>();
-    (Object.keys(ECHO_ROLES) as EchoRoleId[]).forEach(role => {
-      const info = ECHO_ROLES[role];
-      const picked = encounter.participantRoles?.[userId] === role;
-      roleRow.addComponents(
-        new ButtonBuilder()
-          .setCustomId(`ex_boss_role_${userId}_${role}`)
-          .setLabel(picked ? `✓ ${info.short}` : info.short)
-          .setEmoji(info.icon)
-          .setStyle(picked ? ButtonStyle.Success : ButtonStyle.Secondary)
-      );
-    });
-    rows.push(roleRow);
-  }
-
-  return rows;
+  return [row];
 }
 
-export async function showBossLobbyPrompt(
+async function showBossLobbyPrompt(
   interaction: ChatInputCommandInteraction,
   userId: string,
   guildId: string,
@@ -117,7 +92,7 @@ export async function showBossLobbyPrompt(
   }
 
   const remaining = getBossEncounterRemaining(encounter);
-  const members = encounter.participantIds.map(id => encounter.bossId === 'echo_demon' ? `<@${id}> — ${echoRoleLabel(encounter.participantRoles?.[id])}` : `<@${id}>`).join('\n') || '*Chưa có ai*';
+  const members = encounter.participantIds.map(id => `<@${id}>`).join('\n') || '*Chưa có ai*';
   const joined = isBossEncounterParticipant(encounter, userId);
   const embed = new EmbedBuilder()
     .setColor(zone.color)
@@ -131,8 +106,7 @@ export async function showBossLobbyPrompt(
       { name: '👤 Người gọi boss', value: `<@${encounter.summonerId}>`, inline: true },
       { name: '🤝 Đội hình', value: `${encounter.participantIds.length}/${BOSS_MAX_PARTICIPANTS}`, inline: true },
       { name: '⏳ Còn lại', value: `${Math.ceil(remaining / 60)} phút`, inline: true },
-      { name: encounter.bossId === 'echo_demon' ? '📜 Thành viên & Vai Trò' : '📜 Thành viên', value: members, inline: false },
-      ...(encounter.bossId === 'echo_demon' && encounter.echoRitual ? [{ name: '⛩️ Nghi Lễ', value: `Phong ấn phá: **${encounter.echoRitual.sealsBroken}/3** · Độ ổn định: **${encounter.echoRitual.ritualScore}/4** · Corruption: **${encounter.echoRitual.corruption}**`, inline: false }] : [])
+      { name: '📜 Thành viên', value: members, inline: false }
     );
 
   const reply = await interaction.editReply({ embeds: [embed], components: buildBossLobbyRow(userId, encounter) });
@@ -145,10 +119,6 @@ export async function showBossLobbyPrompt(
     if (i.customId === `ex_boss_join_${userId}`) await handleBossJoin(interaction, userId, guildId);
     else if (i.customId === `ex_boss_leave_${userId}`) await handleBossLeave(interaction, userId, guildId);
     else if (i.customId === `ex_boss_start_${userId}`) await handleBossStart(interaction, userId, guildId);
-    else if (i.customId.startsWith(`ex_boss_role_${userId}_`)) {
-      const role = i.customId.replace(`ex_boss_role_${userId}_`, '') as EchoRoleId;
-      await handleBossRole(interaction, userId, guildId, role);
-    }
   });
   collector.on('end', (_c, reason) => { if (reason === 'time') reply.edit({ components: [] }).catch(() => {}); });
 }
@@ -181,11 +151,6 @@ export async function handleBossSummon(
   if (getCombatByUser(userId, guildId)) {
     const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, 'Bạn đang có combat chưa kết thúc, không thể gọi boss mới.')], components: buildContinueExploreRow(userId) });
     attachContinueExploreHandler(reply, interaction, userId, guildId);
-    return;
-  }
-
-  if (player.zone_id === 'shrine' && zone.bossId === 'echo_demon') {
-    await showEchoSealGate(interaction, userId, guildId);
     return;
   }
 
@@ -242,29 +207,6 @@ export async function handleBossLeave(
   await showBossLobbyPrompt(interaction, userId, guildId, after, '🚪 Bạn đã rời đội boss.');
 }
 
-
-export async function handleBossRole(
-  interaction: ChatInputCommandInteraction,
-  userId: string,
-  guildId: string,
-  role: EchoRoleId
-): Promise<void> {
-  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
-  const player = getPlayer(userId, guildId)!;
-  const encounter = getBossEncounter(guildId, player.zone_id);
-  if (!encounter || encounter.bossId !== 'echo_demon') {
-    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, 'Không có nghi lễ Echo Demon nào đang mở.')], components: buildContinueExploreRow(userId) });
-    attachContinueExploreHandler(reply, interaction, userId, guildId);
-    return;
-  }
-  if (!ECHO_ROLES[role] || !encounter.participantIds.includes(userId)) {
-    await showBossLobbyPrompt(interaction, userId, guildId, encounter, '⚠️ Bạn cần tham gia lobby trước khi chọn vai trò.');
-    return;
-  }
-  const updated = setBossEncounterRole(guildId, encounter.zoneId, userId, role) ?? encounter;
-  await showBossLobbyPrompt(interaction, userId, guildId, updated, `${ECHO_ROLES[role].icon} Bạn đã chọn **${ECHO_ROLES[role].name}**.`);
-}
-
 export async function handleBossStart(
   interaction: ChatInputCommandInteraction,
   userId: string,
@@ -296,36 +238,10 @@ export async function handleBossStart(
     return;
   }
 
-  if (encounter.bossId === 'echo_demon' && !allBossEncounterParticipantsHaveRoles(encounter)) {
-    await showBossLobbyPrompt(interaction, userId, guildId, encounter, '⚠️ Echo Demon cần mỗi người chọn **1 vai trò nghi lễ** trước khi bắt đầu.');
-    return;
-  }
-
   setBossEncounterActive(guildId, encounter.zoneId);
   setExploreCooldown(userId, guildId);
 
-  const echoEnemy = encounter.bossId === 'echo_demon' ? buildEchoDemonEnemyForEncounter(encounter) : null;
-
   if (cleanMemberIds.length > 1) {
-    if (echoEnemy) {
-      await startPartyCombatFlowWithEnemy(
-        interaction,
-        userId,
-        guildId,
-        cleanMemberIds,
-        echoEnemy,
-        async (members) => {
-          // Rare Shrine pets can drop from Echo Demon for surviving party members too.
-          for (const member of members) {
-            if (member.alive) maybeRewardEchoDemonPet(member.user_id, guildId);
-          }
-          clearBossEncounter(guildId, encounter.zoneId);
-        },
-        async () => { clearBossEncounter(guildId, encounter.zoneId); },
-        { grantDefaultRewards: true }
-      );
-      return;
-    }
     await startPartyCombatFlow(
       interaction,
       userId,
@@ -339,18 +255,7 @@ export async function handleBossStart(
   }
 
   const clearAndVictory: CombatVictoryHandler = async (itr, btnInt, uid, gid, p, enemy, state) => {
-    try {
-      if (enemy?.id === 'echo_demon') {
-        const extra = maybeRewardEchoDemonPet(uid, gid);
-        if (extra.length) {
-          try {
-            const logs = JSON.parse(state.combat_log ?? '[]');
-            state.combat_log = JSON.stringify([...logs, ...extra]);
-          } catch {}
-        }
-      }
-      await handleVictory(itr, btnInt, uid, gid, p, enemy, state);
-    }
+    try { await handleVictory(itr, btnInt, uid, gid, p, enemy, state); }
     finally { clearBossEncounter(gid, encounter.zoneId); }
   };
   const clearAndDeath: CombatDeathHandler = async (itr, btnInt, uid, gid, p, enemy, remainingEnemyHp) => {
@@ -362,237 +267,8 @@ export async function handleBossStart(
     finally { clearBossEncounter(gid, encounter.zoneId); }
   };
 
-  if (echoEnemy) {
-    await startCombatFlowWithEnemy(interaction, userId, guildId, echoEnemy, undefined, clearAndVictory, clearAndDeath, clearAndFlee);
-  } else {
-    await startCombatFlow(interaction, userId, guildId, encounter.bossId, clearAndVictory, clearAndDeath, clearAndFlee);
-  }
+  await startCombatFlow(interaction, userId, guildId, encounter.bossId, clearAndVictory, clearAndDeath, clearAndFlee);
 }
-
-function buildEchoGateChecklist(userId: string, guildId: string): string {
-  const p = getEchoRitualSnapshot(guildId, userId);
-  const yesNo = (ok: boolean) => ok ? '✅' : '❌';
-  return [
-    '🔑 **Chìa Khóa Nghi Lễ**',
-    `${yesNo(p.hasEchoTrace)} 👁️ Echo Trace`,
-    `${yesNo(p.hasSoulCandle)} 🕯️ Soul Candle`,
-    `${yesNo(p.hasMirrorSigil)} 🪞 Mirror Sigil`,
-    '',
-    '🔒 **Phong Ấn Phụ**',
-    `${p.seals.stone ? '✅' : '❌'} 🗿 Ấn Đá — Broken Guardian`,
-    `${p.seals.candle ? '✅' : '❌'} 🕯️ Ấn Nến — Wraith Priest`,
-    `${p.seals.mirror ? '✅' : '❌'} 🪞 Ấn Gương — Mirror Shade`,
-    '',
-    `${p.hasPurifyingSalt ? '✅' : '❌'} 🧂 Purifying Salt x1`,
-    `${p.corruption < 70 ? '✅' : '❌'} 🌘 Corruption: ${p.corruption}/70`,
-    '',
-    p.canStartRitual
-      ? '🕯️ **Cổng đã phản ứng. Có thể bắt đầu Nghi Lễ Giữ Phong Ấn.**'
-      : `Còn thiếu: ${p.missing.map(x => `**${x}**`).join(', ')}`,
-    p.sealsBroken > 0 ? `\n⚠️ Đã phá **${p.sealsBroken}/3** phong ấn. Càng phá nhiều, Echo Demon càng ít được buff.` : '\n⚠️ Bạn cần phá ít nhất **1/3** phong ấn để mở cổng.',
-  ].join('\n');
-}
-
-function buildEchoGateRows(userId: string, guildId: string): ActionRowBuilder<ButtonBuilder>[] {
-  const p = getEchoRitualSnapshot(guildId, userId);
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`echo_ritual_${userId}`).setLabel('Bắt Đầu Nghi Lễ').setEmoji('🕯️').setStyle(ButtonStyle.Success).setDisabled(!p.canStartRitual),
-    new ButtonBuilder().setCustomId(`echo_back_${userId}`).setLabel('Quay lại').setEmoji('↩️').setStyle(ButtonStyle.Secondary),
-  ));
-  const sealRow = new ActionRowBuilder<ButtonBuilder>();
-  (Object.keys(ECHO_SEALS) as EchoSealId[]).forEach(seal => {
-    const info = ECHO_SEALS[seal];
-    sealRow.addComponents(
-      new ButtonBuilder().setCustomId(`echo_seal_${userId}_${seal}`)
-        .setLabel(p.seals[seal] ? `${info.name} đã phá` : `Thách Đấu ${info.name}`)
-        .setEmoji(info.icon).setStyle(p.seals[seal] ? ButtonStyle.Secondary : ButtonStyle.Danger).setDisabled(p.seals[seal])
-    );
-  });
-  rows.push(sealRow);
-  return rows;
-}
-
-export async function showEchoSealGate(
-  interaction: ChatInputCommandInteraction,
-  userId: string,
-  guildId: string,
-  note?: string
-): Promise<void> {
-  if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
-  const player = getPlayer(userId, guildId)!;
-  if (player.zone_id !== 'shrine') {
-    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⛩️ Bạn phải đứng trong **Đền Cổ** mới chạm được Cổng Phong Ấn.')], components: buildContinueExploreRow(userId) });
-    attachContinueExploreHandler(reply, interaction, userId, guildId);
-    return;
-  }
-  if (isBossSlain(guildId, 'echo_demon')) {
-    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '👁️ Echo Demon đang bị phong ấn lại. Cổng không đáp lời lúc này.')], components: buildContinueExploreRow(userId) });
-    attachContinueExploreHandler(reply, interaction, userId, guildId);
-    return;
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor(0x7c3aed)
-    .setTitle('⛩️ Cổng Phong Ấn Echo Demon')
-    .setDescription(`${note ? `${note}\n\n` : ''}${buildEchoGateChecklist(userId, guildId)}\n\n*Cánh cửa vẫn im lặng. Một tiếng cười vọng ra từ sau lớp đá...*`)
-    .setFooter({ text: '3 key item lấy từ 3 event riêng trong Đền Cổ. Mini boss phá phong ấn có thể đánh ngay tại đây.' });
-
-  const reply = await interaction.editReply({ embeds: [embed], components: buildEchoGateRows(userId, guildId) });
-  const collector = reply.createMessageComponentCollector({ filter: onlyUser(userId), time: 90_000 });
-  collector.on('collect', async (i) => {
-    const ok = await i.deferUpdate().then(() => true).catch(() => false);
-    if (!ok) return;
-    await reply.edit({ components: [] }).catch(() => {});
-    collector.stop('action');
-    if (i.customId === `echo_back_${userId}`) {
-      const r = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '↩️ Bạn rời Cổng Phong Ấn. Tiếng vọng vẫn chờ trong đá.')], components: buildContinueExploreRow(userId) });
-      attachContinueExploreHandler(r, interaction, userId, guildId);
-      return;
-    }
-    if (i.customId === `echo_ritual_${userId}`) return runEchoStabilizationRitual(interaction, userId, guildId);
-    if (i.customId.startsWith(`echo_seal_${userId}_`)) {
-      const seal = i.customId.replace(`echo_seal_${userId}_`, '') as EchoSealId;
-      return startEchoSealMiniboss(interaction, userId, guildId, seal);
-    }
-  });
-  collector.on('end', (_c, reason) => { if (reason === 'time') reply.edit({ components: [] }).catch(() => {}); });
-}
-
-async function startEchoSealMiniboss(
-  interaction: ChatInputCommandInteraction,
-  userId: string,
-  guildId: string,
-  seal: EchoSealId
-): Promise<void> {
-  const info = ECHO_SEALS[seal];
-  if (!info) return showEchoSealGate(interaction, userId, guildId, '⚠️ Phong ấn này không tồn tại.');
-  if (getEchoRitualSnapshot(guildId, userId).seals[seal]) return showEchoSealGate(interaction, userId, guildId, `✅ **${info.name}** đã bị phá từ trước.`);
-  if (getCombatByUser(userId, guildId)) return showEchoSealGate(interaction, userId, guildId, '⚠️ Bạn đang có combat khác, chưa thể thách đấu phong ấn.');
-
-  const enemy = getEnemy(info.enemyId);
-  if (!enemy) return showEchoSealGate(interaction, userId, guildId, '⚠️ Dữ liệu mini boss phong ấn bị thiếu.');
-  const embed = new EmbedBuilder()
-    .setColor(COLORS.danger)
-    .setTitle(`${info.icon} ${info.name} Rung Chuyển`)
-    .setDescription(`Bạn đặt tay lên biểu tượng ${info.name.toLowerCase()}. Một hộ vệ bước ra khỏi vết nứt phong ấn.\n\n**${enemy.icon} ${enemy.name}**\n*${enemy.lore ?? 'Hộ vệ cũ của Đền Cổ đã thức tỉnh.'}*`);
-  await interaction.editReply({ embeds: [embed], components: [] });
-  await new Promise(r => setTimeout(r, 700));
-
-  const onVictory: CombatVictoryHandler = async (itr, btnInt, uid, gid, p, e, state) => {
-    markEchoSealBroken(gid, uid, seal);
-    const extra = seal === 'mirror' ? recordMirrorShadeAfterMirrorSigil(uid, gid) : [];
-    if (extra.length) {
-      try {
-        const logs = JSON.parse(state.combat_log ?? '[]');
-        state.combat_log = JSON.stringify([...logs, ...extra]);
-      } catch {}
-    }
-    await handleVictory(itr, btnInt, uid, gid, p, e, state);
-  };
-  await startCombatFlow(interaction, userId, guildId, info.enemyId, onVictory, handleDeath, handleFlee);
-}
-
-async function runEchoStabilizationRitual(
-  interaction: ChatInputCommandInteraction,
-  userId: string,
-  guildId: string
-): Promise<void> {
-  const snapshot = getEchoRitualSnapshot(guildId, userId);
-  if (!snapshot.canStartRitual) return showEchoSealGate(interaction, userId, guildId, '⚠️ Cổng chưa nhận đủ điều kiện để bắt đầu nghi lễ.');
-  removeItem(userId, guildId, 'purifying_salt', 1);
-
-  const rounds = [
-    { prompt: 'Ngọn nến xanh rung mạnh, như sắp tắt.', correct: 'candle', hint: 'Ổn định lửa nghi lễ.' },
-    { prompt: 'Mặt gương đen tối lại, không còn phản chiếu bạn.', correct: 'mirror', hint: 'Đưa ánh nhìn trở lại đúng hướng.' },
-    { prompt: 'Muối dưới chân chuyển sang màu đen.', correct: 'salt', hint: 'Rắc lại vòng bảo hộ.' },
-    { prompt: 'Tiếng vọng gọi tên bạn ba lần liên tiếp.', correct: 'silence', hint: 'Đừng trả lời thứ biết tên bạn.' },
-  ].sort(() => Math.random() - 0.5).slice(0, 4);
-  const labels: Record<string, { label: string; emoji: string }> = {
-    salt: { label: 'Rắc Muối', emoji: '🧂' }, candle: { label: 'Thắp Nến', emoji: '🕯️' }, mirror: { label: 'Chỉnh Gương', emoji: '🪞' }, chant: { label: 'Đọc Chú Văn', emoji: '📜' }, silence: { label: 'Im Lặng', emoji: '🤫' },
-  };
-  let score = 0;
-  const log: string[] = ['🕯️ **Nghi Lễ Giữ Phong Ấn bắt đầu.**'];
-
-  for (let idx = 0; idx < rounds.length; idx++) {
-    const round = rounds[idx];
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      ...(['salt', 'candle', 'mirror', 'chant', 'silence'] as const).map(id => new ButtonBuilder()
-        .setCustomId(`echo_mini_${userId}_${id}`)
-        .setLabel(labels[id].label)
-        .setEmoji(labels[id].emoji)
-        .setStyle(ButtonStyle.Secondary))
-    );
-    const embed = new EmbedBuilder()
-      .setColor(0x7c3aed)
-      .setTitle(`🕯️ Nghi Lễ Giữ Phong Ấn — Lượt ${idx + 1}/${rounds.length}`)
-      .setDescription(`${log.slice(-4).join('\n')}\n\n**Dấu hiệu:** ${round.prompt}\n*${round.hint}*`)
-      .addFields({ name: 'Ổn định', value: `${score}/${idx} lựa chọn đúng`, inline: true });
-    const reply = await interaction.editReply({ embeds: [embed], components: [row] });
-    const btn = await reply.awaitMessageComponent({ filter: onlyUser(userId), time: 25_000 }).catch(() => null);
-    if (!btn || !btn.isButton()) { log.push('⏳ Bạn chậm một nhịp. Tiếng vọng lấn vào vòng nghi lễ.'); adjustCorruption(userId, guildId, 8); continue; }
-    await btn.deferUpdate().catch(() => {});
-    const choice = btn.customId.replace(`echo_mini_${userId}_`, '');
-    if (choice === round.correct) { score++; log.push(`✅ ${labels[choice].emoji} **${labels[choice].label}** — phong ấn ổn định.`); }
-    else { log.push(`❌ ${labels[choice]?.emoji ?? '❔'} **${labels[choice]?.label ?? choice}** — lựa chọn sai, vết nứt lan rộng.`); adjustCorruption(userId, guildId, 6); }
-  }
-
-  const corruption = getCorruptionLevel(userId, guildId);
-  const quality = score >= 4 ? 'perfect' : score >= 2 ? 'stable' : 'unstable';
-  const echoRitual = { sealsBroken: snapshot.sealsBroken, ritualScore: score, corruption, quality } as const;
-  const encounter = createBossEncounter(guildId, 'shrine', 'echo_demon', userId, { echoRitual, participantRoles: {} });
-  setExploreCooldown(userId, guildId);
-  const qualityLine = quality === 'perfect' ? '✨ Nghi lễ hoàn hảo. Echo Demon bị kéo ra khỏi phong ấn trong trạng thái yếu nhất.' : quality === 'stable' ? '🕯️ Nghi lễ ổn định. Echo Demon không được buff thêm từ cổng.' : '🌘 Nghi lễ chao đảo. Echo Demon mang theo một phần Corruption vào trận.';
-  await showBossLobbyPrompt(interaction, userId, guildId, encounter, `${qualityLine}\n\nHãy chọn **vai trò nghi lễ** trước khi bắt đầu boss fight.`);
-}
-
-function buildEchoDemonEnemyForEncounter(encounter: BossEncounter): any {
-  const base = getEnemy('echo_demon');
-  if (!base) return null;
-  const enemy: any = { ...base, drops: Array.isArray((base as any).drops) ? [...(base as any).drops] : (base as any).drops, guaranteedDrops: Array.isArray((base as any).guaranteedDrops) ? [...(base as any).guaranteedDrops] : (base as any).guaranteedDrops, specialAttacks: Array.isArray((base as any).specialAttacks) ? [...(base as any).specialAttacks] : (base as any).specialAttacks, phases: Array.isArray((base as any).phases) ? JSON.parse(JSON.stringify((base as any).phases)) : (base as any).phases };
-  const ritual = encounter.echoRitual;
-  const roles = Object.values(encounter.participantRoles ?? {}) as EchoRoleId[];
-  const lines: string[] = [];
-  const seals = ritual?.sealsBroken ?? 1;
-  if (seals <= 1) { enemy.hp = Math.floor(enemy.hp * 1.25); enemy.atk = Math.floor(enemy.atk * 1.28); lines.push('🔒 Chỉ 1/3 phong ấn bị phá: Echo Demon bước ra trong trạng thái **rất mạnh**.'); }
-  else if (seals === 2) { enemy.hp = Math.floor(enemy.hp * 1.12); enemy.atk = Math.floor(enemy.atk * 1.14); lines.push('🔒 2/3 phong ấn bị phá: Echo Demon vẫn được tăng sức mạnh nhẹ.'); }
-  else lines.push('🔓 3/3 phong ấn bị phá: Echo Demon không còn lớp bảo hộ phụ.');
-  const score = ritual?.ritualScore ?? 0;
-  if (score >= 4) { enemy.hp = Math.floor(enemy.hp * 0.92); enemy.atk = Math.floor(enemy.atk * 0.95); lines.push('✨ Nghi lễ hoàn hảo: Boss mất một phần HP/ATK đầu trận.'); }
-  else if (score < 2) { enemy.atk = Math.floor(enemy.atk * 1.12); enemy.specialAttacks = Array.from(new Set([...(enemy.specialAttacks ?? []), 'drain_mp'])); lines.push('🌘 Nghi lễ bất ổn: Boss được +ATK và có thêm MP drain.'); }
-  const corruption = ritual?.corruption ?? 0;
-  if (corruption >= 60) {
-    enemy.hp = Math.floor(enemy.hp * 1.18);
-    enemy.atk = Math.floor(enemy.atk * 1.22);
-    enemy.specialAttacks = Array.from(new Set([...(enemy.specialAttacks ?? []), 'drain_mp', 'death_curse', 'mind_crush']));
-    if (Array.isArray(enemy.phases)) {
-      enemy.phases = enemy.phases.map((phase: any) => phase.phaseIndex === 3
-        ? { ...phase, atkMult: Math.round((Number(phase.atkMult ?? 1) * 1.10) * 100) / 100, specialAttacks: Array.from(new Set([...(phase.specialAttacks ?? []), 'mind_crush'])) }
-        : phase);
-    }
-    lines.push('🌘 Corruption cao: Echo Demon +HP/+ATK mạnh hơn, Phase cuối nguy hiểm hơn.');
-  }
-  else if (corruption >= 30) {
-    enemy.atk = Math.floor(enemy.atk * 1.12);
-    enemy.specialAttacks = Array.from(new Set([...(enemy.specialAttacks ?? []), 'drain_mp']));
-    if (Array.isArray(enemy.phases)) {
-      enemy.phases = enemy.phases.map((phase: any) => phase.phaseIndex === 2
-        ? { ...phase, atkMult: Math.round((Number(phase.atkMult ?? 1) * 1.06) * 100) / 100 }
-        : phase);
-    }
-    lines.push('🌗 Corruption trung bình: Boss +ATK rõ hơn và có thêm MP drain.');
-  }
-  else lines.push('🌕 Corruption thấp: Boss không nhận buff từ ô nhiễm.');
-  const countRole = (role: EchoRoleId) => roles.filter(r => r === role).length;
-  const sealKeepers = countRole('seal_keeper'), candleLighters = countRole('candle_lighter'), mirrorWardens = countRole('mirror_warden'), breakers = countRole('seal_breaker');
-  if (sealKeepers) { enemy.atk = Math.floor(enemy.atk * (1 - Math.min(0.18, sealKeepers * 0.06))); lines.push(`🛡️ Người Giữ Ấn: ATK boss giảm ${Math.min(18, sealKeepers * 6)}%.`); }
-  if (candleLighters) { enemy.specialAttacks = (enemy.specialAttacks ?? []).filter((s: string) => !(candleLighters >= 1 && s === 'drain_mp')); lines.push('🕯️ Người Thắp Nến: làm dịu tiếng vọng hút MP.'); }
-  if (mirrorWardens) { enemy.def = Math.max(0, Math.floor(enemy.def * (1 - Math.min(0.20, mirrorWardens * 0.08)))); lines.push('🪞 Người Giữ Gương: DEF/ảo ảnh boss suy yếu.'); }
-  if (breakers) { enemy.hp = Math.floor(enemy.hp * (1 - Math.min(0.15, breakers * 0.05))); enemy.atk = Math.floor(enemy.atk * (1 + Math.min(0.10, breakers * 0.04))); lines.push('⚔️ Người Phá Ấn: boss mất HP đầu trận nhưng phản kích dữ hơn.'); }
-  enemy.lore = `${enemy.lore}\n\n${lines.join('\n')}`;
-  return enemy;
-}
-
 
 // ── Oak event ─────────────────────────────────────────────────────────────────
 export async function handleOakHuntStart(

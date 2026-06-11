@@ -1,5 +1,4 @@
 import { getEnemy } from '../data/enemies';
-import type { EchoRoleId, EchoRitualResult } from './echoDemonRitual';
 import { deleteFlag, getFlag, setFlag } from './world';
 
 export type BossEncounterPhase = 'summoning' | 'active';
@@ -10,8 +9,6 @@ export interface BossEncounter {
   bossId: string;
   summonerId: string;
   participantIds: string[];
-  participantRoles?: Record<string, EchoRoleId>;
-  echoRitual?: EchoRitualResult;
   phase: BossEncounterPhase;
   createdAt: number;
   expiresAt: number;
@@ -42,8 +39,6 @@ function normalizeEncounter(raw: any, guildId: string, zoneId: string): BossEnco
     bossId,
     summonerId: String(raw.summonerId ?? participantIds[0] ?? ''),
     participantIds,
-    participantRoles: raw.participantRoles && typeof raw.participantRoles === 'object' ? raw.participantRoles : {},
-    echoRitual: raw.echoRitual && typeof raw.echoRitual === 'object' ? raw.echoRitual : undefined,
     phase: raw.phase === 'active' ? 'active' : 'summoning',
     createdAt: Number(raw.createdAt ?? nowSec()),
     expiresAt: Number(raw.expiresAt ?? (nowSec() + BOSS_ENCOUNTER_TTL)),
@@ -74,7 +69,7 @@ export function getBossEncounter(guildId: string, zoneId: string): BossEncounter
   }
 }
 
-export function createBossEncounter(guildId: string, zoneId: string, bossId: string, summonerId: string, extra?: Partial<Pick<BossEncounter, 'participantRoles' | 'echoRitual'>>): BossEncounter {
+export function createBossEncounter(guildId: string, zoneId: string, bossId: string, summonerId: string): BossEncounter {
   const now = nowSec();
   const encounter: BossEncounter = {
     guildId,
@@ -82,8 +77,6 @@ export function createBossEncounter(guildId: string, zoneId: string, bossId: str
     bossId,
     summonerId,
     participantIds: [summonerId],
-    participantRoles: extra?.participantRoles ?? {},
-    echoRitual: extra?.echoRitual,
     phase: 'summoning',
     createdAt: now,
     expiresAt: now + BOSS_ENCOUNTER_TTL,
@@ -107,28 +100,12 @@ export function leaveBossEncounter(guildId: string, zoneId: string, userId: stri
   const encounter = getBossEncounter(guildId, zoneId);
   if (!encounter) return null;
   encounter.participantIds = encounter.participantIds.filter(id => id !== userId);
-  if (encounter.participantRoles) delete encounter.participantRoles[userId];
   if (encounter.participantIds.length === 0 || encounter.summonerId === userId) {
     clearBossEncounter(guildId, zoneId);
     return null;
   }
   saveEncounter(encounter);
   return encounter;
-}
-
-
-export function setBossEncounterRole(guildId: string, zoneId: string, userId: string, role: EchoRoleId): BossEncounter | null {
-  const encounter = getBossEncounter(guildId, zoneId);
-  if (!encounter || !encounter.participantIds.includes(userId)) return encounter;
-  encounter.participantRoles = { ...(encounter.participantRoles ?? {}), [userId]: role };
-  saveEncounter(encounter);
-  return encounter;
-}
-
-export function allBossEncounterParticipantsHaveRoles(encounter: BossEncounter | null): boolean {
-  if (!encounter || encounter.bossId !== 'echo_demon') return true;
-  const roles = encounter.participantRoles ?? {};
-  return encounter.participantIds.length > 0 && encounter.participantIds.every(id => !!roles[id]);
 }
 
 export function setBossEncounterActive(guildId: string, zoneId: string): BossEncounter | null {

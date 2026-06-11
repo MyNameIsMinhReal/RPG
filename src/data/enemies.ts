@@ -187,7 +187,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   // ── ANCIENT SHRINE / ZONE 2 ─────────────────────────────────
   wandering_spirit: {
     id: 'wandering_spirit', name: 'Wandering Spirit', icon: '👻', level: 4,
-    hp: 98, atk: 25, def: 8, expReward: 88, goldMin: 20, goldMax: 42,
+    hp: 78, atk: 20, def: 6, expReward: 88, goldMin: 20, goldMax: 42,
     drops: [{ itemId: 'ectoplasm', chance: 55 }, { itemId: 'mana_crystal', chance: 22 }, { itemId: 'holy_ash', chance: 15 }, { itemId: 'ancient_book', chance: 8 }],
     specialAttacks: ['phase_through', 'drain_mp'],
     zones: ['shrine'],
@@ -195,7 +195,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   stone_guardian: {
     id: 'stone_guardian', name: 'Stone Guardian', icon: '🗿', level: 5,
-    hp: 160, atk: 27, def: 23, expReward: 112, goldMin: 24, goldMax: 52,
+    hp: 128, atk: 21, def: 18, expReward: 112, goldMin: 24, goldMax: 52,
     drops: [{ itemId: 'shrine_stone', chance: 60 }, { itemId: 'ancient_rune', chance: 8 }, { itemId: 'stone', chance: 45 }, { itemId: 'ancient_book', chance: 7 }],
     specialAttacks: ['shatter_guard', 'fortress_stance'],
     zones: ['shrine'],
@@ -203,7 +203,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   curse_bat: {
     id: 'curse_bat', name: 'Curse Bat', icon: '🦇', level: 4,
-    hp: 90, atk: 30, def: 7, expReward: 92, goldMin: 18, goldMax: 45,
+    hp: 72, atk: 24, def: 5, expReward: 92, goldMin: 18, goldMax: 45,
     drops: [{ itemId: 'cursed_cloth', chance: 22 }, { itemId: 'curse_shard', chance: 9 }, { itemId: 'ectoplasm', chance: 30 }, { itemId: 'dark_wing', chance: 18 }],
     specialAttacks: ['screech', 'death_curse'],
     zones: ['shrine'],
@@ -211,7 +211,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   candle_wraith: {
     id: 'candle_wraith', name: 'Candle Wraith', icon: '🕯️', level: 5,
-    hp: 115, atk: 33, def: 10, expReward: 118, goldMin: 25, goldMax: 58,
+    hp: 92, atk: 26, def: 8, expReward: 118, goldMin: 25, goldMax: 58,
     drops: [{ itemId: 'holy_ash', chance: 45 }, { itemId: 'beeswax', chance: 28 }, { itemId: 'moonwater', chance: 8 }, { itemId: 'ancient_book', chance: 8 }],
     specialAttacks: ['drain_mp', 'hex_bolt'],
     zones: ['shrine'],
@@ -219,7 +219,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   shrine_watcher: {
     id: 'shrine_watcher', name: 'Shrine Watcher', icon: '🧿', level: 6,
-    hp: 135, atk: 39, def: 13, expReward: 145, goldMin: 32, goldMax: 70,
+    hp: 108, atk: 31, def: 10, expReward: 145, goldMin: 32, goldMax: 70,
     drops: [{ itemId: 'rune_stone', chance: 25 }, { itemId: 'mana_crystal', chance: 28 }, { itemId: 'ancient_rune', chance: 5 }, { itemId: 'ancient_book', chance: 9 }],
     specialAttacks: ['mind_crush', 'hex_bolt'],
     zones: ['shrine'],
@@ -227,7 +227,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   possessed_relic: {
     id: 'possessed_relic', name: 'Possessed Relic', icon: '⚱️', level: 6,
-    hp: 148, atk: 34, def: 18, expReward: 150, goldMin: 34, goldMax: 74,
+    hp: 118, atk: 27, def: 14, expReward: 150, goldMin: 34, goldMax: 74,
     drops: [{ itemId: 'shrine_relic', chance: 7 }, { itemId: 'ancient_relic', chance: 8 }, { itemId: 'mirror_shard', chance: 12 }, { itemId: 'ancient_book', chance: 10 }],
     specialAttacks: ['idol_curse', 'shatter_guard'],
     zones: ['shrine'],
@@ -235,7 +235,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   shrine_guardian: {
     id: 'shrine_guardian', name: 'Broken Guardian', icon: '🗿', level: 7,
-    hp: 338, atk: 47, def: 33, expReward: 230, goldMin: 80, goldMax: 145,
+    hp: 260, atk: 36, def: 25, expReward: 230, goldMin: 80, goldMax: 145,
     drops: [{ itemId: 'shrine_stone', chance: 75 }, { itemId: 'ancient_bone', chance: 45 }, { itemId: 'purification_stone', chance: 22 }, { itemId: 'shrine_relic', chance: 10 }, { itemId: 'ancient_book', chance: 12 }],
     guaranteedDrops: ['shrine_stone'],
     specialAttacks: ['divine_judgment', 'shatter_guard', 'fortress_stance'],
@@ -244,7 +244,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   wraith_priest: {
     id: 'wraith_priest', name: 'Wraith Priest', icon: '🙏', level: 7,
-    hp: 293, atk: 52, def: 21, expReward: 240, goldMin: 85, goldMax: 155,
+    hp: 225, atk: 40, def: 16, expReward: 240, goldMin: 85, goldMax: 155,
     drops: [{ itemId: 'holy_ash', chance: 70 }, { itemId: 'cursed_cloth', chance: 35 }, { itemId: 'curse_shard', chance: 16 }, { itemId: 'ancient_book', chance: 12 }],
     guaranteedDrops: ['holy_ash'],
     specialAttacks: ['death_curse', 'drain_mp', 'banish'],
@@ -253,7 +253,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   mirror_shade: {
     id: 'mirror_shade', name: 'Mirror Shade', icon: '🪞', level: 8,
-    hp: 309, atk: 56, def: 18, expReward: 255, goldMin: 90, goldMax: 165,
+    hp: 238, atk: 43, def: 14, expReward: 255, goldMin: 90, goldMax: 165,
     drops: [{ itemId: 'mirror_shard', chance: 80 }, { itemId: 'mysterious_shard', chance: 28 }, { itemId: 'curse_shard', chance: 14 }, { itemId: 'ancient_book', chance: 12 }],
     guaranteedDrops: ['mirror_shard'],
     specialAttacks: ['mirror_split', 'skill_echo', 'phase_through'],
@@ -262,7 +262,7 @@ export const ENEMIES: Record<string, EnemyDef> = {
   },
   echo_demon: {
     id: 'echo_demon', name: 'Echo Demon, Voice Behind the Seal', icon: '👁️', level: 9,
-    hp: 820, atk: 60, def: 34, expReward: 760, goldMin: 240, goldMax: 390,
+    hp: 760, atk: 56, def: 32, expReward: 760, goldMin: 240, goldMax: 390,
     drops: [
       { itemId: 'demon_seal', chance: 60 },
       { itemId: 'demon_horn', chance: 22 },

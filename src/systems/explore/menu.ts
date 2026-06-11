@@ -29,11 +29,9 @@ import {
   blockIfPartyMember, attachContinueExploreHandler
 } from './shared';
 import { handleSearch } from './search';
-import { handleOakHuntStart, handleOakSummon, handleOakJoin, handleOakFight, handleBossSummon, handleBossJoin, handleBossLeave, handleBossStart, handleBossRole, showBossLobbyPrompt } from './boss';
+import { handleOakHuntStart, handleOakSummon, handleOakJoin, handleOakFight, handleBossSummon, handleBossJoin, handleBossLeave, handleBossStart } from './boss';
 import { describeCorruption, getCorruptionAdvice } from '../corruption';
 import { getBossEncounter, getBossEncounterRemaining, isBossEncounterParticipant } from '../bossEncounter';
-import { canSeeShrineSecretMerchant, showShrineSecretMerchant } from '../shrineSecretMerchant';
-import { listActiveShrineBlessings } from '../shrineBlessings';
 
 interface OakButtonInfo {
   canSummon: boolean;
@@ -123,7 +121,7 @@ export async function showExploreMenu(
     }
   }
 
-  const rows = buildExploreRows(userId, zone.safe, player.zone_id, oakInfo, !!bossId && !bossSlain && player.zone_id !== 'forest', player.zone_id === 'shrine' && canSeeShrineSecretMerchant(userId, guildId));
+  const rows = buildExploreRows(userId, zone.safe, oakInfo, !!bossId && !bossSlain && player.zone_id !== 'forest');
   const { embed: zoneEmbed, files: zoneFiles } = withImage(embed, `zone_${player.zone_id}`);
   const reply = await interaction.editReply({ embeds: [zoneEmbed], files: zoneFiles, components: rows });
 
@@ -162,9 +160,7 @@ export async function showExploreMenu(
     else if (cid === `ex_boss_join_${userId}`)   await handleBossJoin(interaction, userId, guildId);
     else if (cid === `ex_boss_leave_${userId}`)  await handleBossLeave(interaction, userId, guildId);
     else if (cid === `ex_boss_start_${userId}`)  await handleBossStart(interaction, userId, guildId);
-    else if (cid.startsWith(`ex_boss_role_${userId}_`)) await handleBossRole(interaction, userId, guildId, cid.replace(`ex_boss_role_${userId}_`, '') as any);
     else if (cid === `ex_gather_${userId}`)     await handleGather(interaction, userId, guildId);
-    else if (cid === `ex_shrine_secret_${userId}`) await showShrineSecretMerchant(interaction, userId, guildId);
     else if (cid === `vill_shop_${userId}`)     await handleVillageService(interaction, userId, guildId, 'shop');
     else if (cid === `vill_smith_${userId}`)    await handleVillageService(interaction, userId, guildId, 'smith');
     else if (cid === `vill_tavern_${userId}`)   await handleVillageService(interaction, userId, guildId, 'tavern');
@@ -236,17 +232,57 @@ async function showBossLockedLobby(
   guildId: string
 ): Promise<void> {
   const player = applyPassiveStats(getPlayer(userId, guildId)!);
+  const zone = getZone(player.zone_id)!;
   const encounter = getBossEncounter(guildId, player.zone_id);
   if (!encounter) return showExploreMenu(interaction, userId, guildId);
-  await showBossLobbyPrompt(interaction, userId, guildId, encounter);
+  const boss = getEnemy(encounter.bossId);
+  if (!boss) return showExploreMenu(interaction, userId, guildId);
+
+  const joined = isBossEncounterParticipant(encounter, userId);
+  const isSummoner = encounter.summonerId === userId;
+  const remaining = getBossEncounterRemaining(encounter);
+  const names = encounter.participantIds.map(id => `<@${id}>`).join('\n') || '*Chưa có ai*';
+
+  const embed = new EmbedBuilder()
+    .setColor(zone.color)
+    .setTitle(`${boss.icon ?? '👑'} ${boss.name} Đã Xuất Hiện`)
+    .setDescription(
+      `Không khí trong **${zone.name}** bị ép xuống như trước một cơn bão. **Khám phá tạm khóa** cho đến khi boss bị hạ hoặc biến mất.\n\n` +
+      (joined ? 'Bạn đã tham gia đội hình. Người gọi boss có thể bắt đầu trận.' : 'Bấm **Tham Gia** để vào đội hình đánh boss.')
+    )
+    .addFields(
+      { name: '👤 Người gọi boss', value: `<@${encounter.summonerId}>`, inline: true },
+      { name: '🤝 Đội hình', value: `${encounter.participantIds.length}/4`, inline: true },
+      { name: '⏳ Còn lại', value: `${Math.ceil(remaining / 60)} phút`, inline: true },
+      { name: '📜 Thành viên', value: names, inline: false }
+    );
+
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  if (!joined) {
+    row.addComponents(new ButtonBuilder().setCustomId(`ex_boss_join_${userId}`).setLabel('Tham Gia Đánh Boss').setEmoji('🤝').setStyle(ButtonStyle.Primary));
+  } else {
+    row.addComponents(new ButtonBuilder().setCustomId(`ex_boss_leave_${userId}`).setLabel('Rời Đội').setEmoji('🚪').setStyle(ButtonStyle.Secondary));
+  }
+  row.addComponents(new ButtonBuilder().setCustomId(`ex_boss_start_${userId}`).setLabel(isSummoner ? 'Bắt Đầu Boss Fight' : 'Chờ Người Gọi Boss').setEmoji('⚔️').setStyle(ButtonStyle.Danger).setDisabled(!isSummoner));
+
+  const reply = await interaction.editReply({ embeds: [embed], components: [row] });
+  const collector = reply.createMessageComponentCollector({ filter: onlyUser(userId), time: 90_000 });
+  collector.on('collect', async (i) => {
+    const ok = await i.deferUpdate().then(() => true).catch(() => false);
+    if (!ok) return;
+    await reply.edit({ components: [] }).catch(() => {});
+    collector.stop('action');
+    if (i.customId === `ex_boss_join_${userId}`) await handleBossJoin(interaction, userId, guildId);
+    else if (i.customId === `ex_boss_leave_${userId}`) await handleBossLeave(interaction, userId, guildId);
+    else if (i.customId === `ex_boss_start_${userId}`) await handleBossStart(interaction, userId, guildId);
+  });
+  collector.on('end', (_c, reason) => { if (reason === 'time') reply.edit({ components: [] }).catch(() => {}); });
 }
 
-
 function buildExploreRows(
-  userId: string, isSafe: boolean, zoneId: string,
+  userId: string, isSafe: boolean,
   oakInfo?: OakButtonInfo | null,
-  canSummonZoneBoss = false,
-  canShowShrineSecretMerchant = false
+  canSummonZoneBoss = false
 ) {
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`ex_search_${userId}`)
@@ -262,21 +298,11 @@ function buildExploreRows(
     );
 
     const rows: ActionRowBuilder<ButtonBuilder>[] = [row1];
-    if (canSummonZoneBoss || canShowShrineSecretMerchant) {
-      const specialRow = new ActionRowBuilder<ButtonBuilder>();
-      if (canSummonZoneBoss) {
-        specialRow.addComponents(
-          new ButtonBuilder().setCustomId(`ex_boss_summon_${userId}`)
-            .setLabel(zoneId === 'shrine' ? 'Cổng Phong Ấn' : 'Gọi Boss Khu Vực').setEmoji(zoneId === 'shrine' ? '👁️' : '👑').setStyle(ButtonStyle.Danger)
-        );
-      }
-      if (canShowShrineSecretMerchant) {
-        specialRow.addComponents(
-          new ButtonBuilder().setCustomId(`ex_shrine_secret_${userId}`)
-            .setLabel('Người Bán Hàng Dưới Ánh Nến').setEmoji('🕯️').setStyle(ButtonStyle.Secondary)
-        );
-      }
-      rows.push(specialRow);
+    if (canSummonZoneBoss) {
+      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`ex_boss_summon_${userId}`)
+          .setLabel('Gọi Boss Khu Vực').setEmoji('👑').setStyle(ButtonStyle.Danger)
+      ));
     }
 
     if (oakInfo) {

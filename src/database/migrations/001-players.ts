@@ -43,3 +43,4 @@ try { db.exec(`ALTER TABLE players ADD COLUMN stat_end INTEGER DEFAULT 0`); } ca
 try { db.exec(`ALTER TABLE players ADD COLUMN stat_agi INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE players ADD COLUMN stat_luk INTEGER DEFAULT 0`); } catch {}
 try { db.exec(`ALTER TABLE players ADD COLUMN free_stat_reset INTEGER DEFAULT 1`); } catch {}
+try { db.exec(`ALTER TABLE players ADD COLUMN corruption INTEGER DEFAULT 0`); } catch {}

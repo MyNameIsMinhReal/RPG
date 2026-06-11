@@ -7,7 +7,6 @@ import {
 import { processVictoryRewards, processDeathPenalty } from '../rewards';
 import { setFlag, markPlayerClearedBoss } from '../world';
 import { markOakPrereq } from '../oakEvent';
-import { ECHO_SEALS, markEchoSealByEnemy } from '../echoDemonRitual';
 import { awardAchievements } from '../achievements';
 import { incrementChapterObjective } from '../chapter';
 import {
@@ -86,14 +85,6 @@ export async function handleVictory(
   if (enemy.miniboss && enemy.zones?.includes('forest')) {
     markOakPrereq(guildId, userId);
     setFlag(guildId, `oak_lore_miniboss_${userId}`, '1');
-  }
-
-  if (enemy.miniboss && enemy.zones?.includes('shrine')) {
-    const seal = markEchoSealByEnemy(guildId, userId, enemy.id);
-    if (seal) {
-      const sealInfo = ECHO_SEALS[seal];
-      embed.addFields({ name: `${sealInfo.icon} Phong Ấn Đã Nứt`, value: `**${sealInfo.name}** đã bị phá. Cổng Phong Ấn Echo Demon yếu đi một bậc.`, inline: false });
-    }
   }
 
   if (enemy.boss) {

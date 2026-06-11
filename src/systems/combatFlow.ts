@@ -23,7 +23,7 @@ import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumable
 import { incrementDaily, countsAsPotion } from '../commands/daily';
 import { applyBossLevelScaling } from './bossScaling';
 import { applyMonsterLevelScaling } from './monsterScaling';
-import { applyCombatEnemyModifiers } from './combat/modifiers';
+import { getCorruptionCombatMods } from './corruption';
 
 
 
@@ -66,7 +66,15 @@ function tuneNormalMobForCombat<T extends any>(enemy: T, playerLevel: number = 1
 
 
 function applyShrineCorruptionToEnemy<T extends any>(enemy: T, player: any): { enemy: T; lines: string[] } {
-  return applyCombatEnemyModifiers(enemy, player);
+  if (!enemy || (enemy as any).isShopkeeper || !Array.isArray((enemy as any).zones) || !(enemy as any).zones.includes('shrine')) {
+    return { enemy, lines: [] };
+  }
+  const mods = getCorruptionCombatMods(player);
+  if (mods.atkPct <= 0 && mods.hpPct <= 0) return { enemy, lines: [] };
+  const next: any = { ...enemy };
+  next.atk = Math.max(1, Math.floor(next.atk * (1 + mods.atkPct / 100)));
+  next.hp = Math.max(1, Math.floor(next.hp * (1 + mods.hpPct / 100)));
+  return { enemy: next as T, lines: mods.lines };
 }
 
 function safeJsonParse<T>(raw: string | null | undefined, fallback: T): T {

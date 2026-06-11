@@ -542,32 +542,6 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Tàn tích thiêng liêng của đền cổ, tỏa ra hào quang yếu ớt.',
     sellPrice: 200
   },
-
-  echo_trace: {
-    id: 'echo_trace', name: 'Echo Trace', icon: '👁️',
-    type: 'key_item', stackable: false,
-    description: 'Dấu tiếng vọng khắc vào ký ức. Một trong ba chìa khóa mở Cổng Phong Ấn Echo Demon.',
-    sellPrice: 120
-  },
-  soul_candle: {
-    id: 'soul_candle', name: 'Soul Candle', icon: '🕯️',
-    type: 'key_item', stackable: false,
-    description: 'Ngọn nến linh hồn không tắt. Một trong ba chìa khóa mở Cổng Phong Ấn Echo Demon.',
-    sellPrice: 120
-  },
-  mirror_sigil: {
-    id: 'mirror_sigil', name: 'Mirror Sigil', icon: '🪞',
-    type: 'key_item', stackable: false,
-    description: 'Ấn gương đen phản chiếu lời nói dối. Một trong ba chìa khóa mở Cổng Phong Ấn Echo Demon.',
-    sellPrice: 120
-  },
-
-  mirror_ring_fragment: {
-    id: 'mirror_ring_fragment', name: 'Mirror Ring Fragment', icon: '💍',
-    type: 'key_item', stackable: true,
-    description: 'Mảnh công thức của nhẫn gương. Thương nhân dưới ánh nến đôi khi bán vật này.',
-    sellPrice: 180, buyPrice: 520
-  },
   forgotten_crown: {
     id: 'forgotten_crown', name: 'Forgotten Crown', icon: '👑',
     type: 'key_item', stackable: false,

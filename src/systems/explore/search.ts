@@ -40,7 +40,6 @@ import { showExploreMenu } from './menu';
 import { showMerchant, showSoulShop } from './merchant';
 import { getReadyPartyMemberIds } from './partyHelpers';
 import { maybeGainShrineCorruption, getCorruptionLevel, getCorruptionTier } from '../corruption';
-import { ECHO_SEALS, markEchoSealByEnemy } from '../echoDemonRitual';
 
 async function startEnemyCombatMaybeParty(
   interaction: ChatInputCommandInteraction,
@@ -141,12 +140,6 @@ export async function handleSearch(
           for (const m of members.filter(m => m.alive)) {
             markOakPrereq(guildId, m.user_id);
             setFlag(guildId, `oak_lore_miniboss_${m.user_id}`, '1');
-          }
-        }
-
-        if (enemyDef?.miniboss && enemyDef.zones?.includes('shrine')) {
-          for (const m of members.filter(m => m.alive)) {
-            markEchoSealByEnemy(guildId, m.user_id, enemyDef.id);
           }
         }
 

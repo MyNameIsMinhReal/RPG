@@ -25,7 +25,6 @@ import { combatStartLine, eventIntro, eventResult, polishGameText, section } fro
 import { learnRandomSkillFromEvent, type AncientBookTier } from './skillLearning';
 import { pick, randInt } from '../utils/format';
 import { onlyParty, onlyUser } from '../utils/collectors';
-import { recordShrineMiniGameResult } from './shrineAchievements';
 import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
 import {
@@ -437,16 +436,11 @@ async function runMiniGameEvent(ctx: RunExploreEventInput, event: DataDrivenExpl
 
   const needed = miniGame.successNeeded ?? miniGame.rounds.length;
   const won = successCount >= needed;
-  const shrineExtraLines = event.zones?.includes('shrine')
-    ? recordShrineMiniGameResult(ctx.userId, ctx.guildId, event.id, successCount, miniGame.rounds.length, won)
-    : [];
-
   const summaryLines = [
     won ? miniGame.successText : miniGame.failureText,
     '',
     `🎯 Kết quả: **${successCount}/${miniGame.rounds.length}** lượt đúng${needed !== miniGame.rounds.length ? ` (cần ${needed})` : ''}`,
     ...roundLogs,
-    ...shrineExtraLines,
   ];
 
   return resolveResultActions(ctx, event, miniGame.title ?? event.title, summaryLines, won ? miniGame.onSuccess : miniGame.onFailure, won ? COLORS.success : COLORS.warning);

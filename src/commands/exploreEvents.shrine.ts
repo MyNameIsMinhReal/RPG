@@ -6,11 +6,10 @@ import {
   EmbedBuilder,
   Message
 } from 'discord.js';
-import { addItem, adjustReputation, getItemQty, getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, removeItem, spendGold, updatePlayerHpMp } from '../systems/player';
+import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp } from '../systems/player';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { onlyUser } from '../utils/collectors';
-import { adjustCorruption } from '../systems/corruption';
 
 async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<void> {
   const msg = await ctx.interaction.editReply({
@@ -18,135 +17,6 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<v
     components: ctx.callbacks.buildContinueExploreRow(ctx.userId)
   });
   await ctx.callbacks.attachContinueExploreHandler(msg as Message<boolean>, ctx.interaction, ctx.userId, ctx.guildId);
-}
-
-
-
-// ════════════════════════════════════════════════════════════════
-//  SHRINE — Echo Demon key-item events
-// ════════════════════════════════════════════════════════════════
-export async function showShrineEchoDoor(ctx: RunExploreEventInput): Promise<void> {
-  if (getItemQty(ctx.userId, ctx.guildId, 'echo_trace') > 0) {
-    return finish(ctx, simpleEmbed(COLORS.info, '👁️ Cánh cửa đá vẫn thì thầm, nhưng **Echo Trace** trong túi bạn đã đáp lại. Không cần lấy thêm dấu vết này.'));
-  }
-  const hasSalt = getItemQty(ctx.userId, ctx.guildId, 'purifying_salt') > 0;
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`ed_listen_${ctx.userId}`).setLabel('Lắng nghe').setEmoji('🕯️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`ed_salt_${ctx.userId}`).setLabel('Rắc muối thanh tẩy').setEmoji('🧂').setStyle(ButtonStyle.Success).setDisabled(!hasSalt),
-    new ButtonBuilder().setCustomId(`ed_leave_${ctx.userId}`).setLabel('Rời đi').setEmoji('🚪').setStyle(ButtonStyle.Secondary),
-  );
-  const embed = new EmbedBuilder()
-    .setColor(0x7c3aed)
-    .setTitle('👁️ Tiếng Vọng Sau Cánh Cửa')
-    .setDescription('Sau một bức tường đá, có giọng nói gọi đúng tên bạn. Cánh cửa không có tay nắm, chỉ có một khe mắt mở hé trong bóng tối.')
-    .setFooter({ text: hasSalt ? 'Muối thanh tẩy có thể ổn định tiếng vọng.' : 'Bạn không có Purifying Salt.' });
-  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
-  if (!btn || !btn.isButton() || btn.customId === `ed_leave_${ctx.userId}`) return finish(ctx, simpleEmbed(COLORS.info, '🚪 Bạn rời khỏi cánh cửa trước khi tiếng gọi học được thêm điều gì về bạn.'));
-  await btn.deferUpdate().catch(() => {});
-
-  if (btn.customId === `ed_salt_${ctx.userId}`) {
-    removeItem(ctx.userId, ctx.guildId, 'purifying_salt', 1);
-    adjustCorruption(ctx.userId, ctx.guildId, -8);
-    addItem(ctx.userId, ctx.guildId, 'echo_trace', 1);
-    return finish(ctx, simpleEmbed(COLORS.success, `🧂 Muối trắng cháy thành vòng sáng. Giọng nói im bặt, để lại một dấu khắc trong ký ức.
-🔑 +**1× Echo Trace**
-🌘 Corruption -8`));
-  }
-
-  if (randInt(1, 100) <= 70) {
-    addItem(ctx.userId, ctx.guildId, 'echo_trace', 1);
-    grantExp(ctx.userId, ctx.guildId, 18);
-    return finish(ctx, simpleEmbed(COLORS.success, `🕯️ Bạn lắng nghe đến cuối. Tiếng vọng không còn là âm thanh — nó biến thành một dấu vết lạnh trong lòng bàn tay.
-🔑 +**1× Echo Trace**
-⭐ +**18 EXP**`));
-  }
-  const next = adjustCorruption(ctx.userId, ctx.guildId, 10);
-  return finish(ctx, simpleEmbed(COLORS.warning, `👁️ Giọng nói bắt chước tiếng thở của bạn. Bạn giật mình lùi lại, nhưng nó đã để lại vết ố trong linh hồn.
-🌘 Corruption: **${next}** (+10)`));
-}
-
-export async function showShrineSoulCandle(ctx: RunExploreEventInput): Promise<void> {
-  if (getItemQty(ctx.userId, ctx.guildId, 'soul_candle') > 0) {
-    return finish(ctx, simpleEmbed(COLORS.info, '🕯️ Ngọn nến vẫn cháy, nhưng **Soul Candle** của bạn đã đủ sáng để đáp lại nó.'));
-  }
-  const hasMoonwater = getItemQty(ctx.userId, ctx.guildId, 'moonwater') > 0;
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`sc_light_${ctx.userId}`).setLabel('Thắp lại nến').setEmoji('🔥').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`sc_moon_${ctx.userId}`).setLabel('Dùng Moonwater').setEmoji('🌙').setStyle(ButtonStyle.Success).setDisabled(!hasMoonwater),
-    new ButtonBuilder().setCustomId(`sc_shadow_${ctx.userId}`).setLabel('Chạm vào bóng nến').setEmoji('✋').setStyle(ButtonStyle.Danger),
-  );
-  const embed = new EmbedBuilder()
-    .setColor(0xffd166)
-    .setTitle('🕯️ Ngọn Nến Không Tắt')
-    .setDescription('Trong căn phòng kín gió, một ngọn nến cháy ngược xuống sàn. Bóng của nó thì đứng thẳng, như một người đang canh cửa.');
-  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
-  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🕯️ Bạn rời phòng. Ngọn nến vẫn cháy sau lưng, không ngắn đi chút nào.'));
-  await btn.deferUpdate().catch(() => {});
-
-  if (btn.customId === `sc_moon_${ctx.userId}`) {
-    removeItem(ctx.userId, ctx.guildId, 'moonwater', 1);
-    addItem(ctx.userId, ctx.guildId, 'soul_candle', 1);
-    adjustCorruption(ctx.userId, ctx.guildId, -6);
-    return finish(ctx, simpleEmbed(COLORS.success, `🌙 Moonwater chạm vào bấc nến. Ngọn lửa xanh dịu lại và tách ra thành một cây nến nhỏ trong tay bạn.
-🔑 +**1× Soul Candle**
-🌘 Corruption -6`));
-  }
-  if (btn.customId === `sc_light_${ctx.userId}`) {
-    addItem(ctx.userId, ctx.guildId, 'soul_candle', 1);
-    grantExp(ctx.userId, ctx.guildId, 20);
-    return finish(ctx, simpleEmbed(COLORS.success, `🔥 Bạn thắp lại nến bằng ngọn lửa thường. Lửa chuyển thành màu lam, rồi để lại một cây nến linh hồn.
-🔑 +**1× Soul Candle**
-⭐ +**20 EXP**`));
-  }
-  addItem(ctx.userId, ctx.guildId, 'soul_candle', 1);
-  const next = adjustCorruption(ctx.userId, ctx.guildId, 12);
-  return finish(ctx, simpleEmbed(COLORS.warning, `✋ Bạn chạm vào bóng nến. Nó lạnh như tay người chết, nhưng chịu đi theo bạn.
-🔑 +**1× Soul Candle**
-🌘 Corruption: **${next}** (+12)`));
-}
-
-export async function showShrineBlackMirror(ctx: RunExploreEventInput): Promise<void> {
-  if (getItemQty(ctx.userId, ctx.guildId, 'mirror_sigil') > 0) {
-    return finish(ctx, simpleEmbed(COLORS.info, '🪞 Mặt gương chỉ phản chiếu **Mirror Sigil** bạn đã có. Không còn ấn gương nào để lấy thêm.'));
-  }
-  const hasScroll = getItemQty(ctx.userId, ctx.guildId, 'scroll_mirror') > 0;
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`bm_look_${ctx.userId}`).setLabel('Nhìn vào gương').setEmoji('🪞').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`bm_scroll_${ctx.userId}`).setLabel('Dùng Scroll of Mirror').setEmoji('📜').setStyle(ButtonStyle.Success).setDisabled(!hasScroll),
-    new ButtonBuilder().setCustomId(`bm_break_${ctx.userId}`).setLabel('Đập vỡ gương').setEmoji('🗡️').setStyle(ButtonStyle.Danger),
-  );
-  const embed = new EmbedBuilder()
-    .setColor(0x111827)
-    .setTitle('🪞 Gương Đen Nứt Vỡ')
-    .setDescription('Một chiếc gương đen dựng giữa hành lang. Hình phản chiếu trong đó mỉm cười trước bạn nửa nhịp, như thể nó biết trước lựa chọn của bạn.');
-  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
-  if (!btn || !btn.isButton()) return finish(ctx, simpleEmbed(COLORS.info, '🪞 Bạn quay lưng trước khi hình phản chiếu kịp bước ra.'));
-  await btn.deferUpdate().catch(() => {});
-
-  if (btn.customId === `bm_scroll_${ctx.userId}`) {
-    removeItem(ctx.userId, ctx.guildId, 'scroll_mirror', 1);
-    addItem(ctx.userId, ctx.guildId, 'mirror_sigil', 1);
-    return finish(ctx, simpleEmbed(COLORS.success, `📜 Scroll of Mirror cháy thành tro bạc. Hình phản chiếu cúi đầu, để lại một ấn gương trên mặt kính.
-🔑 +**1× Mirror Sigil**`));
-  }
-  if (btn.customId === `bm_break_${ctx.userId}`) {
-    addItem(ctx.userId, ctx.guildId, 'mirror_sigil', 1);
-    const next = adjustCorruption(ctx.userId, ctx.guildId, 8);
-    return finish(ctx, simpleEmbed(COLORS.warning, `🗡️ Bạn đập vỡ gương. Mảnh kính vỡ bay ngược lên, khắc thành một ký hiệu trong túi bạn.
-🔑 +**1× Mirror Sigil**
-🌘 Corruption: **${next}** (+8)`));
-  }
-  if (randInt(1, 100) <= 65) {
-    addItem(ctx.userId, ctx.guildId, 'mirror_sigil', 1);
-    return finish(ctx, simpleEmbed(COLORS.success, `🪞 Bạn nhìn thẳng vào gương mà không chớp mắt. Hình phản chiếu lùi lại và để rơi một ấn gương đen.
-🔑 +**1× Mirror Sigil**`));
-  }
-  const next = adjustCorruption(ctx.userId, ctx.guildId, 10);
-  return finish(ctx, simpleEmbed(COLORS.warning, `🪞 Hình phản chiếu gọi tên bạn bằng giọng của người thân đã mất. Bạn thoát ra được, nhưng tâm trí nặng hơn.
-🌘 Corruption: **${next}** (+10)`));
 }
 
 // ════════════════════════════════════════════════════════════════

@@ -100,18 +100,6 @@ export const SETS: Record<string, SetDef> = {
     bonus2: { effects: ['mp_regen_3t'] },
     bonus3: { effects: ['celestial_revive'] }
   },
-  shrine_mage_set: {
-    id: 'shrine_mage_set', name: 'Shrine Mage Set',
-    pieces: ['candle_sage_staff', 'soul_candle_robe', 'mirror_focus_orb'],
-    bonus2: { maxMp: 18 },
-    bonus3: { effects: ['mp_regen_3t'] }
-  },
-  echo_mage_set: {
-    id: 'echo_mage_set', name: 'Echo Mage Set',
-    pieces: ['echo_grimoire', 'voicebound_mantle', 'oracle_moon_ring'],
-    bonus2: { maxMp: 28, expBonus: 4 },
-    bonus3: { effects: ['kill_mp_regen'] }
-  },
   abyssal_set: {
     id: 'abyssal_set', name: 'Abyssal Set',
     pieces: ['abyssal_scythe', 'abyssal_armor', 'void_core'],
@@ -1209,94 +1197,6 @@ const EQUIPMENT_RAW: Record<string, EquipmentDef> = {
     sellPrice: 1500, dropFrom: ['the_forgotten'], dropChance: 5, minZone: 'wastes'
   },
 
-  mirror_ring_plus: {
-    id: 'mirror_ring_plus', name: 'Mirror Ring+', icon: '💍', slot: 'accessory1', rarity: 'legendary',
-    description: 'Nhẫn gương đã được khắc lại bằng mảnh kính linh hồn. Tăng crit, drop và làm ảo ảnh yếu hơn trong các trận boss.',
-    stats: { critChance: 10, dropBonus: 6, maxMp: 30 }, effects: ['block_one_crit'],
-    sellPrice: 760, dropFrom: ['echo_demon'], dropChance: 3, minZone: 'shrine'
-  },
-  warding_charm_plus: {
-    id: 'warding_charm_plus', name: 'Warding Charm+', icon: '🧿', slot: 'accessory1', rarity: 'epic',
-    description: 'Bùa hộ mệnh được phủ tro thánh. Tăng DEF/MP và giúp sống sót tốt hơn trước lời nguyền.',
-    stats: { def: 5, maxMp: 35, dodgeChance: 4 }, effects: ['block_one_crit'],
-    sellPrice: 520, minZone: 'shrine'
-  },
-  demon_fang_plus: {
-    id: 'demon_fang_plus', name: 'Demon Fang+', icon: '😈', slot: 'weapon', rarity: 'cursed',
-    description: 'Nanh quỷ được rèn lại bằng Echo Core. Sát thương cao, hút máu nhẹ, nhưng vẫn mang cảm giác lạnh của phong ấn.',
-    stats: { atk: 27, critChance: 9, lifesteal: 6 }, effects: ['low_hp_atk'],
-    sellPrice: 1100, dropFrom: ['echo_demon'], dropChance: 2, minZone: 'shrine'
-  },
-  shrine_cloak: {
-    id: 'shrine_cloak', name: 'Shrine Cloak', icon: '⛩️', slot: 'armor', rarity: 'epic',
-    description: 'Áo choàng may bằng vải cúng và bụi gương. Hợp cho build né và farm Đền Cổ.',
-    stats: { maxHp: 45, def: 6, dodgeChance: 8, dropBonus: 4 },
-    sellPrice: 560, dropFrom: ['wraith_priest', 'mirror_shade'], dropChance: 4, minZone: 'shrine'
-  },
-  echo_staff: {
-    id: 'echo_staff', name: 'Echo Staff', icon: '🔮', slot: 'weapon', rarity: 'legendary',
-    description: 'Trượng lặp lại tiếng chú văn cuối cùng. Tăng MP, EXP và sức đánh phép thuật.',
-    stats: { atk: 21, maxMp: 70, expBonus: 8 }, effects: ['mp_regen_3t'],
-    sellPrice: 820, dropFrom: ['echo_demon'], dropChance: 3, minZone: 'shrine'
-  },
-
-
-  // ── Mage progression expansion ─────────────────────────────────────────
-  moonwater_wand: {
-    id: 'moonwater_wand', name: 'Moonwater Wand', icon: '🌙', slot: 'weapon', rarity: 'rare',
-    description: 'Đũa phép ngâm dưới ánh trăng. Dành cho pháp sư mới vào Đền Cổ: ATK vừa, MP ổn định.',
-    stats: { atk: 7, maxMp: 28 }, effects: ['mp_regen_3t'],
-    sellPrice: 120, buyPrice: 420, dropFrom: ['candle_wraith', 'shrine_watcher'], dropChance: 6, minZone: 'shrine'
-  },
-  sealbinder_circlet: {
-    id: 'sealbinder_circlet', name: 'Sealbinder Circlet', icon: '👑', slot: 'accessory2', rarity: 'rare',
-    description: 'Vòng trán khắc muối bạc. Tăng MP và giúp pháp sư giữ nhịp khi gặp lời nguyền.',
-    stats: { maxMp: 26, def: 2, dodgeChance: 3 }, effects: ['block_one_crit'],
-    sellPrice: 135, buyPrice: 520, dropFrom: ['shrine_watcher', 'possessed_relic'], dropChance: 5, minZone: 'shrine'
-  },
-  candle_sage_staff: {
-    id: 'candle_sage_staff', name: 'Candle Sage Staff', icon: '🕯️', slot: 'weapon', rarity: 'epic',
-    description: 'Trượng của hiền giả nến xanh. Mạnh hơn khi đi đường phép, hồi MP theo nhịp combat.',
-    stats: { atk: 15, maxMp: 58, expBonus: 4 }, effects: ['mp_regen_3t'], setId: 'shrine_mage_set',
-    sellPrice: 430, buyPrice: 1250, dropFrom: ['wraith_priest', 'candle_wraith'], dropChance: 4, minZone: 'shrine'
-  },
-  soul_candle_robe: {
-    id: 'soul_candle_robe', name: 'Soul Candle Robe', icon: '🧥', slot: 'armor', rarity: 'epic',
-    description: 'Áo choàng dệt bằng sợi khói nến. Ít giáp hơn plate, nhưng nhiều MP và né nhẹ.',
-    stats: { maxHp: 48, maxMp: 68, def: 5, dodgeChance: 6 }, setId: 'shrine_mage_set',
-    sellPrice: 420, buyPrice: 1180, dropFrom: ['wraith_priest', 'candle_wraith'], dropChance: 4, minZone: 'shrine'
-  },
-  mirror_focus_orb: {
-    id: 'mirror_focus_orb', name: 'Mirror Focus Orb', icon: '🪞', slot: 'accessory1', rarity: 'epic',
-    description: 'Quả cầu gương dùng để ổn định ma lực. Tăng crit phép, MP và tỉ lệ rơi vật phẩm Shrine.',
-    stats: { critChance: 9, maxMp: 46, dropBonus: 5 }, effects: ['block_one_crit'], setId: 'shrine_mage_set',
-    sellPrice: 460, buyPrice: 1320, dropFrom: ['mirror_shade', 'possessed_relic'], dropChance: 4, minZone: 'shrine'
-  },
-  echo_grimoire: {
-    id: 'echo_grimoire', name: 'Echo Grimoire', icon: '📖', slot: 'weapon', rarity: 'legendary',
-    description: 'Sách phép ghi lại âm cuối của Echo Demon. MP lớn, ATK phép cao và hồi MP sau khi hạ địch.',
-    stats: { atk: 22, maxMp: 92, expBonus: 8 }, effects: ['kill_mp_regen'], setId: 'echo_mage_set',
-    sellPrice: 920, dropFrom: ['echo_demon'], dropChance: 3, minZone: 'shrine'
-  },
-  voicebound_mantle: {
-    id: 'voicebound_mantle', name: 'Voicebound Mantle', icon: '👘', slot: 'armor', rarity: 'legendary',
-    description: 'Áo choàng giữ lại tiếng nói của kẻ bị phong ấn. Tăng MP, HP và giảm rủi ro bị áp đảo bởi boss.',
-    stats: { maxHp: 80, maxMp: 88, def: 8 }, effects: ['boss_dmg_redux'], setId: 'echo_mage_set',
-    sellPrice: 900, dropFrom: ['echo_demon'], dropChance: 3, minZone: 'shrine'
-  },
-  oracle_moon_ring: {
-    id: 'oracle_moon_ring', name: 'Oracle Moon Ring', icon: '🌘', slot: 'accessory2', rarity: 'legendary',
-    description: 'Nhẫn trăng non của pháp sư tiên tri. Tăng EXP, drop và giữ nhịp mana trong các trận dài.',
-    stats: { maxMp: 55, expBonus: 10, dropBonus: 7 }, effects: ['mp_regen_3t'], setId: 'echo_mage_set',
-    sellPrice: 860, dropFrom: ['echo_demon', 'mirror_shade'], dropChance: 3, minZone: 'shrine'
-  },
-  abyss_mage_codex: {
-    id: 'abyss_mage_codex', name: 'Abyss Mage Codex', icon: '📕', slot: 'weapon', rarity: 'cursed',
-    description: 'Cấm thư hút lời cầu nguyện thành mana. ATK/MP rất cao, nhưng không thể dùng potion hồi máu trong combat.',
-    stats: { atk: 25, maxMp: 95, critChance: 8 }, effects: ['no_healing'],
-    sellPrice: 780, dropFrom: ['echo_demon', 'void_wraith'], dropChance: 3, minZone: 'shrine'
-  },
-
   // ── Special / Promo-only ─────────────────────────────────────────────────
   early_access_ring: {
     id: 'early_access_ring', name: 'Early Access Ring', icon: '💫', slot: 'accessory2', rarity: 'epic',
@@ -1461,8 +1361,6 @@ export const SLOT_LABELS: Record<EquipSlot, string> = {
   armor:      'Giáp',
   accessory1: 'Phụ Kiện 1',
   accessory2: 'Phụ Kiện 2',
-
-
 };
 
 export function getEquipment(id: string): EquipmentDef | undefined {

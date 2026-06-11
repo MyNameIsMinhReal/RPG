@@ -95,11 +95,6 @@ export const TITLES: TitleDef[] = [
     description: 'Thương nhân điêu luyện của thế giới ngầm.',
     fromAchievement: 'trader'
   }
-  ,
-  { id: 'echo_silent', name: 'Echo-Silent', icon: '👁️', description: 'Không trả lời tiếng vọng gọi tên mình.', fromAchievement: 'shrine_echo_silence' },
-  { id: 'salt_warder', name: 'Salt Warder', icon: '🧂', description: 'Người biết vá lại vòng phong ấn.', fromAchievement: 'shrine_salt_warder' },
-  { id: 'no_shadow', name: 'No Shadow', icon: '🪞', description: 'Kẻ không để gương giữ bóng của mình.', fromAchievement: 'shrine_no_shadow' },
-  { id: 'gate_opener', name: 'Gate Opener', icon: '⛩️', description: 'Người đã mở Cổng Phong Ấn Echo Demon.', fromAchievement: 'shrine_gate_opener' }
 ];
 
 export function getTitleByAchievement(achievementId: string): TitleDef | undefined {

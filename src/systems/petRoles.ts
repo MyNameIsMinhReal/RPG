@@ -120,7 +120,6 @@ export function applyActivePetAfterVictory(userId: string, guildId: string, play
 
   const def = getPet(pet.petId);
   if (!def) return lines;
-  const zones = enemy.zones ?? [];
 
   if (pet.petId === 'shadow_cat') {
     const fresh = getPlayer(userId, guildId);
@@ -149,20 +148,6 @@ export function applyActivePetAfterVictory(userId: string, guildId: string, play
   if (pet.petId === 'mini_dragon' && enemy.boss && Math.random() < 0.12) {
     addItem(userId, guildId, 'dragon_scale', 1);
     lines.push('🐉 Mini Dragon để lại **Dragon Scale x1** sau trận boss.');
-  }
-
-  if (pet.petId === 'candle_wisp' && zones.includes('shrine') && Math.random() < 0.16) {
-    addItem(userId, guildId, 'holy_ash', 1);
-    lines.push('🕯️ Candle Wisp gom được **Holy Ash x1** từ tro nghi lễ.');
-  }
-  if (pet.petId === 'mirror_imp' && zones.includes('shrine') && Math.random() < 0.14) {
-    addItem(userId, guildId, 'mirror_shard', 1);
-    lines.push('🪞 Mirror Imp kéo ra **Mirror Shard x1** từ khe gương.');
-  }
-  if (pet.petId === 'echo_sprite' && zones.includes('shrine') && Math.random() < (enemy.boss ? 0.18 : 0.08)) {
-    const itemId = enemy.boss ? 'echo_core' : 'lost_memory';
-    addItem(userId, guildId, itemId, 1);
-    lines.push(`👁️ Echo Sprite tìm thấy **${itemId} x1** trong tiếng vọng còn sót lại.`);
   }
 
   return lines;
