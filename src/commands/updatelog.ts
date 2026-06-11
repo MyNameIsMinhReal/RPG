@@ -7,14 +7,40 @@ const ALLOWED_IDS = new Set(
   (process.env.BOT_ADMIN_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean)
 );
 
+const FIELD_VALUE_LIMIT = 1024;
+const EMBED_DESCRIPTION_LIMIT = 4096;
+
+function clampText(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, Math.max(0, limit - 20)).trimEnd()}\n… *(đã rút gọn)*`;
+}
+
+function buildLogPreview(content: string): string {
+  return clampText(content, FIELD_VALUE_LIMIT);
+}
+
+function buildListDescription(logs: ReturnType<typeof getAllUpdateLogs>): string {
+  const lines: string[] = [];
+  let total = 0;
+
+  for (const log of logs) {
+    const block = `**#${log.id} — ${log.version}**\n${clampText(log.content, 180)}`;
+    if (total + block.length + 2 > EMBED_DESCRIPTION_LIMIT) break;
+    lines.push(block);
+    total += block.length + 2;
+  }
+
+  return lines.join('\n\n') || 'Không có update log để hiển thị.';
+}
+
 export const data = new SlashCommandBuilder()
   .setName('updatelog')
   .setDescription('Quản lý update log')
   .addSubcommand(sub => sub
     .setName('add')
     .setDescription('Thêm update log mới — sẽ DM tất cả người chơi lần sau họ dùng lệnh')
-    .addStringOption(opt => opt.setName('version').setDescription('Tên version, vd: v1.2 hoặc 2026-06-09').setRequired(true))
-    .addStringOption(opt => opt.setName('content').setDescription('Nội dung update (hỗ trợ markdown Discord)').setRequired(true))
+    .addStringOption(opt => opt.setName('version').setDescription('Tên version, vd: v1.2 hoặc 2026-06-09').setRequired(true).setMaxLength(80))
+    .addStringOption(opt => opt.setName('content').setDescription('Nội dung update (hỗ trợ markdown Discord)').setRequired(true).setMaxLength(4000))
   )
   .addSubcommand(sub => sub
     .setName('list')
@@ -32,8 +58,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const sub = interaction.options.getSubcommand();
 
   if (sub === 'add') {
-    const version = interaction.options.getString('version', true);
-    const content = interaction.options.getString('content', true);
+    const version = interaction.options.getString('version', true).trim();
+    const content = interaction.options.getString('content', true).trim();
+
+    if (!version || !content) {
+      await interaction.editReply({ content: '❌ Version và nội dung không được để trống.' });
+      return;
+    }
+
     const log = addUpdateLog(version, content);
 
     await interaction.editReply({
@@ -41,10 +73,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         new EmbedBuilder()
           .setColor(0x57F287)
           .setTitle('✅ Update log đã được tạo')
+          .setDescription('Nội dung đã được lưu đầy đủ. Bản xem trước bên dưới được rút gọn để tránh lỗi giới hạn Embed của Discord.')
           .addFields(
             { name: 'ID', value: `#${log.id}`, inline: true },
-            { name: 'Version', value: log.version, inline: true },
-            { name: 'Nội dung', value: log.content }
+            { name: 'Version', value: clampText(log.version, 256), inline: true },
+            { name: 'Độ dài', value: `${log.content.length}/4000 ký tự`, inline: true },
+            { name: 'Xem trước', value: buildLogPreview(log.content) || 'Không có nội dung.' }
           )
           .setFooter({ text: 'Người chơi sẽ nhận DM vào lần tiếp theo họ dùng lệnh.' })
       ]
@@ -58,16 +92,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       await interaction.editReply({ content: 'Chưa có update log nào.' });
       return;
     }
-    const desc = logs.map(l =>
-      `**#${l.id} — ${l.version}**\n${l.content.slice(0, 100)}${l.content.length > 100 ? '...' : ''}`
-    ).join('\n\n');
 
     await interaction.editReply({
       embeds: [
         new EmbedBuilder()
           .setColor(0x5865F2)
           .setTitle('📋 Update Logs (10 gần nhất)')
-          .setDescription(desc)
+          .setDescription(buildListDescription(logs))
       ]
     });
   }
