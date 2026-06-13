@@ -335,13 +335,24 @@ export async function renderMerchantBuy(
             .setMaxLength(4)
         ));
 
-      await compInt.showModal(modal).catch(() => null);
+      const modalShown = await compInt.showModal(modal).then(() => true).catch((err) => {
+        console.warn('[MERCHANT] showModal (mua nhiều) lỗi:', err?.message ?? err);
+        return false;
+      });
+      if (!modalShown) {
+        await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⚠️ Không mở được form nhập số lượng (lỗi kết nối). Hãy bấm lại nút mua.')], components: buildContinueExploreRow(userId) });
+        return;
+      }
+
       const modalSubmit = await compInt.awaitModalSubmit({
         time: 45_000,
         filter: i => i.user.id === buyerId && i.customId === modalId,
-      }).catch(() => null);
+      }).catch((err) => {
+        console.warn('[MERCHANT] awaitModalSubmit (mua nhiều) lỗi:', err?.message ?? err);
+        return null;
+      });
       if (!modalSubmit) return;
-      await modalSubmit.deferUpdate().catch(() => null);
+      await modalSubmit.deferUpdate().catch((err) => console.warn('[MERCHANT] deferUpdate modal (mua nhiều) lỗi:', err?.message ?? err));
 
       const qty = parsePositiveQuantity(modalSubmit.fields.getTextInputValue('quantity'), 999);
       if (!qty) {

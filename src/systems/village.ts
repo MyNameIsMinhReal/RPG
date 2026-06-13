@@ -546,14 +546,25 @@ Bạn có: **${freshPlayer.gold} 🪙**`
           .setMaxLength(4)
       ));
 
-    await btn.showModal(modal).catch(() => null);
+    const modalShown = await btn.showModal(modal).then(() => true).catch((err) => {
+      console.warn('[VILLAGE] showModal (mua nhiều) lỗi:', err?.message ?? err);
+      return false;
+    });
+    if (!modalShown) {
+      await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⚠️ Không mở được form nhập số lượng (lỗi kết nối). Hãy bấm lại nút mua.')], components: [backRow(userId)] });
+      return;
+    }
+
     const modalSubmit = await btn.awaitModalSubmit({
       time: 45_000,
       filter: i => i.user.id === actorId && i.customId === modalId,
-    }).catch(() => null);
+    }).catch((err) => {
+      console.warn('[VILLAGE] awaitModalSubmit (mua nhiều) lỗi:', err?.message ?? err);
+      return null;
+    });
 
     if (!modalSubmit) { await showVillageShop(interaction, userId, guildId); return; }
-    await modalSubmit.deferUpdate().catch(() => null);
+    await modalSubmit.deferUpdate().catch((err) => console.warn('[VILLAGE] deferUpdate modal (mua nhiều) lỗi:', err?.message ?? err));
     const parsedQty = parsePositiveQuantity(modalSubmit.fields.getTextInputValue('quantity'), 999);
     if (!parsedQty) {
       await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⚠️ Số lượng không hợp lệ. Hãy nhập số nguyên lớn hơn 0.')], components: [backRow(userId)] });
