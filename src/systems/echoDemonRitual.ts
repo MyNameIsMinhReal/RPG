@@ -110,3 +110,56 @@ export function echoRoleLabel(role?: EchoRoleId | null): string {
   const r = ECHO_ROLES[role];
   return r ? `${r.icon} ${r.name}` : 'Chưa chọn vai trò';
 }
+
+
+// ── Ritual boss scaling ────────────────────────────────────────────────────
+// HP của Echo Demon khi vào trận qua nghi lễ: phá càng nhiều ấn → boss càng yếu
+// (3/3 = chuẩn). Giữ ấn đúng thứ tự (puzzle) làm boss yếu thêm; sai thì mạnh hơn.
+export const RITUAL_SEAL_HP_MULT: Record<number, number> = { 0: 1.7, 1: 1.5, 2: 1.25, 3: 1.0 };
+
+export function getRitualHpMultiplier(sealsBroken: number, puzzleCorrect: boolean): number {
+  const sealMult = RITUAL_SEAL_HP_MULT[Math.min(3, Math.max(0, sealsBroken))] ?? 1.5;
+  const puzzleMult = puzzleCorrect ? 0.85 : 1.1;
+  return sealMult * puzzleMult;
+}
+
+export function computeRitualBossHp(baseHp: number, sealsBroken: number, puzzleCorrect: boolean): number {
+  return Math.max(1, Math.floor(Math.max(1, baseHp) * getRitualHpMultiplier(sealsBroken, puzzleCorrect)));
+}
+
+
+// ── Role combat setup ──────────────────────────────────────────────────────
+// Ánh xạ vai trò nghi lễ sang effect combat CÓ SẴN (không cần sửa engine).
+// `effects` được seed vào active_effects lúc mở trận; `cleanse` là lượng Ô Nhiễm
+// được thanh tẩy ngay trước trận (Người Thắp Nến).
+export interface EchoRoleCombatSetup {
+  effects: { name: string; duration: number; value?: number }[];
+  cleanse: number;
+}
+
+export function getEchoRoleCombatSetup(role: EchoRoleId): EchoRoleCombatSetup {
+  switch (role) {
+    case 'seal_keeper':    // 🛡️ Giữ Ấn — giảm sát thương đòn thường của boss.
+      return { effects: [{ name: 'stone_skin', duration: 999, value: 18 }], cleanse: 0 };
+    case 'candle_lighter': // 🕯️ Thắp Nến — thanh tẩy bớt Ô Nhiễm trước trận.
+      return { effects: [], cleanse: 25 };
+    case 'mirror_warden':  // 🪞 Giữ Gương — chặn debuff kế tiếp + né một đòn.
+      return { effects: [{ name: 'ward', duration: 1 }, { name: 'dodge', duration: 1 }], cleanse: 0 };
+    case 'seal_breaker':   // ⚔️ Phá Ấn — +ATK lên boss nhưng nhận thêm sát thương.
+      return { effects: [{ name: 'battle_cry', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 15 }], cleanse: 0 };
+  }
+}
+
+
+// Party: vì party combat dùng model atk/def đơn giản (không có effect system),
+// vai trò được áp bằng cách nhân atk/def lúc load member.
+export interface EchoRolePartyModifier { atkMult: number; defMult: number; }
+
+export function getEchoRolePartyModifier(role: EchoRoleId): EchoRolePartyModifier {
+  switch (role) {
+    case 'seal_keeper':    return { atkMult: 1.0,  defMult: 1.4 };  // tank: chịu đòn
+    case 'seal_breaker':   return { atkMult: 1.25, defMult: 0.8 };  // glass cannon
+    case 'mirror_warden':  return { atkMult: 1.0,  defMult: 1.15 }; // chống chịu nhẹ
+    case 'candle_lighter': return { atkMult: 1.1,  defMult: 1.0 };  // support + thanh tẩy
+  }
+}

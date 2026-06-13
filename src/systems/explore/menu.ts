@@ -30,6 +30,7 @@ import {
 } from './shared';
 import { handleSearch } from './search';
 import { handleOakHuntStart, handleOakSummon, handleOakJoin, handleOakFight, handleBossSummon, handleBossJoin, handleBossLeave, handleBossStart } from './boss';
+import { handleEchoGate } from './echoGate';
 import { describeCorruption, getCorruptionAdvice } from '../corruption';
 import { getBossEncounter, getBossEncounterRemaining, isBossEncounterParticipant } from '../bossEncounter';
 
@@ -121,7 +122,7 @@ export async function showExploreMenu(
     }
   }
 
-  const rows = buildExploreRows(userId, zone.safe, oakInfo, !!bossId && !bossSlain && player.zone_id !== 'forest');
+  const rows = buildExploreRows(userId, zone.safe, oakInfo, !!bossId && !bossSlain && player.zone_id !== 'forest' && player.zone_id !== 'shrine', player.zone_id === 'shrine' && !bossSlain);
   const { embed: zoneEmbed, files: zoneFiles } = withImage(embed, `zone_${player.zone_id}`);
   const reply = await interaction.editReply({ embeds: [zoneEmbed], files: zoneFiles, components: rows });
 
@@ -160,6 +161,7 @@ export async function showExploreMenu(
     else if (cid === `ex_boss_join_${userId}`)   await handleBossJoin(interaction, userId, guildId);
     else if (cid === `ex_boss_leave_${userId}`)  await handleBossLeave(interaction, userId, guildId);
     else if (cid === `ex_boss_start_${userId}`)  await handleBossStart(interaction, userId, guildId);
+    else if (cid === `ex_echo_gate_${userId}`)   await handleEchoGate(interaction, userId, guildId);
     else if (cid === `ex_gather_${userId}`)     await handleGather(interaction, userId, guildId);
     else if (cid === `vill_shop_${userId}`)     await handleVillageService(interaction, userId, guildId, 'shop');
     else if (cid === `vill_smith_${userId}`)    await handleVillageService(interaction, userId, guildId, 'smith');
@@ -282,7 +284,8 @@ async function showBossLockedLobby(
 function buildExploreRows(
   userId: string, isSafe: boolean,
   oakInfo?: OakButtonInfo | null,
-  canSummonZoneBoss = false
+  canSummonZoneBoss = false,
+  showEchoGate = false
 ) {
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`ex_search_${userId}`)
@@ -302,6 +305,13 @@ function buildExploreRows(
       rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId(`ex_boss_summon_${userId}`)
           .setLabel('Gọi Boss Khu Vực').setEmoji('👑').setStyle(ButtonStyle.Danger)
+      ));
+    }
+
+    if (showEchoGate) {
+      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`ex_echo_gate_${userId}`)
+          .setLabel('Cổng Phong Ấn').setEmoji('👁️').setStyle(ButtonStyle.Secondary)
       ));
     }
 

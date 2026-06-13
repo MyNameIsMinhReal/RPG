@@ -48,3 +48,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await attachProfileStatCollector(interaction, target, guildId);
   }
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['p','pf','me'];

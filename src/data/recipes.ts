@@ -207,6 +207,17 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     recipeRequired: true, unlockedBy: 'echo_demon'
   },
   {
+    // Phase 5: mở khi hạ Echo Demon — chế Warding Charm (chặn debuff) từ di vật Đền Cổ.
+    id: 'craft_warding_charm', resultItemId: 'warding_charm', resultAmount: 2,
+    category: 'potion', resultRarity: 'rare', goldCost: 220, levelRequired: 7,
+    successRate: 80, craftingExp: 60,
+    ingredients: [
+      { itemId: 'ancient_seal', amount: 1 },
+      { itemId: 'demon_seal', amount: 1 }
+    ],
+    recipeRequired: true, unlockedBy: 'echo_demon'
+  },
+  {
     id: 'craft_soul_eater', resultItemId: 'soul_eater', resultAmount: 1,
     category: 'weapon', resultRarity: 'cursed', goldCost: 700, levelRequired: 8,
     successRate: 55, craftingExp: 150,

@@ -246,3 +246,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     components: []
   });
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['pvp'];

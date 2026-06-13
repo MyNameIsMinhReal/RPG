@@ -10,30 +10,10 @@ import {
   User
 } from 'discord.js';
 
-import { execute as execStart     } from './commands/start';
-import { execute as execProfile   } from './commands/profile';
-import { execute as execExplore   } from './commands/explore';
-import { execute as execInventory } from './commands/inventory';
-import { execute as execUse       } from './commands/use';
-import { execute as execTrade     } from './commands/trade';
-import { execute as execCraft     } from './commands/craft';
-import { execute as execDaily     } from './commands/daily';
-import { execute as execAchievements } from './commands/achievements';
-import { execute as execWorld     } from './commands/world';
-import { execute as execPrestige  } from './commands/prestige';
-import { execute as execWorldboss } from './commands/worldboss';
-import { execute as execDuel      } from './commands/duel';
-import { execute as execGuild     } from './commands/guild';
-import { execute as execPet       } from './commands/pet';
-import { execute as execParty     } from './commands/party';
-import { execute as execChapter   } from './commands/chapter';
-import { execute as execCode      } from './commands/code';
-import { execute as execHelp      } from './commands/help';
-import { execute as execUpdatelog } from './commands/updatelog';
-import { execute as execAdmin     } from './commands/admin';
+import { loadCommands, buildAliasMap } from './commands/registry';
 import { sendUnseenLogsDM } from './systems/updateLog';
 import { buildHelpGuideEmbeds } from './commands/help';
-import { validateGameData } from './utils/validateData';
+import { runStartupDataCheck } from './doctor';
 import { dispatchCombatInteraction } from './systems/combatFlow';
 
 const client = new Client({
@@ -45,126 +25,19 @@ const client = new Client({
 });
 
 type CommandHandler = (i: ChatInputCommandInteraction) => Promise<void>;
+
+// Commands are auto-discovered from ./commands (see registry.ts). Adding a new
+// command is just dropping a file there that exports `data` + `execute`
+// (and optionally `aliases`) — no edits needed here or in deploy.ts.
+const loadedCommands = loadCommands();
 const commands = new Collection<string, CommandHandler>();
-commands.set('start',     execStart);
-commands.set('profile',   execProfile);
-commands.set('explore',   execExplore);
-commands.set('inventory', execInventory);
-commands.set('use',       execUse);
-commands.set('trade',     execTrade);
-commands.set('craft',     execCraft);
-commands.set('daily',     execDaily);
-commands.set('achievements', execAchievements);
-commands.set('world',     execWorld);
-commands.set('prestige',  execPrestige);
-commands.set('worldboss', execWorldboss);
-commands.set('duel',      execDuel);
-commands.set('guild',     execGuild);
-commands.set('pet',       execPet);
-commands.set('party',     execParty);
-commands.set('chapter',   execChapter);
-commands.set('code',      execCode);
-commands.set('help',      execHelp);
-commands.set('updatelog', execUpdatelog);
-commands.set('admin',     execAdmin);
+for (const cmd of loadedCommands) {
+  commands.set(cmd.name, cmd.execute);
+}
+console.log(`📦 Loaded ${commands.size} commands: ${loadedCommands.map(c => c.name).join(', ')}`);
 
-const prefixAliases = new Map<string, string>([
-  // Start / revive
-  ['s', 'start'],
-  ['start', 'start'],
-  ['begin', 'start'],
-  ['new', 'start'],
-  ['revive', 'start'],
-  ['respawn', 'start'],
-
-  // Profile
-  ['p', 'profile'],
-  ['pf', 'profile'],
-  ['me', 'profile'],
-  ['profile', 'profile'],
-
-  // Explore
-  ['e', 'explore'],
-  ['ex', 'explore'],
-  ['explore', 'explore'],
-  ['x', 'explore'],
-
-  // Inventory
-  ['i', 'inventory'],
-  ['inv', 'inventory'],
-  ['bag', 'inventory'],
-  ['items', 'inventory'],
-  ['inventory', 'inventory'],
-
-  // Use item
-  ['u', 'use'],
-  ['use', 'use'],
-  ['useitem', 'use'],
-
-  // Trade gold
-  ['t', 'trade'],
-  ['trade', 'trade'],
-  ['give', 'trade'],
-  ['pay', 'trade'],
-  ['send', 'trade'],
-
-  // Craft
-  ['c', 'craft'],
-  ['craft', 'craft'],
-  ['make', 'craft'],
-
-  // Daily
-  ['d', 'daily'],
-  ['daily', 'daily'],
-  ['quest', 'daily'],
-  ['quests', 'daily'],
-
-  // Achievements
-  ['a', 'achievements'],
-  ['ach', 'achievements'],
-  ['achievement', 'achievements'],
-  ['achievements', 'achievements'],
-
-  // World
-  ['w', 'world'],
-  ['world', 'world'],
-  ['server', 'world'],
-
-  // Prestige
-  ['prestige', 'prestige'],
-  ['pr', 'prestige'],
-
-  // World Boss
-  ['worldboss', 'worldboss'],
-  ['wb', 'worldboss'],
-  ['boss', 'worldboss'],
-
-  // Duel
-  ['duel', 'duel'],
-  ['pvp', 'duel'],
-
-  // Guild
-  ['guild', 'guild'],
-  ['clan', 'guild'],
-  ['gc', 'guild'],
-
-  // Pet
-  ['pet', 'pet'],
-
-
-  // Party
-  ['party', 'party'],
-  ['pt', 'party'],
-
-  // Story / chapter
-  ['chapter', 'chapter'],
-  ['ch', 'chapter'],
-  ['story', 'chapter'],
-
-
-  // Code redeem
-  ['code', 'code'],
-]);
+// alias → command-name, derived from each command's own `aliases` export.
+const prefixAliases = buildAliasMap(loadedCommands);
 
 // Prefix help uses the same embed guide as /help.
 
@@ -440,7 +313,7 @@ function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): s
 client.once('ready', (c) => {
   console.log(`✅ Bot ready: ${c.user.tag}`);
   c.user.setActivity('⚔️ Butterfly Effect RPG');
-  validateGameData();
+  runStartupDataCheck(); // fail-fast: exits the process if game data has errors
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {

@@ -137,6 +137,11 @@ export async function handleBossSummon(
     attachContinueExploreHandler(reply, interaction, userId, guildId);
     return;
   }
+  if (player.zone_id === 'shrine') {
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '👁️ Boss Đền Cổ dùng nghi thức riêng: hãy mở **Cổng Phong Ấn** trong Shrine.')], components: buildContinueExploreRow(userId) });
+    attachContinueExploreHandler(reply, interaction, userId, guildId);
+    return;
+  }
   if (!zone.bossId) {
     const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, 'Khu vực này chưa có boss khu vực.')], components: buildContinueExploreRow(userId) });
     attachContinueExploreHandler(reply, interaction, userId, guildId);

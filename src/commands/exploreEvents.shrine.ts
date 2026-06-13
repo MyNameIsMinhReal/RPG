@@ -6,10 +6,11 @@ import {
   EmbedBuilder,
   Message
 } from 'discord.js';
-import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp } from '../systems/player';
+import { addItem, adjustReputation, getPlayer, getEffectivePlayer, grantExp, grantGold, grantSoulShards, spendGold, updatePlayerHpMp, getItemQty, removeItem } from '../systems/player';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { onlyUser } from '../utils/collectors';
+import { adjustCorruption } from '../systems/corruption';
 
 async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<void> {
   const msg = await ctx.interaction.editReply({
@@ -291,3 +292,87 @@ export async function showShrineSealedReliquary(ctx: RunExploreEventInput): Prom
 Nhưng bạn vẫn kịp đóng hộp lại.`));
 }
 // EXTRA_EVENTS_SHRINE_END
+
+
+// ════════════════════════════════════════════════════════════════
+//  SHRINE — Tiếng Vọng (thu thập key item cho Nghi Lễ Echo Demon)
+//  3 event, mỗi event cho 1 key item khác nhau. "Lắng Nghe" được item
+//  nhưng tăng Ô Nhiễm; "Rắc Muối Thanh Tẩy" tiêu 1 Purifying Salt để
+//  lấy item mà không nhiễm; "Rời Đi" không được gì.
+// ════════════════════════════════════════════════════════════════
+interface EchoWhisperOpts {
+  itemId: string;
+  itemName: string;
+  icon: string;
+  title: string;
+  desc: string;
+  listenText: string;
+  saltText: string;
+}
+
+async function showEchoWhisper(ctx: RunExploreEventInput, opts: EchoWhisperOpts): Promise<void> {
+  // Chỉ cần 1 cái mỗi loại — nếu đã có thì không phát thêm (tránh farm).
+  if (getItemQty(ctx.userId, ctx.guildId, opts.itemId) > 0) {
+    const exp = randInt(15, 30);
+    grantExp(ctx.userId, ctx.guildId, exp);
+    return finish(ctx, simpleEmbed(COLORS.info, `${opts.icon} *Tiếng vọng lặp lại thứ bạn đã mang theo — bạn đã có ${opts.itemName}.*\n⭐ +**${exp} EXP**`));
+  }
+
+  const hasSalt = getItemQty(ctx.userId, ctx.guildId, 'purifying_salt') > 0;
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`ew_listen_${ctx.userId}`).setLabel('Lắng Nghe').setEmoji('🕯️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`ew_salt_${ctx.userId}`).setLabel('Rắc Muối Thanh Tẩy').setEmoji('🧂').setStyle(ButtonStyle.Success).setDisabled(!hasSalt),
+    new ButtonBuilder().setCustomId(`ew_leave_${ctx.userId}`).setLabel('Rời Đi').setEmoji('🏃').setStyle(ButtonStyle.Secondary),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0x6B4C9A)
+    .setTitle(opts.title)
+    .setDescription(opts.desc + (hasSalt ? '' : '\n\n*(Bạn không có Purifying Salt để thanh tẩy.)*'));
+  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
+  if (!btn || !btn.isButton() || btn.customId === `ew_leave_${ctx.userId}`) {
+    return finish(ctx, simpleEmbed(COLORS.info, '🏃 *Bạn lùi khỏi bức tường, để tiếng gọi chìm lại vào đá.*'));
+  }
+  await btn.deferUpdate().catch(() => {});
+
+  if (btn.customId === `ew_salt_${ctx.userId}` && getItemQty(ctx.userId, ctx.guildId, 'purifying_salt') > 0) {
+    removeItem(ctx.userId, ctx.guildId, 'purifying_salt', 1);
+    addItem(ctx.userId, ctx.guildId, opts.itemId, 1);
+    return finish(ctx, simpleEmbed(COLORS.success, `${opts.saltText}\n🧂 -**1 Purifying Salt**\n${opts.icon} +**1× ${opts.itemName}**`));
+  }
+
+  // "Lắng Nghe": nhận item nhưng nhiễm thêm Ô Nhiễm Linh Hồn.
+  addItem(ctx.userId, ctx.guildId, opts.itemId, 1);
+  const corr = adjustCorruption(ctx.userId, ctx.guildId, 6);
+  return finish(ctx, simpleEmbed(COLORS.warning, `${opts.listenText}\n${opts.icon} +**1× ${opts.itemName}**\n🌘 Ô Nhiễm Linh Hồn: **${corr}** (+6)`));
+}
+
+export async function showEchoWhisperTrace(ctx: RunExploreEventInput): Promise<void> {
+  return showEchoWhisper(ctx, {
+    itemId: 'echo_trace', itemName: 'Echo Trace', icon: '👁️',
+    title: '👁️ Tiếng Vọng Sau Cánh Cửa',
+    desc: 'Bạn nghe thấy tiếng gọi phát ra từ bên trong bức tường đá.\nMột giọng nói thì thầm tên bạn, dù bạn chưa từng nói ra.',
+    listenText: '🕯️ Bạn áp tai vào đá và lắng nghe. Một mảnh ký ức không phải của bạn rỉ ra ngoài.',
+    saltText: '🧂 Bạn rắc muối lên khe tường. Tiếng vọng dịu lại, để rơi một dấu vết mờ.',
+  });
+}
+
+export async function showEchoWhisperCandle(ctx: RunExploreEventInput): Promise<void> {
+  return showEchoWhisper(ctx, {
+    itemId: 'soul_candle', itemName: 'Soul Candle', icon: '🕯️',
+    title: '🕯️ Ngọn Nến Không Tắt',
+    desc: 'Giữa đền tối có một ngọn nến cháy suốt hàng trăm năm không lụi.\nKhi bạn lại gần, ngọn lửa nghiêng về phía bạn như đang lắng nghe.',
+    listenText: '🕯️ Bạn ghé sát ngọn lửa. Nó liếm vào tay bạn không nóng, chỉ lạnh — rồi thu lại thành một cây nến nhỏ.',
+    saltText: '🧂 Bạn rắc muối quanh chân nến. Ngọn lửa tách ra một phần sáng, ngưng lại thành nến cầm tay.',
+  });
+}
+
+export async function showEchoWhisperMirror(ctx: RunExploreEventInput): Promise<void> {
+  return showEchoWhisper(ctx, {
+    itemId: 'mirror_sigil', itemName: 'Mirror Sigil', icon: '🪞',
+    title: '🪞 Gương Đen Trong Hốc Tường',
+    desc: 'Một mảnh gương đen gắn trong hốc tường. Hình phản chiếu của bạn cử động chậm hơn bạn một nhịp.',
+    listenText: '🪞 Bạn chạm vào mặt gương. Hình phản chiếu nắm lấy tay bạn từ phía bên kia, rồi để lại một ấn khắc.',
+    saltText: '🧂 Bạn rắc muối lên gương. Lớp đen rạn ra, một mảnh ấn rơi vào lòng bàn tay bạn.',
+  });
+}

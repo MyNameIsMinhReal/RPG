@@ -51,13 +51,12 @@ function toNonNegativeInt(value: unknown): number {
 }
 
 export function getPlayerStatBuild(player: PlayerRow): PlayerStatBuild {
-  const p = player as any;
   return {
-    str: toNonNegativeInt(p.stat_str),
-    vit: toNonNegativeInt(p.stat_vit),
-    end: toNonNegativeInt(p.stat_end),
-    agi: toNonNegativeInt(p.stat_agi),
-    luk: toNonNegativeInt(p.stat_luk),
+    str: toNonNegativeInt(player.stat_str),
+    vit: toNonNegativeInt(player.stat_vit),
+    end: toNonNegativeInt(player.stat_end),
+    agi: toNonNegativeInt(player.stat_agi),
+    luk: toNonNegativeInt(player.stat_luk),
   };
 }
 
@@ -79,13 +78,13 @@ export function deriveBaseStats(player: PlayerRow): DerivedBaseStats {
   const s = getPlayerStatBuild(player);
   const level = Math.max(1, toNonNegativeInt(player.level) || 1);
   const levelIndex = level - 1;
-  const cls = getClass((player as any).class ?? 'warrior') ?? getClass('warrior')!;
-  const blessing = toNonNegativeInt((player as any).rebirth_blessing);
+  const cls = getClass(player.class ?? 'warrior') ?? getClass('warrior')!;
+  const blessing = toNonNegativeInt(player.rebirth_blessing);
 
-  const permanentAtk = toNonNegativeInt((player as any).permanent_atk_bonus);
-  const permanentDef = toNonNegativeInt((player as any).permanent_def_bonus);
-  const permanentHp  = toNonNegativeInt((player as any).permanent_max_hp_bonus);
-  const permanentMp  = toNonNegativeInt((player as any).permanent_max_mp_bonus);
+  const permanentAtk = toNonNegativeInt(player.permanent_atk_bonus);
+  const permanentDef = toNonNegativeInt(player.permanent_def_bonus);
+  const permanentHp  = toNonNegativeInt(player.permanent_max_hp_bonus);
+  const permanentMp  = toNonNegativeInt(player.permanent_max_mp_bonus);
 
   return {
     maxHp: Math.max(10, 100 + cls.hpBonus + permanentHp + blessing * 20 + levelIndex * 6 + s.vit * 12),
@@ -113,7 +112,7 @@ export function getStatSummary(player: PlayerRow): StatSummary {
     availablePoints: getAvailableStatPoints(player),
     base: deriveBaseStats(player),
     secondary: getSecondaryStatBonuses(player),
-    freeResetAvailable: ((player as any).free_stat_reset ?? 1) === 1,
+    freeResetAvailable: (player.free_stat_reset ?? 1) === 1,
   };
 }
 

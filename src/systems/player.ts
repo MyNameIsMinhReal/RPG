@@ -39,7 +39,7 @@ export function createPlayer(userId: string, guildId: string, name: string, clas
 
 
 export function changePlayerClass(userId: string, guildId: string, classId: string): { ok: boolean; reason?: string; oldClassId?: string; newClassId?: string } {
-  const player = getPlayer(userId, guildId) as any;
+  const player = getPlayer(userId, guildId);
   if (!player) return { ok: false, reason: 'not_found' };
 
   const oldCls = getClass(player.class ?? 'warrior') ?? CLASSES.warrior;
@@ -134,7 +134,7 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
   bonusMaxMp += eq.maxMp ?? 0;
 
   // Pet passive bonus
-  const activePetId = (player as any).active_pet as string | null;
+  const activePetId = player.active_pet ?? null;
   if (activePetId) {
     const petRow = db.prepare('SELECT level FROM player_pets WHERE user_id=? AND guild_id=? AND pet_id=?')
       .get(player.user_id, player.guild_id, activePetId) as { level: number } | undefined;
@@ -244,6 +244,8 @@ export function spendStatPoint(userId: string, guildId: string, stat: StatKey): 
   if (!isStatKey(stat)) return { ok: false, reason: 'invalid_stat' };
   if (getAvailableStatPoints(player) <= 0) return { ok: false, reason: 'no_points', player };
 
+  // SAFE: `stat` passed the isStatKey() guard above, so `col` is always one of
+  // the fixed stat_* column names — never arbitrary user input.
   const col = `stat_${stat}`;
   db.prepare(`UPDATE players SET ${col} = COALESCE(${col},0) + 1 WHERE user_id=? AND guild_id=?`)
     .run(userId, guildId);
@@ -270,6 +272,8 @@ export function spendStatPointsBulk(
   if (spent <= 0) return { ok: false, reason: 'empty', player };
   if (spent > getAvailableStatPoints(player)) return { ok: false, reason: 'no_points', spent, player };
 
+  // SAFE: `entries` was filtered through isStatKey() above, so every `key` is a
+  // known StatKey and `stat_${key}` is always a fixed column name.
   const setSql = entries.map(([key]) => `stat_${key} = COALESCE(stat_${key},0) + ?`).join(', ');
   const params = entries.map(([, value]) => value);
   db.prepare(`UPDATE players SET ${setSql} WHERE user_id=? AND guild_id=?`)
@@ -282,7 +286,7 @@ export function spendStatPointsBulk(
 export function resetAllocatedStats(userId: string, guildId: string, consumeFreeReset = true): { ok: boolean; reason?: string; player?: PlayerRow } {
   const player = getPlayer(userId, guildId);
   if (!player) return { ok: false, reason: 'not_found' };
-  if (consumeFreeReset && ((player as any).free_stat_reset ?? 1) !== 1) return { ok: false, reason: 'no_free_reset', player };
+  if (consumeFreeReset && (player.free_stat_reset ?? 1) !== 1) return { ok: false, reason: 'no_free_reset', player };
 
   const before = applyPassiveStats(player);
   const hpRatio = before.max_hp > 0 ? Math.max(0, before.hp / before.max_hp) : 1;
@@ -558,6 +562,8 @@ export function addPermanentStat(userId: string, guildId: string, stat: 'atk' | 
     max_hp: 'permanent_max_hp_bonus',
     max_mp: 'permanent_max_mp_bonus'
   };
+  // SAFE: `stat` is a 4-literal union type and `bonusColumn` is a fixed Record,
+  // so every interpolated identifier is a hard-coded column name, not user input.
   db.prepare(`UPDATE players SET ${stat} = ${stat} + ?, ${bonusColumn[stat]} = COALESCE(${bonusColumn[stat]},0) + ?, bonus_stat_points = COALESCE(bonus_stat_points,0) + ? WHERE user_id=? AND guild_id=?`)
     .run(safeAmount, safeAmount, safeAmount, userId, guildId);
   if (stat === 'max_hp') db.prepare('UPDATE players SET hp = hp + ? WHERE user_id=? AND guild_id=?').run(safeAmount, userId, guildId);
@@ -595,7 +601,7 @@ export function addMerchantMercy(userId: string, guildId: string, amount = 1): n
 }
 
 export function getClassPassives(userId: string, guildId: string): { dodgeBonus: number; skillDmgMult: number; classId: string } {
-  const player = getPlayer(userId, guildId) as any;
+  const player = getPlayer(userId, guildId);
   const cls = getClass(player?.class ?? 'warrior') ?? CLASSES.warrior;
   return { dodgeBonus: cls.dodgeBonus, skillDmgMult: cls.skillDmgMult, classId: cls.id };
 }

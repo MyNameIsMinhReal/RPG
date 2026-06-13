@@ -102,3 +102,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     embeds: [embed]
   });
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['t','give','pay','send'];

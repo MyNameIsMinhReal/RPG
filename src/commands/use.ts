@@ -47,3 +47,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setFooter({ text: result.consumed ? `Còn lại: ${afterQty}x ${item.name}` : `Đang có: ${beforeQty}x ${item.name}` })]
   });
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['u','useitem'];

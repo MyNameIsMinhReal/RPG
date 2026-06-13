@@ -267,3 +267,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['pt'];

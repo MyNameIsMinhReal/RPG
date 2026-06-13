@@ -383,6 +383,10 @@ function rollPartyDrops(userId: string, guildId: string, enemyDef: any, extraDro
 export interface PartyCombatOptions {
   /** Set false for event combats that handle their own rewards/message in onVictory. */
   grantDefaultRewards?: boolean;
+  /** Per-user atk/def multipliers (Echo Demon ritual roles). Keyed by user_id. */
+  roleModifiers?: Record<string, { atkMult: number; defMult: number }>;
+  /** Extra boss HP multiplier on top of party scaling (ritual seal/puzzle weakening). */
+  bossHpMult?: number;
 }
 
 export async function startPartyCombatFlow(
@@ -401,6 +405,7 @@ export async function startPartyCombatFlow(
     const base = getPlayer(uid, guildId);
     if (!base?.alive) continue;
     const p = applyPassiveStats(base);
+    const mod = options.roleModifiers?.[uid];
     members.push({
       user_id: uid,
       name: p.name,
@@ -411,8 +416,8 @@ export async function startPartyCombatFlow(
       stamina: PARTY_MAX_STAMINA,
       max_stamina: PARTY_MAX_STAMINA,
       level: p.level ?? base.level ?? 1,
-      atk: p.atk,
-      def: p.def,
+      atk: mod ? Math.max(1, Math.floor(p.atk * mod.atkMult)) : p.atk,
+      def: mod ? Math.max(0, Math.floor(p.def * mod.defMult)) : p.def,
       alive: true
     });
   }
@@ -441,7 +446,7 @@ export async function startPartyCombatFlow(
   const atkScale = (isBoss ? (1.10 + 0.18 * extraMembers) : (1 + 0.10 * extraMembers)) * levelScaling.atkMult;
   const defScale = levelScaling.defMult;
   const defBonus = (levelScaling as any).defBonus ?? 0;
-  const scaledHp = Math.round(baseDef.hp * hpScale);
+  const scaledHp = Math.max(1, Math.round(baseDef.hp * hpScale * (options.bossHpMult ?? 1)));
   const scaledAtk = Math.round(baseDef.atk * atkScale);
   const scaledDef = Math.round((baseDef.def ?? 0) * defScale + defBonus);
   const enemy: PartyCombatEnemy = {

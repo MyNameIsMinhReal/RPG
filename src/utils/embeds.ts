@@ -51,6 +51,8 @@ export interface PlayerRow {
   stat_str?: number; stat_vit?: number; stat_end?: number; stat_agi?: number; stat_luk?: number;
   free_stat_reset?: number;
   corruption?: number;
+  active_pet?: string | null;
+  last_gather?: number;
 }
 
 // ── Simple embeds ───────────────────────────────────────────────────────────

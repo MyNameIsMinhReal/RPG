@@ -82,3 +82,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   await interaction.editReply({ embeds: [embed], components: [] });
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['ch','story'];

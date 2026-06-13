@@ -17,6 +17,7 @@ import type { EnemyDef } from '../data/enemies';
 import { getSecondaryStatBonuses } from './statSystem';
 import { getEquipmentStats } from './equipment';
 import { getCorruptionDropBonus } from './corruption';
+import { markEchoSealByEnemy, ECHO_SEALS } from './echoDemonRitual';
 
 
 function combatRewardMultipliers(enemy: EnemyDef): { exp: number; gold: number } {
@@ -112,6 +113,15 @@ export function processVictoryRewards(
     logEvent(guildId, userId, player.name, 'boss_kill', `tiêu diệt Boss **${enemy.icon} ${enemy.name}**!`, player.zone_id);
   } else {
     logEvent(guildId, userId, player.name, 'kill', `tiêu diệt **${enemy.icon} ${enemy.name}**.`, player.zone_id);
+  }
+
+  // Echo Demon ritual: hạ một trong 3 miniboss shrine sẽ phá phong ấn tương ứng.
+  // markEchoSealByEnemy là no-op nếu enemy không phải quái phong ấn.
+  const brokenSeal = markEchoSealByEnemy(guildId, userId, enemy.id);
+  if (brokenSeal) {
+    const sealInfo = ECHO_SEALS[brokenSeal];
+    bonusLine = `${bonusLine}\n\n${sealInfo.icon} **Phong ấn ${sealInfo.name} đã vỡ!** Echo Demon sẽ yếu đi khi bạn mở nghi lễ ở Đền Cổ.`;
+    logEvent(guildId, userId, player.name, 'kill', `phá **Phong ấn ${sealInfo.name}** quanh Đền Cổ.`, player.zone_id);
   }
 
   return {

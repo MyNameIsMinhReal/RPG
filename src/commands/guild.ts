@@ -543,6 +543,7 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
 
       const isAttacker  = war.attacker_clan_id === myClan.clan_id;
       const dmg         = player.atk + Math.floor(Math.random() * player.atk * 0.3);
+      // SAFE: `scoreField` is a ternary between two hard-coded column names.
       const scoreField  = isAttacker ? 'attacker_score' : 'defender_score';
 
       db.prepare(`UPDATE clan_wars SET ${scoreField}=${scoreField}+? WHERE war_id=?`).run(dmg, war.war_id);
@@ -975,3 +976,6 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
     return;
   }
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['clan','gc'];

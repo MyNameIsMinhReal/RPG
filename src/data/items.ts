@@ -35,6 +35,27 @@ export const ITEMS: Record<string, ItemDef> = {
     sellPrice: 80, buyPrice: 240
   },
 
+  // Echo Demon ritual key items — thu thập từ event "Tiếng Vọng" ở Đền Cổ (shrine).
+  // Dùng để mở Cổng Phong Ấn / Nghi Lễ triệu hồi Echo Demon.
+  echo_trace: {
+    id: 'echo_trace', name: 'Echo Trace', icon: '👁️',
+    type: 'key_item', stackable: true,
+    description: 'Dấu Tiếng Vọng. Mảnh ký ức rò rỉ từ sau phong ấn Đền Cổ — một trong các vật phẩm để mở Nghi Lễ Echo Demon.',
+    sellPrice: 40
+  },
+  soul_candle: {
+    id: 'soul_candle', name: 'Soul Candle', icon: '🕯️',
+    type: 'key_item', stackable: true,
+    description: 'Nến Linh Hồn. Ngọn lửa không bao giờ tắt trong Đền Cổ — một trong các vật phẩm để mở Nghi Lễ Echo Demon.',
+    sellPrice: 40
+  },
+  mirror_sigil: {
+    id: 'mirror_sigil', name: 'Mirror Sigil', icon: '🪞',
+    type: 'key_item', stackable: true,
+    description: 'Ấn Gương. Phản chiếu thứ không có thật — một trong các vật phẩm để mở Nghi Lễ Echo Demon.',
+    sellPrice: 40
+  },
+
   // ══════════════════════════════════════════════════════════════════════
   //  CONSUMABLES — Tier 1: Early game, rẻ, dễ kiếm
   // ══════════════════════════════════════════════════════════════════════

@@ -1,52 +1,10 @@
 import 'dotenv/config';
 import { REST, Routes } from 'discord.js';
-import { data as startData        } from './commands/start';
-import { data as profileData      } from './commands/profile';
-import { data as exploreData      } from './commands/explore';
-import { data as inventoryData    } from './commands/inventory';
-import { data as useData          } from './commands/use';
-import { data as tradeData        } from './commands/trade';
-import { data as craftData        } from './commands/craft';
-import { data as dailyData        } from './commands/daily';
-import { data as achievementsData } from './commands/achievements';
-import { data as worldData        } from './commands/world';
-import { data as prestigeData     } from './commands/prestige';
-import { data as duelData         } from './commands/duel';
-import { data as worldbossData    } from './commands/worldboss';
-import { data as guildData        } from './commands/guild';
-import { data as petData          } from './commands/pet';
-import { data as partyData        } from './commands/party';
-import { data as chapterData      } from './commands/chapter';
-import { data as codeData         } from './commands/code';
-import { data as helpData         } from './commands/help';
-import { data as updatelogData    } from './commands/updatelog';
-import { data as adminData        } from './commands/admin';
+import { loadCommands } from './commands/registry';
 
-// Slash commands public cho người chơi.
-// Fishing là event trong explore, không có lệnh riêng.
-const commands = [
-  startData,
-  profileData,
-  exploreData,
-  inventoryData,
-  useData,
-  tradeData,
-  craftData,
-  dailyData,
-  achievementsData,
-  worldData,
-  prestigeData,
-  duelData,
-  worldbossData,
-  guildData,
-  petData,
-  partyData,
-  chapterData,
-  codeData,
-  helpData,
-  updatelogData,
-  adminData,
-].map(c => c.toJSON());
+// Slash commands are auto-discovered from ./commands (single source of truth,
+// shared with index.ts). Fishing là event trong explore, không có lệnh riêng.
+const commands = loadCommands().map(c => c.data.toJSON());
 
 const token    = process.env.DISCORD_TOKEN!;
 const clientId = process.env.CLIENT_ID!;
@@ -73,7 +31,7 @@ const rest = new REST({ version: '10' }).setToken(token);
       console.log(`✅ Deployed ${data.length} GLOBAL commands:`);
     }
 
-    commands.forEach(c => console.log(`   /${c.name}`));
+    commands.forEach((c: any) => console.log(`   /${c.name}`));
   } catch (err) {
     console.error('❌ Deploy failed:', err);
     process.exit(1);

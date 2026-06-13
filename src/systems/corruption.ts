@@ -1,6 +1,7 @@
 import db from '../database/index';
 import type { PlayerRow } from '../utils/embeds';
 import { randInt } from '../utils/format';
+import { getFlag } from './world';
 
 export const CORRUPTION_MAX = 100;
 
@@ -67,9 +68,12 @@ export function maybeGainShrineCorruption(player: PlayerRow): string | null {
   if (player.zone_id !== 'shrine') return null;
   const current = clampCorruption(player.corruption ?? getCorruptionLevel(player.user_id, player.guild_id));
   const tier = getCorruptionTier(current);
-  const chance = [40, 48, 56, 65][tier] ?? 40;
+  // Sau khi hạ Echo Demon: Ô Nhiễm ở Đền Cổ tăng chậm hơn trong 24h.
+  const slowed = getFlag(player.guild_id, 'shrine_corruption_slow') !== null;
+  const chance = Math.floor(([40, 48, 56, 65][tier] ?? 40) * (slowed ? 0.5 : 1));
   if (randInt(1, 100) > chance) return null;
-  const gain = tier >= 2 ? randInt(2, 4) : randInt(1, 3);
+  let gain = tier >= 2 ? randInt(2, 4) : randInt(1, 3);
+  if (slowed) gain = Math.max(1, Math.floor(gain / 2));
   const next = adjustCorruption(player.user_id, player.guild_id, gain);
   return `🌘 Ô Nhiễm Linh Hồn +${gain} → **${next}/100**`;
 }

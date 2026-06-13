@@ -66,14 +66,27 @@ export function clearPlayerBossProgress(guildId: string, userId: string, bossId?
 }
 
 // ── Butterfly effect triggers ─────────────────────────────────────────────
-export function onBossKilled(guildId: string, bossId: string, playerName: string, zoneId: string): string {
+// Default respawn cooldown for zone bosses fought through the generic boss
+// lobby (echo_demon, mine_colossus, the_forgotten). Matches Ancient Oak's
+// OAK_RESPAWN_TTL (48h) so every boss can be re-summoned after a cooldown
+// instead of being sealed permanently. The TTL is applied to the
+// `boss_<id>_slain` world flag below.
+export const BOSS_RESPAWN_TTL = 48 * 3600; // 48 giờ
+
+export function onBossKilled(
+  guildId: string,
+  bossId: string,
+  playerName: string,
+  zoneId: string,
+  respawnTtlSeconds: number = BOSS_RESPAWN_TTL
+): string {
   const flagKey = `boss_${bossId}_slain`;
-  setFlag(guildId, flagKey, playerName);
+  setFlag(guildId, flagKey, playerName, respawnTtlSeconds);
 
   // Each boss death has cascading world consequences
   const consequences: Record<string, string> = {
     ancient_oak_slain:      '🌳 Ancient Oak đã ngã xuống — rừng bị bóng tối lấn chiếm, drop rate tăng 20% trong rừng.',
-    echo_demon_slain:       '👁️ Echo Demon đã bị phong ấn lại — Ô Nhiễm Linh Hồn trong Đền Cổ dịu xuống, shop giảm 10% trong 24h.',
+    echo_demon_slain:       '⛩️ **Tiếng Vọng Im Lặng** — Echo Demon bị phong ấn lại; nến trong Đền Cổ tự cháy sáng sau hàng trăm năm. Trong 24h: Ô Nhiễm Linh Hồn ở Đền Cổ tăng chậm hơn · shop Shrine giảm 10% · event thanh tẩy xuất hiện nhiều hơn.',
     mine_colossus_slain:    '⛏️ Mine Colossus đã sụp đổ — mạch quặng mở ra, giá shop giảm 15% trong 24h.',
     the_forgotten_slain:    '❓ The Forgotten đã bị lãng quên — thực tại ổn định, toàn bộ player được +10% EXP trong 48h.'
   };
@@ -85,6 +98,8 @@ export function onBossKilled(guildId: string, bossId: string, playerName: string
   }
   if (bossId === 'echo_demon') {
     setFlag(guildId, 'shop_discount', '10', 86400);
+    setFlag(guildId, 'shrine_corruption_slow', '1', 86400); // Ô Nhiễm tăng chậm hơn ở Đền Cổ
+    setFlag(guildId, 'shrine_purify_boost', '1', 86400);    // event thanh tẩy xuất hiện nhiều hơn
     setWorldEvent(guildId, 'echo_demon_sealed', consequences['echo_demon_slain'] ?? 'Echo Demon đã bị phong ấn lại.', 86400);
   }
   if (bossId === 'mine_colossus') {

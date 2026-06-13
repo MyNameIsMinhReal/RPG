@@ -50,6 +50,8 @@ export function getOrCreateDaily(userId: string, guildId: string): DailyRow {
 export function incrementDaily(userId: string, guildId: string, field: 'explore_count' | 'kill_count' | 'potion_used'): void {
   const date = todayStr();
   getOrCreateDaily(userId, guildId);
+  // SAFE: `field` is constrained by its TypeScript union type to one of three
+  // literal column names; callers cannot pass arbitrary strings.
   db.prepare(`UPDATE daily_quests SET ${field} = ${field} + 1 WHERE user_id=? AND guild_id=? AND date=?`)
     .run(userId, guildId, date);
 }
@@ -191,3 +193,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     components: []
   });
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['d','quest','quests'];

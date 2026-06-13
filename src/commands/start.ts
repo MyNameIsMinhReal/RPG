@@ -233,3 +233,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   await waitAndRoute(interaction, userId, guildId);
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['s','begin','new','revive','respawn'];

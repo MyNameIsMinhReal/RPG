@@ -725,3 +725,6 @@ function buildTitlesTab(
 
   return [embed, rows];
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['i','inv','bag','items'];

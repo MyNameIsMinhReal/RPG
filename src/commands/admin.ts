@@ -524,6 +524,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       const clamped = Math.min(value, withPassive.max_mp);
       updatePlayerHpMp(target.id, guildId, player.hp, clamped);
     } else if (SAFE_COLS.has(stat)) {
+      // SAFE: `stat` is validated against the SAFE_COLS allow-list above, so it
+      // can only ever be one of the fixed column names — never raw user input.
       db.prepare(`UPDATE players SET ${stat}=? WHERE user_id=? AND guild_id=?`)
         .run(value, target.id, guildId);
     }

@@ -248,3 +248,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     killPlayer(userId, guildId);
   }
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['wb','boss'];

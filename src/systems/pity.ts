@@ -1,4 +1,5 @@
 import db from '../database/index';
+import { withTransaction } from '../database/transaction';
 import type { ExploreEventType } from '../commands/exploreEvents';
 
 // Events eligible for pity: always have weight > 0, regardless of player state.
@@ -59,8 +60,10 @@ export function updatePityCounters(userId: string, guildId: string, pickedEvent:
     ON CONFLICT(user_id, guild_id, event_id) DO UPDATE SET counter = 0
   `);
 
-  db.exec('BEGIN');
-  try {
+  // All pity counters update atomically: either every event in this pass moves
+  // or none does. SAVEPOINT-based so it's safe even if a caller is already in a
+  // transaction.
+  withTransaction(() => {
     for (const eventId of PITY_EVENTS) {
       if (eventId === pickedEvent) {
         reset.run(userId, guildId, eventId);
@@ -68,9 +71,5 @@ export function updatePityCounters(userId: string, guildId: string, pickedEvent:
         incr.run(userId, guildId, eventId);
       }
     }
-    db.exec('COMMIT');
-  } catch (e) {
-    db.exec('ROLLBACK');
-    throw e;
-  }
+  });
 }

@@ -1,6 +1,7 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
-import { getPlayer, addItem, addPet } from '../systems/player';
-// doGather is also imported directly by explore.ts for the in-zone gather button
+import { EmbedBuilder } from 'discord.js';
+import { addItem, addPet } from '../systems/player';
+// Pure helper module (not a slash command): doGather() is imported by the
+// explore in-zone gather button. There is no /gather command by design.
 import { COLORS } from '../utils/embeds';
 import db from '../database/index';
 
@@ -82,23 +83,4 @@ export function doGather(userId: string, guildId: string, playerName: string): G
       )
       .setFooter({ text: 'cooldown 60s · /inventory để xem đồ' }),
   };
-}
-
-export const data = new SlashCommandBuilder()
-  .setName('gather')
-  .setDescription('Thu thập nguyên liệu — cooldown 60 giây');
-
-export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  await interaction.deferReply();
-  const { id: userId } = interaction.user;
-  const guildId = interaction.guildId!;
-  const player  = getPlayer(userId, guildId);
-
-  if (!player?.alive) {
-    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.danger).setDescription('❌ Bạn đã chết. Dùng `/start` để hồi sinh.')] });
-    return;
-  }
-
-  const { embed } = doGather(userId, guildId, player.name);
-  await interaction.editReply({ embeds: [embed] });
 }

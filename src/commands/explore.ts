@@ -56,3 +56,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 }
 
 export { showExploreMenu } from '../systems/explore/menu';
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['e','ex','x'];

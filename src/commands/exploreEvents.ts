@@ -62,7 +62,7 @@ import {
   showForestHerbForaging, showForestAnimalTracks, showForestRiverCrossing, showForestTreeClimbing, showForestFogMaze,
   showForestWaterfallCave, showForestDeadTreeOracle, showForestFlowerField, showForestCrowMessenger, showForestCampfireStranger,
 } from './exploreEvents.forest';
-import { showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp, showShrineWeepingStatue, showShrineForbiddenOffering, showShrineSealedReliquary } from './exploreEvents.shrine';
+import { showShrineSilentBell, showShrinePrayerBeads, showShrineSealDoor, showShrineSpiritLamp, showShrineWeepingStatue, showShrineForbiddenOffering, showShrineSealedReliquary, showEchoWhisperTrace, showEchoWhisperCandle, showEchoWhisperMirror } from './exploreEvents.shrine';
 import { showMineCollapse, showMineRichOreVein, showMineEchoTunnel, showMineRustedLift, showMineRunawayCart, showMineLivingOre, showMineTrappedMiner } from './exploreEvents.mines';
 import { showWastesAshStorm, showWastesBoneCaravan, showWastesGlassMirage, showWastesFallenBanner, showWastesMirrorSelf, showWastesMemoryRain, showWastesFacelessMerchant } from './exploreEvents.wastes';
 import {
@@ -86,7 +86,7 @@ import {
   showWorldFactionStandoff, showWorldChurchInquisition, showWorldShadowOffer, showWorldHuntersMission, showWorldVillagerDispute,
 } from './exploreEvents.world';
 
-export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wandering_blacksmith' | 'temporary_arena' | 'boss_tracks' | 'map_seller' | 'shrine_weeping_statue' | 'shrine_forbidden_offering' | 'shrine_sealed_reliquary' | 'mine_runaway_cart' | 'mine_living_ore' | 'mine_trapped_miner' | 'wastes_mirror_self' | 'wastes_memory_rain' | 'wastes_faceless_merchant' 
+export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wandering_blacksmith' | 'temporary_arena' | 'boss_tracks' | 'map_seller' | 'shrine_weeping_statue' | 'shrine_forbidden_offering' | 'shrine_sealed_reliquary' | 'mine_runaway_cart' | 'mine_living_ore' | 'mine_trapped_miner' | 'wastes_mirror_self' | 'wastes_memory_rain' | 'wastes_faceless_merchant' | 'echo_whisper_trace' | 'echo_whisper_candle' | 'echo_whisper_mirror' 
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'gear_buyer' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
   | 'soul_shop' | 'abandoned_camp' | 'lost_pouch' | 'rune_stone' | 'treasure_chest' | 'wandering_healer' | 'spirit_trial'
   | 'blood_trail' | 'nameless_grave' | 'memory_seller' | 'stranger_campfire' | 'cracked_shrine' | 'injured_monster'
@@ -360,7 +360,7 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['shrine_prayer_beads',      player.zone_id === 'shrine' ? 3 : 0],
     ['shrine_seal_door',         player.zone_id === 'shrine' ? 3 : 0],
     ['shrine_spirit_lamp',       player.zone_id === 'shrine' ? (time === 'night' ? 4 : 2) : 0],
-    ['shrine_weeping_statue', player.zone_id === 'shrine' ? 3 : 0], ['shrine_forbidden_offering', player.zone_id === 'shrine' ? 2 : 0], ['shrine_sealed_reliquary', player.zone_id === 'shrine' ? 3 : 0], ['mine_collapse',            player.zone_id === 'mines'  ? 4 : 0],
+    ['shrine_weeping_statue', player.zone_id === 'shrine' ? 3 : 0], ['shrine_forbidden_offering', player.zone_id === 'shrine' ? 2 : 0], ['shrine_sealed_reliquary', player.zone_id === 'shrine' ? 3 : 0], ['echo_whisper_trace', player.zone_id === 'shrine' ? (3 + (getFlag(guildId, 'shrine_purify_boost') ? 2 : 0)) : 0], ['echo_whisper_candle', player.zone_id === 'shrine' ? (3 + (getFlag(guildId, 'shrine_purify_boost') ? 2 : 0)) : 0], ['echo_whisper_mirror', player.zone_id === 'shrine' ? (3 + (getFlag(guildId, 'shrine_purify_boost') ? 2 : 0)) : 0], ['mine_collapse',            player.zone_id === 'mines'  ? 4 : 0],
     ['mine_ore_vein',            player.zone_id === 'mines'  ? 4 : 0],
     ['mine_echo_tunnel',         player.zone_id === 'mines'  ? 3 : 0],
     ['mine_rusted_lift',         player.zone_id === 'mines'  ? 3 : 0],
@@ -584,7 +584,7 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
     case 'shrine_prayer_beads':      return showShrinePrayerBeads(ctx);
     case 'shrine_seal_door':         return showShrineSealDoor(ctx);
     case 'shrine_spirit_lamp':       return showShrineSpiritLamp(ctx);
-     case 'shrine_weeping_statue': return showShrineWeepingStatue(ctx); case 'shrine_forbidden_offering': return showShrineForbiddenOffering(ctx); case 'shrine_sealed_reliquary': return showShrineSealedReliquary(ctx); case 'mine_collapse':            return showMineCollapse(ctx);
+     case 'shrine_weeping_statue': return showShrineWeepingStatue(ctx); case 'shrine_forbidden_offering': return showShrineForbiddenOffering(ctx); case 'shrine_sealed_reliquary': return showShrineSealedReliquary(ctx); case 'echo_whisper_trace': return showEchoWhisperTrace(ctx); case 'echo_whisper_candle': return showEchoWhisperCandle(ctx); case 'echo_whisper_mirror': return showEchoWhisperMirror(ctx); case 'mine_collapse':            return showMineCollapse(ctx);
     case 'mine_ore_vein':            return showMineRichOreVein(ctx);
     case 'mine_echo_tunnel':         return showMineEchoTunnel(ctx);
     case 'mine_rusted_lift':         return showMineRustedLift(ctx);

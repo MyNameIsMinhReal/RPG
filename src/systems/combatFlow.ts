@@ -499,7 +499,8 @@ export async function startCombatFlow(
   onVictory: CombatVictoryHandler,
   onDeath: CombatDeathHandler,
   onFlee?: CombatFleeHandler,
-  hpOverride?: { startHp: number; maxHp: number }
+  hpOverride?: { startHp: number; maxHp: number },
+  startingEffects?: { name: string; duration: number; value?: number }[]
 ): Promise<void> {
   const player      = getPlayer(userId, guildId)!;
   let enemy: any    = getEnemy(enemyId);
@@ -539,6 +540,7 @@ export async function startCombatFlow(
     player_def: withPassive.def,
     turn: 1, is_defending: 0,
     active_effects: JSON.stringify([
+      ...(startingEffects ?? []),
       ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
       ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
       ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),

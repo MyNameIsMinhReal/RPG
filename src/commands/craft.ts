@@ -343,3 +343,6 @@ async function showRecipeDetail(
     });
   }
 }
+
+// Text-prefix aliases (auto-loaded by registry.ts)
+export const aliases = ['c','make'];
