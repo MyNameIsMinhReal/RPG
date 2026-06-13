@@ -437,6 +437,30 @@ async function handleZonePicker(
   await handleTravel(interaction, userId, guildId, zoneId);
 }
 
+async function showTravelBlocked(
+  interaction: ChatInputCommandInteraction, userId: string, guildId: string, embed: EmbedBuilder
+): Promise<void> {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`ex_zoneback_${userId}`)
+      .setLabel('◀ Chọn lại khu vực')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  const reply = await interaction.editReply({ embeds: [embed], components: [row] });
+
+  const btn = await reply.awaitMessageComponent({
+    componentType: ComponentType.Button,
+    filter: onlyUser(userId),
+    time: 30_000
+  }).catch(() => null);
+
+  if (!btn) { await interaction.editReply({ components: [] }).catch(() => {}); return; }
+  const deferred = await btn.deferUpdate().then(() => true).catch(() => false);
+  if (!deferred) return;
+  await handleZonePicker(interaction, userId, guildId);
+}
+
 async function handleTravel(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string, targetId: string
 ): Promise<void> {
@@ -458,23 +482,20 @@ async function handleTravel(
     for (let i = currentIdx; i < targetIdx; i++) {
       const gateZone = ZONES[ZONE_ORDER[i]];
       if (gateZone?.bossId && !hasPlayerClearedBoss(guildId, userId, gateZone.bossId)) {
-        await interaction.editReply({
-          embeds: [simpleEmbed(COLORS.danger,
-            `🔒 **${target.icon} ${target.name}** bị khóa.\n\nBạn cần hạ gục boss **${gateZone.icon} ${gateZone.name}** trước.`
-          )],
-          components: []
-        });
+        await showTravelBlocked(interaction, userId, guildId, simpleEmbed(COLORS.danger,
+          `🔒 **${target.icon} ${target.name}** bị khóa.\n\nBạn cần hạ gục boss **${gateZone.icon} ${gateZone.name}** trước.`
+        ));
         return;
       }
     }
   }
 
   if (player.level < target.minLevel) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `Cần **Lv.${target.minLevel}** để vào **${target.name}**! (Bạn: Lv.${player.level})`)], components: [] });
+    await showTravelBlocked(interaction, userId, guildId, simpleEmbed(COLORS.warning, `Cần **Lv.${target.minLevel}** để vào **${target.name}**! (Bạn: Lv.${player.level})`));
     return;
   }
   if (target.travelCost > 0 && player.gold < target.travelCost) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `Cần **${target.travelCost} 🪙** để đến **${target.name}**! (Bạn có: ${player.gold} 🪙)`)], components: [] });
+    await showTravelBlocked(interaction, userId, guildId, simpleEmbed(COLORS.warning, `Cần **${target.travelCost} 🪙** để đến **${target.name}**! (Bạn có: ${player.gold} 🪙)`));
     return;
   }
 
