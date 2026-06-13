@@ -11,6 +11,7 @@ import {
 } from 'discord.js';
 
 import { loadCommands, buildAliasMap } from './commands/registry';
+import { isTransientNetworkError } from './utils/netErrors';
 import { sendUnseenLogsDM } from './systems/updateLog';
 import { buildHelpGuideEmbeds } from './commands/help';
 import { runStartupDataCheck } from './doctor';
@@ -469,6 +470,7 @@ function formatDiscordApiError(err: any): string {
   return `${message}${code ? ` (code ${code})` : ''}${details}`;
 }
 
+
 process.on('unhandledRejection', (reason: any) => {
   const code = reason?.code ?? reason?.rawError?.code;
   if (code === 10062) {
@@ -479,16 +481,28 @@ process.on('unhandledRejection', (reason: any) => {
     console.warn('[PROCESS] Discord từ chối payload:', formatDiscordApiError(reason));
     return;
   }
-  if (reason?.code === 'UND_ERR_CONNECT_TIMEOUT') {
-    console.warn('[PROCESS] Discord connection timeout:', reason?.message ?? reason);
+  if (isTransientNetworkError(reason)) {
+    console.warn('[PROCESS] Nhiễu mạng Discord (bỏ qua, sẽ tự kết nối lại):', reason?.code ?? reason?.message ?? reason);
     return;
   }
   console.error('[PROCESS] Unhandled rejection:', reason);
 });
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', (err: any) => {
+  if (isTransientNetworkError(err)) {
+    console.warn('[PROCESS] Nhiễu mạng Discord (bỏ qua, sẽ tự kết nối lại):', err?.code ?? err?.message ?? err);
+    return;
+  }
   console.error('[PROCESS] Uncaught exception:', err);
 });
+
+// Gateway resilience: log gọn các sự kiện shard/kết nối thay vì để chúng nổ
+// thành unhandled error. discord.js tự reconnect — ta chỉ cần không sập.
+client.on('error', (err) => console.warn('[GATEWAY] Client error (tự kết nối lại):', err?.message ?? err));
+client.on('shardError', (err, id) => console.warn(`[GATEWAY] Shard ${id} lỗi (tự kết nối lại):`, err?.message ?? err));
+client.on('shardDisconnect', (event, id) => console.warn(`[GATEWAY] Shard ${id} ngắt kết nối (code ${(event as any)?.code ?? '?'}) — đang chờ kết nối lại...`));
+client.on('shardReconnecting', (id) => console.warn(`[GATEWAY] Shard ${id} đang kết nối lại...`));
+client.on('shardResume', (id) => console.log(`[GATEWAY] Shard ${id} đã kết nối lại ✅`));
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) { console.error('❌ Thiếu DISCORD_TOKEN'); process.exit(1); }
