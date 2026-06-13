@@ -360,6 +360,11 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       return;
     }
 
+    if (isTransientNetworkError(err)) {
+      console.warn(`[CMD] ${interaction.commandName}: nhiễu mạng Discord (${err?.code ?? err?.message ?? err})`);
+      return;
+    }
+
     console.error(`[CMD] ${interaction.commandName}:`, err);
 
     if (!interaction.isRepliable()) return;
@@ -439,7 +444,12 @@ client.on('messageCreate', async (message) => {
     }, 15_000);
 
     await handler(prefixInteraction as unknown as ChatInputCommandInteraction);
-  } catch (err) {
+  } catch (err: any) {
+    if (isTransientNetworkError(err)) {
+      console.warn(`[PREFIX] rpg ${parsed.alias}: nhiễu mạng Discord (${err?.code ?? err?.message ?? err})`);
+      return;
+    }
+
     console.error(`[PREFIX] rpg ${parsed.alias}:`, err);
 
     if (prefixInteraction.deferred || prefixInteraction.replied) {
