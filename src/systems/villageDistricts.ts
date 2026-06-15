@@ -307,7 +307,7 @@ export async function showVillageDistrictMenu(interaction: ChatInputCommandInter
       `⚔️ **Quán Trọ Thợ Săn** — bounty, quầy rượu tình báo.\n` +
       `⛪ **Thánh Đường Bỏ Hoang** — hồi phục, tẩy ô nhiễm, quỹ cầu nguyện.\n` +
       `🌑 **Hẻm Tối** — sòng bạc, hiến tế, giao dịch nguyền.\n` +
-      `🪵 **Quảng Trường** — công trình công cộng toàn server.`
+      `🪵 **Quảng Trường** — lò rèn, thức tỉnh trang bị và công trình công cộng.`
     );
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`vill_dist_merchant_${userId}`).setLabel('Thương Hội').setEmoji('⚖️').setStyle(ButtonStyle.Success),
@@ -800,13 +800,45 @@ async function shadowSacrifice(interaction: ChatInputCommandInteraction, userId:
 
 export async function showTownSquareDistrict(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
   ensureProjects(guildId);
+  const p = getPlayer(userId, guildId)!;
+  const active = db.prepare('SELECT COUNT(*) AS n FROM guild_projects WHERE guild_id=? AND is_completed=0').get(guildId) as any;
+  const done = db.prepare('SELECT COUNT(*) AS n FROM guild_projects WHERE guild_id=? AND is_completed=1').get(guildId) as any;
+
+  const embed = new EmbedBuilder()
+    .setColor(0x2ECC71)
+    .setTitle('🪵 Khu E — Quảng Trường Chính')
+    .setDescription(
+      `Giữa quảng trường, tiếng búa rèn vang lên cạnh bảng công trình của làng.\n\n` +
+      `👤 **${p.name}** · 🪙 **${p.gold} Gold**\n` +
+      `⚒️ **Lò Rèn**: nâng trang bị, thức tỉnh đồ cũ, khóa dòng và tẩy luyện Affix.\n` +
+      `🏗️ **Công trình công cộng**: đóng góp nguyên liệu để mở nâng cấp toàn server.\n\n` +
+      `Công trình đang mở: **${active?.n ?? 0}** · Đã hoàn thành: **${done?.n ?? 0}**`
+    );
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_sq_smith_${userId}`).setLabel('Lò Rèn').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`vill_sq_projects_${userId}`).setLabel('Công trình').setEmoji('🏗️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary),
+  );
+
+  const msg = await interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await msg.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 45_000 }).catch(() => null);
+  if (!btn) return;
+  await safeDefer(btn);
+  if (btn.customId === `vill_sq_smith_${userId}`) return showVillageBlacksmith(interaction, userId, guildId);
+  if (btn.customId === `vill_sq_projects_${userId}`) return showTownSquareProjects(interaction, userId, guildId);
+  await interaction.editReply({ components: [] }).catch(() => {});
+}
+
+async function showTownSquareProjects(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+  ensureProjects(guildId);
   const rows = db.prepare('SELECT * FROM guild_projects WHERE guild_id=? ORDER BY is_completed ASC, project_id ASC').all(guildId) as any[];
   const desc = rows.map(r => {
     const def = PROJECTS.find(p => p.id === r.project_id)!;
     const item = displayThing(def.targetItem);
     return `${def.icon} **${def.name}** ${r.is_completed ? '✅' : ''}\n> Cần ${item.icon} **${item.name}** · **${r.current_amount}/${r.target_amount}**\n> ${progressBar(r.current_amount, r.target_amount)}`;
   }).join('\n\n');
-  const embed = new EmbedBuilder().setColor(0x2ECC71).setTitle('🪵 Khu E — Quảng Trường Chính')
+  const embed = new EmbedBuilder().setColor(0x2ECC71).setTitle('🏗️ Công Trình Công Cộng')
     .setDescription(`${desc}\n\nChọn công trình để đóng góp nguyên liệu toàn server.`);
   const options = rows.filter(r => !r.is_completed).slice(0, 25).map(r => {
     const def = PROJECTS.find(p => p.id === r.project_id)!;
@@ -829,7 +861,7 @@ export async function showTownSquareDistrict(interaction: ChatInputCommandIntera
 
 async function showProjectDonation(interaction: ChatInputCommandInteraction, userId: string, guildId: string, projectId: string): Promise<void> {
   const def = PROJECTS.find(p => p.id === projectId);
-  if (!def) return showTownSquareDistrict(interaction, userId, guildId);
+  if (!def) return showTownSquareProjects(interaction, userId, guildId);
   const row = getProjectRow(guildId, projectId);
   const qty = getItemQty(userId, guildId, def.targetItem);
   const item = displayThing(def.targetItem);
@@ -846,7 +878,7 @@ async function showProjectDonation(interaction: ChatInputCommandInteraction, use
   const btn = await msg.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30_000 }).catch(() => null);
   if (!btn) return;
   await safeDefer(btn);
-  if (btn.customId === `vill_back_${userId}`) return showTownSquareDistrict(interaction, userId, guildId);
+  if (btn.customId === `vill_back_${userId}`) return showTownSquareProjects(interaction, userId, guildId);
   const donate = btn.customId.includes('_dall_') ? Math.min(qty, remaining) : btn.customId.includes('_d100_') ? 100 : 10;
   if (donate <= 0 || !removeItem(userId, guildId, def.targetItem, donate)) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Không đủ nguyên liệu để đóng góp.')], components: [backRow(userId)] });
