@@ -925,24 +925,45 @@ export async function showTownSquareDistrict(interaction: ChatInputCommandIntera
     return `${def.icon} **${def.name}** ${r.is_completed ? '✅' : ''}\n> Cần ${item.icon} **${item.name}** · **${r.current_amount}/${r.target_amount}**\n> ${progressBar(r.current_amount, r.target_amount)}`;
   }).join('\n\n');
   const embed = new EmbedBuilder().setColor(0x2ECC71).setTitle('🪵 Khu E — Quảng Trường Chính')
-    .setDescription(`${desc}\n\nChọn công trình để đóng góp nguyên liệu toàn server.`);
+    .setDescription(
+      `${desc}\n\n` +
+      `⚒️ **Lò Rèn** vẫn nằm ở Quảng Trường. Bấm nút bên dưới để nâng trang bị.\n` +
+      `🪵 Chọn công trình để đóng góp nguyên liệu toàn server.`
+    );
+
+  const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_square_smith_${userId}`).setLabel('Lò Rèn').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary),
+  );
+
   const options = rows.filter(r => !r.is_completed).slice(0, 25).map(r => {
     const def = PROJECTS.find(p => p.id === r.project_id)!;
     const item = displayThing(def.targetItem);
     return new StringSelectMenuOptionBuilder().setLabel(`${def.icon} ${def.name}`.slice(0, 100)).setDescription(`Đóng góp ${item.name} · ${r.current_amount}/${r.target_amount}`.slice(0, 100)).setValue(def.id);
   });
-  if (options.length === 0) {
-    await interaction.editReply({ embeds: [embed], components: [backRow(userId)] });
+
+  const components: Array<ActionRowBuilder<ButtonBuilder> | ActionRowBuilder<StringSelectMenuBuilder>> = [];
+  if (options.length > 0) {
+    components.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder().setCustomId(`vill_proj_sel_${userId}`).setPlaceholder('Chọn công trình để đóng góp...').addOptions(options)
+    ));
+  }
+  components.push(actionRow);
+
+  const msg = await interaction.editReply({ embeds: [embed], components });
+  const picked = await msg.awaitMessageComponent({ filter: i => i.user.id === userId, time: 45_000 }).catch(() => null);
+  if (!picked) return;
+  await safeDefer(picked);
+
+  if (picked.customId === `vill_square_smith_${userId}`) {
+    await showVillageBlacksmith(interaction, userId, guildId);
     return;
   }
-  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(new StringSelectMenuBuilder().setCustomId(`vill_proj_sel_${userId}`).setPlaceholder('Chọn công trình...').addOptions(options));
-  const msg = await interaction.editReply({ embeds: [embed], components: [row, backRow(userId)] });
-  const sel = await msg.awaitMessageComponent({ filter: i => i.user.id === userId, time: 45_000 }).catch(() => null);
-  if (!sel) return;
-  await safeDefer(sel);
-  if (!sel.isStringSelectMenu()) return;
-  const projectId = sel.values[0];
-  await showProjectDonation(interaction, userId, guildId, projectId);
+  if (picked.customId === `vill_back_${userId}`) return;
+  if (picked.isStringSelectMenu() && picked.customId === `vill_proj_sel_${userId}`) {
+    const projectId = picked.values[0];
+    await showProjectDonation(interaction, userId, guildId, projectId);
+  }
 }
 
 async function showProjectDonation(interaction: ChatInputCommandInteraction, userId: string, guildId: string, projectId: string): Promise<void> {
