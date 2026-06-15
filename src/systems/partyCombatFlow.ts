@@ -36,7 +36,6 @@ import { getSecondaryStatBonuses } from './statSystem';
 import { getEquipmentStats } from './equipment';
 import { savePartyCombat, deletePartyCombat } from './combat/partyState';
 import { getIntelRewardMods, applyIntelExtraDrop } from './villageDistricts';
-import { createDroppedEquipmentInstance, formatEquipmentRewardInstance } from './equipmentInstances';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -375,8 +374,8 @@ function rollPartyDrops(userId: string, guildId: string, enemyDef: any, extraDro
   const eqDrops = Object.values(EQUIPMENT).filter(e => e.dropFrom?.includes(enemyDef.id) && e.dropChance);
   for (const eq of eqDrops) {
     if (Math.random() * 100 <= (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * extraDropPct / 100)) {
-      const inst = createDroppedEquipmentInstance(userId, guildId, eq.id, Math.max(1, (getPlayer(userId, guildId) as any)?.level ?? 1), enemyDef);
-      drops.push(inst ? formatEquipmentRewardInstance(inst) : displayDrop(eq.id));
+      addItem(userId, guildId, eq.id, 1);
+      drops.push(displayDrop(eq.id));
     }
   }
   return drops;

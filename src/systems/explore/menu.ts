@@ -33,7 +33,7 @@ import {
 } from '../villageDistricts';
 import { doGather } from '../../commands/gather';
 import {
-  simpleEmbed, ensurePlayerAlive, buildContinueExploreRow,
+  simpleEmbed, ensurePlayerAlive, buildOakSummonedRow,
   blockIfPartyMember, attachContinueExploreHandler
 } from './shared';
 import { handleSearch } from './search';
@@ -337,7 +337,12 @@ function buildExploreRows(
             .setLabel(oakInfo.blockedReason).setEmoji('🌳').setStyle(ButtonStyle.Secondary).setDisabled(true)
         );
       }
-      if (oakInfo.huntRemaining > 0) {
+      if (oakInfo.canStartHunt) {
+        oakRow.addComponents(
+          new ButtonBuilder().setCustomId(`ex_oak_hunt_${userId}`)
+            .setLabel('Bắt Đầu Truy Tìm Linh Thú').setEmoji('🐾').setStyle(ButtonStyle.Primary)
+        );
+      } else if (oakInfo.huntRemaining > 0) {
         oakRow.addComponents(
           new ButtonBuilder().setCustomId(`ex_oak_hunt_${userId}`)
             .setLabel(`Đang Truy Tìm (còn ${oakInfo.huntRemaining})`).setEmoji('🐾').setStyle(ButtonStyle.Secondary).setDisabled(true)
@@ -581,6 +586,6 @@ async function handleGather(
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
   const player = getPlayer(userId, guildId)!;
   const { embed } = doGather(userId, guildId, player.name);
-  const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
+  const reply = await interaction.editReply({ embeds: [embed], components: buildOakSummonedRow(userId) });
   attachContinueExploreHandler(reply, interaction, userId, guildId);
 }

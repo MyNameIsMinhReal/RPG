@@ -3,12 +3,22 @@ import { polishGameText, polishGameTitle } from './textPolish';
 
 let installed = false;
 
+function safeText(value: unknown, fallback = '—'): string {
+  const text = polishGameText(String(value ?? ''));
+  return text.trim().length > 0 ? text : fallback;
+}
+
+function safeTitle(value: unknown, fallback = 'RPG'): string {
+  const text = polishGameTitle(String(value ?? ''));
+  return text.trim().length > 0 ? text : fallback;
+}
+
 function polishField(field: any): any {
   if (!field || typeof field !== 'object') return field;
   return {
     ...field,
-    name: typeof field.name === 'string' ? polishGameTitle(field.name) : field.name,
-    value: typeof field.value === 'string' ? polishGameText(field.value) : field.value,
+    name: typeof field.name === 'string' ? safeTitle(field.name, 'Thông tin') : field.name,
+    value: typeof field.value === 'string' ? safeText(field.value) : field.value,
   };
 }
 
@@ -28,16 +38,20 @@ export function installEmbedTextPolish(): void {
   const originalSetFields = proto.setFields;
 
   proto.setTitle = function patchedSetTitle(title: string) {
-    return originalSetTitle.call(this, polishGameTitle(title));
+    return originalSetTitle.call(this, safeTitle(title));
   };
 
-  proto.setDescription = function patchedSetDescription(description: string) {
-    return originalSetDescription.call(this, polishGameText(description));
+  proto.setDescription = function patchedSetDescription(description: string | null | undefined) {
+    if (description === null || description === undefined) {
+      return originalSetDescription.call(this, null);
+    }
+    const text = polishGameText(description);
+    return originalSetDescription.call(this, text.trim().length > 0 ? text : null);
   };
 
   proto.setFooter = function patchedSetFooter(options: any) {
     if (options?.text) {
-      return originalSetFooter.call(this, { ...options, text: polishGameText(String(options.text)) });
+      return originalSetFooter.call(this, { ...options, text: safeText(options.text) });
     }
     return originalSetFooter.call(this, options);
   };

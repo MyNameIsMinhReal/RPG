@@ -1,12 +1,11 @@
 import db from '../database/index';
 import { getEquipment, getSetBonuses, SLOT_ICONS, SLOT_LABELS, RARITY_LABELS, type EquipmentDef, type EquipSlot, type EquipStats, type EquipEffect } from '../data/equipment';
-import { getEquipmentInstance, getInstanceAffixStats, getInstanceUpgradeLevel, formatEquipmentInstanceName, formatInstanceAffixes } from './equipmentInstances';
 
 export const UPGRADE_MAX = 5;
 
 export interface WornEntry {
   user_id: string; guild_id: string;
-  slot: EquipSlot; equipment_id: string; equipment_uuid?: string | null;
+  slot: EquipSlot; equipment_id: string;
 }
 
 export interface FullEquipStats extends EquipStats {
@@ -35,7 +34,7 @@ export function wearEquipment(userId: string, guildId: string, equipId: string):
   if (def.slot === 'accessory1' || def.slot === 'accessory2') {
     const acc1 = getWornInSlot(userId, guildId, 'accessory1');
     const acc2 = getWornInSlot(userId, guildId, 'accessory2');
-    const alreadyWorn = getWornEquipment(userId, guildId).find(w => w.equipment_id === equipId && !w.equipment_uuid);
+    const alreadyWorn = getWornEquipment(userId, guildId).find(w => w.equipment_id === equipId);
 
     if (alreadyWorn) targetSlot = alreadyWorn.slot;
     else if (!acc1) targetSlot = 'accessory1';
@@ -44,8 +43,8 @@ export function wearEquipment(userId: string, guildId: string, equipId: string):
   }
 
   db.prepare(`
-    INSERT OR REPLACE INTO equipment_worn (user_id, guild_id, slot, equipment_id, equipment_uuid)
-    VALUES (?, ?, ?, ?, NULL)
+    INSERT OR REPLACE INTO equipment_worn (user_id, guild_id, slot, equipment_id)
+    VALUES (?, ?, ?, ?)
   `).run(userId, guildId, targetSlot, equipId);
 }
 
@@ -101,19 +100,6 @@ function applyEquipmentStatCaps(stats: FullEquipStats): FullEquipStats {
   return stats;
 }
 
-function addStats(target: FullEquipStats, src: EquipStats): void {
-  target.atk!        += src.atk        ?? 0;
-  target.def!        += src.def        ?? 0;
-  target.maxHp!      += src.maxHp      ?? 0;
-  target.maxMp!      += src.maxMp      ?? 0;
-  target.critChance! += src.critChance  ?? 0;
-  target.dodgeChance!+= src.dodgeChance ?? 0;
-  target.lifesteal!  += src.lifesteal   ?? 0;
-  target.expBonus!   += src.expBonus    ?? 0;
-  target.goldBonus!  += src.goldBonus   ?? 0;
-  target.dropBonus!  += src.dropBonus   ?? 0;
-}
-
 // ── Full stat computation with set bonuses ────────────────────────────────
 export function getEquipmentStats(userId: string, guildId: string): FullEquipStats {
   const worn     = getWornEquipment(userId, guildId);
@@ -125,28 +111,44 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
     effects: [], activeSetNames: []
   };
 
-  // Individual item stats + affixes + blacksmith upgrade bonuses
+  // Individual item stats + blacksmith upgrade bonuses
   for (const entry of worn) {
     const def = getEquipment(entry.equipment_id);
     if (!def) continue;
-    addStats(stats, def.stats);
-    if (entry.equipment_uuid) addStats(stats, getInstanceAffixStats(entry.equipment_uuid));
+    stats.atk!        += def.stats.atk        ?? 0;
+    stats.def!        += def.stats.def        ?? 0;
+    stats.maxHp!      += def.stats.maxHp      ?? 0;
+    stats.maxMp!      += def.stats.maxMp      ?? 0;
+    stats.critChance! += def.stats.critChance  ?? 0;
+    stats.dodgeChance!+= def.stats.dodgeChance ?? 0;
+    stats.lifesteal!  += def.stats.lifesteal   ?? 0;
+    stats.expBonus!   += def.stats.expBonus    ?? 0;
+    stats.goldBonus!  += def.stats.goldBonus   ?? 0;
+    stats.dropBonus!  += def.stats.dropBonus   ?? 0;
     if (def.effects) def.effects.forEach(e => {
       if (!stats.effects.includes(e)) stats.effects.push(e);
     });
-    let upLv = 0;
-    if (entry.equipment_uuid) upLv = getInstanceUpgradeLevel(entry.equipment_uuid);
-    else {
-      const upRow = db.prepare('SELECT upgrade_level FROM equipment_upgrades WHERE user_id=? AND guild_id=? AND slot=?')
-        .get(userId, guildId, entry.slot) as any;
-      upLv = upRow?.upgrade_level ?? 0;
+    // Blacksmith upgrade bonuses
+    const upRow = db.prepare('SELECT upgrade_level FROM equipment_upgrades WHERE user_id=? AND guild_id=? AND slot=?')
+      .get(userId, guildId, entry.slot) as any;
+    const upLv = upRow?.upgrade_level ?? 0;
+    if (upLv > 0) {
+      applyUpgradeStatBonus(stats, entry.slot, def, upLv);
     }
-    if (upLv > 0) applyUpgradeStatBonus(stats, entry.slot, def, upLv);
   }
 
   // Set bonuses
   const { stats: setBonuses, effects: setEffects } = getSetBonuses(wornIds);
-  addStats(stats, setBonuses);
+  stats.atk!        += setBonuses.atk        ?? 0;
+  stats.def!        += setBonuses.def        ?? 0;
+  stats.maxHp!      += setBonuses.maxHp      ?? 0;
+  stats.maxMp!      += setBonuses.maxMp      ?? 0;
+  stats.critChance! += setBonuses.critChance  ?? 0;
+  stats.dodgeChance!+= setBonuses.dodgeChance ?? 0;
+  stats.lifesteal!  += setBonuses.lifesteal   ?? 0;
+  stats.expBonus!   += setBonuses.expBonus    ?? 0;
+  stats.goldBonus!  += setBonuses.goldBonus   ?? 0;
+  stats.dropBonus!  += setBonuses.dropBonus   ?? 0;
   setEffects.forEach(e => { if (!stats.effects.includes(e)) stats.effects.push(e); });
 
   return applyEquipmentStatCaps(stats);
@@ -182,13 +184,6 @@ export function formatWornGear(userId: string, guildId: string): string {
       def.stats.goldBonus  ? `+${def.stats.goldBonus}% Gold`   : '',
       def.stats.dropBonus  ? `+${def.stats.dropBonus}% Drop`   : '',
     ].filter(Boolean).join(', ');
-    if (entry.equipment_uuid) {
-      const inst = getEquipmentInstance(entry.equipment_uuid);
-      if (inst) {
-        const affixText = formatInstanceAffixes(inst).split('\n').slice(0, 3).join(' · ');
-        return `${label} — ${formatEquipmentInstanceName(inst, false)}\n  └ Base: ${statsStr || '*no stats*'}\n  └ ${affixText}`;
-      }
-    }
     return `${def.icon} **${def.name}** [${RARITY_LABELS[def.rarity]}]\n  └ ${statsStr || '*no stats*'}`;
   }).join('\n');
 }

@@ -276,9 +276,7 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
   // Equipment stats
   const eqStats = getEquipmentStats(state.user_id, state.guild_id);
   const statMods = getPlayer(state.user_id, state.guild_id) ? getSecondaryStatBonuses(getPlayer(state.user_id, state.guild_id)!) : { critChance: 0, dodgeChance: 0, goldBonusPct: 0, dropBonusPct: 0 };
-  const critBoost = effects.find(e => e.name === 'crit_up')?.value ?? 0;
-  const totalCrit = Math.min(60, (eqStats.critChance ?? 0) + statMods.critChance + critBoost);
-  if (critBoost > 0) logs.push(`✨ May Mắn Nữ Thần: Crit +${critBoost}%.`);
+  const totalCrit = Math.min(35, (eqStats.critChance ?? 0) + statMods.critChance);
   const totalLifesteal = Math.min(20, (eqStats.lifesteal  ?? 0) + passives.lifestealBonus);
   if (eqStats.effects.includes('low_hp_atk') && player_hp / state.player_max_hp < 0.30) {
     effectiveAtk = Math.floor(effectiveAtk * 1.15);
@@ -785,13 +783,6 @@ function enemyTurn(
   const passiveDodge = Math.min(20, (eqStatsET.dodgeChance ?? 0) + clsPassET.dodgeBonus + statDodgeET);
   if (passiveDodge > 0 && !hasEffect(effects, 'dodge') && randInt(1, 100) <= passiveDodge) {
     logs.push(`💨 **Dodge pasif (${passiveDodge}%)** — Tránh đòn!`);
-    if (eqStatsET.effects.includes('phantom_counter')) {
-      const effDef = ((current as any).player_def ?? 0) + defenseBonus;
-      const wouldDmg = Math.max(1, Math.round(enemy.atk * 50 / (effDef + 50)));
-      const reflect = Math.max(1, Math.floor(wouldDmg * 0.5));
-      current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - reflect) };
-      logs.push(`🕳️ **Ảnh Ảo** phản lại **${reflect} true damage** sau cú né!`);
-    }
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
     if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
     if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }
@@ -805,14 +796,6 @@ function enemyTurn(
     const idx = effects.findIndex(e => e.name === 'dodge');
     effects.splice(idx, 1);
     logs.push(`🌑 **Shadow Step!** Bạn né hoàn toàn đòn tấn công của **${enemy.name}**!`);
-    const eqStatsDodge = getEquipmentStats(current.user_id, current.guild_id);
-    if (eqStatsDodge.effects.includes('phantom_counter')) {
-      const effDef = ((current as any).player_def ?? 0) + defenseBonus;
-      const wouldDmg = Math.max(1, Math.round(enemy.atk * 50 / (effDef + 50)));
-      const reflect = Math.max(1, Math.floor(wouldDmg * 0.5));
-      current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - reflect) };
-      logs.push(`🕳️ **Ảnh Ảo** phản lại **${reflect} true damage** sau cú né!`);
-    }
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
     if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
     if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }

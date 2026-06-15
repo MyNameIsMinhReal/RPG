@@ -6,6 +6,3 @@ import './005-seed-update-codes';
 import './006-shrine-corruption';
 import './007-party-combats';
 import './008-village-districts';
-
-import './009-explore-nodes';
-import './010-equipment-affixes';

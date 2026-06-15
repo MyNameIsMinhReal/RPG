@@ -4,16 +4,10 @@ import {
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
   ComponentType, ModalBuilder, TextInputBuilder, TextInputStyle
 } from 'discord.js';
-import { getPlayer, addItem, getItemQty, applyPassiveStats, getFactionSummary, updatePlayerHpMp } from './player';
+import { getPlayer, addItem, getItemQty, applyPassiveStats, getFactionSummary } from './player';
 import { getPartyOf } from './party';
 import { onlyUser } from '../utils/collectors';
 import { getWornEquipment, UPGRADE_MAX, describeUpgradeBonus } from './equipment';
-import {
-  legacyEquipmentBaseOptions, awakenLegacyEquipment, getOwnedEquipmentInstances,
-  formatEquipmentInstanceName, formatInstanceAffixes, getReforgeCost, canPayReforge,
-  createReforgeOffer, acceptReforgeOffer, rejectReforgeOffer, lockAffix,
-  getInstanceUpgradeLevel, increaseInstanceUpgrade
-} from './equipmentInstances';
 import { COLORS } from '../utils/embeds';
 import { getItem } from '../data/items';
 import { getEquipment, EQUIPMENT, RARITY_LABELS, SLOT_LABELS, getShopEquipment } from '../data/equipment';
@@ -644,10 +638,7 @@ export async function showVillageBlacksmith(
     .setFooter({ text: 'Tối đa +5 mỗi trang bị · Học skill đã chuyển sang 🏛️ Hội Quán → 📖 Cổ thư' });
 
   const bsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vill_bs_upgrade_${userId}`).setLabel('Nâng trang bị').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`vill_bs_awaken_${userId}`).setLabel('Thức tỉnh đồ cũ').setEmoji('🧩').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`vill_bs_lock_${userId}`).setLabel('Khóa dòng').setEmoji('🔒').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`vill_bs_reforge_${userId}`).setLabel('Tẩy luyện').setEmoji('🔁').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`vill_bs_upgrade_${userId}`).setLabel('Nâng trang bị của tôi').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
   );
 
@@ -668,18 +659,6 @@ export async function showVillageBlacksmith(
   }
 
   const actorId = btn.user.id;
-  if (btn.customId === `vill_bs_awaken_${userId}`) {
-    await showLegacyAwakenList(interaction, actorId, guildId, userId);
-    return;
-  }
-  if (btn.customId === `vill_bs_lock_${userId}`) {
-    await showAffixGearList(interaction, actorId, guildId, userId, 'lock');
-    return;
-  }
-  if (btn.customId === `vill_bs_reforge_${userId}`) {
-    await showAffixGearList(interaction, actorId, guildId, userId, 'reforge');
-    return;
-  }
   await showBlacksmithUpgradeList(interaction, actorId, guildId, userId);
 }
 
@@ -700,7 +679,7 @@ async function showBlacksmithUpgradeList(
 
   const options = worn.map(w => {
     const eq   = getEquipment(w.equipment_id);
-    const upLv = w.equipment_uuid ? getInstanceUpgradeLevel(w.equipment_uuid) : getUpgradeLevel(actorId, guildId, w.slot);
+    const upLv = getUpgradeLevel(actorId, guildId, w.slot);
     const nextLv = upLv + 1;
     const cost = UPGRADE_COSTS[nextLv];
     const maxed = upLv >= UPGRADE_MAX;
@@ -757,8 +736,7 @@ async function showBlacksmithUpgradeList(
   if (!sel.isStringSelectMenu()) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
 
   const slot  = sel.values[0].replace('upgrade_', '') as any;
-  const wornEntry = worn.find(w => w.slot === slot)!;
-  const upLv  = wornEntry?.equipment_uuid ? getInstanceUpgradeLevel(wornEntry.equipment_uuid) : getUpgradeLevel(actorId, guildId, slot);
+  const upLv  = getUpgradeLevel(actorId, guildId, slot);
 
   if (upLv >= UPGRADE_MAX) {
     await interaction.editReply({
@@ -770,6 +748,7 @@ async function showBlacksmithUpgradeList(
 
   const nextLv    = upLv + 1;
   const cost      = UPGRADE_COSTS[nextLv]!;
+  const wornEntry = worn.find(w => w.slot === slot)!;
   const eq        = getEquipment(wornEntry.equipment_id);
 
   const confirmEmbed = new EmbedBuilder()
@@ -825,15 +804,11 @@ async function showBlacksmithUpgradeList(
     db.prepare(`DELETE FROM inventory WHERE user_id=? AND guild_id=? AND item_id='mana_crystal' AND quantity<=?`).run(actorId, guildId, cost.crystal);
     db.prepare(`UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND guild_id=? AND item_id='mana_crystal'`).run(cost.crystal, actorId, guildId);
   }
-  if (wornEntry.equipment_uuid) {
-    increaseInstanceUpgrade(wornEntry.equipment_uuid, actorId, guildId);
-  } else {
-    db.prepare(`
-      INSERT INTO equipment_upgrades (user_id, guild_id, slot, upgrade_level)
-      VALUES (?, ?, ?, 1)
-      ON CONFLICT(user_id, guild_id, slot) DO UPDATE SET upgrade_level=upgrade_level+1
-    `).run(actorId, guildId, slot);
-  }
+  db.prepare(`
+    INSERT INTO equipment_upgrades (user_id, guild_id, slot, upgrade_level)
+    VALUES (?, ?, ?, 1)
+    ON CONFLICT(user_id, guild_id, slot) DO UPDATE SET upgrade_level=upgrade_level+1
+  `).run(actorId, guildId, slot);
 
   const bonusDesc = describeUpgradeBonus(slot as any, eq);
   await interaction.editReply({
@@ -845,251 +820,6 @@ async function showBlacksmithUpgradeList(
   });
 }
 
-
-
-
-// ── BLACKSMITH: Legacy Affix / Reforge ───────────────────────────────────
-
-async function showLegacyAwakenList(
-  interaction: ChatInputCommandInteraction,
-  actorId: string, guildId: string, leaderId: string
-): Promise<void> {
-  const actor = getPlayer(actorId, guildId)!;
-  const spark = getItemQty(actorId, guildId, 'legacy_spark');
-  const options = legacyEquipmentBaseOptions(actorId, guildId);
-
-  if (spark <= 0) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🧩 Bạn không có **Legacy Spark** để thức tỉnh đồ cũ.')], components: [backRow(leaderId)] });
-    return;
-  }
-  if (!options.length) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🧩 Bạn không có trang bị cũ dạng stack trong túi để thức tỉnh.')], components: [backRow(leaderId)] });
-    return;
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor(COLORS.magic)
-    .setTitle(`🧩 Thức tỉnh đồ cũ — ${actor.name}`)
-    .setDescription(
-      `Legacy Spark của bạn: **${spark}**\n\n` +
-      `Chọn 1 món gear cũ trong túi. Bot sẽ trừ **1 Legacy Spark** và tách **1 bản** thành gear UUID có Prefix/Suffix.\n` +
-      `Đồ cũ còn lại vẫn giữ dạng stack.`
-    );
-
-  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`vill_bs_awaken_sel_${leaderId}_${actorId}`)
-      .setPlaceholder('Chọn gear cũ để thức tỉnh...')
-      .addOptions(options.slice(0, 25).map(eq => new StringSelectMenuOptionBuilder()
-        .setLabel(`${eq.name} (${RARITY_LABELS[eq.rarity]})`.slice(0, 100))
-        .setDescription(`${SLOT_LABELS[eq.slot]} · iLvl legacy = max(zone, level)`.slice(0, 100))
-        .setValue(eq.id)
-        .setEmoji(eq.icon)
-      ))
-  );
-
-  const msg = await interaction.editReply({ embeds: [embed], components: [row, backRow(leaderId)] });
-  const sel = await msg.awaitMessageComponent({
-    filter: i => {
-      if (i.customId === `vill_back_${leaderId}`) return i.user.id === leaderId;
-      if (i.user.id !== actorId) { rejectVillageInteraction(i, '❌ Chỉ người đang thức tỉnh đồ mới chọn được.'); return false; }
-      return true;
-    },
-    time: 45_000
-  }).catch(() => null);
-
-  if (!sel) { await interaction.editReply({ components: [] }); return; }
-  await safeDeferUpdate(sel as any);
-  if (sel.customId === `vill_back_${leaderId}`) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
-  if (!sel.isStringSelectMenu()) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
-
-  const baseId = sel.values[0];
-  const res = awakenLegacyEquipment(actorId, guildId, baseId, actor.level ?? 1);
-  if (!res.ok || !res.instance) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Thức tỉnh thất bại: **${res.reason ?? 'unknown'}**.`)], components: [backRow(leaderId)] });
-    return;
-  }
-
-  await interaction.editReply({
-    embeds: [new EmbedBuilder()
-      .setColor(COLORS.success)
-      .setTitle('🧩 Thức tỉnh thành công!')
-      .setDescription(`${formatEquipmentInstanceName(res.instance, false)}\n\n${formatInstanceAffixes(res.instance)}`)],
-    components: [backRow(leaderId)]
-  });
-}
-
-async function showAffixGearList(
-  interaction: ChatInputCommandInteraction,
-  actorId: string, guildId: string, leaderId: string,
-  mode: 'lock' | 'reforge'
-): Promise<void> {
-  const actor = getPlayer(actorId, guildId)!;
-  const instances = getOwnedEquipmentInstances(actorId, guildId);
-  if (!instances.length) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '⚒️ Bạn chưa có gear UUID/Legacy nào. Dùng **Thức tỉnh đồ cũ** hoặc farm gear rơi sau patch.')], components: [backRow(leaderId)] });
-    return;
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor(mode === 'lock' ? COLORS.warning : COLORS.danger)
-    .setTitle(mode === 'lock' ? `🔒 Khóa dòng Affix — ${actor.name}` : `🔁 Tẩy luyện Affix — ${actor.name}`)
-    .setDescription(mode === 'lock'
-      ? 'Chọn gear, sau đó chọn 1 dòng affix để khóa. Khóa dòng giúp dòng đó không bị đổi khi Tẩy luyện.'
-      : 'Chọn gear để roll lại toàn bộ affix chưa khóa. Chi phí mất ngay dù bạn giữ kết quả cũ.');
-
-  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`vill_bs_affix_${mode}_${leaderId}_${actorId}`)
-      .setPlaceholder('Chọn gear affix...')
-      .addOptions(instances.slice(0, 25).map(inst => {
-        const cost = mode === 'reforge' ? getReforgeCost(inst) : null;
-        const desc = mode === 'reforge'
-          ? `${cost!.gold} Gold · ${cost!.voidShard} void · ${cost!.lostMemory} memory`
-          : `${inst.affixes.length} affix · đã khóa ${inst.lockedAffixes.length}`;
-        return new StringSelectMenuOptionBuilder()
-          .setLabel(formatEquipmentInstanceName(inst, false).slice(0, 100))
-          .setDescription(desc.slice(0, 100))
-          .setValue(inst.uuid)
-          .setEmoji(inst.base?.icon ?? '⚔️');
-      }))
-  );
-
-  const msg = await interaction.editReply({ embeds: [embed], components: [row, backRow(leaderId)] });
-  const sel = await msg.awaitMessageComponent({
-    filter: i => {
-      if (i.customId === `vill_back_${leaderId}`) return i.user.id === leaderId;
-      if (i.user.id !== actorId) { rejectVillageInteraction(i, '❌ Chỉ người đang dùng lò rèn mới chọn được.'); return false; }
-      return true;
-    },
-    time: 45_000
-  }).catch(() => null);
-
-  if (!sel) { await interaction.editReply({ components: [] }); return; }
-  await safeDeferUpdate(sel as any);
-  if (sel.customId === `vill_back_${leaderId}`) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
-  if (!sel.isStringSelectMenu()) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
-  const uuid = sel.values[0];
-  if (mode === 'lock') await showLockAffixMenu(interaction, actorId, guildId, leaderId, uuid);
-  else await showReforgeConfirm(interaction, actorId, guildId, leaderId, uuid);
-}
-
-async function showLockAffixMenu(
-  interaction: ChatInputCommandInteraction,
-  actorId: string, guildId: string, leaderId: string,
-  uuid: string
-): Promise<void> {
-  const inst = getOwnedEquipmentInstances(actorId, guildId).find(x => x.uuid === uuid);
-  if (!inst) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
-  if (!inst.affixes.length) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, 'Gear này không có affix để khóa.')], components: [backRow(leaderId)] });
-    return;
-  }
-  const opts = inst.affixes.map((a, idx) => new StringSelectMenuOptionBuilder()
-    .setLabel(`${inst.lockedAffixes.includes(idx) ? 'Đã khóa · ' : ''}${idx + 1}. ${a.name}`.slice(0, 100))
-    .setDescription(`+${a.value}${a.isPercent ? '%' : ''} ${a.stat} · T${a.tier}`.slice(0, 100))
-    .setValue(String(idx))
-    .setEmoji(inst.lockedAffixes.includes(idx) ? '🔒' : '🔓'));
-
-  const embed = new EmbedBuilder()
-    .setColor(COLORS.warning)
-    .setTitle(`🔒 ${formatEquipmentInstanceName(inst, false)}`)
-    .setDescription(`${formatInstanceAffixes(inst)}\n\nChi phí khóa: **1 lost_memory**.`);
-
-  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-    new StringSelectMenuBuilder().setCustomId(`vill_bs_lock_sel_${leaderId}_${actorId}`).setPlaceholder('Chọn affix để khóa...').addOptions(opts.slice(0, 25))
-  );
-  const msg = await interaction.editReply({ embeds: [embed], components: [row, backRow(leaderId)] });
-  const sel = await msg.awaitMessageComponent({
-    filter: i => {
-      if (i.customId === `vill_back_${leaderId}`) return i.user.id === leaderId;
-      if (i.user.id !== actorId) { rejectVillageInteraction(i, '❌ Chỉ người khóa dòng mới chọn được.'); return false; }
-      return true;
-    },
-    time: 45_000
-  }).catch(() => null);
-  if (!sel) { await interaction.editReply({ components: [] }); return; }
-  await safeDeferUpdate(sel as any);
-  if (sel.customId === `vill_back_${leaderId}`) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
-  if (!sel.isStringSelectMenu()) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
-
-  if (getItemQty(actorId, guildId, 'lost_memory') < 1) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '❌ Cần **1 lost_memory** để khóa dòng.')], components: [backRow(leaderId)] });
-    return;
-  }
-  db.prepare(`UPDATE inventory SET quantity=quantity-1 WHERE user_id=? AND guild_id=? AND item_id='lost_memory'`).run(actorId, guildId);
-  db.prepare(`DELETE FROM inventory WHERE user_id=? AND guild_id=? AND item_id='lost_memory' AND quantity<=0`).run(actorId, guildId);
-  const res = lockAffix(uuid, Number(sel.values[0]));
-  const refreshed = res.instance ?? getOwnedEquipmentInstances(actorId, guildId).find(x => x.uuid === uuid)!;
-  await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.success).setTitle('🔒 Đã khóa dòng').setDescription(`${formatEquipmentInstanceName(refreshed, false)}\n\n${formatInstanceAffixes(refreshed)}`)], components: [backRow(leaderId)] });
-}
-
-async function showReforgeConfirm(
-  interaction: ChatInputCommandInteraction,
-  actorId: string, guildId: string, leaderId: string,
-  uuid: string
-): Promise<void> {
-  const inst = getOwnedEquipmentInstances(actorId, guildId).find(x => x.uuid === uuid);
-  if (!inst) { await showVillageBlacksmith(interaction, leaderId, guildId); return; }
-  const cost = getReforgeCost(inst);
-  const canPay = canPayReforge(actorId, guildId, cost);
-  const embed = new EmbedBuilder()
-    .setColor(canPay ? COLORS.danger : COLORS.warning)
-    .setTitle(`🔁 Tẩy luyện ${formatEquipmentInstanceName(inst, false)}`)
-    .setDescription(
-      `${formatInstanceAffixes(inst)}\n\n` +
-      `Chi phí: 🪙 **${cost.gold} Gold** · 🌌 **${cost.voidShard} void_shard** · 🧠 **${cost.lostMemory} lost_memory**\n` +
-      `Dòng 🔒 sẽ được giữ nguyên. Chi phí mất ngay dù bạn giữ kết quả cũ.`
-    );
-  if (!canPay) {
-    await interaction.editReply({ embeds: [embed.addFields({ name: '❌ Thiếu tài nguyên', value: 'Hãy kiếm đủ Gold/void_shard/lost_memory rồi quay lại.', inline: false })], components: [backRow(leaderId)] });
-    return;
-  }
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vill_bs_reforge_go_${leaderId}_${actorId}`).setLabel('Tẩy luyện').setEmoji('🔁').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId(`vill_bs_reforge_cancel_${leaderId}_${actorId}`).setLabel('Hủy').setStyle(ButtonStyle.Secondary)
-  );
-  const msg = await interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await msg.awaitMessageComponent({
-    filter: i => i.user.id === actorId,
-    componentType: ComponentType.Button,
-    time: 30_000
-  }).catch(() => null);
-  if (!btn || btn.customId.includes('cancel')) {
-    if (btn) await safeDeferUpdate(btn as any);
-    await showVillageBlacksmith(interaction, leaderId, guildId);
-    return;
-  }
-  await safeDeferUpdate(btn as any);
-  const offer = createReforgeOffer(actorId, guildId, uuid);
-  if (!offer.ok || !offer.offerId || !offer.oldAffixes || !offer.newAffixes) {
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Không thể tẩy luyện: **${offer.reason ?? 'unknown'}**.`)], components: [backRow(leaderId)] });
-    return;
-  }
-
-  const oldText = offer.oldAffixes.map((a, i) => `${i + 1}. ${a.name}: +${a.value}${a.isPercent ? '%' : ''} ${a.stat}`).join('\n') || '*Trống*';
-  const newText = offer.newAffixes.map((a, i) => `${i + 1}. ${a.name}: +${a.value}${a.isPercent ? '%' : ''} ${a.stat}`).join('\n') || '*Trống*';
-  const compare = new EmbedBuilder()
-    .setColor(COLORS.magic)
-    .setTitle('🔁 Kết quả tẩy luyện')
-    .setDescription(`${formatEquipmentInstanceName(inst, false)}\n\n**Cũ:**\n${oldText}\n\n**Mới:**\n${newText}\n\nChọn giữ kết quả mới hoặc giữ đồ cũ. Vật liệu đã tiêu hao.`);
-  const chooseRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vill_bs_reforge_accept_${offer.offerId}`).setLabel('Giữ mới').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`vill_bs_reforge_reject_${offer.offerId}`).setLabel('Giữ cũ').setStyle(ButtonStyle.Secondary)
-  );
-  const msg2 = await interaction.editReply({ embeds: [compare], components: [chooseRow] });
-  const choose = await msg2.awaitMessageComponent({ filter: i => i.user.id === actorId, componentType: ComponentType.Button, time: 60_000 }).catch(() => null);
-  if (!choose) { await interaction.editReply({ components: [] }); return; }
-  await safeDeferUpdate(choose as any);
-  if (choose.customId.startsWith('vill_bs_reforge_accept_')) {
-    const res = acceptReforgeOffer(actorId, guildId, offer.offerId);
-    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLORS.success).setTitle('✅ Đã giữ kết quả mới').setDescription(res.instance ? `${formatEquipmentInstanceName(res.instance, false)}\n\n${formatInstanceAffixes(res.instance)}` : 'Đã cập nhật affix.')], components: [backRow(leaderId)] });
-  } else {
-    rejectReforgeOffer(actorId, guildId, offer.offerId);
-    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '↩️ Bạn giữ lại đồ cũ. Vật liệu tẩy luyện vẫn đã tiêu hao.')], components: [backRow(leaderId)] });
-  }
-}
 
 
 // ── TAVERN ────────────────────────────────────────────────────────────────
@@ -1160,9 +890,8 @@ export async function showVillageTavern(
     return;
   }
 
-  db.prepare('UPDATE players SET gold=gold-? WHERE user_id=? AND guild_id=?')
-    .run(healCost, actorId, guildId);
-  updatePlayerHpMp(actorId, guildId, pNow.max_hp, pNow.max_mp);
+  db.prepare('UPDATE players SET gold=gold-?, hp=?, mp=? WHERE user_id=? AND guild_id=?')
+    .run(healCost, pNow.max_hp, pNow.max_mp, actorId, guildId);
 
   await interaction.editReply({
     embeds: [new EmbedBuilder()

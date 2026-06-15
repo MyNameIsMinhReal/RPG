@@ -19,7 +19,6 @@ import { getEquipmentStats } from './equipment';
 import { getCorruptionDropBonus } from './corruption';
 import { markEchoSealByEnemy, ECHO_SEALS } from './echoDemonRitual';
 import { getIntelRewardMods, applyIntelExtraDrop } from './villageDistricts';
-import { createDroppedEquipmentInstance, formatEquipmentRewardInstance } from './equipmentInstances';
 
 
 function combatRewardMultipliers(enemy: EnemyDef): { exp: number; gold: number } {
@@ -94,8 +93,8 @@ export function processVictoryRewards(
     const roll = Math.random() * 100;
     const adjustedChance = (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * totalDropBonusPct / 100);
     if (roll <= adjustedChance) {
-      const inst = createDroppedEquipmentInstance(userId, guildId, eq.id, player.level, enemy);
-      drops.push(inst ? formatEquipmentRewardInstance(inst) : `${eq.icon} **${eq.name}**`);
+      addItem(userId, guildId, eq.id, 1);
+      drops.push(`${eq.icon} **${eq.name}** *(${['common','rare','epic','legendary'][['common','rare','epic','legendary'].indexOf(eq.rarity)]})*`);
     }
   }
 

@@ -14,7 +14,6 @@ import { bar } from '../utils/format';
 import {
   getPlayer, applyPassiveStats, getInventory, getItemQty, addItem, removeItem,
   grantGold, spendGold, adjustFaction, getFactionReputation, getWantedLevel,
-  updatePlayerHpMp, syncDerivedBaseStats,
 } from './player';
 import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
@@ -63,6 +62,64 @@ function formatDuration(seconds: number): string {
   if (s >= HOUR) return `${Math.floor(s / HOUR)}h ${Math.floor((s % HOUR) / 60)}m`;
   if (s >= 60) return `${Math.floor(s / 60)}m`;
   return `${s}s`;
+}
+
+type VillageCooldownScope = 'user' | 'guild';
+
+const VILLAGE_COOLDOWNS = {
+  randomEvent: 30 * 60,
+  pickpocket: 45 * 60,
+  relief: 2 * HOUR,
+  tavernIntel: 2 * HOUR,
+  mysteryBox: 15,
+  casino: 3 * 60,
+  sacrifice: DAY,
+  serverDefend: 8 * HOUR,
+} as const;
+
+function cleanupVillageCooldowns(): void {
+  db.prepare('DELETE FROM village_cooldowns WHERE expires_at <= ?').run(nowSec());
+}
+
+function getVillageCooldown(scope: VillageCooldownScope, ownerId: string, guildId: string, key: string): number {
+  ensureVillageTables();
+  cleanupVillageCooldowns();
+  const row = db.prepare(`
+    SELECT expires_at FROM village_cooldowns
+    WHERE scope=? AND owner_id=? AND guild_id=? AND cd_key=?
+  `).get(scope, ownerId, guildId, key) as { expires_at: number } | undefined;
+  return row ? Math.max(0, row.expires_at - nowSec()) : 0;
+}
+
+function setVillageCooldown(scope: VillageCooldownScope, ownerId: string, guildId: string, key: string, seconds: number): void {
+  ensureVillageTables();
+  const expiresAt = nowSec() + Math.max(1, seconds);
+  db.prepare(`
+    INSERT INTO village_cooldowns (scope, owner_id, guild_id, cd_key, expires_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, unixepoch())
+    ON CONFLICT(scope, owner_id, guild_id, cd_key)
+    DO UPDATE SET expires_at=excluded.expires_at, updated_at=unixepoch()
+  `).run(scope, ownerId, guildId, key, expiresAt);
+}
+
+function userCooldown(userId: string, guildId: string, key: string): number {
+  return getVillageCooldown('user', userId, guildId, key);
+}
+
+function setUserCooldown(userId: string, guildId: string, key: string, seconds: number): void {
+  setVillageCooldown('user', userId, guildId, key, seconds);
+}
+
+function guildCooldown(guildId: string, key: string): number {
+  return getVillageCooldown('guild', guildId, guildId, key);
+}
+
+function setGuildCooldown(guildId: string, key: string, seconds: number): void {
+  setVillageCooldown('guild', guildId, guildId, key, seconds);
+}
+
+function cooldownLine(label: string, remaining: number): string {
+  return remaining > 0 ? `${label}: còn **${formatDuration(remaining)}**` : `${label}: **sẵn sàng**`;
 }
 
 function displayThing(id: string): { name: string; icon: string; sellPrice?: number } {
@@ -123,6 +180,16 @@ function ensureVillageTables(): void {
       power INTEGER DEFAULT 0,
       joined_at INTEGER DEFAULT (unixepoch()),
       PRIMARY KEY (guild_id, user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS village_cooldowns (
+      scope TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      guild_id TEXT NOT NULL,
+      cd_key TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      updated_at INTEGER DEFAULT (unixepoch()),
+      PRIMARY KEY (scope, owner_id, guild_id, cd_key)
     );
   `);
 }
@@ -190,6 +257,7 @@ function activeRaid(guildId: string): { hp: number; expiresAt: number } | null {
 function startRaid(guildId: string): void {
   const data = { hp: 100, expiresAt: nowSec() + 15 * 60 };
   setFlag(guildId, 'village_raid', JSON.stringify(data), 15 * 60);
+  setGuildCooldown(guildId, 'server_defend_event', VILLAGE_COOLDOWNS.serverDefend);
   db.prepare('DELETE FROM village_raid_participants WHERE guild_id=?').run(guildId);
 }
 
@@ -307,7 +375,7 @@ export async function showVillageDistrictMenu(interaction: ChatInputCommandInter
       `⚔️ **Quán Trọ Thợ Săn** — bounty, quầy rượu tình báo.\n` +
       `⛪ **Thánh Đường Bỏ Hoang** — hồi phục, tẩy ô nhiễm, quỹ cầu nguyện.\n` +
       `🌑 **Hẻm Tối** — sòng bạc, hiến tế, giao dịch nguyền.\n` +
-      `🪵 **Quảng Trường** — lò rèn, thức tỉnh trang bị và công trình công cộng.`
+      `🪵 **Quảng Trường** — công trình công cộng toàn server.`
     );
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`vill_dist_merchant_${userId}`).setLabel('Thương Hội').setEmoji('⚖️').setStyle(ButtonStyle.Success),
@@ -325,10 +393,32 @@ export async function maybeShowVillageEncounter(interaction: ChatInputCommandInt
     await showVillageRaid(interaction, userId, guildId);
     return true;
   }
+
+  // Người chơi đã gặp event làng gần đây thì chỉ mở menu bình thường.
+  if (userCooldown(userId, guildId, 'village_random_event') > 0) return false;
+
+  const eligible: Array<'pickpocket' | 'relief' | 'raid'> = [];
+  if (userCooldown(userId, guildId, 'village_pickpocket') <= 0) eligible.push('pickpocket');
+  if (userCooldown(userId, guildId, 'village_relief_donation') <= 0) eligible.push('relief');
+  if (guildCooldown(guildId, 'server_defend_event') <= 0) eligible.push('raid');
+  if (eligible.length === 0) return false;
+
   if (Math.random() >= 0.15) return false;
-  const pick = Math.floor(Math.random() * 3);
-  if (pick === 0) { await showPickpocketEncounter(interaction, userId, guildId); return true; }
-  if (pick === 1) { await showReliefEncounter(interaction, userId, guildId); return true; }
+  const pick = eligible[Math.floor(Math.random() * eligible.length)];
+
+  setUserCooldown(userId, guildId, 'village_random_event', VILLAGE_COOLDOWNS.randomEvent);
+
+  if (pick === 'pickpocket') {
+    setUserCooldown(userId, guildId, 'village_pickpocket', VILLAGE_COOLDOWNS.pickpocket);
+    await showPickpocketEncounter(interaction, userId, guildId);
+    return true;
+  }
+  if (pick === 'relief') {
+    setUserCooldown(userId, guildId, 'village_relief_donation', VILLAGE_COOLDOWNS.relief);
+    await showReliefEncounter(interaction, userId, guildId);
+    return true;
+  }
+
   startRaid(guildId);
   await showVillageRaid(interaction, userId, guildId, true);
   return true;
@@ -437,19 +527,20 @@ export async function showMerchantGuildDistrict(interaction: ChatInputCommandInt
   const p = getPlayer(userId, guildId)!;
   const rep = getFactionReputation(userId, guildId, 'merchants');
   const bm = currentBlackMarket(guildId);
+  const boxCd = userCooldown(userId, guildId, 'merchant_mystery_box');
   const embed = new EmbedBuilder().setColor(COLORS.gold).setTitle('⚖️ Khu A — Thương Hội')
     .setDescription(
       `Dòng tiền của Ashveil chảy qua đây.\n\n` +
       `👤 **${p.name}** · 🪙 **${p.gold} Gold** · Merchant Rep: **${rep >= 0 ? '+' : ''}${rep}**\n` +
       `🏪 Cửa hàng cơ bản: bình máu, lương khô, đuốc/vật phẩm tiêu hao.\n` +
       `🧺 Chợ đồ cũ: thanh lý item/material/trang bị thừa.\n` +
-      `🎁 Hộp Gỗ Kỳ Bí: 500 Gold, yêu cầu Merchant Rep +20.\n` +
+      `🎁 Hộp Gỗ Kỳ Bí: 500 Gold, yêu cầu Merchant Rep +20 · ${boxCd > 0 ? `CD **${formatDuration(boxCd)}**` : 'sẵn sàng'}.\n` +
       `🌑 Chợ Đen: ${bm.active ? `đang mở **${formatDuration(bm.remaining)}**` : `chưa thấy NPC lạ, thử lại sau **${formatDuration(bm.nextIn)}**`}`
     );
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`vill_mer_shop_${userId}`).setLabel('Cửa hàng').setEmoji('🏪').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`vill_mer_sell_${userId}`).setLabel('Chợ đồ cũ').setEmoji('🧺').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`vill_mer_box_${userId}`).setLabel('Hộp Gỗ').setEmoji('🎁').setStyle(ButtonStyle.Primary).setDisabled(rep < 20),
+    new ButtonBuilder().setCustomId(`vill_mer_box_${userId}`).setLabel('Hộp Gỗ').setEmoji('🎁').setStyle(ButtonStyle.Primary).setDisabled(rep < 20 || boxCd > 0),
     new ButtonBuilder().setCustomId(`vill_mer_black_${userId}`).setLabel('Chợ Đen').setEmoji('🌑').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary),
   );
@@ -513,6 +604,11 @@ async function showJunkMarket(interaction: ChatInputCommandInteraction, userId: 
 }
 
 async function openMysteryWoodenBox(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+  const cd = userCooldown(userId, guildId, 'merchant_mystery_box');
+  if (cd > 0) {
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🎁 Hộp Gỗ Kỳ Bí đang hồi lại hàng. Thử lại sau **${formatDuration(cd)}**.`)], components: [backRow(userId)] });
+    return;
+  }
   const p = getPlayer(userId, guildId)!;
   const rep = getFactionReputation(userId, guildId, 'merchants');
   if (rep < 20) {
@@ -529,6 +625,7 @@ async function openMysteryWoodenBox(interaction: ChatInputCommandInteraction, us
   else if (roll >= 86) { itemId = 'void_shard'; qty = 1; tier = 'epic'; }
   else if (roll >= 70) { itemId = 'mana_crystal'; qty = 2; tier = 'rare'; }
   else if (roll >= 45) { itemId = 'iron_ore'; qty = 5; tier = 'thường'; }
+  setUserCooldown(userId, guildId, 'merchant_mystery_box', VILLAGE_COOLDOWNS.mysteryBox);
   addItem(userId, guildId, itemId, qty);
   const it = displayThing(itemId);
   logEvent(guildId, userId, p.name, 'merchant_gacha', `mở Hộp Gỗ Kỳ Bí và nhận ${it.name} x${qty}.`, 'village');
@@ -566,17 +663,18 @@ async function showTimedBlackMarket(interaction: ChatInputCommandInteraction, us
 export async function showHuntersGuildDistrict(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
   const p = getPlayer(userId, guildId)!;
   const intel = getActiveIntel(userId, guildId);
+  const intelCd = userCooldown(userId, guildId, 'tavern_intel');
   const embed = new EmbedBuilder().setColor(0x8B4513).setTitle('⚔️ Khu B — Quán Trọ Thợ Săn')
     .setDescription(
       `Bàn gỗ đầy vết dao. Bảng truy nã treo cạnh quầy rượu.\n\n` +
       `👤 **${p.name}** · 🪙 **${p.gold} Gold**\n` +
       `📋 **Bounty Board:** 3 nhiệm vụ mỗi ngày, thưởng EXP/Gold/vật phẩm.\n` +
-      `🍻 **Quầy rượu:** trả 50 Gold để mua tin đồn hotzone trong 2 giờ.\n` +
+      `🍻 **Quầy rượu:** trả 50 Gold để mua tin đồn hotzone trong 2 giờ · ${intelCd > 0 ? `CD **${formatDuration(intelCd)}**` : 'sẵn sàng'}.\n` +
       (intel ? `\nTin hiện tại: **${ZONES[intel.zoneId]?.name ?? intel.zoneId}** · hết hạn sau **${formatDuration(intel.expiresAt - nowSec())}**` : '')
     );
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`vill_hunt_board_${userId}`).setLabel('Bảng Truy Nã').setEmoji('📋').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`vill_hunt_intel_${userId}`).setLabel('Mua Tin Đồn').setEmoji('🍻').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`vill_hunt_intel_${userId}`).setLabel('Mua Tin Đồn').setEmoji('🍻').setStyle(ButtonStyle.Success).setDisabled(intelCd > 0),
     new ButtonBuilder().setCustomId(`vill_hunt_hall_${userId}`).setLabel('Hội Quán').setEmoji('🏛️').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary),
   );
@@ -591,6 +689,11 @@ export async function showHuntersGuildDistrict(interaction: ChatInputCommandInte
 }
 
 async function showTavernIntel(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+  const cd = userCooldown(userId, guildId, 'tavern_intel');
+  if (cd > 0) {
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🍻 Bạn vừa mua tin gần đây. Quay lại sau **${formatDuration(cd)}**.`)], components: [backRow(userId)] });
+    return;
+  }
   const { offer, remaining } = currentIntelOffer(guildId);
   const p = getPlayer(userId, guildId)!;
   const active = getActiveIntel(userId, guildId);
@@ -622,6 +725,7 @@ async function showTavernIntel(interaction: ChatInputCommandInteraction, userId:
     INSERT OR REPLACE INTO player_intel (user_id, guild_id, zone_id, target_item, bonus_type, bonus_value, expires_at, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, unixepoch())
   `).run(userId, guildId, offer.zoneId, offer.targetItem, offer.bonusType, offer.bonusValue, nowSec() + 2 * HOUR);
+  setUserCooldown(userId, guildId, 'tavern_intel', VILLAGE_COOLDOWNS.tavernIntel);
   adjustFaction(userId, guildId, 'hunters', 2);
   await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `🍻 Đã nhận tin tình báo!\nTrong **2 giờ**, farm tại **${zone?.name ?? offer.zoneId}** sẽ được bonus.\n🪙 -50 Gold · 🏹 Hunters Rep +2`)], components: [backRow(userId)] });
 }
@@ -670,7 +774,7 @@ async function churchHeal(interaction: ChatInputCommandInteraction, userId: stri
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ Cần **${cost} Gold** để hồi phục.`)], components: [backRow(userId)] });
     return;
   }
-  updatePlayerHpMp(userId, guildId, p.max_hp, p.max_mp);
+  db.prepare('UPDATE players SET hp=?, mp=? WHERE user_id=? AND guild_id=?').run(p.max_hp, p.max_mp, userId, guildId);
   await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💧 Bạn đã hồi đầy HP/MP tại Thánh Đường.\n🪙 Chi phí: **${cost} Gold**`)], components: [backRow(userId)] });
 }
 
@@ -724,17 +828,19 @@ export async function showShadowCourtDistrict(interaction: ChatInputCommandInter
     return;
   }
   const sacrifices = db.prepare(`SELECT COALESCE(SUM(count),0) AS n FROM shadow_sacrifices WHERE user_id=? AND guild_id=?`).get(userId, guildId) as any;
+  const casinoCd = userCooldown(userId, guildId, 'shadow_casino');
+  const sacrificeCd = userCooldown(userId, guildId, 'shadow_sacrifice');
   const embed = new EmbedBuilder().setColor(COLORS.dark).setTitle('🌑 Khu D — Hẻm Tối / Shadow Court')
     .setDescription(
       `Không ai ở làng thừa nhận nơi này tồn tại.\n\n` +
       `👤 **${p.name}** · 🪙 **${p.gold} Gold** · Shadow Rep: **${shadowRep >= 0 ? '+' : ''}${shadowRep}**\n` +
-      `🎲 Sòng bạc: cược Gold, cooldown tự nhiên qua rủi ro.\n` +
-      `🩸 Hiến tế: đổi Max HP vĩnh viễn lấy vật phẩm nguyền.\n` +
+      `🎲 Sòng bạc: cược Gold · ${cooldownLine('CD', casinoCd)}.\n` +
+      `🩸 Hiến tế: đổi Max HP vĩnh viễn lấy vật phẩm nguyền · ${cooldownLine('CD', sacrificeCd)}.\n` +
       `Số lần hiến tế đã ghi nhận: **${sacrifices?.n ?? 0}/3**`
     );
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vill_sh_casino_${userId}`).setLabel('Sòng Bạc 100G').setEmoji('🎲').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`vill_sh_sac_${userId}`).setLabel('Hiến Tế Max HP').setEmoji('🩸').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`vill_sh_casino_${userId}`).setLabel('Sòng Bạc 100G').setEmoji('🎲').setStyle(ButtonStyle.Primary).setDisabled(casinoCd > 0),
+    new ButtonBuilder().setCustomId(`vill_sh_sac_${userId}`).setLabel('Hiến Tế Max HP').setEmoji('🩸').setStyle(ButtonStyle.Danger).setDisabled(sacrificeCd > 0),
     new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary),
   );
   const msg = await interaction.editReply({ embeds: [embed], components: [row] });
@@ -747,12 +853,18 @@ export async function showShadowCourtDistrict(interaction: ChatInputCommandInter
 }
 
 async function shadowCasino(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+  const cd = userCooldown(userId, guildId, 'shadow_casino');
+  if (cd > 0) {
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🎲 Sòng bạc đang cooldown. Thử lại sau **${formatDuration(cd)}**.`)], components: [backRow(userId)] });
+    return;
+  }
   const p = getPlayer(userId, guildId)!;
   const bet = Math.min(100, p.gold);
   if (bet < 100 || !spendGold(userId, guildId, 100)) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '🎲 Cần **100 Gold** để cược.')], components: [backRow(userId)] });
     return;
   }
+  setUserCooldown(userId, guildId, 'shadow_casino', VILLAGE_COOLDOWNS.casino);
   const playerRoll = 1 + Math.floor(Math.random() * 6);
   const houseRoll = 1 + Math.floor(Math.random() * 6);
   if (playerRoll > houseRoll) {
@@ -769,6 +881,11 @@ async function shadowCasino(interaction: ChatInputCommandInteraction, userId: st
 }
 
 async function shadowSacrifice(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+  const cd = userCooldown(userId, guildId, 'shadow_sacrifice');
+  if (cd > 0) {
+    await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🩸 Nghi lễ hiến tế chưa nguội. Thử lại sau **${formatDuration(cd)}**.`)], components: [backRow(userId)] });
+    return;
+  }
   const p = applyPassiveStats(getPlayer(userId, guildId)!);
   const row = db.prepare(`SELECT COALESCE(SUM(count),0) AS n FROM shadow_sacrifices WHERE user_id=? AND guild_id=?`).get(userId, guildId) as any;
   const count = Number(row?.n ?? 0);
@@ -793,6 +910,7 @@ async function shadowSacrifice(interaction: ChatInputCommandInteraction, userId:
   if (btn.customId !== `vill_sac_confirm_${userId}`) return;
   db.prepare(`UPDATE players SET permanent_max_hp_bonus = COALESCE(permanent_max_hp_bonus,0) - 50, hp = MIN(hp, max_hp - 50) WHERE user_id=? AND guild_id=?`).run(userId, guildId);
   db.prepare(`INSERT INTO shadow_sacrifices (user_id, guild_id, sacrifice_key, count, updated_at) VALUES (?, ?, 'ancient_blood_blade', 1, unixepoch()) ON CONFLICT(user_id, guild_id, sacrifice_key) DO UPDATE SET count=count+1, updated_at=unixepoch()`).run(userId, guildId);
+  setUserCooldown(userId, guildId, 'shadow_sacrifice', VILLAGE_COOLDOWNS.sacrifice);
   addItem(userId, guildId, 'ancient_blood_blade', 1);
   adjustFaction(userId, guildId, 'shadow_court', 8);
   await interaction.editReply({ embeds: [simpleEmbed(COLORS.dark, `🩸 Giao kèo hoàn tất.\nBạn mất **50 Max HP vĩnh viễn** và nhận **🩸 Ancient Blood Blade**.\n🌑 Shadow Court Rep +8`)], components: [backRow(userId)] });
@@ -800,45 +918,13 @@ async function shadowSacrifice(interaction: ChatInputCommandInteraction, userId:
 
 export async function showTownSquareDistrict(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
   ensureProjects(guildId);
-  const p = getPlayer(userId, guildId)!;
-  const active = db.prepare('SELECT COUNT(*) AS n FROM guild_projects WHERE guild_id=? AND is_completed=0').get(guildId) as any;
-  const done = db.prepare('SELECT COUNT(*) AS n FROM guild_projects WHERE guild_id=? AND is_completed=1').get(guildId) as any;
-
-  const embed = new EmbedBuilder()
-    .setColor(0x2ECC71)
-    .setTitle('🪵 Khu E — Quảng Trường Chính')
-    .setDescription(
-      `Giữa quảng trường, tiếng búa rèn vang lên cạnh bảng công trình của làng.\n\n` +
-      `👤 **${p.name}** · 🪙 **${p.gold} Gold**\n` +
-      `⚒️ **Lò Rèn**: nâng trang bị, thức tỉnh đồ cũ, khóa dòng và tẩy luyện Affix.\n` +
-      `🏗️ **Công trình công cộng**: đóng góp nguyên liệu để mở nâng cấp toàn server.\n\n` +
-      `Công trình đang mở: **${active?.n ?? 0}** · Đã hoàn thành: **${done?.n ?? 0}**`
-    );
-
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vill_sq_smith_${userId}`).setLabel('Lò Rèn').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`vill_sq_projects_${userId}`).setLabel('Công trình').setEmoji('🏗️').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary),
-  );
-
-  const msg = await interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await msg.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 45_000 }).catch(() => null);
-  if (!btn) return;
-  await safeDefer(btn);
-  if (btn.customId === `vill_sq_smith_${userId}`) return showVillageBlacksmith(interaction, userId, guildId);
-  if (btn.customId === `vill_sq_projects_${userId}`) return showTownSquareProjects(interaction, userId, guildId);
-  await interaction.editReply({ components: [] }).catch(() => {});
-}
-
-async function showTownSquareProjects(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
-  ensureProjects(guildId);
   const rows = db.prepare('SELECT * FROM guild_projects WHERE guild_id=? ORDER BY is_completed ASC, project_id ASC').all(guildId) as any[];
   const desc = rows.map(r => {
     const def = PROJECTS.find(p => p.id === r.project_id)!;
     const item = displayThing(def.targetItem);
     return `${def.icon} **${def.name}** ${r.is_completed ? '✅' : ''}\n> Cần ${item.icon} **${item.name}** · **${r.current_amount}/${r.target_amount}**\n> ${progressBar(r.current_amount, r.target_amount)}`;
   }).join('\n\n');
-  const embed = new EmbedBuilder().setColor(0x2ECC71).setTitle('🏗️ Công Trình Công Cộng')
+  const embed = new EmbedBuilder().setColor(0x2ECC71).setTitle('🪵 Khu E — Quảng Trường Chính')
     .setDescription(`${desc}\n\nChọn công trình để đóng góp nguyên liệu toàn server.`);
   const options = rows.filter(r => !r.is_completed).slice(0, 25).map(r => {
     const def = PROJECTS.find(p => p.id === r.project_id)!;
@@ -861,7 +947,7 @@ async function showTownSquareProjects(interaction: ChatInputCommandInteraction, 
 
 async function showProjectDonation(interaction: ChatInputCommandInteraction, userId: string, guildId: string, projectId: string): Promise<void> {
   const def = PROJECTS.find(p => p.id === projectId);
-  if (!def) return showTownSquareProjects(interaction, userId, guildId);
+  if (!def) return showTownSquareDistrict(interaction, userId, guildId);
   const row = getProjectRow(guildId, projectId);
   const qty = getItemQty(userId, guildId, def.targetItem);
   const item = displayThing(def.targetItem);
@@ -878,7 +964,7 @@ async function showProjectDonation(interaction: ChatInputCommandInteraction, use
   const btn = await msg.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 30_000 }).catch(() => null);
   if (!btn) return;
   await safeDefer(btn);
-  if (btn.customId === `vill_back_${userId}`) return showTownSquareProjects(interaction, userId, guildId);
+  if (btn.customId === `vill_back_${userId}`) return showTownSquareDistrict(interaction, userId, guildId);
   const donate = btn.customId.includes('_dall_') ? Math.min(qty, remaining) : btn.customId.includes('_d100_') ? 100 : 10;
   if (donate <= 0 || !removeItem(userId, guildId, def.targetItem, donate)) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '❌ Không đủ nguyên liệu để đóng góp.')], components: [backRow(userId)] });

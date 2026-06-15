@@ -20,29 +20,6 @@ const UPDATE_CODES: SeedCode[] = [
     maxUses: 0,
   },
   {
-    code: 'ASHVEILUPDATE',
-    rewards: {
-      gold: 300,
-      items: [
-        { id: 'legacy_spark', qty: 1 },
-        { id: 'health_potion', qty: 2 },
-      ],
-    },
-    maxUses: 0,
-  },
-  {
-    code: 'STEVEJOBSVN',
-    rewards: {
-      gold: 300,
-      items: [
-        { id: 'exam_score_ten', qty: 1 },
-        { id: 'legacy_spark', qty: 1 },
-        { id: 'health_potion', qty: 2 },
-      ],
-    },
-    maxUses: 0,
-  },
-  {
     code: 'ZONE2UPDATE',
     rewards: {
       gold: 300,

@@ -57,4 +57,15 @@ try { db.exec(`
     joined_at INTEGER DEFAULT (unixepoch()),
     PRIMARY KEY (guild_id, user_id)
   );
+
+
+  CREATE TABLE IF NOT EXISTS village_cooldowns (
+    scope TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    guild_id TEXT NOT NULL,
+    cd_key TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    updated_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (scope, owner_id, guild_id, cd_key)
+  );
 `); } catch {}

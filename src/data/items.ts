@@ -49,13 +49,6 @@ export const ITEMS: Record<string, ItemDef> = {
     sellPrice: 50
   },
 
-  legacy_spark: {
-    id: 'legacy_spark', name: 'Legacy Spark', icon: '🧩',
-    type: 'key_item', stackable: true,
-    description: 'Dùng tại Lò Rèn để thức tỉnh 1 trang bị cũ thành trang bị có Prefix/Suffix. Người chơi cũ nhận 2 lần đầu sau update.',
-    sellPrice: 200
-  },
-
   // Echo Demon ritual key items — thu thập từ event "Tiếng Vọng" ở Đền Cổ (shrine).
   // Dùng để mở Cổng Phong Ấn / Nghi Lễ triệu hồi Echo Demon.
   echo_trace: {

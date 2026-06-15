@@ -52,17 +52,8 @@ export function changePlayerClass(userId: string, guildId: string, classId: stri
   const missingMp = Math.max(0, before.max_mp - before.mp);
   const projected = { ...player, class: classId } as PlayerRow;
   const next = deriveBaseStats(projected);
-  const afterCaps = applyPassiveStats({
-    ...projected,
-    hp: next.maxHp,
-    max_hp: next.maxHp,
-    mp: next.maxMp,
-    max_mp: next.maxMp,
-    atk: next.atk,
-    def: next.def,
-  } as PlayerRow);
-  const nextHp = Math.max(1, Math.min(afterCaps.max_hp, afterCaps.max_hp - missingHp));
-  const nextMp = Math.max(0, Math.min(afterCaps.max_mp, afterCaps.max_mp - missingMp));
+  const nextHp = Math.max(1, Math.min(next.maxHp, next.maxHp - missingHp));
+  const nextMp = Math.max(0, Math.min(next.maxMp, next.maxMp - missingMp));
 
   db.prepare(`
     UPDATE players SET
@@ -107,24 +98,16 @@ export function resetPlayer(userId: string, guildId: string): void {
   // Death reset is now harsher: equipped gear is lost too.
   // Delete worn equipment links first, then wipe inventory without keeping equipped items.
   db.prepare('DELETE FROM equipment_worn WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
-  db.prepare('DELETE FROM equipment_instance_upgrades WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
-  db.prepare('DELETE FROM equipment_instances WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
   db.prepare('DELETE FROM inventory WHERE user_id = ? AND guild_id = ?').run(userId, guildId);
 }
 
 // ── Stat helpers ──────────────────────────────────────────────────────────
 export function applyPassiveStats(player: PlayerRow): PlayerRow {
   const derivedBase = deriveBaseStats(player);
-  // `hp` / `mp` may legally be higher than the derived base caps because
-  // equipment, pets, passives and clan buffs can add *virtual* Max HP/MP.  The
-  // old code clamped HP to `derivedBase.maxHp` before those virtual bonuses were
-  // added, which made players with +MaxHP gear display/heal like 120/150 after a
-  // full heal.  Keep current vitals raw here and clamp once, after all virtual
-  // caps are known.
   const normalized: PlayerRow = {
     ...player,
-    hp: Math.max(0, Math.floor(Number(player.hp ?? 0))),
-    mp: Math.max(0, Math.floor(Number(player.mp ?? 0))),
+    hp: Math.min(player.hp, derivedBase.maxHp),
+    mp: Math.min(player.mp, derivedBase.maxMp),
     max_hp: derivedBase.maxHp,
     max_mp: derivedBase.maxMp,
     atk: derivedBase.atk,
@@ -245,17 +228,8 @@ export function syncDerivedBaseStats(userId: string, guildId: string, preserveMi
   const missingHp = preserveMissing ? Math.max(0, before.max_hp - before.hp) : 0;
   const missingMp = preserveMissing ? Math.max(0, before.max_mp - before.mp) : 0;
   const base = deriveBaseStats(player);
-  const afterCaps = applyPassiveStats({
-    ...player,
-    hp: base.maxHp,
-    max_hp: base.maxHp,
-    mp: base.maxMp,
-    max_mp: base.maxMp,
-    atk: base.atk,
-    def: base.def,
-  } as PlayerRow);
-  const nextHp = Math.max(player.alive ? 1 : 0, Math.min(afterCaps.max_hp, afterCaps.max_hp - missingHp));
-  const nextMp = Math.max(0, Math.min(afterCaps.max_mp, afterCaps.max_mp - missingMp));
+  const nextHp = Math.max(player.alive ? 1 : 0, Math.min(base.maxHp, base.maxHp - missingHp));
+  const nextMp = Math.max(0, Math.min(base.maxMp, base.maxMp - missingMp));
 
   db.prepare(`
     UPDATE players SET hp=?, max_hp=?, mp=?, max_mp=?, atk=?, def=?
@@ -327,17 +301,8 @@ export function resetAllocatedStats(userId: string, guildId: string, consumeFree
     stat_luk: 0,
   } as PlayerRow;
   const base = deriveBaseStats(projected);
-  const afterCaps = applyPassiveStats({
-    ...projected,
-    hp: base.maxHp,
-    max_hp: base.maxHp,
-    mp: base.maxMp,
-    max_mp: base.maxMp,
-    atk: base.atk,
-    def: base.def,
-  } as PlayerRow);
-  const nextHp = Math.max(player.alive ? 1 : 0, Math.min(afterCaps.max_hp, Math.floor(afterCaps.max_hp * hpRatio)));
-  const nextMp = Math.max(0, Math.min(afterCaps.max_mp, Math.floor(afterCaps.max_mp * mpRatio)));
+  const nextHp = Math.max(player.alive ? 1 : 0, Math.min(base.maxHp, Math.floor(base.maxHp * hpRatio)));
+  const nextMp = Math.max(0, Math.min(base.maxMp, Math.floor(base.maxMp * mpRatio)));
 
   db.prepare(`
     UPDATE players SET
@@ -370,23 +335,14 @@ export function grantExp(userId: string, guildId: string, amount: number): Level
 
   const projected = { ...player, level, exp, exp_next } as PlayerRow;
   const newBase = deriveBaseStats(projected);
-  const afterCaps = applyPassiveStats({
-    ...projected,
-    hp: newBase.maxHp,
-    max_hp: newBase.maxHp,
-    mp: newBase.maxMp,
-    max_mp: newBase.maxMp,
-    atk: newBase.atk,
-    def: newBase.def,
-  } as PlayerRow);
   let hp = player.hp;
   let mp = player.mp;
   if (leveledUp) {
-    hp = Math.max(1, Math.min(afterCaps.max_hp, afterCaps.max_hp - missingHp));
-    mp = Math.max(0, Math.min(afterCaps.max_mp, afterCaps.max_mp - missingMp));
+    hp = Math.max(1, Math.min(newBase.maxHp, newBase.maxHp - missingHp));
+    mp = Math.max(0, Math.min(newBase.maxMp, newBase.maxMp - missingMp));
   } else {
-    hp = Math.max(0, Math.min(hp, afterCaps.max_hp));
-    mp = Math.max(0, Math.min(mp, afterCaps.max_mp));
+    hp = Math.max(0, Math.min(hp, newBase.maxHp));
+    mp = Math.max(0, Math.min(mp, newBase.maxMp));
   }
 
   db.prepare(`

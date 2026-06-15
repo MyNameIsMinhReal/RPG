@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import {
   getPlayer, applyPassiveStats, grantGold, spendGold, grantExp, grantSoulShards,
-  addItem, getItemQty, updatePlayerHpMp, adjustReputation, removeItem
+  addItem, getItemQty, updatePlayerHpMp, adjustReputation
 } from '../player';
 import {
   startCombatFlow, startCombatFlowWithEnemy, startGroupCombatFlow,
@@ -40,11 +40,6 @@ import { showExploreMenu } from './menu';
 import { showMerchant, showSoulShop } from './merchant';
 import { getReadyPartyMemberIds } from './partyHelpers';
 import { maybeGainShrineCorruption, getCorruptionLevel, getCorruptionTier } from '../corruption';
-import { setBuff } from '../consumables';
-import {
-  generateExploreNodes, getExploreNoise, addExploreNoise, reduceExploreNoise, resetExploreNoise,
-  formatNoiseBar, canUseSmokeBomb, consumeSmokeForNoise, describeNode, rollResourceResult, getZoneTitle, type ExploreNode
-} from './nodes';
 
 async function startEnemyCombatMaybeParty(
   interaction: ChatInputCommandInteraction,
@@ -89,7 +84,6 @@ export async function handleSearch(
   const player = getPlayer(userId, guildId)!;
   const currentZone = getZone(player.zone_id)!;
   if (currentZone.safe) {
-    resetExploreNoise(userId, guildId);
     await showExploreMenu(interaction, userId, guildId);
     return;
   }
@@ -244,6 +238,21 @@ export async function handleSearch(
   }
 
   const shrineCorruptionTier = player.zone_id === 'shrine' ? getCorruptionTier((player as any).corruption ?? 0) : 0;
+  const groupChance = (GROUP_CHANCE[player.zone_id] ?? 0.15) + shrineCorruptionTier * 0.03;
+  if (enemies.length >= 2 && Math.random() < groupChance) {
+    setExploreCooldown(userId, guildId);
+    if (isPartyLeader) {
+      await startPartyCombat(pick(enemies).id);
+    } else {
+      const shuffled = [...enemies].sort(() => Math.random() - 0.5);
+      const threeChance = THREE_ENEMY_CHANCE[player.zone_id] ?? 0.20;
+      const count = (enemies.length >= 3 && Math.random() < threeChance) ? 3 : 2;
+      const groupIds = shuffled.slice(0, count).map(e => e.id);
+      await startGroupCombatFlow(interaction, userId, guildId, groupIds, handleVictory, handleDeath, handleFlee);
+    }
+    return;
+  }
+
   const hasCombat = enemies.length > 0;
   const hasLegacy = legacies.length > 0;
 
@@ -316,308 +325,54 @@ export async function handleSearch(
     }
   }
 
-  const runRandomExploreEvent = async (): Promise<void> => {
-      const event = pickExploreEvent({ player, guildId, hasCombat, hasLegacy });
-      const pityTargets = partyMemberIds ?? [userId];
-      for (const mid of pityTargets) updatePityCounters(mid, guildId, event);
+  const event = pickExploreEvent({ player, guildId, hasCombat, hasLegacy });
+  const pityTargets = partyMemberIds ?? [userId];
+  for (const mid of pityTargets) updatePityCounters(mid, guildId, event);
 
-      setExploreCooldown(userId, guildId);
+  setExploreCooldown(userId, guildId);
 
-      return runExploreEvent({
-        event,
-        interaction,
-        userId,
-        guildId,
-        player,
-        enemies,
-        legacies,
-        partyMemberIds,
-        partyMemberNames,
-        callbacks: {
-          startCombat: isPartyLeader
-            ? startPartyCombat
-            : (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee),
-          startCombatWithEnemy: isPartyLeader
-            ? startPartyCombatWithEnemy
-            : (enemy: any, onVictory?: CombatVictoryHandler, onDeath?: CombatDeathHandler, onFlee?: CombatFleeHandler) => startCombatFlowWithEnemy(interaction, userId, guildId, enemy, undefined, onVictory, onDeath, onFlee),
-          handleFlee,
-          showAmbush: () => showAmbush(interaction, userId, guildId, pick(enemies).id),
-          showLegacyFind: () => showLegacyFind(interaction, userId, guildId, legacies),
-          showMerchant: () => showMerchant(interaction, userId, guildId, partyMemberIds, partyMemberNames),
-          showHealingSpring: () => showHealingSpring(interaction, userId, guildId),
-          showTrap: () => showTrap(interaction, userId, guildId),
-          showAncientAltar: () => showAncientAltar(interaction, userId, guildId),
-          showMysteriousFigure: () => showMysteriousFigure(interaction, userId, guildId),
-          showVillagerRescue: () => showVillagerRescue(interaction, userId, guildId, enemies),
-          showCaravanRobbery: () => showCaravanRobbery(interaction, userId, guildId, enemies),
-          showLootFind: () => showLootFind(interaction, userId, guildId),
-          showSoulShop: () => showSoulShop(interaction, userId, guildId, partyMemberIds, partyMemberNames),
-          showAbandonedCamp: () => showAbandonedCamp(interaction, userId, guildId),
-          showLostPouch: () => showLostPouch(interaction, userId, guildId),
-          showRuneStone: () => showRuneStone(interaction, userId, guildId),
-          showTreasureChest: () => showTreasureChest(interaction, userId, guildId),
-          showWanderingHealer: () => showWanderingHealer(interaction, userId, guildId, partyMemberIds, partyMemberNames),
-          showSpiritTrial: () => showSpiritTrial(interaction, userId, guildId, enemies),
-          buildContinueExploreRow,
-          attachContinueExploreHandler,
-          handleVictory,
-          handleDeath
+  return runExploreEvent({
+    event,
+    interaction,
+    userId,
+    guildId,
+    player,
+    enemies,
+    legacies,
+    partyMemberIds,
+    partyMemberNames,
+    callbacks: {
+      startCombat: isPartyLeader
+        ? startPartyCombat
+        : (enemyId: string) => startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee),
+      startCombatWithEnemy: isPartyLeader
+        ? startPartyCombatWithEnemy
+        : (enemy: any, onVictory?: CombatVictoryHandler, onDeath?: CombatDeathHandler, onFlee?: CombatFleeHandler) => startCombatFlowWithEnemy(interaction, userId, guildId, enemy, undefined, onVictory, onDeath, onFlee),
+      handleFlee,
+      showAmbush: () => showAmbush(interaction, userId, guildId, pick(enemies).id),
+      showLegacyFind: () => showLegacyFind(interaction, userId, guildId, legacies),
+      showMerchant: () => showMerchant(interaction, userId, guildId, partyMemberIds, partyMemberNames),
+      showHealingSpring: () => showHealingSpring(interaction, userId, guildId),
+      showTrap: () => showTrap(interaction, userId, guildId),
+      showAncientAltar: () => showAncientAltar(interaction, userId, guildId),
+      showMysteriousFigure: () => showMysteriousFigure(interaction, userId, guildId),
+      showVillagerRescue: () => showVillagerRescue(interaction, userId, guildId, enemies),
+      showCaravanRobbery: () => showCaravanRobbery(interaction, userId, guildId, enemies),
+      showLootFind: () => showLootFind(interaction, userId, guildId),
+      showSoulShop: () => showSoulShop(interaction, userId, guildId, partyMemberIds, partyMemberNames),
+      showAbandonedCamp: () => showAbandonedCamp(interaction, userId, guildId),
+      showLostPouch: () => showLostPouch(interaction, userId, guildId),
+      showRuneStone: () => showRuneStone(interaction, userId, guildId),
+      showTreasureChest: () => showTreasureChest(interaction, userId, guildId),
+      showWanderingHealer: () => showWanderingHealer(interaction, userId, guildId, partyMemberIds, partyMemberNames),
+      showSpiritTrial: () => showSpiritTrial(interaction, userId, guildId, enemies),
+      buildContinueExploreRow,
+      attachContinueExploreHandler,
+      handleVictory,
+      handleDeath
       
-        }
-      });
-  };
-
-  const startCombatNode = async (): Promise<void> => {
-    setExploreCooldown(userId, guildId);
-    const combatGroupChance = (GROUP_CHANCE[player.zone_id] ?? 0.15) + shrineCorruptionTier * 0.03;
-    if (enemies.length >= 2 && Math.random() < combatGroupChance) {
-      if (isPartyLeader) {
-        await startPartyCombat(pick(enemies).id);
-      } else {
-        const shuffled = [...enemies].sort(() => Math.random() - 0.5);
-        const threeChance = THREE_ENEMY_CHANCE[player.zone_id] ?? 0.20;
-        const count = (enemies.length >= 3 && Math.random() < threeChance) ? 3 : 2;
-        const groupIds = shuffled.slice(0, count).map(e => e.id);
-        await startGroupCombatFlow(interaction, userId, guildId, groupIds, handleVictory, handleDeath, handleFlee);
-      }
-      return;
     }
-
-    if (isPartyLeader) await startPartyCombat(pick(enemies).id);
-    else await startCombatFlow(interaction, userId, guildId, pick(enemies).id, handleVictory, handleDeath, handleFlee);
-  };
-
-  const maybeTriggerNoiseAmbush = async (noise: { triggered: boolean; after: number }): Promise<boolean> => {
-    if (!noise.triggered || !enemies.length) return false;
-    resetExploreNoise(userId, guildId);
-    setExploreCooldown(userId, guildId);
-    const enemy = pick(enemies);
-    const embed = new EmbedBuilder()
-      .setColor(COLORS.danger)
-      .setTitle('🔊 Tiếng Động Đạt 100%')
-      .setDescription(
-        `Bạn gây quá nhiều tiếng động trong **${getZoneTitle(player.zone_id)}**.
-` +
-        `Bóng tối lập tức đáp lại...
-
-` +
-        `💥 **AMBUSH!** Quái vật sẽ được đánh trước.
-` +
-        `🔇 Noise đã reset về **0%** sau khi bị phát hiện.`
-      );
-    await interaction.editReply({ embeds: [embed], components: [] });
-    await new Promise(r => setTimeout(r, 900));
-    await showAmbush(interaction, userId, guildId, enemy.id);
-    return true;
-  };
-
-  const showResourceNode = async (): Promise<void> => {
-    setExploreCooldown(userId, guildId);
-    const result = rollResourceResult(player.zone_id, userId, guildId);
-    addItem(userId, guildId, result.itemId, result.amount);
-    const toolLine = result.hasTool
-      ? `🧰 Công cụ: **${result.toolLabel}** — sản lượng tốt hơn.`
-      : '👐 Không có rìu/cuốc phù hợp: vẫn khai thác được, nhưng sản lượng thấp hơn.';
-    const reply = await interaction.editReply({
-      embeds: [new EmbedBuilder()
-        .setColor(COLORS.success)
-        .setTitle('⛏️ Dấu Vết Tài Nguyên')
-        .setDescription(
-          `${toolLine}
-
-` +
-          `Thu được: ${result.icon} **${result.name} ×${result.amount}**
-` +
-          `🔊 Noise hiện tại: ${formatNoiseBar(getExploreNoise(userId, guildId))}`
-        )],
-      components: buildContinueExploreRow(userId)
-    });
-    attachContinueExploreHandler(reply, interaction, userId, guildId);
-  };
-
-  const showCampNode = async (): Promise<void> => {
-    const fresh = applyPassiveStats(getPlayer(userId, guildId)!);
-    const price = Math.max(12, Math.floor(16 + fresh.level * 5));
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`node_camp_rest_${userId}`).setLabel(`Nghỉ ngơi ${price} Gold`).setEmoji('🔥').setStyle(ButtonStyle.Success).setDisabled(fresh.gold < price),
-      new ButtonBuilder().setCustomId(`node_camp_leave_${userId}`).setLabel('Bỏ đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
-    );
-    const reply = await interaction.editReply({
-      embeds: [new EmbedBuilder()
-        .setColor(COLORS.info)
-        .setTitle('🏕️ Trại Tàn Tạ')
-        .setDescription(
-          `Một trại cũ đủ kín để nghỉ tạm.
-
-` +
-          `🪙 Giá nghỉ: **${price} Gold**
-` +
-          `❤️ Hồi **30% HP** · 💧 **15% MP**
-` +
-          `🔇 Giảm Noise **25%**`
-        )],
-      components: [row]
-    });
-    const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 25_000 }).catch(() => null);
-    const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
-    if (!btn || !deferred || btn.customId !== `node_camp_rest_${userId}`) {
-      const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn rời khỏi trại trước khi khói lửa thu hút thứ khác.')], components: buildContinueExploreRow(userId) });
-      attachContinueExploreHandler(res, interaction, userId, guildId);
-      return;
-    }
-    if (!spendGold(userId, guildId, price)) {
-      const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ Không đủ **${price} Gold** để nghỉ.`)], components: buildContinueExploreRow(userId) });
-      attachContinueExploreHandler(res, interaction, userId, guildId);
-      return;
-    }
-    const cur = applyPassiveStats(getPlayer(userId, guildId)!);
-    const hpGain = Math.max(1, Math.floor(cur.max_hp * 0.30));
-    const mpGain = Math.max(0, Math.floor(cur.max_mp * 0.15));
-    const nextHp = Math.min(cur.max_hp, cur.hp + hpGain);
-    const nextMp = Math.min(cur.max_mp, cur.mp + mpGain);
-    updatePlayerHpMp(userId, guildId, nextHp, nextMp);
-    const noiseNow = reduceExploreNoise(userId, guildId, 25, 'camp');
-    setExploreCooldown(userId, guildId);
-    const res = await interaction.editReply({
-      embeds: [simpleEmbed(COLORS.success, `🔥 Bạn nghỉ một lát ở trại.
-🪙 -**${price} Gold**
-❤️ ${nextHp}/${cur.max_hp} HP · 💧 ${nextMp}/${cur.max_mp} MP
-🔇 Noise: ${formatNoiseBar(noiseNow)}`)],
-      components: buildContinueExploreRow(userId)
-    });
-    attachContinueExploreHandler(res, interaction, userId, guildId);
-  };
-
-  const showBrokenGoddessStatue = async (): Promise<void> => {
-    const embed = new EmbedBuilder()
-      .setColor(0x8b5cf6)
-      .setTitle('🗿 Bức Tượng Nữ Thần Vỡ')
-      .setDescription('Bạn thấy một bức tượng Nữ Thần bị đập nát. Một con quạ đậu trên vai tượng, nhìn bạn chằm chằm.');
-    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`statue_pray_${userId}`).setLabel('Chắp tay cầu nguyện').setEmoji('🙏').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`statue_search_${userId}`).setLabel('Lục soát bệ đá').setEmoji('🔎').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`statue_leave_${userId}`).setLabel('Bỏ đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary)
-    );
-    const reply = await interaction.editReply({ embeds: [embed], components: [row] });
-    const btn = await reply.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 30_000 }).catch(() => null);
-    const deferred = await btn?.deferUpdate().then(() => true).catch(() => false);
-    if (!btn || !deferred || btn.customId === `statue_leave_${userId}`) {
-      const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '🚶 Bạn cúi đầu rời đi. Con quạ vẫn nhìn theo, nhưng không kêu một tiếng.')], components: buildContinueExploreRow(userId) });
-      attachContinueExploreHandler(res, interaction, userId, guildId);
-      return;
-    }
-    if (btn.customId === `statue_pray_${userId}`) {
-      const p = applyPassiveStats(getPlayer(userId, guildId)!);
-      if (randInt(1, 100) <= 70) {
-        setBuff(userId, guildId, 'goddess_luck' as any, 12, 3, 3600);
-        const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '✨ Lời cầu nguyện được đáp lại. **May Mắn Nữ Thần**: +12% Crit trong 3 lượt đánh của combat kế tiếp.')], components: buildContinueExploreRow(userId) });
-        attachContinueExploreHandler(res, interaction, userId, guildId);
-      } else {
-        const dmg = Math.min(10, Math.max(1, p.hp - 1));
-        updatePlayerHpMp(userId, guildId, p.hp - dmg, p.mp);
-        const res = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🐦 Con quạ mổ mạnh vào tay bạn. -**${dmg} HP** (${p.hp - dmg}/${p.max_hp}).`) ], components: buildContinueExploreRow(userId) });
-        attachContinueExploreHandler(res, interaction, userId, guildId);
-      }
-      return;
-    }
-
-    const noise = addExploreNoise(userId, guildId, 20, player.class, 'statue_search');
-    if (await maybeTriggerNoiseAmbush(noise)) return;
-    grantGold(userId, guildId, 20);
-    addItem(userId, guildId, 'holy_water', 1);
-    setBuff(userId, guildId, 'goddess_curse' as any, 20, 5, 7200);
-    const res = await interaction.editReply({
-      embeds: [simpleEmbed(COLORS.warning, `🔎 Bạn lục soát bệ đá và lấy được **20 Gold** + 💧 **Holy Water ×1**.
-
-⚠️ **Lời Nguyền Của Thần**: nhận thêm 20% sát thương trong 5 lượt của combat kế tiếp.
-🔊 Noise: ${formatNoiseBar(getExploreNoise(userId, guildId))}`)],
-      components: buildContinueExploreRow(userId)
-    });
-    attachContinueExploreHandler(res, interaction, userId, guildId);
-  };
-
-  const showMysteryNode = async (): Promise<void> => {
-    setExploreCooldown(userId, guildId);
-    const roll = randInt(1, 100);
-    if (roll <= 38) return showBrokenGoddessStatue();
-    if (roll <= 58) return showTreasureChest(interaction, userId, guildId);
-    if (roll <= 74) return showRuneStone(interaction, userId, guildId);
-    if (roll <= 88) return showLostPouch(interaction, userId, guildId);
-    return runRandomExploreEvent();
-  };
-
-  const resolveExploreNode = async (node: ExploreNode): Promise<void> => {
-    const baseNoise = node.type === 'camp' ? 0 : node.noise;
-    const noise = baseNoise > 0 ? addExploreNoise(userId, guildId, baseNoise, player.class, node.type) : { before: getExploreNoise(userId, guildId), after: getExploreNoise(userId, guildId), added: 0, triggered: false };
-    if (await maybeTriggerNoiseAmbush(noise)) return;
-
-    if (node.type === 'combat') return startCombatNode();
-    if (node.type === 'resource') return showResourceNode();
-    if (node.type === 'camp') return showCampNode();
-    return showMysteryNode();
-  };
-
-  const showExploreNodeChoices = async (): Promise<void> => {
-    const nodes = generateExploreNodes(player, hasCombat, hasLegacy);
-    const noise = getExploreNoise(userId, guildId);
-    const embed = new EmbedBuilder()
-      .setColor(COLORS.info)
-      .setTitle(`🗺️ Ngã Rẽ Định Mệnh — ${getZoneTitle(player.zone_id)}`)
-      .setDescription(
-        `Bạn dừng lại trước vài lối rẽ. Không phải bước nào cũng nên đánh đổi bằng máu.
-
-` +
-        nodes.map(describeNode).join('\n\n') +
-        `
-
-🔊 **Tiếng Động hiện tại**
-${formatNoiseBar(noise)}
-` +
-        `*Noise đạt 100% sẽ kích hoạt Ambush, quái được đánh trước.*`
-      )
-      .setFooter({ text: 'Assassin/Rogue/Shadowblade gây ít Noise hơn. Không có rìu/cuốc vẫn khai thác được nhưng sản lượng thấp.' });
-    const nodeRow = new ActionRowBuilder<ButtonBuilder>();
-    nodes.forEach((n, idx) => {
-      nodeRow.addComponents(new ButtonBuilder()
-        .setCustomId(`exnode_${idx}_${userId}`)
-        .setLabel(n.title.slice(0, 72))
-        .setEmoji(n.emoji)
-        .setStyle(n.type === 'combat' ? ButtonStyle.Danger : n.type === 'resource' ? ButtonStyle.Success : n.type === 'camp' ? ButtonStyle.Secondary : ButtonStyle.Primary));
-    });
-    const rows: ActionRowBuilder<ButtonBuilder>[] = [nodeRow];
-    if (noise > 0 && canUseSmokeBomb(userId, guildId)) {
-      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`exnode_smoke_${userId}`).setLabel('Dùng Smoke reset Noise').setEmoji('💨').setStyle(ButtonStyle.Secondary)
-      ));
-    }
-
-    const reply = await interaction.editReply({ embeds: [embed], components: rows });
-    const collector = reply.createMessageComponentCollector({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 60_000 });
-    collector.on('collect', async (btn) => {
-      const ok = await btn.deferUpdate().then(() => true).catch(() => false);
-      if (!ok) return;
-      collector.stop('picked');
-      await reply.edit({ components: [] }).catch(() => {});
-      if (btn.customId === `exnode_smoke_${userId}`) {
-        const used = consumeSmokeForNoise(userId, guildId);
-        const item = used ? (getItem(used) ?? { icon: '💨', name: used } as any) : null;
-        const res = await interaction.editReply({
-          embeds: [simpleEmbed(used ? COLORS.success : COLORS.warning, used ? `${item!.icon} Bạn dùng **${item!.name}**. Khói phủ kín dấu vết — Noise về **0%**.` : '❌ Không còn Smoke để dùng.')],
-          components: buildContinueExploreRow(userId)
-        });
-        attachContinueExploreHandler(res, interaction, userId, guildId);
-        return;
-      }
-      const idx = Number(btn.customId.split('_')[1]);
-      const node = nodes[idx] ?? nodes[0];
-      await resolveExploreNode(node);
-    });
-    collector.on('end', (_c, reason) => {
-      if (reason === 'time') reply.edit({ components: [] }).catch(() => {});
-    });
-  };
-
-  return showExploreNodeChoices();
+  });
 }
 
 
