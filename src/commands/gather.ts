@@ -4,8 +4,8 @@ import { addItem, addPet } from '../systems/player';
 // explore in-zone gather button. There is no /gather command by design.
 import { COLORS } from '../utils/embeds';
 import db from '../database/index';
-
-const COOLDOWN_MS = 60_000;
+import { pickWeighted } from '../utils/format';
+import { GATHER_COOLDOWN_MS } from '../utils/constants';
 
 export const GATHER_TABLE = [
   { id: 'iron_ore',         weight: 45, name: 'Iron Ore 🪨'        },
@@ -15,13 +15,6 @@ export const GATHER_TABLE = [
   { id: 'mana_crystal',     weight: 6,  name: 'Mana Crystal 💠'     },
   { id: 'void_shard',       weight: 2,  name: 'Void Shard 🌑'       },
 ];
-
-function weightedPick() {
-  const total = GATHER_TABLE.reduce((s, g) => s + g.weight, 0);
-  let r = Math.random() * total;
-  for (const g of GATHER_TABLE) { r -= g.weight; if (r <= 0) return g; }
-  return GATHER_TABLE[0];
-}
 
 export function getLastGather(userId: string, guildId: string): number {
   return (db.prepare('SELECT last_gather FROM players WHERE user_id=? AND guild_id=?').get(userId, guildId) as any)?.last_gather ?? 0;
@@ -39,7 +32,7 @@ export interface GatherResult {
 
 export function doGather(userId: string, guildId: string, playerName: string): GatherResult {
   const now       = Date.now();
-  const remaining = COOLDOWN_MS - (now - getLastGather(userId, guildId));
+  const remaining = GATHER_COOLDOWN_MS - (now - getLastGather(userId, guildId));
 
   if (remaining > 0) {
     return {
@@ -61,7 +54,7 @@ export function doGather(userId: string, guildId: string, playerName: string): G
     };
   }
 
-  const found = weightedPick();
+  const found = pickWeighted(GATHER_TABLE, 'weight');
   const qty   = found.id === 'iron_ore' && Math.random() < 0.35 ? 2 : 1;
   addItem(userId, guildId, found.id, qty);
   let petLine = '';

@@ -12,9 +12,14 @@ export interface MonsterLevelScalingResult {
 }
 
 function avgLevel(levels: number[]): number {
-  const clean = levels.map(Number).filter(n => Number.isFinite(n) && n > 0);
+  const clean = levels.map(n => Number(n)).filter(n => Number.isFinite(n) && n > 0);
   if (clean.length === 0) return 1;
-  return Math.max(1, Math.round(clean.reduce((a, b) => a + b, 0) / clean.length));
+  const avg = clean.reduce((a, b) => a + b, 0) / clean.length;
+  const max = Math.max(...clean);
+  // Weighted toward the strongest member (anti power-leveling): a single high
+  // level carry can't drag scaling down to a low-level alt's level. Solo and
+  // equal-level parties are unchanged (avg === max).
+  return Math.max(1, Math.round(avg * 0.25 + max * 0.75));
 }
 
 function getBaseMonsterLevel(enemy: any): number {

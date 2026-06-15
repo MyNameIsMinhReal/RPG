@@ -8,9 +8,10 @@ import {
 import { getFlag, setFlag } from './world';
 import { MATERIALS } from '../data/materials';
 import { EQUIPMENT, RARITY_LABELS, SLOT_ICONS } from '../data/equipment';
-import { randInt, pick } from '../utils/format';
+import { randInt, pick, pickWeighted } from '../utils/format';
 import type { PlayerRow } from '../utils/embeds';
 import { getEquipmentStats } from './equipment';
+import { createDroppedEquipmentInstance, formatEquipmentRewardInstance } from './equipmentInstances';
 import { cleanseCorruption } from './corruption';
 
 export type BuffKey =
@@ -29,7 +30,9 @@ export type BuffKey =
   | 'assassins_smoke'
   | 'warding_charm'
   | 'rune_charm'
-  | 'luck';
+  | 'luck'
+  | 'goddess_luck'
+  | 'goddess_curse';
 
 export interface PlayerBuff {
   user_id: string;
@@ -355,17 +358,15 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
         { rarity: 'legendary', weight: 4  },
         { rarity: 'mythic',    weight: 1  },
       ];
-      const total = rarityWeights.reduce((s, r) => s + r.weight, 0);
-      let roll = Math.random() * total;
-      const pickedRarity = rarityWeights.find(r => { roll -= r.weight; return roll <= 0; })!.rarity;
+      const pickedRarity = pickWeighted(rarityWeights, 'weight').rarity;
       const isGacha = (e: { rarity: string; id: string }) =>
         e.rarity !== 'cursed' && e.id !== 'early_access_ring';
       const pool = Object.values(EQUIPMENT).filter(e => e.rarity === pickedRarity && isGacha(e));
       const fallback = Object.values(EQUIPMENT).filter(e => isGacha(e));
       const eq = pick(pool.length ? pool : fallback);
-      addItem(userId, guildId, eq.id, 1);
+      const inst = createDroppedEquipmentInstance(userId, guildId, eq.id, Math.max(1, (getPlayer(userId, guildId) as any)?.level ?? 1));
       lines.push('🎰 **Gear Box nứt ra, ánh sáng rơi xuống tay bạn...**');
-      lines.push(...formatEquipmentReward(eq));
+      lines.push(inst ? formatEquipmentRewardInstance(inst) : formatEquipmentReward(eq).join('\n'));
       break;
     }
     case 'cursed_equipment_box': {
@@ -373,9 +374,9 @@ export function useItemOutsideCombat(userId: string, guildId: string, itemId: st
         .concat(Object.values(EQUIPMENT).filter(e => ['rare','epic','legendary','mythic'].includes(e.rarity) && e.rarity !== 'cursed').slice(0, 0));
       const fallback = Object.values(EQUIPMENT).filter(e => ['rare','epic','legendary','mythic','cursed'].includes(e.rarity));
       const eq = pick(pool.length ? pool : fallback);
-      addItem(userId, guildId, eq.id, 1);
+      const inst = createDroppedEquipmentInstance(userId, guildId, eq.id, Math.max(1, (getPlayer(userId, guildId) as any)?.level ?? 1));
       lines.push('🎁 **Hộp nguyền rủa bật mở. Một món trang bị lạnh buốt hiện ra...**');
-      lines.push(...formatEquipmentReward(eq));
+      lines.push(inst ? formatEquipmentRewardInstance(inst) : formatEquipmentReward(eq).join('\n'));
       break;
     }
     case 'purification_stone': {

@@ -21,6 +21,10 @@ export interface SkillDef {
   soulCost?: number;    // Soul Shards consumed on use
   damage?: number;
   heal?: number;
+  baseDamage?: number;  // optional explicit flat base (with atkScale)
+  atkScale?: number;    // optional explicit ATK multiplier; falls back to auto-scaling
+  baseHeal?: number;    // optional explicit flat heal base (with healScale)
+  healScale?: number;   // optional explicit % of max HP healed
   targetType?: 'single' | 'all' | 'self';
   effect?: EffectType;
   effectDuration?: number;

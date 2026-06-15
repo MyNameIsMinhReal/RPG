@@ -270,67 +270,107 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder, image?: st
 
 function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line?: string; startsCombat?: boolean } {
   const player = getEffectivePlayer(ctx.userId, ctx.guildId) ?? ctx.player;
+  // Party explore events are voted on by the whole party, so shared rewards/penalties
+  // must hit every member — not just the leader who clicked. Solo falls back to [userId].
+  const targetIds = ctx.partyMemberIds && ctx.partyMemberIds.length > 1 ? ctx.partyMemberIds : [ctx.userId];
+  const isParty = targetIds.length > 1;
+  const partyTag = isParty ? ' · 👥 cả tổ đội' : '';
 
   switch (action.type) {
     case 'gold': {
       const rolled = randInt(action.min, action.max);
       const amount = scaleEventGold(rolled);
       if (amount >= 0) {
-        grantGold(ctx.userId, ctx.guildId, amount);
-        return { line: `🪙 Nhận **${amount} Gold**` };
+        for (const uid of targetIds) grantGold(uid, ctx.guildId, amount);
+        return { line: `🪙 Nhận **${amount} Gold**${partyTag}` };
       }
       const cost = Math.abs(amount);
-      spendGold(ctx.userId, ctx.guildId, cost);
-      return { line: `🪙 Trả **${cost} Gold**` };
+      for (const uid of targetIds) spendGold(uid, ctx.guildId, cost);
+      return { line: `🪙 Trả **${cost} Gold**${partyTag}` };
     }
     case 'exp': {
       const amount = scaleEventExp(randInt(action.min, action.max));
-      const res = grantExp(ctx.userId, ctx.guildId, amount);
-      return { line: res.leveledUp ? `⭐ Nhận **${amount} EXP** — lên **Lv.${res.newLevel}**` : `⭐ Nhận **${amount} EXP**` };
+      let callerRes: { leveledUp: boolean; newLevel: number } = { leveledUp: false, newLevel: 0 };
+      for (const uid of targetIds) {
+        const r = grantExp(uid, ctx.guildId, amount);
+        if (uid === ctx.userId) callerRes = r;
+      }
+      return { line: callerRes.leveledUp ? `⭐ Nhận **${amount} EXP** — lên **Lv.${callerRes.newLevel}**${partyTag}` : `⭐ Nhận **${amount} EXP**${partyTag}` };
     }
     case 'item': {
       const qty = randInt(action.min ?? 1, action.max ?? action.min ?? 1);
-      addItem(ctx.userId, ctx.guildId, action.itemId, qty);
-      return { line: `🎁 Nhận **${qty}×** ${displayNameForItem(action.itemId)}` };
+      for (const uid of targetIds) addItem(uid, ctx.guildId, action.itemId, qty);
+      return { line: `🎁 Nhận **${qty}×** ${displayNameForItem(action.itemId)}${partyTag}` };
     }
     case 'consume_item': {
+      // A cost paid from the chooser's own inventory — stays on the caller only.
       const amount = Math.max(1, action.amount ?? 1);
       removeItem(ctx.userId, ctx.guildId, action.itemId, amount);
       return { line: `🎒 Dùng **${amount}×** ${displayNameForItem(action.itemId)}` };
     }
     case 'corruption': {
-      const next = adjustCorruption(ctx.userId, ctx.guildId, action.amount);
-      return { line: `🌘 Ô Nhiễm Linh Hồn ${action.amount >= 0 ? '+' : ''}${action.amount} → **${next}/100**` };
+      let callerNext = 0;
+      for (const uid of targetIds) {
+        const n = adjustCorruption(uid, ctx.guildId, action.amount);
+        if (uid === ctx.userId) callerNext = n;
+      }
+      return { line: `🌘 Ô Nhiễm Linh Hồn ${action.amount >= 0 ? '+' : ''}${action.amount} → **${callerNext}/100**${partyTag}` };
     }
     case 'damage_percent': {
-      const dmg = Math.max(1, Math.floor(player.max_hp * randInt(action.min, action.max) / 100));
-      const hp = Math.max(1, player.hp - dmg);
-      updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
-      return { line: `❤️ Mất **${dmg} HP** (${hp}/${player.max_hp})` };
+      let callerLine = '';
+      for (const uid of targetIds) {
+        const p = getEffectivePlayer(uid, ctx.guildId) ?? (uid === ctx.userId ? player : null);
+        if (!p) continue;
+        const dmg = Math.max(1, Math.floor(p.max_hp * randInt(action.min, action.max) / 100));
+        const hp = Math.max(1, p.hp - dmg);
+        updatePlayerHpMp(uid, ctx.guildId, hp, p.mp);
+        if (uid === ctx.userId) callerLine = `❤️ Mất **${dmg} HP** (${hp}/${p.max_hp})`;
+      }
+      return { line: `${callerLine || '❤️ Cả tổ đội trúng đòn'}${partyTag}` };
     }
     case 'heal_percent': {
-      const heal = Math.max(1, Math.floor(player.max_hp * randInt(action.min, action.max) / 100));
-      const hp = Math.min(player.max_hp, player.hp + heal);
-      updatePlayerHpMp(ctx.userId, ctx.guildId, hp, player.mp);
-      return { line: `❤️ Hồi **${heal} HP** (${hp}/${player.max_hp})` };
+      let callerLine = '';
+      for (const uid of targetIds) {
+        const p = getEffectivePlayer(uid, ctx.guildId) ?? (uid === ctx.userId ? player : null);
+        if (!p) continue;
+        const heal = Math.max(1, Math.floor(p.max_hp * randInt(action.min, action.max) / 100));
+        const hp = Math.min(p.max_hp, p.hp + heal);
+        updatePlayerHpMp(uid, ctx.guildId, hp, p.mp);
+        if (uid === ctx.userId) callerLine = `❤️ Hồi **${heal} HP** (${hp}/${p.max_hp})`;
+      }
+      return { line: `${callerLine || '❤️ Cả tổ đội được hồi máu'}${partyTag}` };
     }
     case 'mp_percent': {
-      const restore = Math.max(1, Math.floor(player.max_mp * randInt(action.min, action.max) / 100));
-      const mp = Math.min(player.max_mp, player.mp + restore);
-      updatePlayerHpMp(ctx.userId, ctx.guildId, player.hp, mp);
-      return { line: `💧 Hồi **${restore} MP** (${mp}/${player.max_mp})` };
+      let callerLine = '';
+      for (const uid of targetIds) {
+        const p = getEffectivePlayer(uid, ctx.guildId) ?? (uid === ctx.userId ? player : null);
+        if (!p) continue;
+        const restore = Math.max(1, Math.floor(p.max_mp * randInt(action.min, action.max) / 100));
+        const mp = Math.min(p.max_mp, p.mp + restore);
+        updatePlayerHpMp(uid, ctx.guildId, p.hp, mp);
+        if (uid === ctx.userId) callerLine = `💧 Hồi **${restore} MP** (${mp}/${p.max_mp})`;
+      }
+      return { line: `${callerLine || '💧 Cả tổ đội được hồi MP'}${partyTag}` };
     }
     case 'reputation': {
-      const rep = adjustReputation(ctx.userId, ctx.guildId, action.amount);
-      return { line: `${action.amount >= 0 ? '📈' : '📉'} Danh vọng: **${rep}** (${action.amount >= 0 ? '+' : ''}${action.amount})` };
+      let callerRep = 0;
+      for (const uid of targetIds) {
+        const r = adjustReputation(uid, ctx.guildId, action.amount);
+        if (uid === ctx.userId) callerRep = r;
+      }
+      return { line: `${action.amount >= 0 ? '📈' : '📉'} Danh vọng: **${callerRep}** (${action.amount >= 0 ? '+' : ''}${action.amount})${partyTag}` };
     }
     case 'wanted': {
-      const wanted = adjustWanted(ctx.userId, ctx.guildId, action.amount);
-      return { line: `🚨 Truy nã: **${wanted}** (${action.amount >= 0 ? '+' : ''}${action.amount})` };
+      let callerWanted = 0;
+      for (const uid of targetIds) {
+        const w = adjustWanted(uid, ctx.guildId, action.amount);
+        if (uid === ctx.userId) callerWanted = w;
+      }
+      return { line: `🚨 Truy nã: **${callerWanted}** (${action.amount >= 0 ? '+' : ''}${action.amount})${partyTag}` };
     }
     case 'soul_shard': {
-      grantSoulShards(ctx.userId, ctx.guildId, action.amount);
-      return { line: `💠 ${action.amount >= 0 ? '+' : ''}${action.amount} Soul Shard` };
+      for (const uid of targetIds) grantSoulShards(uid, ctx.guildId, action.amount);
+      return { line: `💠 ${action.amount >= 0 ? '+' : ''}${action.amount} Soul Shard${partyTag}` };
     }
     case 'learn_random_skill': {
       const result = learnRandomSkillFromEvent(ctx.userId, ctx.guildId, action.tier as AncientBookTier);

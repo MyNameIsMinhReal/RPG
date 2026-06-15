@@ -2,6 +2,7 @@ import {
   SlashCommandBuilder, ChatInputCommandInteraction,
   EmbedBuilder, PermissionFlagsBits
 } from 'discord.js';
+import type { PrefixSpec } from './prefixOptions';
 import { getPlayer, updatePlayerHpMp, killPlayer, applyPassiveStats } from '../systems/player';
 import { COLORS } from '../utils/embeds';
 import db from '../database/index';
@@ -251,3 +252,5 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
 // Text-prefix aliases (auto-loaded by registry.ts)
 export const aliases = ['wb','boss'];
+
+export const prefixSpec: PrefixSpec = { defaultSub: 'status' };

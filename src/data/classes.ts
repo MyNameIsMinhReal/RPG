@@ -121,6 +121,17 @@ export const CLASSES: Record<string, ClassDef> = {
   },
 };
 
+export function getPassiveLine(cls: ClassDef): string {
+  const parts: string[] = [];
+  if (cls.hpBonus) parts.push(`+${cls.hpBonus} HP`);
+  if (cls.mpBonus) parts.push(`+${cls.mpBonus} MP`);
+  if (cls.atkBonus) parts.push(`+${cls.atkBonus} ATK`);
+  if (cls.defBonus) parts.push(`+${cls.defBonus} DEF`);
+  if (cls.dodgeBonus) parts.push(`+${cls.dodgeBonus}% Dodge`);
+  if (cls.skillDmgMult && cls.skillDmgMult !== 1.0) parts.push(`Skill +${Math.round((cls.skillDmgMult - 1) * 100)}% DMG`);
+  return parts.join('  ·  ');
+}
+
 export function getClass(id: string): ClassDef | undefined {
   return CLASSES[id];
 }

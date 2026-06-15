@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { getPlayer, createPlayer, resetPlayer, getLoadout, applyPassiveStats } from '../systems/player';
 import { getCombatByUser } from '../systems/combat';
-import { CLASSES } from '../data/classes';
+import { CLASSES, getPassiveLine } from '../data/classes';
 import { COLORS, buildProfileEmbed } from '../utils/embeds';
 import { showExploreMenu } from './explore';
 import { getAchievementSummary } from '../systems/achievements';
@@ -175,7 +175,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           new StringSelectMenuOptionBuilder()
             .setLabel(cls.name)
             .setValue(cls.id)
-            .setDescription(cls.passiveLine.slice(0, 100))
+            .setDescription(getPassiveLine(cls).slice(0, 100))
             .setEmoji(cls.icon)
         )
       )
@@ -187,7 +187,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     .setDescription(
       `Hỡi **${username}**, hãy chọn con đường của mình:\n\n` +
       classEntries.map(cls =>
-        `${cls.icon} **${cls.name}**\n> ${cls.description}\n> ✦ *${cls.passiveLine}*`
+        `${cls.icon} **${cls.name}**\n> ${cls.description}\n> ✦ *${getPassiveLine(cls)}*`
       ).join('\n\n')
     )
     .setFooter({ text: 'Class có thể tiến hoá bằng hệ thống Awakening khi đủ điều kiện.' });
@@ -221,7 +221,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setDescription(
         `Chào mừng đến **🏘️ Làng Ashveil**!\n\n` +
         `**Class:** ${chosenCls.icon} ${chosenCls.name}\n` +
-        `✦ *${chosenCls.passiveLine}*\n\n` +
+        `✦ *${getPassiveLine(chosenCls)}*\n\n` +
         `> ❤️ **${100 + chosenCls.hpBonus} HP**  💧 **${50 + chosenCls.mpBonus} MP**\n` +
         `> ⚔️ **${10 + chosenCls.atkBonus} ATK**  🛡️ **${5 + chosenCls.defBonus} DEF**  🪙 **50 Gold**\n\n` +
         `Dùng \`/explore\` để khám phá, \`/inventory\` để quản lý đồ.\n` +

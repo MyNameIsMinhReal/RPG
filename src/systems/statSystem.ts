@@ -50,6 +50,11 @@ function toNonNegativeInt(value: unknown): number {
   return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
 }
 
+function toSignedInt(value: unknown): number {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? Math.floor(n) : 0;
+}
+
 export function getPlayerStatBuild(player: PlayerRow): PlayerStatBuild {
   return {
     str: toNonNegativeInt(player.stat_str),
@@ -83,12 +88,14 @@ export function deriveBaseStats(player: PlayerRow): DerivedBaseStats {
 
   const permanentAtk = toNonNegativeInt(player.permanent_atk_bonus);
   const permanentDef = toNonNegativeInt(player.permanent_def_bonus);
-  const permanentHp  = toNonNegativeInt(player.permanent_max_hp_bonus);
-  const permanentMp  = toNonNegativeInt(player.permanent_max_mp_bonus);
+  // HP/MP permanent bonuses may be negative because Shadow Court sacrifices
+  // intentionally trade max HP for cursed equipment.
+  const permanentHp  = toSignedInt(player.permanent_max_hp_bonus);
+  const permanentMp  = toSignedInt(player.permanent_max_mp_bonus);
 
   return {
     maxHp: Math.max(10, 100 + cls.hpBonus + permanentHp + blessing * 20 + levelIndex * 6 + s.vit * 12),
-    maxMp: Math.max(5, 50 + cls.mpBonus + permanentMp + blessing * 10 + levelIndex * 3),
+    maxMp: Math.max(5, 50 + cls.mpBonus + permanentMp + blessing * 10 + levelIndex * 3 + s.luk * 2),
     atk: Math.max(1, 10 + cls.atkBonus + permanentAtk + blessing * 2 + levelIndex + s.str * 2),
     def: Math.max(0, Math.floor(5 + cls.defBonus + permanentDef + blessing + levelIndex * 0.5 + s.end * 1.5)),
   };

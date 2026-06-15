@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
+import type { PrefixSpec } from './prefixOptions';
 
 /**
  * Shape that every real slash-command module must satisfy.
@@ -16,6 +17,8 @@ export interface CommandModule {
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
   /** Optional text-prefix aliases, e.g. `['p', 'pf', 'me']` for `profile`. */
   aliases?: string[];
+  /** Optional per-command prefix-arg parsing rules (see prefixOptions.ts). */
+  prefixSpec?: PrefixSpec;
   /**
    * Escape hatch: set to `true` to keep a module out of the command list even
    * though it exports `data` + `execute`. Useful if a future file has a
@@ -76,7 +79,7 @@ export function loadCommands(): LoadedCommand[] {
       continue;
     }
     seen.add(name);
-    loaded.push({ name, data: mod.data, execute: mod.execute, aliases: mod.aliases });
+    loaded.push({ name, data: mod.data, execute: mod.execute, aliases: mod.aliases, prefixSpec: mod.prefixSpec });
   }
 
   loaded.sort((a, b) => a.name.localeCompare(b.name));

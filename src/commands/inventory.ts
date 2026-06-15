@@ -16,6 +16,7 @@ import { getMaterial } from '../data/materials';
 import { getSkill, SKILL_TIER_POOLS, type SkillType } from '../data/skills';
 import { getEquipment, EQUIPMENT, RARITY_COLORS, RARITY_LABELS, SLOT_ICONS, getZoneEquipment } from '../data/equipment';
 import { getWornEquipment, wearEquipment, removeEquipment, getOwnedEquipment, formatWornGear } from '../systems/equipment';
+import { getOwnedEquipmentInstances, getWornInstanceUuids, wearEquipmentInstance, formatEquipmentInstanceName, formatInstanceAffixes } from '../systems/equipmentInstances';
 import { getUnlockedTitles, getSelectedTitle, selectTitle } from '../systems/titles';
 import { bar } from '../utils/format';
 import { useItemOutsideCombat, getActiveBuffLines } from '../systems/consumables';
@@ -142,20 +143,25 @@ async function renderTab(
     // ── Equip tab actions ─────────────────────────────────────────
     if (cid === `inv_wear_${userId}`) {
       const sel    = compInt as StringSelectMenuInteraction;
-      const equipId = sel.values[0].replace('wear_', '');
-      const def    = getEquipment(equipId);
-      if (def) {
-        const playerBefore = getPlayer(userId, guildId)!;
-        const maxBefore = applyPassiveStats(playerBefore).max_hp;
-        wearEquipment(userId, guildId, equipId);
-        const playerAfter = getPlayer(userId, guildId)!;
-        const maxAfter = applyPassiveStats(playerAfter).max_hp;
-        if (maxAfter !== maxBefore) {
-          const newHp = Math.min(maxAfter, Math.max(1, playerAfter.hp + (maxAfter - maxBefore)));
-          updatePlayerHpMp(userId, guildId, newHp, playerAfter.mp);
-        }
-        await renderTab(interaction, userId, guildId, 'equip');
+      const value = sel.values[0];
+      const playerBefore = getPlayer(userId, guildId)!;
+      const maxBefore = applyPassiveStats(playerBefore).max_hp;
+
+      if (value.startsWith('wear_inst_')) {
+        wearEquipmentInstance(userId, guildId, value.replace('wear_inst_', ''));
+      } else {
+        const equipId = value.replace('wear_', '');
+        const def = getEquipment(equipId);
+        if (def) wearEquipment(userId, guildId, equipId);
       }
+
+      const playerAfter = getPlayer(userId, guildId)!;
+      const maxAfter = applyPassiveStats(playerAfter).max_hp;
+      if (maxAfter !== maxBefore) {
+        const newHp = Math.min(maxAfter, Math.max(1, playerAfter.hp + (maxAfter - maxBefore)));
+        updatePlayerHpMp(userId, guildId, newHp, playerAfter.mp);
+      }
+      await renderTab(interaction, userId, guildId, 'equip');
       return;
     }
 
@@ -599,7 +605,9 @@ function buildEquipTab(
 ): [EmbedBuilder, ActionRowBuilder<any>[]] {
   const worn  = getWornEquipment(userId, guildId);
   const owned = getOwnedEquipment(userId, guildId);
-  const { getEquipmentStats: ges, getEquipmentStats } = require('../systems/equipment');
+  const instances = getOwnedEquipmentInstances(userId, guildId);
+  const wornInstanceUuids = getWornInstanceUuids(userId, guildId);
+  const { getEquipmentStats } = require('../systems/equipment');
   const fullStats = getEquipmentStats(userId, guildId);
 
   const embed = new EmbedBuilder()
@@ -612,7 +620,6 @@ function buildEquipTab(
       inline: false
     });
 
-  // Full stat summary
   const statLines = [
     fullStats.atk         ? `⚔️ +${fullStats.atk} ATK`            : '',
     fullStats.def         ? `🛡️ +${fullStats.def} DEF`            : '',
@@ -626,39 +633,40 @@ function buildEquipTab(
     fullStats.dropBonus   ? `📦 +${fullStats.dropBonus}% Drop`    : '',
   ].filter(Boolean);
 
-  if (statLines.length) {
-    embed.addFields({ name: '📊 Tổng bonus', value: statLines.join('  ·  '), inline: false });
-  }
-
-  // Active effects
-  if (fullStats.effects?.length) {
-    embed.addFields({ name: '✨ Effects đang hoạt động', value: fullStats.effects.join(', '), inline: false });
-  }
+  if (statLines.length) embed.addFields({ name: '📊 Tổng bonus', value: statLines.join('  ·  '), inline: false });
+  if (fullStats.effects?.length) embed.addFields({ name: '✨ Effects đang hoạt động', value: fullStats.effects.join(', '), inline: false });
 
   const rows: ActionRowBuilder<any>[] = [];
+  const wornBaseIds = new Set(worn.filter(w => !w.equipment_uuid).map(w => w.equipment_id));
+  const baseOptions = owned.filter(e => !wornBaseIds.has(e.id)).map(e => {
+    const statsStr = Object.entries(e.stats).map(([k, v]) => `+${v} ${k}`).join(', ');
+    return new StringSelectMenuOptionBuilder()
+      .setLabel(`${e.name} (${RARITY_LABELS[e.rarity]})`.slice(0, 100))
+      .setDescription(`${SLOT_ICONS[e.slot]} ${e.slot} · ${statsStr || 'base gear cũ'}`.slice(0, 100))
+      .setValue(`wear_${e.id}`)
+      .setEmoji(e.icon);
+  });
 
-  // Equipment to wear (owned and not currently worn)
-  const wornIds = new Set(worn.map(w => w.equipment_id));
-  const equipable = owned.filter(e => !wornIds.has(e.id));
+  const instanceOptions = instances.filter(inst => !wornInstanceUuids.has(inst.uuid)).map(inst => {
+    const base = inst.base!;
+    const firstAffix = inst.affixes[0] ? formatInstanceAffixes(inst, false).split('\n')[0].replace(/^1\.\s*/, '') : 'không affix';
+    return new StringSelectMenuOptionBuilder()
+      .setLabel(formatEquipmentInstanceName(inst, false).slice(0, 100))
+      .setDescription(`${SLOT_ICONS[base.slot]} ${base.slot} · ${firstAffix}`.slice(0, 100))
+      .setValue(`wear_inst_${inst.uuid}`)
+      .setEmoji(base.icon);
+  });
 
-  if (equipable.length) {
-    const opts = equipable.map(e => {
-      const statsStr = Object.entries(e.stats).map(([k, v]) => `+${v} ${k}`).join(', ');
-      return new StringSelectMenuOptionBuilder()
-        .setLabel(`${e.name} (${RARITY_LABELS[e.rarity]})`)
-        .setDescription(`${SLOT_ICONS[e.slot]} ${e.slot} · ${statsStr}`)
-        .setValue(`wear_${e.id}`)
-        .setEmoji(e.icon);
-    });
+  const opts = [...instanceOptions, ...baseOptions].slice(0, 25);
+  if (opts.length) {
     rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(`inv_wear_${userId}`)
-        .setPlaceholder('⚔️ Trang bị gear...')
-        .addOptions(opts.slice(0, 25))
+        .setPlaceholder('⚔️ Trang bị gear / gear affix...')
+        .addOptions(opts)
     ));
   }
 
-  // Unequip buttons per occupied slot
   if (worn.length) {
     const btns = worn.map(w => {
       const def = EQUIPMENT[w.equipment_id];
@@ -668,13 +676,13 @@ function buildEquipTab(
         .setEmoji(def?.icon ?? '❌')
         .setStyle(ButtonStyle.Secondary);
     });
-    for (const group of chunkArray(btns, 5)) {
-      rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...group));
-    }
+    for (const group of chunkArray(btns, 5)) rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(...group));
   }
 
-  if (!owned.length) {
+  if (!owned.length && !instances.length) {
     embed.addFields({ name: '📦 Kho Gear', value: '*Chưa có gear nào. Tìm thấy khi chiến đấu hoặc mua ở shop!*', inline: false });
+  } else if (instances.length) {
+    embed.addFields({ name: '🧬 Gear Affix', value: `Bạn có **${instances.length}** trang bị UUID/Legacy. Tẩy luyện và khóa dòng ở **Lò Rèn**.`, inline: false });
   }
 
   return [embed, rows];

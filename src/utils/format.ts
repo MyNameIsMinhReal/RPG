@@ -48,3 +48,14 @@ export function truncate(str: string, maxLen: number): string {
 export function padEnd(str: string, len: number): string {
   return str.padEnd(len, ' ');
 }
+
+/** Pick a random element weighted by a numeric property (e.g. loot tables, gacha, events). */
+export function pickWeighted<T>(items: readonly T[], weightKey: keyof T): T {
+  const total = items.reduce((sum, it) => sum + Math.max(0, Number(it[weightKey]) || 0), 0);
+  let r = Math.random() * (total || 1);
+  for (const it of items) {
+    r -= Math.max(0, Number(it[weightKey]) || 0);
+    if (r <= 0) return it;
+  }
+  return items[0];
+}

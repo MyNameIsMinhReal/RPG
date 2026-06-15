@@ -23,6 +23,14 @@ import {
   showVillageShop, showVillageBlacksmith, showVillageTavern,
   showVillageBoard, showVillageHall
 } from '../village';
+import {
+  maybeShowVillageEncounter,
+  showMerchantGuildDistrict,
+  showHuntersGuildDistrict,
+  showOldChurchDistrict,
+  showShadowCourtDistrict,
+  showTownSquareDistrict,
+} from '../villageDistricts';
 import { doGather } from '../../commands/gather';
 import {
   simpleEmbed, ensurePlayerAlive, buildOakSummonedRow,
@@ -163,6 +171,12 @@ export async function showExploreMenu(
     else if (cid === `ex_boss_start_${userId}`)  await handleBossStart(interaction, userId, guildId);
     else if (cid === `ex_echo_gate_${userId}`)   await handleEchoGate(interaction, userId, guildId);
     else if (cid === `ex_gather_${userId}`)     await handleGather(interaction, userId, guildId);
+    else if (cid === `vill_dist_merchant_${userId}`) await handleVillageService(interaction, userId, guildId, 'merchant');
+    else if (cid === `vill_dist_hunter_${userId}`)   await handleVillageService(interaction, userId, guildId, 'hunter');
+    else if (cid === `vill_dist_church_${userId}`)   await handleVillageService(interaction, userId, guildId, 'church');
+    else if (cid === `vill_dist_shadow_${userId}`)   await handleVillageService(interaction, userId, guildId, 'shadow');
+    else if (cid === `vill_dist_square_${userId}`)   await handleVillageService(interaction, userId, guildId, 'square');
+    // Backward-compatible old village buttons, in case an older message is still live.
     else if (cid === `vill_shop_${userId}`)     await handleVillageService(interaction, userId, guildId, 'shop');
     else if (cid === `vill_smith_${userId}`)    await handleVillageService(interaction, userId, guildId, 'smith');
     else if (cid === `vill_tavern_${userId}`)   await handleVillageService(interaction, userId, guildId, 'tavern');
@@ -359,16 +373,16 @@ function buildExploreRows(
   }
 
   const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vill_shop_${userId}`)
-      .setLabel('Cửa hàng').setEmoji('🏪').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`vill_smith_${userId}`)
-      .setLabel('Lò rèn').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`vill_tavern_${userId}`)
-      .setLabel('Quán trọ').setEmoji('🍺').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`vill_board_${userId}`)
-      .setLabel('Nhiệm vụ').setEmoji('📋').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(`vill_hall_${userId}`)
-      .setLabel('Hội quán').setEmoji('🏛️').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId(`vill_dist_merchant_${userId}`)
+      .setLabel('Thương Hội').setEmoji('⚖️').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`vill_dist_hunter_${userId}`)
+      .setLabel('Thợ Săn').setEmoji('⚔️').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`vill_dist_church_${userId}`)
+      .setLabel('Thánh Đường').setEmoji('⛪').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`vill_dist_shadow_${userId}`)
+      .setLabel('Hẻm Tối').setEmoji('🌑').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`vill_dist_square_${userId}`)
+      .setLabel('Quảng Trường').setEmoji('🪵').setStyle(ButtonStyle.Secondary)
   );
   return [row1, row2];
 }
@@ -507,7 +521,7 @@ async function handleTravel(
 async function handleVillageService(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string,
-  service: 'shop' | 'smith' | 'tavern' | 'board' | 'hall'
+  service: 'shop' | 'smith' | 'tavern' | 'board' | 'hall' | 'merchant' | 'hunter' | 'church' | 'shadow' | 'square'
 ): Promise<void> {
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
 
@@ -519,9 +533,24 @@ async function handleVillageService(
     else if (service === 'tavern') await showVillageTavern(interaction, userId, guildId);
     else if (service === 'board') await showVillageBoard(interaction, userId, guildId);
     else if (service === 'hall') await showVillageHall(interaction, userId, guildId);
+    else if (service === 'merchant') await showMerchantGuildDistrict(interaction, userId, guildId);
+    else if (service === 'hunter') await showHuntersGuildDistrict(interaction, userId, guildId);
+    else if (service === 'church') await showOldChurchDistrict(interaction, userId, guildId);
+    else if (service === 'shadow') await showShadowCourtDistrict(interaction, userId, guildId);
+    else if (service === 'square') await showTownSquareDistrict(interaction, userId, guildId);
   };
 
-  await runService();
+  if (['merchant', 'hunter', 'church', 'shadow', 'square'].includes(service)) {
+    const intercepted = await maybeShowVillageEncounter(interaction, userId, guildId);
+    if (intercepted) {
+      // Random village encounters own the current reply. The usual back handler below
+      // will still return the user to the explore/village screen when possible.
+    } else {
+      await runService();
+    }
+  } else {
+    await runService();
+  }
 
   const msg = await interaction.fetchReply();
   const hasBackBtn = msg.components.some(row => {

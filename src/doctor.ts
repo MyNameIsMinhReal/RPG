@@ -11,6 +11,7 @@ import { SKILLS } from './data/skills';
 import { PETS } from './data/pets';
 import { CRAFT_RECIPES } from './data/recipes';
 import { EQUIPMENT } from './data/equipment';
+import { DATA_DRIVEN_EXPLORE_EVENTS, type DataEventAction } from './data/exploreEventDefs';
 import { loadCommands, buildAliasMap } from './commands/registry';
 
 export type Severity = 'error' | 'warn' | 'info';
@@ -107,6 +108,106 @@ export function checkGameData(): Issue[] {
   return issues;
 }
 
+// ────────────────────────────────────────────────────────────────────────────────
+// Group 1b — Data-driven explore events
+// Catches authoring mistakes before they reach Discord at runtime:
+// duplicate IDs, missing item references, bad mini-game wiring, and component
+// limits (button label <= 80, embed title <= 256, description <= 4096) / bad emoji.
+// ────────────────────────────────────────────────────────────────────────────────
+const DISCORD_BUTTON_LABEL_MAX = 80;
+const DISCORD_EMBED_TITLE_MAX = 256;
+const DISCORD_EMBED_DESC_MAX = 4096;
+
+// Mirrors isUsableButtonEmoji() in eventEngine.ts: accept custom <:name:id> or a
+// real unicode pictographic emoji; reject plain punctuation that Discord rejects.
+function isUsableEmoji(emoji?: string | null): boolean {
+  const v = String(emoji ?? '').trim();
+  if (!v) return false;
+  if (/^<a?:[a-zA-Z0-9_]{2,32}:\d{17,20}>$/.test(v)) return true;
+  if (!/[\p{Extended_Pictographic}\p{Emoji_Presentation}]/u.test(v)) return false;
+  return v.length <= 32;
+}
+
+export function checkEvents(): Issue[] {
+  const issues: Issue[] = [];
+  const err  = (ctx: string, msg: string) => issues.push({ severity: 'error', context: ctx, message: msg });
+  const warn = (ctx: string, msg: string) => issues.push({ severity: 'warn',  context: ctx, message: msg });
+
+  const checkActionItems = (ctx: string, actions?: DataEventAction[]): void => {
+    for (const a of actions ?? []) {
+      if ((a.type === 'item' || a.type === 'consume_item') && !itemExists(a.itemId)) {
+        err(ctx, `action "${a.type}" itemId "${a.itemId}" không tồn tại trong ITEMS/MATERIALS/EQUIPMENT`);
+      }
+    }
+  };
+
+  const seenIds = new Set<string>();
+  for (const ev of DATA_DRIVEN_EXPLORE_EVENTS) {
+    const ectx = `Event "${ev.id}"`;
+    if (seenIds.has(ev.id)) err(ectx, 'ID event bị trùng');
+    seenIds.add(ev.id);
+
+    if (!ev.title) err(ectx, 'thiếu title');
+    else if (ev.title.length > DISCORD_EMBED_TITLE_MAX) warn(ectx, `title dài ${ev.title.length} > ${DISCORD_EMBED_TITLE_MAX} ký tự`);
+    if (!ev.description) err(ectx, 'thiếu description');
+    else if (ev.description.length > DISCORD_EMBED_DESC_MAX) warn(ectx, `description dài ${ev.description.length} > ${DISCORD_EMBED_DESC_MAX} ký tự`);
+    if (typeof ev.weight !== 'number' || ev.weight <= 0) warn(ectx, `weight không hợp lệ (${ev.weight})`);
+    for (const z of ev.zones ?? []) {
+      if (!ZONES[z]) err(`${ectx} zones`, `zone "${z}" không tồn tại`);
+    }
+    if (!ev.choices?.length && !ev.miniGame) {
+      warn(ectx, 'không có choices lẫn miniGame — người chơi không tương tác được');
+    }
+
+    // Choices
+    const seenChoiceIds = new Set<string>();
+    for (const c of ev.choices ?? []) {
+      const cctx = `${ectx} choice "${c.id}"`;
+      if (seenChoiceIds.has(c.id)) err(cctx, 'ID choice bị trùng trong cùng event');
+      seenChoiceIds.add(c.id);
+      if (!c.label) err(cctx, 'thiếu label');
+      else if (c.label.length > DISCORD_BUTTON_LABEL_MAX) warn(cctx, `label dài ${c.label.length} > ${DISCORD_BUTTON_LABEL_MAX} (runtime sẽ cắt)`);
+      if (c.emoji && !isUsableEmoji(c.emoji)) warn(cctx, `emoji "${c.emoji}" không hợp lệ — Discord có thể từ chối (runtime sẽ bỏ qua)`);
+      if (c.requires?.itemId && !itemExists(c.requires.itemId)) err(cctx, `requires.itemId "${c.requires.itemId}" không tồn tại`);
+      if (!c.outcomes?.length) err(cctx, 'không có outcomes');
+      for (const o of c.outcomes ?? []) {
+        if (typeof o.chance !== 'number' || o.chance <= 0) warn(cctx, `outcome có chance không hợp lệ (${o.chance})`);
+        if (!o.text) warn(cctx, 'outcome thiếu text');
+        checkActionItems(cctx, o.actions);
+      }
+    }
+
+    // Mini-game
+    if (ev.miniGame) {
+      const mg = ev.miniGame;
+      const mctx = `${ectx} miniGame`;
+      const optIds = new Set<string>();
+      for (const opt of mg.options ?? []) {
+        if (optIds.has(opt.id)) err(mctx, `option ID "${opt.id}" bị trùng`);
+        optIds.add(opt.id);
+        if (!opt.label) err(mctx, `option "${opt.id}" thiếu label`);
+        else if (opt.label.length > DISCORD_BUTTON_LABEL_MAX) warn(mctx, `option "${opt.id}" label dài ${opt.label.length} > ${DISCORD_BUTTON_LABEL_MAX}`);
+        if (opt.emoji && !isUsableEmoji(opt.emoji)) warn(mctx, `option "${opt.id}" emoji "${opt.emoji}" không hợp lệ`);
+      }
+      if (mg.startEmoji && !isUsableEmoji(mg.startEmoji)) warn(mctx, `startEmoji "${mg.startEmoji}" không hợp lệ`);
+      if (!optIds.size) err(mctx, 'không có options');
+      if (!mg.rounds?.length) err(mctx, 'không có rounds');
+      mg.rounds?.forEach((r, i) => {
+        if (!optIds.has(r.correctOptionId)) err(mctx, `round ${i + 1} correctOptionId "${r.correctOptionId}" không khớp option nào`);
+        if (!r.prompt) warn(mctx, `round ${i + 1} thiếu prompt`);
+      });
+      checkActionItems(mctx, mg.onSuccess);
+      checkActionItems(mctx, mg.onFailure);
+    }
+  }
+
+  if (issues.length === 0) {
+    issues.push({ severity: 'info', context: 'events', message: `${DATA_DRIVEN_EXPLORE_EVENTS.length} data-driven event hợp lệ.` });
+  }
+  return issues;
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Group 2 — Database & schema
 // ─────────────────────────────────────────────────────────────────────────────
@@ -119,7 +220,8 @@ const EXPECTED_TABLES = [
   'clan_wars', 'clan_stocks', 'stock_holdings', 'stock_history', 'chapter_state',
   'chapter_progress', 'chapter_event_state', 'redeem_codes', 'used_codes', 'oak_event',
   'oak_participants', 'update_logs', 'update_logs_seen', 'parties', 'party_members',
-  'event_chain_progress',
+  'event_chain_progress', 'active_party_combats',
+  'guild_projects', 'village_funds', 'player_intel', 'shadow_sacrifices', 'village_raid_participants',
 ];
 
 function checkDatabase(): Issue[] {
@@ -265,7 +367,7 @@ function printReport(groups: CheckGroup[]): { errors: number; warns: number } {
 /** Light data-only check for bot startup. Logs a summary and exits the process
  *  with code 1 if any data ERROR is found (fail-fast — don't run on broken data). */
 export function runStartupDataCheck(): void {
-  const issues = checkGameData();
+  const issues = [...checkGameData(), ...checkEvents()];
   const errors = issues.filter(i => i.severity === 'error');
   const warns  = issues.filter(i => i.severity === 'warn');
   if (errors.length === 0) {
@@ -284,6 +386,7 @@ function main(): void {
   const json = process.argv.includes('--json');
   const groups: CheckGroup[] = [
     { name: 'Data integrity', issues: checkGameData() },
+    { name: 'Explore events', issues: checkEvents() },
     { name: 'Database & schema', issues: checkDatabase() },
     { name: 'Config / env', issues: checkConfig() },
     { name: 'Command registry', issues: checkRegistry() },

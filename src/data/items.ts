@@ -20,6 +20,7 @@ export interface ItemDef {
     passiveOnly?: boolean;
   };
   teachesSkill?: string;
+  isCombatUsable?: boolean;
   stackable: boolean;
 }
 
@@ -33,6 +34,26 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'key_item', stackable: true,
     description: 'Cổ thư kỹ năng. Mang về Hội Quán ở làng để nghiên cứu, hoặc gặp event học trực tiếp ngoài đường.',
     sellPrice: 80, buyPrice: 240
+  },
+
+  torch: {
+    id: 'torch', name: 'Torch', icon: '🔥',
+    type: 'consumable', stackable: true,
+    description: 'Đuốc dùng khi đi vào khu tối. Hiện là vật phẩm tiêu hao cho các event làng/hầm mỏ sau này.',
+    sellPrice: 4, buyPrice: 12
+  },
+  shadow_token: {
+    id: 'shadow_token', name: 'Shadow Token', icon: '🌑',
+    type: 'key_item', stackable: true,
+    description: 'Dấu hiệu của Shadow Court. Có thể mở lối vào Hẻm Tối trong làng.',
+    sellPrice: 50
+  },
+
+  legacy_spark: {
+    id: 'legacy_spark', name: 'Legacy Spark', icon: '🧩',
+    type: 'key_item', stackable: true,
+    description: 'Dùng tại Lò Rèn để thức tỉnh 1 trang bị cũ thành trang bị có Prefix/Suffix. Người chơi cũ nhận 2 lần đầu sau update.',
+    sellPrice: 200
   },
 
   // Echo Demon ritual key items — thu thập từ event "Tiếng Vọng" ở Đền Cổ (shrine).
@@ -66,36 +87,42 @@ export const ITEMS: Record<string, ItemDef> = {
     effect: { hpPercent: 0.15 }, sellPrice: 6, buyPrice: 18
   },
   minor_healing_potion: {
+    isCombatUsable: true,
     id: 'minor_healing_potion', name: 'Minor Healing Potion', icon: '🩺',
     type: 'consumable', stackable: true,
     description: 'Thuốc hồi máu nhỏ. Hồi **25% HP tối đa**.',
     effect: { hpPercent: 0.25 }, sellPrice: 8, buyPrice: 20
   },
   mana_potion: {
+    isCombatUsable: true,
     id: 'mana_potion', name: 'Mana Potion', icon: '🔵',
     type: 'consumable', stackable: true,
     description: 'Bình mana cơ bản. Hồi **30% MP tối đa**.',
     effect: { mpPercent: 0.30 }, sellPrice: 14, buyPrice: 35
   },
   antidote: {
+    isCombatUsable: true,
     id: 'antidote', name: 'Antidote', icon: '💊',
     type: 'consumable', stackable: true,
     description: 'Giải trừ **poison** ngay lập tức trong combat.',
     effect: { removeEffect: 'poison', combatOnly: true }, sellPrice: 10, buyPrice: 20
   },
   cooling_salve: {
+    isCombatUsable: true,
     id: 'cooling_salve', name: 'Cooling Salve', icon: '🧊',
     type: 'consumable', stackable: true,
     description: 'Thuốc bôi lạnh. Xóa **burn** trong combat.',
     effect: { removeEffect: 'burn', combatOnly: true }, sellPrice: 10, buyPrice: 25
   },
   quick_salve: {
+    isCombatUsable: true,
     id: 'quick_salve', name: 'Quick Salve', icon: '🩹',
     type: 'consumable', stackable: true,
     description: 'Băng cấp tốc — dùng giữa combat. Hồi **20% HP tối đa** ngay lập tức.',
     effect: { hpPercent: 0.20, combatOnly: true }, sellPrice: 15, buyPrice: 38
   },
   shadow_mana_vial: {
+    isCombatUsable: true,
     id: 'shadow_mana_vial', name: 'Shadow Mana Vial', icon: '🫧',
     type: 'consumable', stackable: true,
     description: 'Lọ mana đen. Hồi **15% MP tối đa** ngay trong combat.',
@@ -106,54 +133,63 @@ export const ITEMS: Record<string, ItemDef> = {
   //  CONSUMABLES — Tier 2: Mid game, cân bằng
   // ══════════════════════════════════════════════════════════════════════
   health_potion: {
+    isCombatUsable: true,
     id: 'health_potion', name: 'Health Potion', icon: '🧪',
     type: 'consumable', stackable: true,
     description: 'Thuốc hồi máu tiêu chuẩn. Hồi **45% HP tối đa**.',
     effect: { hpPercent: 0.45 }, sellPrice: 18, buyPrice: 45
   },
   mana_flask: {
+    isCombatUsable: true,
     id: 'mana_flask', name: 'Mana Flask', icon: '🫙',
     type: 'consumable', stackable: true,
     description: 'Bình mana phổ thông. Hồi **50% MP tối đa**.',
     effect: { mpPercent: 0.50 }, sellPrice: 22, buyPrice: 55
   },
   emergency_potion: {
+    isCombatUsable: true,
     id: 'emergency_potion', name: 'Emergency Potion', icon: '🚨',
     type: 'consumable', stackable: true,
     description: 'Chỉ dùng được khi HP dưới **30%**. Hồi **40% HP tối đa**.',
     effect: { hpPercent: 0.40, hpBelowPct: 0.30 }, sellPrice: 28, buyPrice: 75
   },
   moonwater: {
+    isCombatUsable: true,
     id: 'moonwater', name: 'Moonwater', icon: '🌙',
     type: 'consumable', stackable: true,
     description: 'Nước ánh trăng. Hồi **20% MP**, xóa **poison/burn** và giảm nhẹ **Ô Nhiễm Linh Hồn**.',
     effect: { mpPercent: 0.20, removeEffects: ['poison', 'burn'] }, sellPrice: 30, buyPrice: 80
   },
   purifying_salt: {
+    isCombatUsable: true,
     id: 'purifying_salt', name: 'Purifying Salt', icon: '🧂',
     type: 'consumable', stackable: true,
     description: 'Muối thanh tẩy. Xóa **curse** trong combat, hoặc dùng ngoài combat để giảm **Ô Nhiễm Linh Hồn**.',
     effect: { removeEffect: 'curse' }, sellPrice: 18, buyPrice: 45
   },
   blood_vial: {
+    isCombatUsable: true,
     id: 'blood_vial', name: 'Blood Vial', icon: '🩸',
     type: 'consumable', stackable: true,
     description: 'Lọ máu nguyền từ chợ đen. Hồi **30% HP tối đa** — tác dụng phụ chưa rõ.',
     effect: { hpPercent: 0.30 }, sellPrice: 25, buyPrice: 65
   },
   vitality_brew: {
+    isCombatUsable: true,
     id: 'vitality_brew', name: 'Vitality Brew', icon: '🍵',
     type: 'consumable', stackable: true,
     description: 'Trà thảo mộc cân bằng. Hồi **25% HP** và **25% MP** cùng lúc.',
     effect: { hpPercent: 0.25, mpPercent: 0.25 }, sellPrice: 30, buyPrice: 80
   },
   forest_tonic: {
+    isCombatUsable: true,
     id: 'forest_tonic', name: 'Forest Tonic', icon: '🌿',
     type: 'consumable', stackable: true,
     description: 'Tonic rừng thảo mộc. Hồi **30% HP** + xóa **poison**.',
     effect: { hpPercent: 0.30, removeEffect: 'poison' }, sellPrice: 25, buyPrice: 65
   },
   holy_water: {
+    isCombatUsable: true,
     id: 'holy_water', name: 'Holy Water', icon: '💧',
     type: 'consumable', stackable: true,
     description: 'Nước thánh từ đền thờ. Hồi **20% HP**, xóa **curse** và giảm **Ô Nhiễm Linh Hồn**.',
@@ -172,6 +208,7 @@ export const ITEMS: Record<string, ItemDef> = {
     effect: { hpPercent: 0.40 }, sellPrice: 16, buyPrice: 50
   },
   warding_charm: {
+    isCombatUsable: true,
     id: 'warding_charm', name: 'Warding Charm', icon: '🧿',
     type: 'consumable', stackable: true,
     description: 'Bùa hộ mệnh. Chặn **1 debuff** tiếp theo trong combat.',
@@ -182,72 +219,84 @@ export const ITEMS: Record<string, ItemDef> = {
   //  CONSUMABLES — Tier 3: Late game, mạnh, đắt
   // ══════════════════════════════════════════════════════════════════════
   healing_potion: {
+    isCombatUsable: true,
     id: 'healing_potion', name: 'Healing Potion', icon: '🍶',
     type: 'consumable', stackable: true,
     description: 'Thuốc hồi máu cấp cao. Hồi **65% HP tối đa**.',
     effect: { hpPercent: 0.65 }, sellPrice: 30, buyPrice: 75
   },
   greater_health_potion: {
+    isCombatUsable: true,
     id: 'greater_health_potion', name: 'Greater Health Potion', icon: '⚗️',
     type: 'consumable', stackable: true,
     description: 'Thuốc hồi máu tối thượng. Hồi **80% HP tối đa**.',
     effect: { hpPercent: 0.80 }, sellPrice: 60, buyPrice: 150
   },
   mana_vial: {
+    isCombatUsable: true,
     id: 'mana_vial', name: 'Mana Vial', icon: '💜',
     type: 'consumable', stackable: true,
     description: 'Lọ tinh chất mana. Hồi **70% MP tối đa**.',
     effect: { mpPercent: 0.70 }, sellPrice: 35, buyPrice: 88
   },
   elixir: {
+    isCombatUsable: true,
     id: 'elixir', name: 'Elixir', icon: '✨',
     type: 'consumable', stackable: true,
     description: 'Tinh chất hai nguồn. Hồi **60% HP tối đa** và **40% MP tối đa**.',
     effect: { hpPercent: 0.60, mpPercent: 0.40 }, sellPrice: 60, buyPrice: 150
   },
   grand_restoration: {
+    isCombatUsable: true,
     id: 'grand_restoration', name: 'Grand Restoration', icon: '🔮',
     type: 'consumable', stackable: true,
     description: 'Tinh chất phục hồi hoàn toàn. Hồi **50% HP** và **50% MP**.',
     effect: { hpPercent: 0.50, mpPercent: 0.50 }, sellPrice: 80, buyPrice: 200
   },
   supreme_elixir: {
+    isCombatUsable: true,
     id: 'supreme_elixir', name: 'Supreme Elixir', icon: '🌟',
     type: 'consumable', stackable: true,
     description: 'Đỉnh cao của thuật bào chế. Hồi **100% HP tối đa** và **80% MP tối đa**.',
     effect: { hpPercent: 1.0, mpPercent: 0.80 }, sellPrice: 150, buyPrice: 420
   },
   berserker_draught: {
+    isCombatUsable: true,
     id: 'berserker_draught', name: 'Berserker Draught', icon: '😤',
     type: 'consumable', stackable: true,
     description: 'Chỉ uống được khi HP dưới **20%**. Hồi **50% HP tối đa** — dành cho lúc tuyệt vọng.',
     effect: { hpPercent: 0.50, hpBelowPct: 0.20 }, sellPrice: 45, buyPrice: 120
   },
   crystallized_faith: {
+    isCombatUsable: true,
     id: 'crystallized_faith', name: 'Crystallized Faith', icon: '💠',
     type: 'consumable', stackable: true,
     description: 'Tinh thể niềm tin. Hồi **30% HP** + xóa **poison, burn, curse** cùng lúc.',
     effect: { hpPercent: 0.30, removeEffects: ['poison', 'burn', 'curse'] }, sellPrice: 65, buyPrice: 170
   },
   purification_potion: {
+    isCombatUsable: true,
     id: 'purification_potion', name: 'Purification Potion', icon: '🌸',
     type: 'consumable', stackable: true,
     description: 'Xóa **tất cả debuff** đang hiện diện trong combat.',
     effect: { removeEffect: 'all', combatOnly: true }, sellPrice: 55, buyPrice: 150
   },
   iron_will_tonic: {
+    isCombatUsable: true,
     id: 'iron_will_tonic', name: 'Iron Will Tonic', icon: '💪',
     type: 'consumable', stackable: true,
     description: 'Xóa **stun** và **freeze** trong combat. Hồi **10% HP** sau đó.',
     effect: { removeEffects: ['stun', 'freeze'], hpPercent: 0.10, combatOnly: true }, sellPrice: 30, buyPrice: 75
   },
   void_mana_flask: {
+    isCombatUsable: true,
     id: 'void_mana_flask', name: 'Void Mana Flask', icon: '🌀',
     type: 'consumable', stackable: true,
     description: 'Bình mana từ hư không. Hồi **80% MP tối đa** trong combat.',
     effect: { mpPercent: 0.80, combatOnly: true }, sellPrice: 50, buyPrice: 130
   },
   life_crystal_shard: {
+    isCombatUsable: true,
     id: 'life_crystal_shard', name: 'Life Crystal Shard', icon: '💎',
     type: 'consumable', stackable: true,
     description: 'Mảnh tinh thể sự sống. Hồi **35% HP** — chỉ dùng được khi HP dưới **50%**.',
@@ -270,48 +319,56 @@ export const ITEMS: Record<string, ItemDef> = {
     effect: { hpPercent: 0.15 }, sellPrice: 20, buyPrice: 50
   },
   stone_skin_draught: {
+    isCombatUsable: true,
     id: 'stone_skin_draught', name: 'Stone Skin Draught', icon: '🛡️',
     type: 'consumable', stackable: true,
     description: 'Da đá. Trận kế tiếp: **DEF +15%**.',
     effect: {}, sellPrice: 32, buyPrice: 85
   },
   quickstep_tea: {
+    isCombatUsable: true,
     id: 'quickstep_tea', name: 'Quickstep Tea', icon: '🍃',
     type: 'consumable', stackable: true,
     description: 'Trà lá gió. Trận kế tiếp: **tốc độ né tăng**, đòn đầu khó trúng hơn.',
     effect: {}, sellPrice: 28, buyPrice: 75
   },
   focus_tonic: {
+    isCombatUsable: true,
     id: 'focus_tonic', name: 'Focus Tonic', icon: '🔹',
     type: 'consumable', stackable: true,
     description: 'Tonic tập trung. Trận kế tiếp: **độ chính xác skill tăng**, nhưng DEF giảm nhẹ.',
     effect: { mpPercent: 0.15 }, sellPrice: 35, buyPrice: 90
   },
   rage_elixir: {
+    isCombatUsable: true,
     id: 'rage_elixir', name: 'Rage Elixir', icon: '🔥',
     type: 'consumable', stackable: true,
     description: 'Elixir thịnh nộ. Trận kế tiếp: **ATK +25%** nhưng nhận thêm **15% sát thương**.',
     effect: {}, sellPrice: 50, buyPrice: 140
   },
   weapon_oil: {
+    isCombatUsable: true,
     id: 'weapon_oil', name: 'Weapon Oil', icon: '🔩',
     type: 'consumable', stackable: true,
     description: 'Dầu tra vũ khí. Trận kế tiếp: **damage +10%**.',
     effect: {}, sellPrice: 20, buyPrice: 55
   },
   armor_polish: {
+    isCombatUsable: true,
     id: 'armor_polish', name: 'Armor Polish', icon: '🧼',
     type: 'consumable', stackable: true,
     description: 'Sáp đánh bóng giáp. Trận kế tiếp: **DEF +10%**.',
     effect: {}, sellPrice: 20, buyPrice: 55
   },
   arson_bottle: {
+    isCombatUsable: true,
     id: 'arson_bottle', name: 'Arson Bottle', icon: '💥',
     type: 'consumable', stackable: true,
     description: 'Bom lửa ném tay. Gây **sát thương trực tiếp** trong combat. Không dùng với boss lớn.',
     effect: { combatOnly: true }, sellPrice: 42, buyPrice: 120
   },
   blood_sacrifice_vial: {
+    isCombatUsable: true,
     id: 'blood_sacrifice_vial', name: 'Blood Sacrifice Vial', icon: '⚗️',
     type: 'consumable', stackable: true,
     description: 'Tế máu đổi mana. Trong combat: mất **10% HP hiện tại** để hồi **40% MP tối đa**.',
@@ -322,6 +379,7 @@ export const ITEMS: Record<string, ItemDef> = {
   //  CONSUMABLES — Scrolls & special use
   // ══════════════════════════════════════════════════════════════════════
   scroll_escape: {
+    isCombatUsable: true,
     id: 'scroll_escape', name: 'Scroll of Escape', icon: '📜',
     type: 'consumable', stackable: true,
     description: 'Cuộn thoát thân. Thoát khỏi combat thường — không dùng với boss/shopkeeper/bounty.',
@@ -340,12 +398,14 @@ export const ITEMS: Record<string, ItemDef> = {
     effect: {}, sellPrice: 45, buyPrice: 125
   },
   scroll_silence: {
+    isCombatUsable: true,
     id: 'scroll_silence', name: 'Scroll of Silence', icon: '🔇',
     type: 'consumable', stackable: true,
     description: 'Cuộn câm lặng. Enemy không dùng được skill trong **2 lượt**. Không dùng với boss chính.',
     effect: { combatOnly: true }, sellPrice: 50, buyPrice: 140
   },
   scroll_mirror: {
+    isCombatUsable: true,
     id: 'scroll_mirror', name: 'Scroll of Mirror', icon: '🪞',
     type: 'consumable', stackable: true,
     description: 'Cuộn phản chiếu. Trong combat: phản lại **50% sát thương** từ đòn kế tiếp của enemy.',
@@ -546,6 +606,7 @@ export const ITEMS: Record<string, ItemDef> = {
     sellPrice: 80
   },
   rune_charm: {
+    isCombatUsable: true,
     id: 'rune_charm', name: 'Rune Charm', icon: '🧿',
     type: 'consumable', stackable: true,
     description: 'Bùa rune dùng một lần. Trận combat kế tiếp: tự động chặn **1 debuff**.',
@@ -684,6 +745,7 @@ export const ITEMS: Record<string, ItemDef> = {
     sellPrice: 300
   },
   purification_stone: {
+    isCombatUsable: true,
     id: 'purification_stone', name: 'Purification Stone', icon: '💎',
     type: 'consumable', stackable: true,
     description: 'Xóa toàn bộ **debuff** và **cursed effect** khỏi nhân vật.',

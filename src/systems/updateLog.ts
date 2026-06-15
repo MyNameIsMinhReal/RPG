@@ -8,6 +8,15 @@ export interface UpdateLog {
   created_at: number;
 }
 
+/**
+ * Discord embed limits: description <= 4096 chars, field value <= 1024 chars.
+ * Long update content used to throw "Invalid Form Body", so always clamp before render.
+ */
+export function clampLogText(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return text.slice(0, Math.max(0, max - 20)).trimEnd() + '\n…đã rút gọn';
+}
+
 export function addUpdateLog(version: string, content: string): UpdateLog {
   const info = db.prepare(
     'INSERT INTO update_logs (version, content) VALUES (?, ?)'
@@ -43,7 +52,7 @@ function buildUpdateLogEmbed(log: UpdateLog): EmbedBuilder {
   return new EmbedBuilder()
     .setColor(0x5865F2)
     .setTitle(`📋 Update — ${log.version}`)
-    .setDescription(log.content)
+    .setDescription(clampLogText(log.content, 3900))
     .setFooter({ text: 'Dùng /help để xem hướng dẫn.' })
     .setTimestamp(log.created_at * 1000);
 }

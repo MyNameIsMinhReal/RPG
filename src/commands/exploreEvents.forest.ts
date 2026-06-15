@@ -1,4 +1,5 @@
 import type { RunExploreEventInput } from './exploreEvents';
+import { finishExploreEvent as finish } from './exploreEventShared';
 import { awaitVote } from './exploreEvents';
 import {
   ActionRowBuilder,
@@ -13,13 +14,6 @@ import { pick, randInt } from '../utils/format';
 import { onlyUser } from '../utils/collectors';
 
 // ── Local finish helper (mirrors the one in exploreEvents.ts) ────────────
-async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<void> {
-  const msg = await ctx.interaction.editReply({
-    embeds: [embed],
-    components: ctx.callbacks.buildContinueExploreRow(ctx.userId)
-  });
-  await ctx.callbacks.attachContinueExploreHandler(msg as Message<boolean>, ctx.interaction, ctx.userId, ctx.guildId);
-}
 
 // ════════════════════════════════════════════════════════════════
 //  FOREST — Cây Cổ Thì Thầm

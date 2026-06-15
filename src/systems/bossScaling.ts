@@ -18,7 +18,12 @@ const BOSS_RECOMMENDED_LEVELS: Record<string, number> = {
 function avgLevel(levels: number[]): number {
   const clean = levels.map(n => Number(n)).filter(n => Number.isFinite(n) && n > 0);
   if (clean.length === 0) return 1;
-  return Math.max(1, Math.round(clean.reduce((a, b) => a + b, 0) / clean.length));
+  const avg = clean.reduce((a, b) => a + b, 0) / clean.length;
+  const max = Math.max(...clean);
+  // Weighted toward the strongest member (anti power-leveling): a single high
+  // level carry can't drag scaling down to a low-level alt's level. Solo and
+  // equal-level parties are unchanged (avg === max).
+  return Math.max(1, Math.round(avg * 0.25 + max * 0.75));
 }
 
 export function getBossRecommendedLevel(enemy: any): number {
@@ -32,7 +37,14 @@ export function getBossLevelScaling(enemy: any, participantLevels: number[]): Bo
   const recommendedLevel = getBossRecommendedLevel(enemy);
   const average = avgLevel(participantLevels);
   const levelDelta = average - recommendedLevel;
+  // Per-boss scaling profile. Define `scaling` on an enemy in data/enemies.ts to
+  // override any of these; otherwise fall back to the tuned Ancient Oak / default
+  // profiles so behavior is unchanged and no hardcoded id checks are needed for
+  // future bosses.
   const isAncientOak = String(enemy?.id ?? '') === 'ancient_oak';
+  const defaultProfile = { hpStep: 0.04, atkStep: 0.03, defStep: 0.030, hpCap: 0.70, atkCap: 0.45, defCap: 0.55, defBonusCap: 24, defBonusStep: 1.10 };
+  const oakProfile     = { hpStep: 0.05, atkStep: 0.035, defStep: 0.035, hpCap: 0.85, atkCap: 0.55, defCap: 0.65, defBonusCap: 28, defBonusStep: 1.35 };
+  const prof = { ...defaultProfile, ...(isAncientOak ? oakProfile : {}), ...((enemy?.scaling as Partial<typeof defaultProfile>) ?? {}) };
 
   let hpMult = 1;
   let atkMult = 1;
@@ -42,15 +54,12 @@ export function getBossLevelScaling(enemy: any, participantLevels: number[]): Bo
   let rewardMult = 1;
 
   if (levelDelta > 0) {
-    const hpPerLevel = isAncientOak ? 0.05 : 0.04;
-    const atkPerLevel = isAncientOak ? 0.035 : 0.03;
-    const defPerLevel = isAncientOak ? 0.035 : 0.030;
-    hpMult = 1 + Math.min(isAncientOak ? 0.85 : 0.70, levelDelta * hpPerLevel);
-    atkMult = 1 + Math.min(isAncientOak ? 0.55 : 0.45, levelDelta * atkPerLevel);
+    hpMult = 1 + Math.min(prof.hpCap, levelDelta * prof.hpStep);
+    atkMult = 1 + Math.min(prof.atkCap, levelDelta * prof.atkStep);
     // DEF uses both multiplier and flat bonus.
     // Multiplier alone is too weak for early bosses with low base DEF.
-    defMult = 1 + Math.min(isAncientOak ? 0.65 : 0.55, levelDelta * defPerLevel);
-    defBonus = Math.min(isAncientOak ? 28 : 24, Math.floor(levelDelta * (isAncientOak ? 1.35 : 1.10)));
+    defMult = 1 + Math.min(prof.defCap, levelDelta * prof.defStep);
+    defBonus = Math.min(prof.defBonusCap, Math.floor(levelDelta * prof.defBonusStep));
     specialBonus = Math.min(14, Math.floor(levelDelta * 1.5));
     rewardMult = 1 + Math.min(0.35, levelDelta * 0.025);
   } else if (levelDelta < 0) {

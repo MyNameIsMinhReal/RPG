@@ -3,6 +3,7 @@ import {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder,
   ButtonStyle, ComponentType,
 } from 'discord.js';
+import type { PrefixSpec } from './prefixOptions';
 import db from '../database/index';
 import { getPlayer } from '../systems/player';
 import { COLORS } from '../utils/embeds';
@@ -979,3 +980,21 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
 
 // Text-prefix aliases (auto-loaded by registry.ts)
 export const aliases = ['clan','gc'];
+
+export const prefixSpec: PrefixSpec = {
+  groups: ['war', 'stock'],
+  defaultSub: 'info',
+  parseString(name, ctx) {
+    if (ctx.sub === 'create') {
+      if (name === 'tag') return ctx.payload[ctx.payload.length - 1] ?? null;
+      if (name === 'name') return ctx.payload.slice(0, -1).join(' ') || null;
+      return null;
+    }
+    if (name === 'type' && ctx.sub === 'buff') return ctx.payload[0] ?? null;
+    if (name === 'name' || name === 'target') {
+      const noNumbers = ctx.payload.filter(t => !/^-?\d+$/.test(t));
+      return noNumbers.join(' ') || null;
+    }
+    return undefined;
+  },
+};

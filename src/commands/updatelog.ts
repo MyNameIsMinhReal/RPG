@@ -1,7 +1,7 @@
 import {
   SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder
 } from 'discord.js';
-import { addUpdateLog, getAllUpdateLogs } from '../systems/updateLog';
+import { addUpdateLog, getAllUpdateLogs, clampLogText } from '../systems/updateLog';
 
 const ALLOWED_IDS = new Set(
   (process.env.BOT_ADMIN_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean)
@@ -44,7 +44,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           .addFields(
             { name: 'ID', value: `#${log.id}`, inline: true },
             { name: 'Version', value: log.version, inline: true },
-            { name: 'Nội dung', value: log.content }
+            { name: 'Nội dung', value: clampLogText(log.content, 1000) }
           )
           .setFooter({ text: 'Người chơi sẽ nhận DM vào lần tiếp theo họ dùng lệnh.' })
       ]
@@ -67,7 +67,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         new EmbedBuilder()
           .setColor(0x5865F2)
           .setTitle('📋 Update Logs (10 gần nhất)')
-          .setDescription(desc)
+          .setDescription(clampLogText(desc, 3900))
       ]
     });
   }

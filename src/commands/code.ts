@@ -3,6 +3,7 @@ import {
   EmbedBuilder,
   SlashCommandBuilder,
 } from 'discord.js';
+import type { PrefixSpec } from './prefixOptions';
 import { COLORS } from '../utils/embeds';
 import { withImage } from '../utils/eventImages';
 import { redeemCode } from '../systems/codes';
@@ -56,3 +57,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const { embed: imgEmbed, files } = withImage(embed, 'code_redeem');
   await interaction.editReply({ embeds: [imgEmbed], files });
 }
+
+export const prefixSpec: PrefixSpec = {
+  parseString: (name, ctx) => (name === 'code' ? (ctx.argsText.trim() || null) : undefined),
+};

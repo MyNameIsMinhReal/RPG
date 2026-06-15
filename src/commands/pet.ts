@@ -2,6 +2,7 @@ import {
   SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder,
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType,
 } from 'discord.js';
+import type { PrefixSpec } from './prefixOptions';
 import db from '../database/index';
 import { getPlayer, addItem } from '../systems/player';
 import { PETS, getPet, petPassiveValue, RARITY_COLOR, RARITY_LABEL } from '../data/pets';
@@ -226,3 +227,8 @@ export async function execute(i: ChatInputCommandInteraction): Promise<void> {
     });
   }
 }
+
+export const prefixSpec: PrefixSpec = {
+  defaultSub: 'list',
+  parseString: (name, ctx) => (name === 'pet_id' ? (ctx.payload[0] ?? null) : undefined),
+};

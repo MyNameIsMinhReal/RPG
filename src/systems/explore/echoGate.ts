@@ -123,6 +123,7 @@ async function handleEchoRitualStart(
   removeItem(userId, guildId, 'echo_trace', 1);
   removeItem(userId, guildId, 'soul_candle', 1);
   removeItem(userId, guildId, 'mirror_sigil', 1);
+  removeItem(userId, guildId, 'purifying_salt', 1);
   clearEchoRitualProgress(guildId, userId);
 
   const hpMult = getRitualHpMultiplier(sealsBroken, puzzleCorrect);

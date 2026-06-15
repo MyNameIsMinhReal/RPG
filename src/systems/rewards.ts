@@ -1,6 +1,6 @@
 import { grantGold, incrementKills, grantExp, grantSoulShards, addItem, killPlayer } from './player';
 import { createLegacy, pickLegacySkill } from './legacy';
-import { logEvent, onBossKilled, getDropBonus } from './world';
+import { logEvent, onBossKilled, getDropBonus, getExpBonus } from './world';
 import { getItem } from '../data/items';
 import { getMaterial } from '../data/materials';
 import { unlockRecipesBySource } from './crafting';
@@ -18,6 +18,8 @@ import { getSecondaryStatBonuses } from './statSystem';
 import { getEquipmentStats } from './equipment';
 import { getCorruptionDropBonus } from './corruption';
 import { markEchoSealByEnemy, ECHO_SEALS } from './echoDemonRitual';
+import { getIntelRewardMods, applyIntelExtraDrop } from './villageDistricts';
+import { createDroppedEquipmentInstance, formatEquipmentRewardInstance } from './equipmentInstances';
 
 
 function combatRewardMultipliers(enemy: EnemyDef): { exp: number; gold: number } {
@@ -53,15 +55,17 @@ export function processVictoryRewards(
   const baseExp   = scaleReward(enemy.expReward, rewardMult.exp, 1);
   const greedGoldBonus = getGreedGoldBonusPercent(userId, guildId);
   const factionMods = getFactionRewardMods(userId, guildId);
+  const intelMods = getIntelRewardMods(userId, guildId, player.zone_id);
+  const globalExpBonus = getExpBonus(guildId);
   const petMods = getPetRewardMods(userId, guildId);
   const statMods = getSecondaryStatBonuses(player);
   const eqStats = getEquipmentStats(userId, guildId);
   const gearGoldBonus = eqStats.goldBonus ?? 0;
   const gearExpBonus = eqStats.expBonus ?? 0;
   const gearDropBonus = eqStats.dropBonus ?? 0;
-  const goldBonusPct = greedGoldBonus + factionMods.goldPct + petMods.goldPct + statMods.goldBonusPct + gearGoldBonus;
-  const expBonusPct = factionMods.expPct + petMods.expPct + gearExpBonus;
-  const totalDropBonusPct = dropBonus + corruptionDropBonus + factionMods.dropPct + statMods.dropBonusPct + gearDropBonus;
+  const goldBonusPct = greedGoldBonus + factionMods.goldPct + intelMods.goldPct + petMods.goldPct + statMods.goldBonusPct + gearGoldBonus;
+  const expBonusPct = globalExpBonus + factionMods.expPct + intelMods.expPct + petMods.expPct + gearExpBonus;
+  const totalDropBonusPct = dropBonus + corruptionDropBonus + factionMods.dropPct + intelMods.dropPct + statMods.dropBonusPct + gearDropBonus;
   const gold      = Math.max(0, Math.floor(baseGold * (1 + goldBonusPct / 100)));
   const exp       = Math.max(1, Math.floor(baseExp * (1 + expBonusPct / 100)));
   const drops: string[] = [];
@@ -77,7 +81,8 @@ export function processVictoryRewards(
     if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * totalDropBonusPct / 100)) {
       addItem(userId, guildId, drop.itemId, 1);
       const it = getItem(drop.itemId) ?? getMaterial(drop.itemId);
-      if (it) drops.push(`${it.icon} ${it.name}`);
+      const extraIntel = applyIntelExtraDrop(userId, guildId, player.zone_id, drop.itemId);
+      if (it) drops.push(`${it.icon} ${it.name}${extraIntel ? ` + ${extraIntel}` : ''}`);
     }
   }
 
@@ -89,8 +94,8 @@ export function processVictoryRewards(
     const roll = Math.random() * 100;
     const adjustedChance = (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * totalDropBonusPct / 100);
     if (roll <= adjustedChance) {
-      addItem(userId, guildId, eq.id, 1);
-      drops.push(`${eq.icon} **${eq.name}** *(${['common','rare','epic','legendary'][['common','rare','epic','legendary'].indexOf(eq.rarity)]})*`);
+      const inst = createDroppedEquipmentInstance(userId, guildId, eq.id, player.level, enemy);
+      drops.push(inst ? formatEquipmentRewardInstance(inst) : `${eq.icon} **${eq.name}**`);
     }
   }
 
@@ -99,6 +104,8 @@ export function processVictoryRewards(
   const bonusParts = [
     greedGoldBonus > 0 ? `📜 Scroll of Greed: gold +${greedGoldBonus}% (**${baseGold} → ${gold}**)` : null,
     ...factionMods.lines,
+    intelMods.line ?? null,
+    globalExpBonus > 0 ? `🙏 Ánh Sáng Thánh: EXP +${globalExpBonus}% toàn server` : null,
     statMods.goldBonusPct > 0 || statMods.dropBonusPct > 0 ? `🍀 LUK: gold +${statMods.goldBonusPct}% · drop +${statMods.dropBonusPct}%` : null,
     corruptionDropBonus > 0 ? `🌘 Ô Nhiễm Linh Hồn: drop +${corruptionDropBonus}%` : null,
     gearGoldBonus > 0 || gearExpBonus > 0 || gearDropBonus > 0 ? `🎒 Gear: gold +${gearGoldBonus}% · exp +${gearExpBonus}% · drop +${gearDropBonus}%` : null,

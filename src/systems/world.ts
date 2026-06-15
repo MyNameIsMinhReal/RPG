@@ -1,4 +1,5 @@
 import db from '../database/index';
+import { DAY_SECONDS } from '../utils/constants';
 
 export interface WorldFlag {
   guild_id: string; flag_key: string; flag_value: string;
@@ -93,18 +94,18 @@ export function onBossKilled(
 
   // Set mechanic flags
   if (bossId === 'ancient_oak') {
-    setFlag(guildId, 'forest_drop_bonus', '20', 86400);
-    setWorldEvent(guildId, 'ancient_oak_fall', consequences['ancient_oak_slain'] ?? 'Ancient Oak đã bị tiêu diệt.', 86400);
+    setFlag(guildId, 'forest_drop_bonus', '20', DAY_SECONDS);
+    setWorldEvent(guildId, 'ancient_oak_fall', consequences['ancient_oak_slain'] ?? 'Ancient Oak đã bị tiêu diệt.', DAY_SECONDS);
   }
   if (bossId === 'echo_demon') {
-    setFlag(guildId, 'shop_discount', '10', 86400);
-    setFlag(guildId, 'shrine_corruption_slow', '1', 86400); // Ô Nhiễm tăng chậm hơn ở Đền Cổ
-    setFlag(guildId, 'shrine_purify_boost', '1', 86400);    // event thanh tẩy xuất hiện nhiều hơn
-    setWorldEvent(guildId, 'echo_demon_sealed', consequences['echo_demon_slain'] ?? 'Echo Demon đã bị phong ấn lại.', 86400);
+    setFlag(guildId, 'shop_discount', '10', DAY_SECONDS);
+    setFlag(guildId, 'shrine_corruption_slow', '1', DAY_SECONDS); // Ô Nhiễm tăng chậm hơn ở Đền Cổ
+    setFlag(guildId, 'shrine_purify_boost', '1', DAY_SECONDS);    // event thanh tẩy xuất hiện nhiều hơn
+    setWorldEvent(guildId, 'echo_demon_sealed', consequences['echo_demon_slain'] ?? 'Echo Demon đã bị phong ấn lại.', DAY_SECONDS);
   }
   if (bossId === 'mine_colossus') {
-    setFlag(guildId, 'shop_discount', '15', 86400);
-    setWorldEvent(guildId, 'mine_colossus_fall', consequences['mine_colossus_slain'] ?? 'Mine Colossus đã sụp đổ.', 86400);
+    setFlag(guildId, 'shop_discount', '15', DAY_SECONDS);
+    setWorldEvent(guildId, 'mine_colossus_fall', consequences['mine_colossus_slain'] ?? 'Mine Colossus đã sụp đổ.', DAY_SECONDS);
   }
   if (bossId === 'the_forgotten') {
     setFlag(guildId, 'global_exp_bonus', '10', 172800);
@@ -139,7 +140,7 @@ export function getShopMarkup(guildId: string): number {
 export function increaseShopMarkup(guildId: string, amount: number, cap = 75): number {
   const next = Math.min(cap, Math.max(0, getShopMarkup(guildId) + amount));
   setFlag(guildId, 'shop_markup', String(next));
-  setWorldEvent(guildId, 'merchant_fear', `🛒 Thương nhân bắt đầu thuê vệ sĩ — giá shop toàn thế giới tăng **${next}%**.`, 86400);
+  setWorldEvent(guildId, 'merchant_fear', `🛒 Thương nhân bắt đầu thuê vệ sĩ — giá shop toàn thế giới tăng **${next}%**.`, DAY_SECONDS);
   return next;
 }
 
@@ -262,7 +263,7 @@ export function getMerchantFear(guildId: string): number {
 
 export function increaseMerchantFear(guildId: string, amount: number): number {
   const next = adjustWorldNumber(guildId, 'merchant_fear', amount, 0, 100);
-  setWorldEvent(guildId, 'merchant_fear_level', `🏦 Thương nhân sợ hãi: **${next}%**. Giá shop và vệ sĩ sẽ tăng theo mức này.`, 86400);
+  setWorldEvent(guildId, 'merchant_fear_level', `🏦 Thương nhân sợ hãi: **${next}%**. Giá shop và vệ sĩ sẽ tăng theo mức này.`, DAY_SECONDS);
   return next;
 }
 
@@ -276,7 +277,7 @@ export function getWorldDanger(guildId: string): number {
 
 export function adjustWorldDanger(guildId: string, amount: number): number {
   const next = adjustWorldNumber(guildId, 'world_danger_level', amount, 0, 100);
-  setWorldEvent(guildId, 'danger_level', `⚠️ Mức nguy hiểm thế giới: **${next}%**. Thợ săn tiền thưởng và ambush xuất hiện nhiều hơn.`, 86400);
+  setWorldEvent(guildId, 'danger_level', `⚠️ Mức nguy hiểm thế giới: **${next}%**. Thợ săn tiền thưởng và ambush xuất hiện nhiều hơn.`, DAY_SECONDS);
   return next;
 }
 

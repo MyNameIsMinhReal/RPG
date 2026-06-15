@@ -4,6 +4,7 @@ import {
 } from 'discord.js';
 import { getPlayer, spendGold, grantGold } from '../systems/player';
 import { logEvent } from '../systems/world';
+import { withTransaction } from '../database/transaction';
 import { awardAchievements } from '../systems/achievements';
 import { COLORS } from '../utils/embeds';
 
@@ -21,7 +22,7 @@ export const data = new SlashCommandBuilder()
     opt.setName('amount')
        .setDescription('Số Gold muốn gửi')
        .setRequired(true)
-       .setMinValue(1)
+       .setMinValue(10)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -74,8 +75,20 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const tax        = Math.max(1, Math.floor(amount * TAX_RATE));
   const received   = amount - tax;
 
-  spendGold(userId, guildId, amount);
-  grantGold(target.id, guildId, received);
+  // Atomic transfer: deduct then credit inside one transaction, and bail out if
+  // the deduction fails (insufficient / concurrent change) so we never credit
+  // the receiver without charging the sender.
+  const ok = withTransaction(() => {
+    if (!spendGold(userId, guildId, amount)) return false;
+    grantGold(target.id, guildId, received);
+    return true;
+  });
+  if (!ok) {
+    await interaction.editReply({
+      embeds: [new EmbedBuilder().setColor(COLORS.warning).setDescription('❌ Giao dịch thất bại! Bạn không đủ Gold (số dư có thể vừa thay đổi).')]
+    });
+    return;
+  }
 
   logEvent(guildId, userId, sender.name, 'trade',
     `đã chuyển **${received}** Gold cho **${receiver.name}** (thuế ${tax} Gold).`);

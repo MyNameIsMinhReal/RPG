@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { getPlayer } from '../systems/player';
-import { getCombatByUser } from '../systems/combat';
+import { getCombatByUser, getPartyCombatForMember, deletePartyCombat } from '../systems/combat';
 import { canExplore, exploreCooldownRemaining } from '../systems/economy';
 import { setCombatFallbackHandlers } from '../systems/combatRegistry';
 import { COLORS } from '../utils/embeds';
@@ -36,6 +36,22 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   if (!player.alive) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, '☠️ Nhân vật đã chết. Dùng `/start` để hồi sinh!')] });
+    return;
+  }
+
+  // Recover an interrupted party combat (bot restarted mid-fight). The live fight
+  // can't be resumed in-place, so clear the orphaned snapshot and tell the player
+  // clearly instead of leaving them feeling the battle silently vanished.
+  const staleParty = getPartyCombatForMember(userId, guildId);
+  if (staleParty) {
+    deletePartyCombat(staleParty.message_id);
+    let enemyName = 'kẻ địch';
+    try { enemyName = (JSON.parse(staleParty.enemy_json)?.name as string) ?? enemyName; } catch { /* keep default */ }
+    await interaction.editReply({
+      embeds: [simpleEmbed(COLORS.warning,
+        `👥 Trận **party combat** với **${enemyName}** (lượt ${staleParty.turn}) đã bị gián đoạn do bot khởi động lại. ` +
+        `HP/MP của bạn được giữ nguyên — hãy bắt đầu lại trận mới.`)],
+    });
     return;
   }
 

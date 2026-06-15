@@ -11,18 +11,28 @@ import {
 } from 'discord.js';
 
 import { loadCommands, buildAliasMap } from './commands/registry';
+import { PrefixCommandOptions, stripUserMentionToken, type PrefixSpec } from './commands/prefixOptions';
 import { isTransientNetworkError } from './utils/netErrors';
 import { sendUnseenLogsDM } from './systems/updateLog';
 import { buildHelpGuideEmbeds } from './commands/help';
 import { runStartupDataCheck } from './doctor';
 import { dispatchCombatInteraction } from './systems/combatFlow';
+import db from './database/index';
+
+// One-time GC on boot: expired world_state rows are skipped on read but never
+// deleted, so they pile up over months. Sweep them once at startup.
+try {
+  db.prepare('DELETE FROM world_state WHERE expires_at IS NOT NULL AND expires_at <= ?').run(Math.floor(Date.now() / 1000));
+} catch { /* table may not exist on very first run */ }
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent
-  ]
+  ],
+  // Global default: never ping the replied-to user; still allow explicit @user/@role.
+  allowedMentions: { parse: ['users', 'roles'], repliedUser: false }
 });
 
 type CommandHandler = (i: ChatInputCommandInteraction) => Promise<void>;
@@ -40,6 +50,12 @@ console.log(`📦 Loaded ${commands.size} commands: ${loadedCommands.map(c => c.
 // alias → command-name, derived from each command's own `aliases` export.
 const prefixAliases = buildAliasMap(loadedCommands);
 
+// Per-command prefix parsing rules, declared by each command's optional
+// `prefixSpec` export (keeps command-specific arg parsing out of this file).
+const prefixSpecs = new Map<string, PrefixSpec | undefined>(
+  loadedCommands.map(c => [c.name, (c as { prefixSpec?: PrefixSpec }).prefixSpec])
+);
+
 // Prefix help uses the same embed guide as /help.
 
 
@@ -55,113 +71,6 @@ function stripInteractionOnlyOptions(options: any): any {
   };
 }
 
-function stripUserMentionToken(token: string): string | null {
-  const match = token.match(/^<@!?(\d+)>$/) ?? token.match(/^(\d{15,25})$/);
-  return match?.[1] ?? null;
-}
-
-class PrefixCommandOptions {
-  private readonly tokens: string[];
-
-  constructor(
-    private readonly sourceMessage: Message,
-    private readonly commandName: string,
-    private readonly argsText: string
-  ) {
-    this.tokens = argsText.trim().split(/\s+/).filter(Boolean);
-  }
-
-  private groupNames(): string[] {
-    return this.commandName === 'guild' ? ['war', 'stock'] : [];
-  }
-
-  private subIndex(): number {
-    return this.getSubcommandGroup(false) ? 1 : 0;
-  }
-
-  private payloadTokens(): string[] {
-    const start = this.subIndex() + (this.tokens.length ? 1 : 0);
-    return this.tokens.slice(start);
-  }
-
-  getString(name: string, required = false): string | null {
-    let value: string | null = null;
-    const sub = this.getSubcommand(false);
-    const group = this.getSubcommandGroup(false);
-    const payload = this.payloadTokens();
-
-    if (name === 'item' || (this.commandName === 'code' && name === 'code')) {
-      value = this.argsText.trim() || null;
-    } else if (this.commandName === 'pet' && name === 'pet_id') {
-      value = payload[0] ?? null;
-    } else if (this.commandName === 'guild' && sub === 'create') {
-      if (name === 'tag') value = payload[payload.length - 1] ?? null;
-      if (name === 'name') value = payload.slice(0, -1).join(' ') || null;
-    } else if (this.commandName === 'guild' && name === 'type' && sub === 'buff') {
-      value = payload[0] ?? null;
-    } else if (this.commandName === 'guild' && (name === 'name' || name === 'target')) {
-      const noNumbers = payload.filter(t => !/^-?\d+$/.test(t));
-      value = noNumbers.join(' ') || null;
-    } else {
-      value = payload.join(' ') || null;
-    }
-
-    if (!value && required) throw new Error(`Missing required string option: ${name}`);
-    return value;
-  }
-
-  getInteger(name: string, required = false): number | null {
-    const payload = this.payloadTokens();
-    const numericToken = [...payload, ...this.tokens].reverse().find(t => /^-?\d+$/.test(t));
-    const value = numericToken ? Number.parseInt(numericToken, 10) : null;
-
-    if (value === null && required) throw new Error(`Missing required integer option: ${name}`);
-    return value;
-  }
-
-  getUser(name: string, required = false): User | null {
-    const mentioned = this.sourceMessage.mentions.users.first();
-    if (mentioned) return mentioned;
-
-    for (const token of this.tokens) {
-      const id = stripUserMentionToken(token);
-      if (!id) continue;
-
-      const cached = this.sourceMessage.client.users.cache.get(id);
-      if (cached) return cached;
-
-      const member = this.sourceMessage.guild?.members.cache.get(id);
-      if (member?.user) return member.user;
-    }
-
-    if (required) throw new Error(`Missing required user option: ${name}`);
-    return null;
-  }
-
-  getSubcommand(required = true): string {
-    const group = this.getSubcommandGroup(false);
-    const idx = group ? 1 : 0;
-    if (this.tokens.length > idx) return this.tokens[idx].toLowerCase();
-    // Default subcommand per command
-    const defaults: Record<string, string> = {
-      worldboss: 'status',
-      pet:       'list',
-      guild:     'info',
-      party:     'info',
-    };
-    const def = defaults[this.commandName];
-    if (def) return def;
-    if (required) throw new Error(`Missing subcommand for ${this.commandName}`);
-    return '';
-  }
-
-  getSubcommandGroup(required = true): string | null {
-    const first = this.tokens[0]?.toLowerCase();
-    if (first && this.groupNames().includes(first)) return first;
-    if (required) throw new Error(`Missing subcommand group for ${this.commandName}`);
-    return null;
-  }
-}
 
 class PrefixInteractionAdapter {
   public deferred = false;
@@ -185,7 +94,7 @@ class PrefixInteractionAdapter {
     this.guild = sourceMessage.guild;
     this.client = sourceMessage.client;
     this.channel = sourceMessage.channel;
-    this.options = new PrefixCommandOptions(sourceMessage, commandName, argsText);
+    this.options = new PrefixCommandOptions(sourceMessage, commandName, argsText, prefixSpecs.get(commandName));
   }
 
   isRepliable(): boolean {

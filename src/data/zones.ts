@@ -18,7 +18,7 @@ export const ZONES: Record<string, ZoneDef> = {
     id: 'village', name: 'Làng Ashveil', icon: '🏘️',
     description: 'Ngôi làng nhỏ yên bình, nơi mọi hành trình bắt đầu. Người ta nói rừng phía đông đang thay đổi...',
     minLevel: 0, safe: true, travelCost: 0,
-    enemyIds: [], shopItems: ['bread', 'minor_healing_potion', 'health_potion', 'mana_potion', 'quick_salve', 'weapon_oil', 'armor_polish', 'scroll_detection', 'ancient_book'],
+    enemyIds: [], shopItems: ['bread', 'torch', 'minor_healing_potion', 'health_potion', 'mana_potion', 'quick_salve', 'weapon_oil', 'armor_polish', 'scroll_detection', 'ancient_book'],
     color: 0x57F287,
     ambiance: [
       'Gió thổi nhẹ qua những mái nhà tranh.',

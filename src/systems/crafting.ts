@@ -1,4 +1,5 @@
 import db from '../database/index';
+import { withTransaction } from '../database/transaction';
 import { randInt } from '../utils/format';
 import { getItemQty, removeItem, addItem } from './player';
 import {
@@ -134,6 +135,7 @@ export function attemptCraft(
 
   const lostMaterials: Array<{ itemId: string; lost: number }> = [];
 
+  withTransaction(() => {
   if (success) {
     // Consume all materials
     for (const ing of recipe.ingredients) {
@@ -155,6 +157,7 @@ export function attemptCraft(
       lostMaterials.push({ itemId: ing.itemId, lost: lostAmt });
     }
   }
+  });
 
   const { newLevel, leveledUp } = addCraftingExp(userId, guildId, recipe.craftingExp);
   return { success, leveledUp, newCraftLevel: newLevel, itemName: recipe.resultItemId, lostMaterials, lostGold: recipe.goldCost };

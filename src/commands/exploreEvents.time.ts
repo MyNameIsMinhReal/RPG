@@ -1,4 +1,5 @@
 import type { ExploreEventType, RunExploreEventInput } from './exploreEvents';
+import { finishExploreEvent as finish, awaitExploreBtn as awaitBtn } from './exploreEventShared';
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -15,12 +16,13 @@ import { logEvent } from '../systems/world';
 import { COLORS, simpleEmbed } from '../utils/embeds';
 import { pick, randInt } from '../utils/format';
 import { onlyUser } from '../utils/collectors';
+import { TIMEZONE_OFFSET } from '../utils/constants';
 
 // ── Time of day (UTC+7) ──────────────────────────────────────────────────
 export type TimeOfDay = 'dawn' | 'day' | 'dusk' | 'night';
 
 export function getTimeOfDay(): TimeOfDay {
-  const hour = (new Date().getUTCHours() + 7) % 24; // UTC+7
+  const hour = (new Date().getUTCHours() + TIMEZONE_OFFSET) % 24;
   if (hour >= 5  && hour < 8)  return 'dawn';
   if (hour >= 8  && hour < 17) return 'day';
   if (hour >= 17 && hour < 20) return 'dusk';
@@ -79,25 +81,7 @@ export function getTimeWeightMultipliers(time: TimeOfDay): Partial<Record<Explor
 }
 
 // ── Local finish helper ──────────────────────────────────────────────────
-async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<void> {
-  const msg = await ctx.interaction.editReply({
-    embeds: [embed],
-    components: ctx.callbacks.buildContinueExploreRow(ctx.userId)
-  });
-  await ctx.callbacks.attachContinueExploreHandler(msg as Message<boolean>, ctx.interaction, ctx.userId, ctx.guildId);
-}
 
-async function awaitBtn(
-  ctx: RunExploreEventInput,
-  embed: EmbedBuilder,
-  row: ActionRowBuilder<ButtonBuilder>
-): Promise<string | null> {
-  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time: 30_000 }).catch(() => null);
-  if (!btn || !btn.isButton()) return null;
-  await btn.deferUpdate().catch(() => {});
-  return btn.customId;
-}
 
 // ════════════════════════════════════════════════════════════════════════
 //  DAWN (05:00 – 07:59)

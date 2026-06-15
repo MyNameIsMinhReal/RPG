@@ -1,4 +1,4 @@
-import { CLASSES } from '../data/classes';
+import { CLASSES, getPassiveLine } from '../data/classes';
 import { ITEMS } from '../data/items';
 import { MATERIALS } from '../data/materials';
 import { EQUIPMENT, SETS } from '../data/equipment';
@@ -196,7 +196,7 @@ export function getGameIdSections(): GameIdSection[] {
     {
       category: 'classes',
       label: GAME_ID_CATEGORY_LABELS.classes,
-      rows: sortedRows(Object.values(CLASSES).map(c => row('classes', c.id, c.name, c.icon, c.passiveLine))),
+      rows: sortedRows(Object.values(CLASSES).map(c => row('classes', c.id, c.name, c.icon, getPassiveLine(c)))),
     },
     {
       category: 'pets',

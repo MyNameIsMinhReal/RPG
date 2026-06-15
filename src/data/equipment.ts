@@ -28,7 +28,9 @@ export type EquipEffect  =
   | 'worldbreaker'      // -10 DEF (high risk)
   | 'debt_on_death'     // lose extra gold penalty on death
   | 'set_bonus_2'       // set bonus 2-piece active
-  | 'set_bonus_3';      // set bonus 3-piece active
+  | 'set_bonus_3'       // set bonus 3-piece active
+  | 'set_bonus_4'       // set bonus 4-piece active
+  | 'phantom_counter';  // after dodge, reflect part of damage as true damage
 
 export interface EquipStats {
   atk?:        number;
@@ -67,6 +69,7 @@ export interface SetDef {
   pieces:  string[];   // equipment IDs
   bonus2:  EquipStats & { effects?: EquipEffect[] };
   bonus3?: EquipStats & { effects?: EquipEffect[] };
+  bonus4?: EquipStats & { effects?: EquipEffect[] };
 }
 
 export const SETS: Record<string, SetDef> = {
@@ -105,6 +108,12 @@ export const SETS: Record<string, SetDef> = {
     pieces: ['abyssal_scythe', 'abyssal_armor', 'void_core'],
     bonus2: { effects: ['kill_mp_regen'] },
     bonus3: { effects: ['soul_stack'] }
+  },
+  forgotten_set: {
+    id: 'forgotten_set', name: 'Kẻ Lãng Quên',
+    pieces: ['moonlight_katana', 'nightwalker_cloak', 'eye_of_observer', 'bell_of_silence'],
+    bonus2: { dodgeChance: 10 },
+    bonus4: { effects: ['phantom_counter'] }
   }
 };
 
@@ -312,7 +321,7 @@ const EQUIPMENT_RAW: Record<string, EquipmentDef> = {
   moonlight_katana: {
     id: 'moonlight_katana', name: 'Moonlight Katana', icon: '🌙', slot: 'weapon', rarity: 'legendary',
     description: 'Khi HP dưới 35%, tăng thêm 10% ATK.',
-    stats: { atk: 16, critChance: 15 }, effects: ['low_hp_atk'],
+    stats: { atk: 16, critChance: 15 }, effects: ['low_hp_atk'], setId: 'forgotten_set',
     sellPrice: 600, dropFrom: ['void_wraith'], dropChance: 6, minZone: 'wastes'
   },
   staff_of_ancient_mana: {
@@ -836,7 +845,7 @@ const EQUIPMENT_RAW: Record<string, EquipmentDef> = {
   nightwalker_cloak: {
     id: 'nightwalker_cloak', name: 'Nightwalker Cloak', icon: '🌙', slot: 'armor', rarity: 'legendary',
     description: '+15% Dodge. Sau khi né, đòn tiếp theo +20% damage.',
-    stats: { maxHp: 50, def: 7, dodgeChance: 12 }, effects: ['dodge_then_dmg'],
+    stats: { maxHp: 50, def: 7, dodgeChance: 12 }, effects: ['dodge_then_dmg'], setId: 'forgotten_set',
     sellPrice: 650, dropFrom: ['echo_demon'], dropChance: 6, minZone: 'shrine'
   },
   titan_shield: {
@@ -1153,12 +1162,12 @@ const EQUIPMENT_RAW: Record<string, EquipmentDef> = {
   bell_of_silence: {
     id: 'bell_of_silence', name: 'Bell of Silence', icon: '🔔', slot: 'accessory1', rarity: 'legendary',
     description: 'Tăng khả năng chặn debuff. +30 MP.',
-    stats: { maxMp: 30, maxHp: 30 }, sellPrice: 850, buyPrice: 3200, minZone: 'wastes'
+    stats: { maxMp: 30, maxHp: 30 }, setId: 'forgotten_set', sellPrice: 850, buyPrice: 3200, minZone: 'wastes'
   },
   eye_of_observer: {
     id: 'eye_of_observer', name: 'Eye of Observer', icon: '👁️', slot: 'accessory1', rarity: 'legendary',
     description: '+8% Crit, +8% Dodge. Nhìn thấu kẻ thù.',
-    stats: { critChance: 8, dodgeChance: 8 }, sellPrice: 1000, buyPrice: 4000, minZone: 'wastes'
+    stats: { critChance: 8, dodgeChance: 8 }, setId: 'forgotten_set', sellPrice: 1000, buyPrice: 4000, minZone: 'wastes'
   },
   broken_crown_fragment: {
     id: 'broken_crown_fragment', name: 'Broken Crown Fragment', icon: '👑', slot: 'accessory1', rarity: 'legendary',
@@ -1198,6 +1207,23 @@ const EQUIPMENT_RAW: Record<string, EquipmentDef> = {
   },
 
   // ── Special / Promo-only ─────────────────────────────────────────────────
+  ancient_blood_blade: {
+    id: 'ancient_blood_blade', name: 'Ancient Blood Blade', icon: '🩸', slot: 'weapon', rarity: 'cursed',
+    description: 'Lưỡi kiếm cổ nhận được từ giao kèo Shadow Court. Rất mạnh nhưng buộc người dùng sống với cái giá đã trả.',
+    stats: { atk: 24, critChance: 8, lifesteal: 4, def: -4 },
+    effects: ['blood_kill_regen', 'debt_on_death'],
+    sellPrice: 666,
+    minZone: 'village'
+  },
+
+  exam_score_ten: {
+    id: 'exam_score_ten', name: 'Bài Thi 10 Điểm', icon: '🎓', slot: 'accessory1', rarity: 'epic',
+    description: 'Bài thi đỏ chót điểm 10 dành cho sĩ tử 2k8. Mang theo vía roll đề đẹp, né câu bẫy và vượt vũ môn thành công. **EXP +8%, Crit +5%, Max HP +10**.',
+    stats: { expBonus: 8, critChance: 5, maxHp: 10 },
+    sellPrice: 1,
+    minZone: 'village'
+  },
+
   early_access_ring: {
     id: 'early_access_ring', name: 'Early Access Ring', icon: '💫', slot: 'accessory2', rarity: 'epic',
     description: 'Nhẫn dành cho những người khai sáng thế giới đầu tiên. **ATK +4, DEF +3, Max HP +25, EXP +8%**. Hồi **15% HP** sau mỗi lần hạ gục kẻ thù. Không thể mua hay đổi.',
@@ -1439,6 +1465,12 @@ export function getSetBonuses(wornIds: string[]): { stats: EquipStats; effects: 
     }
     if (count >= 3 && set.bonus3) {
       Object.entries(set.bonus3).forEach(([k, v]) => {
+        if (k === 'effects') { (v as EquipEffect[]).forEach(e => effects.push(e)); return; }
+        (result as any)[k] = ((result as any)[k] ?? 0) + v;
+      });
+    }
+    if (count >= 4 && set.bonus4) {
+      Object.entries(set.bonus4).forEach(([k, v]) => {
         if (k === 'effects') { (v as EquipEffect[]).forEach(e => effects.push(e)); return; }
         (result as any)[k] = ((result as any)[k] ?? 0) + v;
       });

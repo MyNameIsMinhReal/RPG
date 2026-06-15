@@ -19,6 +19,7 @@ import { buildCombatEmbed, buildCombatButtons, buildSkillSelectMenu, simpleEmbed
 import type { CombatEnemy } from '../utils/embeds';
 import { withImage } from '../utils/eventImages';
 import { getEnemyAtkBonus } from './world';
+import { getVillageDefenseReduction } from './villageDistricts';
 import { applyConsumableCombatBonuses, getBuff, consumeBuff } from './consumables';
 import { incrementDaily, countsAsPotion } from '../commands/daily';
 import { applyBossLevelScaling } from './bossScaling';
@@ -64,6 +65,23 @@ function tuneNormalMobForCombat<T extends any>(enemy: T, playerLevel: number = 1
   };
 }
 
+
+
+function consumeExploreCombatEffects(userId: string, guildId: string): { effects: any[]; logs: string[] } {
+  const effects: any[] = [];
+  const logs: string[] = [];
+  const goddessLuck = consumeBuff(userId, guildId, 'goddess_luck' as any);
+  if (goddessLuck) {
+    effects.push({ name: 'crit_up', duration: Math.max(1, goddessLuck.charges ?? 3), value: goddessLuck.value ?? 12 });
+    logs.push(`✨ May Mắn Nữ Thần: Crit +${goddessLuck.value ?? 12}% trong ${goddessLuck.charges ?? 3} lượt đánh.`);
+  }
+  const goddessCurse = consumeBuff(userId, guildId, 'goddess_curse' as any);
+  if (goddessCurse) {
+    effects.push({ name: 'incoming_damage_up', duration: Math.max(1, goddessCurse.charges ?? 5), value: goddessCurse.value ?? 20 });
+    logs.push(`⚠️ Lời Nguyền Của Thần: nhận thêm ${goddessCurse.value ?? 20}% sát thương trong ${goddessCurse.charges ?? 5} lượt.`);
+  }
+  return { effects, logs };
+}
 
 function applyShrineCorruptionToEnemy<T extends any>(enemy: T, player: any): { enemy: T; lines: string[] } {
   if (!enemy || (enemy as any).isShopkeeper || !Array.isArray((enemy as any).zones) || !(enemy as any).zones.includes('shrine')) {
@@ -126,7 +144,9 @@ const COMBAT_USABLE_ITEM_IDS = new Set([
 ]);
 
 export function isCombatUsableItem(itemId: string): boolean {
-  return COMBAT_USABLE_ITEM_IDS.has(itemId);
+  // Single source of truth: items mark themselves usable in combat via data/items.ts.
+  // The legacy ID set stays only as a fallback for any item not yet migrated.
+  return getItem(itemId)?.isCombatUsable === true || COMBAT_USABLE_ITEM_IDS.has(itemId);
 }
 
 function makeBackRow(userId: string) {
@@ -515,11 +535,13 @@ export async function startCombatFlow(
   const withPassiveRaw = applyPassiveStats(player);
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
   const withPassive    = buffedStart.player;
+  const exploreStart    = consumeExploreCombatEffects(userId, guildId);
 
   const atkBonus     = getEnemyAtkBonus(guildId);
+  const defenseRedux = getVillageDefenseReduction(guildId);
   const greedBuff    = getBuff(userId, guildId, 'scroll_greed');
   const greedAtk     = greedBuff ? 15 : 0;
-  const adjustedAtk  = enemy.atk + Math.floor(enemy.atk * (atkBonus + greedAtk) / 100);
+  const adjustedAtk  = Math.max(1, Math.floor((enemy.atk + Math.floor(enemy.atk * (atkBonus + greedAtk) / 100)) * (1 - defenseRedux / 100)));
 
   const log0 = enemy.boss
     ? `👑 **BOSS** — **${enemy.icon} ${enemy.name}** xuất hiện!
@@ -527,7 +549,7 @@ export async function startCombatFlow(
     : `⚠️ **${enemy.icon} ${enemy.name}** (Lv.${enemy.level}) tấn công!`;
   const bossScaleDesc = enemy.boss ? enemy._bossLevelScaling?.desc : null;
   const monsterScaleDesc = !enemy.boss ? enemy._monsterLevelScaling?.desc : null;
-  const openingLogs = [log0, ...(bossScaleDesc ? [bossScaleDesc] : []), ...(monsterScaleDesc ? [monsterScaleDesc] : []), ...corruptionAdjusted.lines, ...buffedStart.logs, ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
+  const openingLogs = [log0, ...(bossScaleDesc ? [bossScaleDesc] : []), ...(monsterScaleDesc ? [monsterScaleDesc] : []), ...corruptionAdjusted.lines, ...buffedStart.logs, ...exploreStart.logs, ...(defenseRedux > 0 ? [`🧱 Tường thành Ashveil: quái bị giảm ${defenseRedux}% ATK.`] : []), ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
 
   const initState = {
     message_id: 'temp', channel_id: interaction.channelId,
@@ -541,6 +563,7 @@ export async function startCombatFlow(
     turn: 1, is_defending: 0,
     active_effects: JSON.stringify([
       ...(startingEffects ?? []),
+      ...exploreStart.effects,
       ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
       ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
       ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),
@@ -596,6 +619,7 @@ export async function startCombatFlowWithEnemy(
   const withPassiveRaw = applyPassiveStats(player);
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
   const withPassive    = buffedStart.player;
+  const exploreStart    = consumeExploreCombatEffects(userId, guildId);
 
   const greedBuff = getBuff(userId, guildId, 'scroll_greed');
   if (greedBuff) enemy.atk = Math.floor(enemy.atk * 1.15);
@@ -611,6 +635,7 @@ export async function startCombatFlowWithEnemy(
     ...(monsterScaleDesc ? [monsterScaleDesc] : []),
     ...corruptionAdjusted.lines,
     ...buffedStart.logs,
+    ...exploreStart.logs,
     ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : []),
     ...(smokeBuff ? ['🗡️ Assassin’s Smoke: shopkeeper DEF -20% khi mở combat.'] : [])
   ];
@@ -625,6 +650,7 @@ export async function startCombatFlowWithEnemy(
     player_def: withPassive.def,
     turn: 1, is_defending: 0,
     active_effects: JSON.stringify([
+      ...exploreStart.effects,
       ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
       ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
       ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),
@@ -660,7 +686,9 @@ export async function startGroupCombatFlow(
   const withPassiveRaw = applyPassiveStats(player);
   const buffedStart    = applyConsumableCombatBonuses(withPassiveRaw);
   const withPassive    = buffedStart.player;
+  const exploreStart    = consumeExploreCombatEffects(userId, guildId);
   const atkBonus       = getEnemyAtkBonus(guildId);
+  const defenseRedux   = getVillageDefenseReduction(guildId);
 
   const rawEnemies = enemyIds.map(id => getEnemy(id)!).filter(Boolean);
   const tunedEnemyResults = rawEnemies.map(e => applyShrineCorruptionToEnemy(tuneNormalMobForCombat(e, player.level), player));
@@ -669,7 +697,7 @@ export async function startGroupCombatFlow(
   const combatEnemies: CombatEnemy[] = tunedEnemies.map(e => ({
     id: e.id, name: e.name, icon: e.icon,
     hp: e.hp, max_hp: e.hp,
-    atk: e.atk + Math.floor(e.atk * atkBonus / 100),
+    atk: Math.max(1, Math.floor((e.atk + Math.floor(e.atk * atkBonus / 100)) * (1 - defenseRedux / 100))),
     def: e.def,
     specialAttacks: (e.specialAttacks ?? []) as string[],
   }));
@@ -677,7 +705,7 @@ export async function startGroupCombatFlow(
   const primary    = combatEnemies[0];
   const groupLabel = combatEnemies.map(e => `${e.icon} ${e.name}`).join(', ');
   const groupScaleLines = tunedEnemies.map((e: any) => e._monsterLevelScaling?.desc).filter(Boolean).slice(0, 2);
-  const openingLogs = [`⚠️ **Nhóm kẻ thù xuất hiện!** ${groupLabel}`, ...groupScaleLines, ...corruptionLines, ...buffedStart.logs];
+  const openingLogs = [`⚠️ **Nhóm kẻ thù xuất hiện!** ${groupLabel}`, ...groupScaleLines, ...corruptionLines, ...buffedStart.logs, ...exploreStart.logs, ...(defenseRedux > 0 ? [`🧱 Tường thành Ashveil: quái bị giảm ${defenseRedux}% ATK.`] : [])];
 
   const baseState = {
     message_id: 'temp', channel_id: interaction.channelId,
@@ -690,6 +718,7 @@ export async function startGroupCombatFlow(
     player_def: withPassive.def,
     turn: 1, is_defending: 0,
     active_effects: JSON.stringify([
+      ...exploreStart.effects,
       ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
       ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
       ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),

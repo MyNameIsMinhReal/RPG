@@ -7,6 +7,7 @@ import { getEquipmentStats } from '../equipment';
 import type { CombatState, CombatEnemy } from '../../utils/embeds';
 import { type Effect, parseEffects, hasEffect, tickEffects, addEffect } from './effects';
 import { getGroupEnemies } from './state';
+import { AOE_SKILL_PENALTY, SKILL_BASE_RETAIN, SKILL_ATK_DIVISOR, HEAL_MAXHP_DIVISOR } from '../../utils/constants';
 
 // ── Passive snapshot ──────────────────────────────────────────────────────
 interface Passives {
@@ -191,6 +192,27 @@ export interface ActionResult {
 }
 
 // ── processAttack ─────────────────────────────────────────────────────────
+// Skills used to deal a flat number regardless of the caster's ATK, so casters
+// fell off hard at high level. Scale skill power with ATK (and gear) while
+// keeping early-game numbers close to the old flat values. Explicit atkScale /
+// healScale on a skill override the auto-scaling.
+function scaledSkillRaw(skill: any, playerAtk: number): number {
+  const base = Number(skill?.damage) || 0;
+  if (base <= 0) return 0;
+  if (typeof skill?.atkScale === 'number') {
+    return Math.max(1, Math.round((Number(skill.baseDamage) || 0) + playerAtk * skill.atkScale));
+  }
+  return Math.max(1, Math.round(base * SKILL_BASE_RETAIN + playerAtk * (base / SKILL_ATK_DIVISOR)));
+}
+function scaledSkillHeal(skill: any, maxHp: number): number {
+  const base = Number(skill?.heal) || 0;
+  if (base <= 0) return 0;
+  if (typeof skill?.healScale === 'number') {
+    return Math.max(1, Math.round((Number(skill.baseHeal) || 0) + maxHp * skill.healScale));
+  }
+  return Math.max(1, Math.round(base * SKILL_BASE_RETAIN + maxHp * (base / HEAL_MAXHP_DIVISOR)));
+}
+
 export function processAttack(state: CombatState, playerAtk: number, targetIdx = 0): ActionResult {
   const effects  = parseEffects(state.active_effects);
   const logs: string[] = JSON.parse(state.combat_log || '[]');
@@ -254,7 +276,9 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
   // Equipment stats
   const eqStats = getEquipmentStats(state.user_id, state.guild_id);
   const statMods = getPlayer(state.user_id, state.guild_id) ? getSecondaryStatBonuses(getPlayer(state.user_id, state.guild_id)!) : { critChance: 0, dodgeChance: 0, goldBonusPct: 0, dropBonusPct: 0 };
-  const totalCrit = Math.min(35, (eqStats.critChance ?? 0) + statMods.critChance);
+  const critBoost = effects.find(e => e.name === 'crit_up')?.value ?? 0;
+  const totalCrit = Math.min(60, (eqStats.critChance ?? 0) + statMods.critChance + critBoost);
+  if (critBoost > 0) logs.push(`✨ May Mắn Nữ Thần: Crit +${critBoost}%.`);
   const totalLifesteal = Math.min(20, (eqStats.lifesteal  ?? 0) + passives.lifestealBonus);
   if (eqStats.effects.includes('low_hp_atk') && player_hp / state.player_max_hp < 0.30) {
     effectiveAtk = Math.floor(effectiveAtk * 1.15);
@@ -445,7 +469,7 @@ export function processSkill(
       const names: string[] = [];
       for (let i = 0; i < group.length; i++) {
         if (group[i].hp <= 0) continue;
-        const dmg = calcSkillDamage(skill.damage, group[i].def, group[i].id);
+        const dmg = Math.max(1, Math.round(calcSkillDamage(scaledSkillRaw(skill, playerAtk), group[i].def, group[i].id) * AOE_SKILL_PENALTY));
         group[i] = { ...group[i], hp: Math.max(0, group[i].hp - dmg) };
         total += dmg;
         names.push(`${group[i].icon ?? '👹'} ${group[i].name} −${dmg}`);
@@ -454,7 +478,7 @@ export function processSkill(
       state = { ...state, enemy_hp, enemies_json: JSON.stringify(group) };
       logs.push(`${skill.icon} **${skill.name}** đánh diện rộng: ${names.join(', ')}. Tổng **${total}** sát thương.`);
     } else {
-      const dmg = calcSkillDamage(skill.damage, state.enemy_def, state.enemy_id);
+      const dmg = calcSkillDamage(scaledSkillRaw(skill, playerAtk), state.enemy_def, state.enemy_id);
       enemy_hp = Math.max(0, enemy_hp - dmg);
       logs.push(`${skill.icon} **${skill.name}** gây **${dmg}** sát thương lên **${state.enemy_name}**. (${enemy_hp}/${state.enemy_max_hp} HP còn lại)`);
     }
@@ -470,7 +494,8 @@ export function processSkill(
     }
     const target = group ? group[idx] : null;
     const hpRatio = target ? target.hp / target.max_hp : enemy_hp / state.enemy_max_hp;
-    const rawDamage = hpRatio <= 0.35 ? Math.floor(skill.damage * 1.85) : skill.damage;
+    const execRaw = scaledSkillRaw(skill, playerAtk);
+    const rawDamage = hpRatio <= 0.35 ? Math.floor(execRaw * 1.85) : execRaw;
     const dmg = calcSkillDamage(rawDamage, target ? target.def : state.enemy_def, target ? target.id : state.enemy_id);
     if (group && target && idx >= 0) {
       group[idx] = { ...group[idx], hp: Math.max(0, group[idx].hp - dmg) };
@@ -515,7 +540,7 @@ export function processSkill(
       skillMult *= 1.15;
       logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
     }
-    let finalDmg  = Math.max(1, Math.round(skill.damage * 50 / (skillTargetDef * defPierce + 50) * skillMult));
+    let finalDmg  = Math.max(1, Math.round(scaledSkillRaw(skill, playerAtk) * 50 / (skillTargetDef * defPierce + 50) * skillMult));
     finalDmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, finalDmg, targetIsBoss(targetId), logs, effects);
     if (skillGroupEnemies) {
       skillGroupEnemies[actualTargetIdx] = {
@@ -532,8 +557,9 @@ export function processSkill(
 
   // ── Heal skills ──────────────────────────────────────────────────────────
   if (skill.heal) {
-    const healed = Math.min(skill.heal, state.player_max_hp - player_hp);
-    player_hp = Math.min(state.player_max_hp, player_hp + skill.heal);
+    const healAmt = scaledSkillHeal(skill, state.player_max_hp);
+    const healed = Math.min(healAmt, state.player_max_hp - player_hp);
+    player_hp = Math.min(state.player_max_hp, player_hp + healAmt);
     // Soul Drain also restores 15 MP
     if (skill.id === 'soul_drain') {
       player_mp = Math.min(state.player_max_mp, player_mp + 15);
@@ -759,6 +785,13 @@ function enemyTurn(
   const passiveDodge = Math.min(20, (eqStatsET.dodgeChance ?? 0) + clsPassET.dodgeBonus + statDodgeET);
   if (passiveDodge > 0 && !hasEffect(effects, 'dodge') && randInt(1, 100) <= passiveDodge) {
     logs.push(`💨 **Dodge pasif (${passiveDodge}%)** — Tránh đòn!`);
+    if (eqStatsET.effects.includes('phantom_counter')) {
+      const effDef = ((current as any).player_def ?? 0) + defenseBonus;
+      const wouldDmg = Math.max(1, Math.round(enemy.atk * 50 / (effDef + 50)));
+      const reflect = Math.max(1, Math.floor(wouldDmg * 0.5));
+      current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - reflect) };
+      logs.push(`🕳️ **Ảnh Ảo** phản lại **${reflect} true damage** sau cú né!`);
+    }
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
     if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
     if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }
@@ -772,6 +805,14 @@ function enemyTurn(
     const idx = effects.findIndex(e => e.name === 'dodge');
     effects.splice(idx, 1);
     logs.push(`🌑 **Shadow Step!** Bạn né hoàn toàn đòn tấn công của **${enemy.name}**!`);
+    const eqStatsDodge = getEquipmentStats(current.user_id, current.guild_id);
+    if (eqStatsDodge.effects.includes('phantom_counter')) {
+      const effDef = ((current as any).player_def ?? 0) + defenseBonus;
+      const wouldDmg = Math.max(1, Math.round(enemy.atk * 50 / (effDef + 50)));
+      const reflect = Math.max(1, Math.floor(wouldDmg * 0.5));
+      current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - reflect) };
+      logs.push(`🕳️ **Ảnh Ảo** phản lại **${reflect} true damage** sau cú né!`);
+    }
     const { effects: ticked, playerBurnDmg, enemyBurnDmg } = tickEffects(effects);
     if (playerBurnDmg > 0) { playerHp = Math.max(0, playerHp - playerBurnDmg); logs.push(`🔥 Đốt cháy −**${playerBurnDmg} HP**.`); }
     if (enemyBurnDmg > 0) { current = { ...current, enemy_hp: Math.max(0, current.enemy_hp - enemyBurnDmg) }; logs.push(`🔥 **${enemy.name}** chịu **${enemyBurnDmg}** sát thương DoT!`); }

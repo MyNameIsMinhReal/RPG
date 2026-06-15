@@ -6,6 +6,7 @@ import {
   Message
 } from 'discord.js';
 import type { RunExploreEventInput } from './exploreEvents';
+import { finishExploreEvent as finish, awaitExploreBtn as awaitBtn } from './exploreEventShared';
 import {
   addItem,
   adjustFaction,
@@ -34,26 +35,6 @@ import { COLORS, simpleEmbed } from '../utils/embeds';
 import { onlyUser } from '../utils/collectors';
 import { pick, randInt } from '../utils/format';
 
-async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder): Promise<void> {
-  const msg = await ctx.interaction.editReply({
-    embeds: [embed],
-    components: ctx.callbacks.buildContinueExploreRow(ctx.userId)
-  });
-  await ctx.callbacks.attachContinueExploreHandler(msg as Message<boolean>, ctx.interaction, ctx.userId, ctx.guildId);
-}
-
-async function awaitBtn(
-  ctx: RunExploreEventInput,
-  embed: EmbedBuilder,
-  row: ActionRowBuilder<ButtonBuilder>,
-  time = 30_000
-): Promise<string | null> {
-  const reply = await ctx.interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await reply.awaitMessageComponent({ filter: onlyUser(ctx.userId), time }).catch(() => null);
-  if (!btn || !btn.isButton()) return null;
-  const ok = await btn.deferUpdate().then(() => true).catch(() => false);
-  return ok ? btn.customId : null;
-}
 
 function repLine(ctx: RunExploreEventInput, amount: number): string {
   const rep = adjustReputation(ctx.userId, ctx.guildId, amount);

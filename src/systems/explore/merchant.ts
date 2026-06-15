@@ -15,6 +15,7 @@ import { getZone, ZONE_ORDER } from '../../data/zones';
 import { getItem } from '../../data/items';
 import { getMaterial } from '../../data/materials';
 import { getEquipment, getZoneEquipment } from '../../data/equipment';
+import { withTransaction } from '../../database/transaction';
 import {
   logEvent, getEffectiveShopMarkup, increaseShopMarkup,
   getShopkeeperThreatMultiplier, getShopkeeperRobberyCount, recordShopkeeperRobbery,
@@ -291,8 +292,10 @@ export async function renderMerchantBuy(
       return;
     }
 
-    spendGold(buyerId, guildId, total);
-    addItem(buyerId, guildId, itemId, qty);
+    withTransaction(() => {
+      spendGold(buyerId, guildId, total);
+      addItem(buyerId, guildId, itemId, qty);
+    });
     if (isBuyEq) stock.equipmentIds = stock.equipmentIds.filter(id => id !== itemId);
     else stock.itemIds = stock.itemIds.filter(id => id !== itemId);
 
@@ -571,8 +574,11 @@ export async function renderMerchantSell(
       const qty = getItemQty(sellerId, guildId, itemId);
       if (qty <= 0) return;
 
-      removeItem(sellerId, guildId, itemId, 1);
-      grantGold(sellerId, guildId, item.sellPrice);
+      const sellPrice = item.sellPrice; // narrowed to number by the guard above
+      withTransaction(() => {
+        removeItem(sellerId, guildId, itemId, 1);
+        grantGold(sellerId, guildId, sellPrice);
+      });
 
       const fresh = getPlayer(sellerId, guildId)!;
       await interaction.editReply({

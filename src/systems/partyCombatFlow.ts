@@ -25,7 +25,7 @@ import { COLORS } from '../utils/embeds';
 import { randInt, pick, bar } from '../utils/format';
 import { incrementDaily, countsAsPotion } from '../commands/daily';
 import { incrementChapterObjective } from './chapter';
-import { logEvent, onBossKilled, markPlayerClearedBoss } from './world';
+import { logEvent, onBossKilled, markPlayerClearedBoss, getExpBonus } from './world';
 import { unlockRecipesBySource } from './crafting';
 import { getBossLevelScaling } from './bossScaling';
 import { getMonsterLevelScaling } from './monsterScaling';
@@ -34,6 +34,9 @@ import { getPetRewardMods, applyActivePetAfterVictory, grantPetDropAfterVictory 
 import { awardAchievements } from './achievements';
 import { getSecondaryStatBonuses } from './statSystem';
 import { getEquipmentStats } from './equipment';
+import { savePartyCombat, deletePartyCombat } from './combat/partyState';
+import { getIntelRewardMods, applyIntelExtraDrop } from './villageDistricts';
+import { createDroppedEquipmentInstance, formatEquipmentRewardInstance } from './equipmentInstances';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -352,7 +355,7 @@ function displayDrop(itemId: string): string {
   return it ? `${it.icon} ${it.name}` : itemId;
 }
 
-function rollPartyDrops(userId: string, guildId: string, enemyDef: any, extraDropPct = 0): string[] {
+function rollPartyDrops(userId: string, guildId: string, enemyDef: any, extraDropPct = 0, zoneId?: string): string[] {
   const drops: string[] = [];
 
   // Guaranteed drops must work in party combat too, otherwise miniboss route items can be missed.
@@ -364,15 +367,16 @@ function rollPartyDrops(userId: string, guildId: string, enemyDef: any, extraDro
   for (const drop of enemyDef.drops ?? []) {
     if (Math.random() * 100 <= drop.chance + Math.floor(drop.chance * extraDropPct / 100)) {
       addItem(userId, guildId, drop.itemId, 1);
-      drops.push(displayDrop(drop.itemId));
+      const extraIntel = zoneId ? applyIntelExtraDrop(userId, guildId, zoneId, drop.itemId) : null;
+      drops.push(`${displayDrop(drop.itemId)}${extraIntel ? ` + ${extraIntel}` : ''}`);
     }
   }
 
   const eqDrops = Object.values(EQUIPMENT).filter(e => e.dropFrom?.includes(enemyDef.id) && e.dropChance);
   for (const eq of eqDrops) {
     if (Math.random() * 100 <= (eq.dropChance ?? 0) + Math.floor((eq.dropChance ?? 0) * extraDropPct / 100)) {
-      addItem(userId, guildId, eq.id, 1);
-      drops.push(displayDrop(eq.id));
+      const inst = createDroppedEquipmentInstance(userId, guildId, eq.id, Math.max(1, (getPlayer(userId, guildId) as any)?.level ?? 1), enemyDef);
+      drops.push(inst ? formatEquipmentRewardInstance(inst) : displayDrop(eq.id));
     }
   }
   return drops;
@@ -470,6 +474,7 @@ export async function startPartyCombatFlow(
   const sessionId = `${leaderId.slice(-6)}_${Date.now().toString(36)}`;
   const log: string[] = levelScaling?.desc ? [levelScaling.desc] : [];
   let turn = 1;
+  let combatMessageId: string | null = null;
 
   // ── Turn loop ────────────────────────────────────────────────────────────────
   // eslint-disable-next-line no-constant-condition
@@ -488,9 +493,28 @@ export async function startPartyCombatFlow(
       try {
         // Build a fresh row for each edit; reusing builder instances across many edits can make debugging Discord component errors harder.
         reply = await interaction.editReply({ embeds: [embed], components: [buildActionRow(sessionId)] }) as Message<boolean>;
+        // Persist a snapshot each time control passes to a member, so a restart
+        // mid-fight can be detected and recovered instead of vanishing silently.
+        combatMessageId = reply.id;
+        try {
+          savePartyCombat({
+            message_id: reply.id,
+            channel_id: (reply as any).channelId ?? '',
+            guild_id: guildId,
+            leader_id: leaderId,
+            member_ids: JSON.stringify(memberIds),
+            enemy_json: JSON.stringify(enemy),
+            members_json: JSON.stringify(members),
+            turn,
+            log_json: JSON.stringify(log.slice(-12)),
+            current_member_id: currentMember.user_id,
+            decided_actions_json: JSON.stringify([...actions.entries()]),
+          });
+        } catch { /* persistence is best-effort — never break the live fight */ }
       } catch (err: any) {
         if (isDiscordInvalidComponentsError(err)) {
           logDiscordComponentError('turn action row', err);
+          if (combatMessageId) deletePartyCombat(combatMessageId);
           await interaction.editReply({
             embeds: [new EmbedBuilder(embed.toJSON()).setFooter({ text: '⚠️ Discord từ chối nút combat. Trận này đã được dừng an toàn, hãy thử lại.' })],
             components: []
@@ -527,6 +551,7 @@ export async function startPartyCombatFlow(
     const fleeChance = enemy.boss ? 18 : 50;
     if (fleeCount > 0 && randInt(1, 100) <= fleeChance) {
       for (const m of members) updatePlayerHpMp(m.user_id, guildId, m.alive ? m.hp : 1, m.mp);
+      if (combatMessageId) deletePartyCombat(combatMessageId);
       await interaction.editReply({
         embeds: [new EmbedBuilder().setColor(COLORS.info)
           .setTitle('🏃 Party Tháo Chạy!')
@@ -661,6 +686,9 @@ export async function startPartyCombatFlow(
 
   const allDead = members.every(m => !m.alive);
 
+  // Combat is over — clear the persisted snapshot so it isn't seen as interrupted.
+  if (combatMessageId) deletePartyCombat(combatMessageId);
+
   // ── Save HP/MP back to DB for all members ──────────────────────────────────
   for (const m of members) {
     updatePlayerHpMp(m.user_id, guildId, m.alive ? m.hp : 1, m.mp);
@@ -702,6 +730,9 @@ export async function startPartyCombatFlow(
   const bossLines: string[] = [];
   for (const m of survivors) {
     const factionMods = getFactionRewardMods(m.user_id, guildId);
+    const freshForZone = getPlayer(m.user_id, guildId);
+    const intelMods = getIntelRewardMods(m.user_id, guildId, freshForZone?.zone_id ?? 'village');
+    const globalExpBonus = getExpBonus(guildId);
     const petMods = getPetRewardMods(m.user_id, guildId);
     const rawForStats = getPlayer(m.user_id, guildId);
     const statMods = rawForStats ? getSecondaryStatBonuses(rawForStats) : { critChance: 0, dodgeChance: 0, goldBonusPct: 0, dropBonusPct: 0 };
@@ -709,8 +740,8 @@ export async function startPartyCombatFlow(
     const gearGoldBonus = eqStats.goldBonus ?? 0;
     const gearExpBonus = eqStats.expBonus ?? 0;
     const gearDropBonus = eqStats.dropBonus ?? 0;
-    const expReward = Math.max(1, Math.floor(baseExpReward * (1 + (factionMods.expPct + petMods.expPct + gearExpBonus) / 100)));
-    const goldReward = Math.max(0, Math.floor(baseGoldReward * (1 + (factionMods.goldPct + petMods.goldPct + statMods.goldBonusPct + gearGoldBonus) / 100)));
+    const expReward = Math.max(1, Math.floor(baseExpReward * (1 + (globalExpBonus + factionMods.expPct + intelMods.expPct + petMods.expPct + gearExpBonus) / 100)));
+    const goldReward = Math.max(0, Math.floor(baseGoldReward * (1 + (factionMods.goldPct + intelMods.goldPct + petMods.goldPct + statMods.goldBonusPct + gearGoldBonus) / 100)));
     grantExp(m.user_id, guildId, expReward);
     grantGold(m.user_id, guildId, goldReward);
     incrementKills(m.user_id, guildId);
@@ -726,11 +757,13 @@ export async function startPartyCombatFlow(
       }
       logEvent(guildId, m.user_id, fresh.name, baseDef.boss ? 'boss_kill' : 'kill', `cùng party tiêu diệt **${baseDef.icon} ${baseDef.name}**.`, fresh.zone_id);
     }
-    const drops = rollPartyDrops(m.user_id, guildId, baseDef, factionMods.dropPct + statMods.dropBonusPct + gearDropBonus);
+    const drops = rollPartyDrops(m.user_id, guildId, baseDef, factionMods.dropPct + intelMods.dropPct + statMods.dropBonusPct + gearDropBonus, fresh?.zone_id);
     const petLines = fresh ? [...applyActivePetAfterVictory(m.user_id, guildId, fresh, baseDef as any), ...grantPetDropAfterVictory(m.user_id, guildId, baseDef as any)] : [];
     const achievementLines = fresh ? awardAchievements(m.user_id, guildId) : [];
     const bonusLines = [
       ...factionMods.lines,
+      intelMods.line ?? null,
+      globalExpBonus > 0 ? `🙏 Ánh Sáng Thánh: EXP +${globalExpBonus}% toàn server` : null,
       (statMods.goldBonusPct > 0 || statMods.dropBonusPct > 0) ? `🍀 LUK: gold +${statMods.goldBonusPct}% · drop +${statMods.dropBonusPct}%` : null,
       (gearGoldBonus > 0 || gearExpBonus > 0 || gearDropBonus > 0) ? `🎒 Gear: gold +${gearGoldBonus}% · exp +${gearExpBonus}% · drop +${gearDropBonus}%` : null,
       ...petMods.lines,

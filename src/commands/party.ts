@@ -6,6 +6,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
 } from 'discord.js';
+import type { PrefixSpec } from './prefixOptions';
 import {
   createParty, disbandParty, addMember, removeMember,
   getPartyOf, getPartyMembers, isPartyLeader
@@ -270,3 +271,5 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
 // Text-prefix aliases (auto-loaded by registry.ts)
 export const aliases = ['pt'];
+
+export const prefixSpec: PrefixSpec = { defaultSub: 'info' };

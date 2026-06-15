@@ -85,6 +85,7 @@ import {
   showWorldPropheticVision, showWorldSecretMeeting,
   showWorldFactionStandoff, showWorldChurchInquisition, showWorldShadowOffer, showWorldHuntersMission, showWorldVillagerDispute,
 } from './exploreEvents.world';
+import { GUILD_EVENT_HANDLERS, GuildExploreEventId } from './exploreEvents.guild';
 
 export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wandering_blacksmith' | 'temporary_arena' | 'boss_tracks' | 'map_seller' | 'shrine_weeping_statue' | 'shrine_forbidden_offering' | 'shrine_sealed_reliquary' | 'mine_runaway_cart' | 'mine_living_ore' | 'mine_trapped_miner' | 'wastes_mirror_self' | 'wastes_memory_rain' | 'wastes_faceless_merchant' | 'echo_whisper_trace' | 'echo_whisper_candle' | 'echo_whisper_mirror' 
   | 'combat' | 'ambush' | 'legacy' | 'merchant' | 'gear_buyer' | 'spring' | 'trap' | 'altar' | 'mysterious' | 'villager' | 'caravan' | 'loot'
@@ -124,7 +125,8 @@ export type ExploreEventType = DataDrivenExploreEventId | 'mimic_chest' | 'wande
   | 'world_plague_spreads' | 'world_bandit_coalition' | 'world_convoy_attacked' | 'world_magic_surge' | 'world_dark_omen'
   | 'world_price_gouger' | 'world_tax_collector' | 'world_supply_shortage' | 'world_merchant_guild_job'
   | 'world_ancient_inscription' | 'world_spy_letter' | 'world_missing_persons' | 'world_old_chronicle' | 'world_prophetic_vision' | 'world_secret_meeting'
-  | 'world_faction_standoff' | 'world_church_inquisition' | 'world_shadow_offer' | 'world_hunters_mission' | 'world_villager_dispute';
+  | 'world_faction_standoff' | 'world_church_inquisition' | 'world_shadow_offer' | 'world_hunters_mission' | 'world_villager_dispute'
+  | GuildExploreEventId;
 
 export interface PickExploreEventInput {
   player: PlayerRow;
@@ -408,6 +410,26 @@ export function pickExploreEvent(input: PickExploreEventInput): ExploreEventType
     ['world_shadow_offer',        2],
     ['world_hunters_mission',     2],
     ['world_villager_dispute',    2],
+    ['guild_caravan_ambush',       hasCombat ? 3 : 1],
+    ['guild_recruiter',            1],
+    ['guild_vault_cipher',         1],
+    ['guild_bulletin_board',       1],
+    ['guild_watchtower_drill',     hasCombat ? 2 : 1],
+    ['guild_rival_scout',          1],
+    ['guild_smuggler_chase',       1],
+    ['guild_stock_whisper',        1],
+    ['guild_sparring_ring',        hasCombat ? 2 : 1],
+    ['guild_festival_donation',    1],
+    ['guild_festival_ring_toss',   1],
+    ['guild_lost_courier',         1],
+    ['guild_cipher_scroll',        1],
+    ['guild_war_messenger',        1],
+    ['guild_mock_duel',            hasCombat ? 2 : 1],
+    ['guild_anniversary',          1],
+    ['guild_alarm_bell',           hasCombat ? 2 : 1],
+    ['guild_bounty_board',         1],
+    ['guild_relic_puzzle',         1],
+    ['guild_treasury_audit',       1],
   ];
 
   // Apply pity bonus to unconditional events that haven't appeared in a while.
@@ -433,6 +455,10 @@ export async function runExploreEvent(input: RunExploreEventInput): Promise<void
   const cb = ctx.callbacks;
 
   if (isDataDrivenExploreEvent(ctx.event)) return runDataDrivenExploreEvent(ctx);
+
+  if (ctx.event in GUILD_EVENT_HANDLERS) {
+    return (GUILD_EVENT_HANDLERS as Record<string, (ctx: RunExploreEventInput) => Promise<void>>)[ctx.event](ctx);
+  }
 
   switch (ctx.event) {
     case 'combat': return cb.startCombat(pick(ctx.enemies).id);
