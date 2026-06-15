@@ -452,9 +452,9 @@ export async function handleSearch(
 ` +
           `🪙 Giá nghỉ: **${price} Gold**
 ` +
-          `❤️ Hồi khoảng **30% HP** · 💧 **15% MP**
+          `❤️ Hồi **30% HP** · 💧 **15% MP**
 ` +
-          `🔇 Giảm Noise khoảng **25%**`
+          `🔇 Giảm Noise **25%**`
         )],
       components: [row]
     });

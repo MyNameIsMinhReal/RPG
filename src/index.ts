@@ -7,13 +7,15 @@ import {
   ChatInputCommandInteraction,
   Interaction,
   Message,
-  User
+  User,
+  Partials
 } from 'discord.js';
 
 import { loadCommands, buildAliasMap } from './commands/registry';
 import { PrefixCommandOptions, stripUserMentionToken, type PrefixSpec } from './commands/prefixOptions';
 import { isTransientNetworkError } from './utils/netErrors';
 import { sendUnseenLogsDM } from './systems/updateLog';
+import { handleUpdateLogDMMessage, handleUpdateLogButton, isUpdateLogButtonInteraction } from './commands/updatelog';
 import { buildHelpGuideEmbeds } from './commands/help';
 import { runStartupDataCheck } from './doctor';
 import { dispatchCombatInteraction } from './systems/combatFlow';
@@ -29,8 +31,10 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.DirectMessages,
     GatewayIntentBits.MessageContent
   ],
+  partials: [Partials.Channel],
   // Global default: never ping the replied-to user; still allow explicit @user/@role.
   allowedMentions: { parse: ['users', 'roles'], repliedUser: false }
 });
@@ -228,6 +232,14 @@ client.once('ready', (c) => {
 
 client.on('interactionCreate', async (interaction: Interaction) => {
   if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
+
+  if (isUpdateLogButtonInteraction(interaction)) {
+    await handleUpdateLogButton(interaction).catch((err) => {
+      console.error('[UPDATELOG BUTTON]:', err);
+    });
+    return;
+  }
+
   const cid = interaction.customId;
   const isCombat = cid.startsWith('rpg_') || cid.startsWith('shopmercy_');
   if (!isCombat) return;
@@ -307,10 +319,18 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
+  if (!message.guildId) {
+    const handledUpdateLogDM = await handleUpdateLogDMMessage(message).catch((err) => {
+      console.error('[UPDATELOG DM]:', err);
+      return false;
+    });
+    if (handledUpdateLogDM) return;
+  }
+
   const parsed = parsePrefixCommand(message.content);
   if (!parsed) return;
 
-  if (!message.guildId) {
+  if (!message.guildId && parsed.commandName !== 'updatelog') {
     await message.reply('❌ Lệnh RPG chỉ dùng trong server Discord.').catch(() => {});
     return;
   }

@@ -3,7 +3,7 @@ import {
 } from 'discord.js';
 import { clearPlayerBossProgress, hasPlayerClearedBoss, setFlag, getFlag } from '../systems/world';
 import {
-  getPlayer, revivePlayer, applyPassiveStats,
+  getPlayer, revivePlayer, applyPassiveStats, syncDerivedBaseStats,
   grantGold, grantExp, addItem, updatePlayerHpMp, getItemQty
 } from '../systems/player';
 import { getItem } from '../data/items';
@@ -11,6 +11,7 @@ import { getMaterial } from '../data/materials';
 import { getEquipment } from '../data/equipment';
 import { ENEMIES } from '../data/enemies';
 import { expNext } from '../utils/format';
+import { deriveBaseStats } from '../systems/statSystem';
 import { ZONES } from '../data/zones';
 import db from '../database/index';
 import {
@@ -509,12 +510,38 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return;
     }
 
-    const SAFE_COLS = new Set(['gold', 'hp', 'max_hp', 'mp', 'max_mp', 'atk', 'def']);
+    let noteLine = '';
+
+    function setDerivedBaseStat(baseKey: 'maxHp' | 'maxMp' | 'atk' | 'def', bonusColumn: string, rawStatColumn: 'max_hp' | 'max_mp' | 'atk' | 'def') {
+      const current = getPlayer(target.id, guildId)!;
+      const baseNow = deriveBaseStats(current);
+      const currentBaseValue = baseNow[baseKey];
+      const oldBonus = Number((current as any)[bonusColumn] ?? 0);
+      const nextBonus = oldBonus + (value - currentBaseValue);
+
+      // ATK/DEF permanent bonuses are non-negative in deriveBaseStats().  HP/MP
+      // may be negative because Shadow Court sacrifices lower Max HP.
+      const safeBonus = (baseKey === 'atk' || baseKey === 'def')
+        ? Math.max(0, Math.floor(nextBonus))
+        : Math.floor(nextBonus);
+
+      db.prepare(`UPDATE players SET ${bonusColumn}=? WHERE user_id=? AND guild_id=?`)
+        .run(safeBonus, target.id, guildId);
+      const synced = syncDerivedBaseStats(target.id, guildId, true);
+      const syncedBase = synced ? deriveBaseStats(synced) : undefined;
+      const actual = syncedBase?.[baseKey] ?? value;
+      if (actual !== value) {
+        noteLine = `\n⚠️ Giá trị thực tế là **${actual}** vì chỉ số này không thể thấp hơn nền tự nhiên từ level/class/stat point.`;
+      }
+    }
 
     if (stat === 'level') {
-      const newExpNext = expNext(value);
+      const safeLevel = Math.max(1, value);
+      const newExpNext = expNext(safeLevel);
       db.prepare('UPDATE players SET level=?, exp=0, exp_next=? WHERE user_id=? AND guild_id=?')
-        .run(value, newExpNext, target.id, guildId);
+        .run(safeLevel, newExpNext, target.id, guildId);
+      syncDerivedBaseStats(target.id, guildId, true);
+      if (safeLevel !== value) noteLine = '\n⚠️ Level tối thiểu là 1.';
     } else if (stat === 'hp') {
       const withPassive = applyPassiveStats(player);
       const clamped = Math.min(value, withPassive.max_hp);
@@ -523,11 +550,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       const withPassive = applyPassiveStats(player);
       const clamped = Math.min(value, withPassive.max_mp);
       updatePlayerHpMp(target.id, guildId, player.hp, clamped);
-    } else if (SAFE_COLS.has(stat)) {
-      // SAFE: `stat` is validated against the SAFE_COLS allow-list above, so it
-      // can only ever be one of the fixed column names — never raw user input.
-      db.prepare(`UPDATE players SET ${stat}=? WHERE user_id=? AND guild_id=?`)
+    } else if (stat === 'gold') {
+      db.prepare('UPDATE players SET gold=? WHERE user_id=? AND guild_id=?')
         .run(value, target.id, guildId);
+    } else if (stat === 'max_hp') {
+      setDerivedBaseStat('maxHp', 'permanent_max_hp_bonus', 'max_hp');
+    } else if (stat === 'max_mp') {
+      setDerivedBaseStat('maxMp', 'permanent_max_mp_bonus', 'max_mp');
+    } else if (stat === 'atk') {
+      setDerivedBaseStat('atk', 'permanent_atk_bonus', 'atk');
+    } else if (stat === 'def') {
+      setDerivedBaseStat('def', 'permanent_def_bonus', 'def');
     }
 
     const fresh = applyPassiveStats(getPlayer(target.id, guildId)!);
@@ -546,6 +579,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       embeds: [new EmbedBuilder()
         .setColor(0x3498DB)
         .setTitle('✏️ Đã Cập Nhật Chỉ Số')
+        .setDescription(noteLine.trim() || null)
         .addFields(
           { name: 'Người chơi', value: `<@${target.id}> (${player.name})`, inline: true },
           { name: statLabels[stat] ?? stat, value: displayVal, inline: true },
