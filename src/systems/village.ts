@@ -622,44 +622,10 @@ export async function showVillageBlacksmith(
   interaction: ChatInputCommandInteraction,
   userId: string, guildId: string
 ): Promise<void> {
-  const leader = getPlayer(userId, guildId)!;
-  const ironQty  = getItemQty(userId, guildId, 'iron_ore');
-  const crystQty = getItemQty(userId, guildId, 'mana_crystal');
-
-  const bsEmbed = new EmbedBuilder()
-    .setColor(0xE67E22)
-    .setTitle('⚒️ Lò Rèn Làng')
-    .setDescription(
-      `Leader: **${leader.name}**\n` +
-      `Vật liệu leader: 🪨 **${ironQty} Iron Ore** · 💠 **${crystQty} Mana Crystal** · 🪙 **${leader.gold} Gold**\n\n` +
-      `Chọn thao tác bên dưới. Vật liệu/Gold sẽ lấy từ **người bấm nút**.${partyVillageHint(userId, guildId)}\n\n` +
-      `Nâng cấp mới: **Weapon** +2 ATK · **Armor** +2 DEF +6 HP · **Accessory** tăng theo loại phụ kiện`
-    )
-    .setFooter({ text: 'Tối đa +5 mỗi trang bị · Học skill đã chuyển sang 🏛️ Hội Quán → 📖 Cổ thư' });
-
-  const bsRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vill_bs_upgrade_${userId}`).setLabel('Nâng trang bị của tôi').setEmoji('⚒️').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
-  );
-
-  const msg = await interaction.editReply({ embeds: [bsEmbed], components: [bsRow] });
-
-  const btn = await msg.awaitMessageComponent({
-    filter: villageActorFilter(userId, guildId),
-    componentType: ComponentType.Button,
-    time: 45_000
-  }).catch(() => null);
-
-  if (!btn) { await interaction.editReply({ components: [] }); return; }
-  await safeDeferUpdate(btn);
-
-  if (btn.customId === `vill_back_${userId}`) {
-    await interaction.editReply({ components: [] });
-    return;
-  }
-
-  const actorId = btn.user.id;
-  await showBlacksmithUpgradeList(interaction, actorId, guildId, userId);
+  // New forge UI: open the equipment selector directly instead of showing the old
+  // one-button “Nâng trang bị của tôi” screen. This keeps the forge feeling like a
+  // proper Town Square district while reusing the same safe upgrade flow below.
+  await showBlacksmithUpgradeList(interaction, userId, guildId, userId);
 }
 
 async function showBlacksmithUpgradeList(
@@ -677,16 +643,31 @@ async function showBlacksmithUpgradeList(
     return;
   }
 
+  const slotLines = worn.map(w => {
+    const eq = getEquipment(w.equipment_id);
+    const upLv = getUpgradeLevel(actorId, guildId, w.slot);
+    const nextLv = upLv + 1;
+    const cost = UPGRADE_COSTS[nextLv];
+    const rarity = eq ? RARITY_LABELS[eq.rarity] : 'Không rõ';
+    const slotName = SLOT_LABELS[w.slot as keyof typeof SLOT_LABELS] ?? w.slot;
+    const bonus = describeUpgradeBonus(w.slot as any, eq);
+    const nextText = upLv >= UPGRADE_MAX
+      ? `Đã đạt **MAX +${UPGRADE_MAX}**`
+      : cost ? `Lv.${nextLv}: 🪨 ${cost.iron} · 💠 ${cost.crystal} · 🪙 ${cost.gold}` : 'Không có công thức';
+    return `${eq?.icon ?? '⚙️'} **${slotName}** — ${eq?.name ?? w.equipment_id} **[+${upLv}]** · ${rarity}\n> ${bonus}\n> ${nextText}`;
+  }).join('\n\n');
+
   const options = worn.map(w => {
     const eq   = getEquipment(w.equipment_id);
     const upLv = getUpgradeLevel(actorId, guildId, w.slot);
     const nextLv = upLv + 1;
     const cost = UPGRADE_COSTS[nextLv];
     const maxed = upLv >= UPGRADE_MAX;
-    const label = `${eq?.icon ?? ''} ${eq?.name ?? w.equipment_id} [+${upLv}]`;
+    const slotName = SLOT_LABELS[w.slot as keyof typeof SLOT_LABELS] ?? w.slot;
+    const label = `${eq?.icon ?? ''} ${slotName}: ${eq?.name ?? w.equipment_id} [+${upLv}]`;
     const desc = maxed
-      ? `MAX (+${UPGRADE_MAX}) — không thể nâng thêm`
-      : cost ? `Lv.${nextLv}: ${cost.iron} Iron + ${cost.crystal > 0 ? cost.crystal + ' Crystal + ' : ''}${cost.gold} 🪙` : '';
+      ? `MAX +${UPGRADE_MAX} — không thể nâng thêm`
+      : cost ? `Cần ${cost.iron} Iron, ${cost.crystal} Crystal, ${cost.gold} Gold` : 'Không có công thức';
     return new StringSelectMenuOptionBuilder()
       .setLabel(label.slice(0, 100))
       .setDescription(desc.slice(0, 100))
@@ -698,16 +679,21 @@ async function showBlacksmithUpgradeList(
 
   const bsEmbed = new EmbedBuilder()
     .setColor(0xE67E22)
-    .setTitle(`⚒️ Lò Rèn — ${actor.name}`)
+    .setTitle(`⚒️ Khu E — Lò Rèn Ashveil`)
     .setDescription(
-      `Vật liệu của bạn:\n> 🪨 **${ironQty} Iron Ore** · 💠 **${crystQty} Mana Crystal** · 🪙 **${actor.gold} Gold**\n\n` +
-      `Chọn trang bị cần nâng cấp.`
-    );
+      `**${actor.name}** đặt trang bị lên bàn rèn. Chọn một món để xem xác nhận nâng cấp.\n\n` +
+      `**Tài nguyên hiện có**\n` +
+      `> 🪨 Iron Ore: **${ironQty}** · 💠 Mana Crystal: **${crystQty}** · 🪙 Gold: **${actor.gold}**\n\n` +
+      `**Trang bị đang mặc**\n${slotLines}\n\n` +
+      `**Hiệu ứng nâng cấp**\n` +
+      `> Weapon: +ATK · Armor: +DEF/+HP · Accessory: cộng chỉ số theo loại phụ kiện${partyVillageHint(leaderId, guildId)}`
+    )
+    .setFooter({ text: `Tối đa +${UPGRADE_MAX}. Công trình Thợ Rèn Cấp 2 ở Quảng Trường sẽ dùng cho nâng cấp nâng cao sau này.` });
 
   const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`vill_bs_sel_${leaderId}_${actorId}`)
-      .setPlaceholder('Chọn trang bị cần nâng...')
+      .setPlaceholder('⚒️ Chọn trang bị cần nâng trong lò rèn...')
       .addOptions(options.slice(0, 25))
   );
 
@@ -729,7 +715,8 @@ async function showBlacksmithUpgradeList(
   await safeDeferUpdate(sel);
 
   if (sel.customId === `vill_back_${leaderId}`) {
-    await showVillageBlacksmith(interaction, leaderId, guildId);
+    // Let the outer village/explore handler decide where the user returns.
+    await interaction.editReply({ components: [] });
     return;
   }
 
