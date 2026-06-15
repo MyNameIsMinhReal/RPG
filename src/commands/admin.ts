@@ -11,6 +11,7 @@ import { getMaterial } from '../data/materials';
 import { getEquipment } from '../data/equipment';
 import { ENEMIES } from '../data/enemies';
 import { expNext } from '../utils/format';
+import { deriveBaseStats } from '../systems/statSystem';
 import { ZONES } from '../data/zones';
 import db from '../database/index';
 import {
@@ -33,6 +34,69 @@ import { getCombatByUser } from '../systems/combat';
 const BOSS_IDS = Object.values(ZONES)
   .filter(z => z.bossId)
   .map(z => ({ id: z.bossId!, zone: z.name }));
+
+type AdminBaseStat = 'atk' | 'def' | 'max_hp' | 'max_mp';
+
+const ADMIN_BASE_STAT_META: Record<AdminBaseStat, { bonusColumn: string; legacyColumn: string; derivedKey: 'atk' | 'def' | 'maxHp' | 'maxMp'; min: number }> = {
+  atk:    { bonusColumn: 'permanent_atk_bonus',    legacyColumn: 'atk',    derivedKey: 'atk',   min: 1 },
+  def:    { bonusColumn: 'permanent_def_bonus',    legacyColumn: 'def',    derivedKey: 'def',   min: 0 },
+  max_hp: { bonusColumn: 'permanent_max_hp_bonus', legacyColumn: 'max_hp', derivedKey: 'maxHp', min: 10 },
+  max_mp: { bonusColumn: 'permanent_max_mp_bonus', legacyColumn: 'max_mp', derivedKey: 'maxMp', min: 5 },
+};
+
+function naturalBaseWithoutPermanent(player: ReturnType<typeof getPlayer>) {
+  if (!player) throw new Error('missing player');
+  return deriveBaseStats({
+    ...player,
+    permanent_atk_bonus: 0,
+    permanent_def_bonus: 0,
+    permanent_max_hp_bonus: 0,
+    permanent_max_mp_bonus: 0,
+  });
+}
+
+function setAdminBaseStat(userId: string, guildId: string, stat: AdminBaseStat, desiredValue: number): number {
+  const player = getPlayer(userId, guildId);
+  if (!player) return desiredValue;
+
+  const meta = ADMIN_BASE_STAT_META[stat];
+  const safeDesired = Math.max(meta.min, Math.floor(desiredValue));
+  const natural = naturalBaseWithoutPermanent(player);
+  const naturalValue = natural[meta.derivedKey];
+  const requiredPermanentBonus = safeDesired - naturalValue;
+
+  // SAFE: both column names come from ADMIN_BASE_STAT_META, a fixed allow-list.
+  let sql = `UPDATE players SET ${meta.bonusColumn} = ?, ${meta.legacyColumn} = ?`;
+  const args: Array<number | string> = [requiredPermanentBonus, safeDesired];
+
+  if (stat === 'max_hp') {
+    sql += ', hp = MIN(hp, ?)';
+    args.push(safeDesired);
+  } else if (stat === 'max_mp') {
+    sql += ', mp = MIN(mp, ?)';
+    args.push(safeDesired);
+  }
+
+  sql += ' WHERE user_id = ? AND guild_id = ?';
+  args.push(userId, guildId);
+  db.prepare(sql).run(...args);
+  return safeDesired;
+}
+
+function formatAdminSetValue(stat: string, player: ReturnType<typeof getPlayer>, fallback: number): string {
+  if (!player) return String(fallback);
+  const base = deriveBaseStats(player);
+  const effective = applyPassiveStats(player);
+  switch (stat) {
+    case 'atk': return `Base **${base.atk}** / Hiện tại **${effective.atk}**`;
+    case 'def': return `Base **${base.def}** / Hiện tại **${effective.def}**`;
+    case 'max_hp': return `Base **${base.maxHp}** / Hiện tại **${effective.max_hp}**`;
+    case 'max_mp': return `Base **${base.maxMp}** / Hiện tại **${effective.max_mp}**`;
+    case 'hp': return `**${effective.hp}/${effective.max_hp}**`;
+    case 'mp': return `**${effective.mp}/${effective.max_mp}**`;
+    default: return String((effective as any)[stat] ?? (player as any)[stat] ?? fallback);
+  }
+}
 
 const ALLOWED_IDS = new Set(
   (process.env.BOT_ADMIN_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean)
@@ -509,38 +573,43 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return;
     }
 
-    const SAFE_COLS = new Set(['gold', 'hp', 'max_hp', 'mp', 'max_mp', 'atk', 'def']);
+    const baseStat = stat as AdminBaseStat;
 
     if (stat === 'level') {
       const newExpNext = expNext(value);
       db.prepare('UPDATE players SET level=?, exp=0, exp_next=? WHERE user_id=? AND guild_id=?')
         .run(value, newExpNext, target.id, guildId);
+    } else if (stat === 'gold') {
+      db.prepare('UPDATE players SET gold=? WHERE user_id=? AND guild_id=?')
+        .run(Math.max(0, Math.floor(value)), target.id, guildId);
     } else if (stat === 'hp') {
-      const withPassive = applyPassiveStats(player);
-      const clamped = Math.min(value, withPassive.max_hp);
-      updatePlayerHpMp(target.id, guildId, clamped, player.mp);
+      const before = applyPassiveStats(player);
+      if (value > before.max_hp) {
+        // Admin set HP should be able to heal above the old cap; raise base Max HP first.
+        setAdminBaseStat(target.id, guildId, 'max_hp', value);
+      }
+      const afterRaw = getPlayer(target.id, guildId)!;
+      updatePlayerHpMp(target.id, guildId, value, afterRaw.mp);
     } else if (stat === 'mp') {
-      const withPassive = applyPassiveStats(player);
-      const clamped = Math.min(value, withPassive.max_mp);
-      updatePlayerHpMp(target.id, guildId, player.hp, clamped);
-    } else if (SAFE_COLS.has(stat)) {
-      // SAFE: `stat` is validated against the SAFE_COLS allow-list above, so it
-      // can only ever be one of the fixed column names — never raw user input.
-      db.prepare(`UPDATE players SET ${stat}=? WHERE user_id=? AND guild_id=?`)
-        .run(value, target.id, guildId);
+      const before = applyPassiveStats(player);
+      if (value > before.max_mp) {
+        // Same behavior for MP: grow Max MP first when the requested current MP exceeds the cap.
+        setAdminBaseStat(target.id, guildId, 'max_mp', value);
+      }
+      const afterRaw = getPlayer(target.id, guildId)!;
+      updatePlayerHpMp(target.id, guildId, afterRaw.hp, value);
+    } else if (baseStat in ADMIN_BASE_STAT_META) {
+      setAdminBaseStat(target.id, guildId, baseStat, value);
     }
 
-    const fresh = applyPassiveStats(getPlayer(target.id, guildId)!);
+    const freshRaw = getPlayer(target.id, guildId)!;
+    const fresh = applyPassiveStats(freshRaw);
     const statLabels: Record<string, string> = {
       level: '🏅 Level', gold: '🪙 Gold', hp: '❤️ HP',
       max_hp: '❤️ Max HP', mp: '💧 MP', max_mp: '💧 Max MP',
       atk: '⚔️ ATK', def: '🛡️ DEF',
     };
-    const displayVal = stat === 'hp'
-      ? `${fresh.hp}/${fresh.max_hp}`
-      : stat === 'mp'
-      ? `${fresh.mp}/${fresh.max_mp}`
-      : String((fresh as any)[stat] ?? value);
+    const displayVal = formatAdminSetValue(stat, freshRaw, value);
 
     await interaction.editReply({
       embeds: [new EmbedBuilder()

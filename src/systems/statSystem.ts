@@ -86,8 +86,11 @@ export function deriveBaseStats(player: PlayerRow): DerivedBaseStats {
   const cls = getClass(player.class ?? 'warrior') ?? getClass('warrior')!;
   const blessing = toNonNegativeInt(player.rebirth_blessing);
 
-  const permanentAtk = toNonNegativeInt(player.permanent_atk_bonus);
-  const permanentDef = toNonNegativeInt(player.permanent_def_bonus);
+  // Admin/debug tooling may intentionally set these bonuses negative to
+  // force a player's base ATK/DEF below the natural class+level value.
+  // Normal upgrades still add positive values, so existing progression is unchanged.
+  const permanentAtk = toSignedInt(player.permanent_atk_bonus);
+  const permanentDef = toSignedInt(player.permanent_def_bonus);
   // HP/MP permanent bonuses may be negative because Shadow Court sacrifices
   // intentionally trade max HP for cursed equipment.
   const permanentHp  = toSignedInt(player.permanent_max_hp_bonus);
