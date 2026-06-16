@@ -49,6 +49,13 @@ export const ITEMS: Record<string, ItemDef> = {
     sellPrice: 50
   },
 
+  legacy_token: {
+    id: 'legacy_token', name: 'Legacy Token', icon: '🪙',
+    type: 'key_item', stackable: true,
+    description: 'Đồng xu cổ dùng ở Lò Rèn Ashveil để thức tỉnh trang bị, khóa dòng và tẩy luyện Affix.',
+    sellPrice: 120
+  },
+
   // Echo Demon ritual key items — thu thập từ event "Tiếng Vọng" ở Đền Cổ (shrine).
   // Dùng để mở Cổng Phong Ấn / Nghi Lễ triệu hồi Echo Demon.
   echo_trace: {

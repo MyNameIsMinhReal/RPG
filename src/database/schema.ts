@@ -251,6 +251,19 @@ db.exec(`
     upgrade_level INTEGER DEFAULT 0,
     PRIMARY KEY (user_id, guild_id, slot)
   );
+
+
+  CREATE TABLE IF NOT EXISTS equipment_forge (
+    user_id       TEXT NOT NULL,
+    guild_id      TEXT NOT NULL,
+    slot          TEXT NOT NULL,
+    awakened      INTEGER DEFAULT 0,
+    affix1        TEXT,
+    affix2        TEXT,
+    locked_affix  INTEGER DEFAULT 0,
+    updated_at    INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id, slot)
+  );
 `);
 
 // ── Village bounty claims ─────────────────────────────────────────────────

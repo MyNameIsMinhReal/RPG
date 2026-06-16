@@ -90,6 +90,192 @@ function applyUpgradeStatBonus(stats: FullEquipStats, slot: EquipSlot, def: Equi
   else stats.atk! += level;
 }
 
+
+export type ForgeAffixKey =
+  | 'atk_3' | 'atk_5'
+  | 'def_3' | 'def_5'
+  | 'hp_15' | 'hp_25'
+  | 'mp_12' | 'mp_20'
+  | 'crit_1' | 'dodge_1'
+  | 'lifesteal_1'
+  | 'exp_3' | 'gold_3' | 'drop_2';
+
+export interface ForgeAffixDef {
+  key: ForgeAffixKey;
+  label: string;
+  stat: keyof EquipStats;
+  amount: number;
+  weight: number;
+}
+
+export interface EquipmentForgeMeta {
+  user_id: string;
+  guild_id: string;
+  slot: EquipSlot;
+  awakened: number;
+  affix1: ForgeAffixKey | null;
+  affix2: ForgeAffixKey | null;
+  locked_affix: number;
+  updated_at?: number;
+}
+
+export const FORGE_AFFIXES: Record<ForgeAffixKey, ForgeAffixDef> = {
+  atk_3:       { key: 'atk_3',       label: '+3 ATK',        stat: 'atk',         amount: 3,  weight: 15 },
+  atk_5:       { key: 'atk_5',       label: '+5 ATK',        stat: 'atk',         amount: 5,  weight: 6  },
+  def_3:       { key: 'def_3',       label: '+3 DEF',        stat: 'def',         amount: 3,  weight: 15 },
+  def_5:       { key: 'def_5',       label: '+5 DEF',        stat: 'def',         amount: 5,  weight: 6  },
+  hp_15:       { key: 'hp_15',       label: '+15 HP',        stat: 'maxHp',       amount: 15, weight: 14 },
+  hp_25:       { key: 'hp_25',       label: '+25 HP',        stat: 'maxHp',       amount: 25, weight: 6  },
+  mp_12:       { key: 'mp_12',       label: '+12 MP',        stat: 'maxMp',       amount: 12, weight: 12 },
+  mp_20:       { key: 'mp_20',       label: '+20 MP',        stat: 'maxMp',       amount: 20, weight: 5  },
+  crit_1:      { key: 'crit_1',      label: '+1% Crit',      stat: 'critChance',  amount: 1,  weight: 8  },
+  dodge_1:     { key: 'dodge_1',     label: '+1% Dodge',     stat: 'dodgeChance', amount: 1,  weight: 8  },
+  lifesteal_1: { key: 'lifesteal_1', label: '+1% Lifesteal', stat: 'lifesteal',   amount: 1,  weight: 5  },
+  exp_3:       { key: 'exp_3',       label: '+3% EXP',       stat: 'expBonus',    amount: 3,  weight: 8  },
+  gold_3:      { key: 'gold_3',      label: '+3% Gold',      stat: 'goldBonus',   amount: 3,  weight: 8  },
+  drop_2:      { key: 'drop_2',      label: '+2% Drop',      stat: 'dropBonus',   amount: 2,  weight: 7  },
+};
+
+const FORGE_AFFIX_KEYS = Object.keys(FORGE_AFFIXES) as ForgeAffixKey[];
+
+function normalizeAffixKey(value: unknown): ForgeAffixKey | null {
+  return typeof value === 'string' && value in FORGE_AFFIXES ? value as ForgeAffixKey : null;
+}
+
+function pickForgeAffix(exclude: ForgeAffixKey[] = []): ForgeAffixKey {
+  const pool = FORGE_AFFIX_KEYS.filter(k => !exclude.includes(k));
+  const total = pool.reduce((sum, key) => sum + FORGE_AFFIXES[key].weight, 0);
+  let roll = Math.random() * total;
+  for (const key of pool) {
+    roll -= FORGE_AFFIXES[key].weight;
+    if (roll <= 0) return key;
+  }
+  return pool[0] ?? 'atk_3';
+}
+
+export function rollForgeAffixes(locked?: ForgeAffixKey | null): [ForgeAffixKey, ForgeAffixKey] {
+  const first = locked ?? pickForgeAffix();
+  const second = pickForgeAffix([first]);
+  return [first, second];
+}
+
+export function formatForgeAffix(key: ForgeAffixKey | null | undefined): string {
+  if (!key) return '*Chưa có dòng*';
+  return FORGE_AFFIXES[key]?.label ?? '*Dòng lạ*';
+}
+
+export function getEquipmentForgeMeta(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta | undefined {
+  const row = db.prepare('SELECT * FROM equipment_forge WHERE user_id=? AND guild_id=? AND slot=?')
+    .get(userId, guildId, slot) as any;
+  if (!row) return undefined;
+  return {
+    ...row,
+    slot: row.slot as EquipSlot,
+    affix1: normalizeAffixKey(row.affix1),
+    affix2: normalizeAffixKey(row.affix2),
+    awakened: Number(row.awakened ?? 0),
+    locked_affix: Number(row.locked_affix ?? 0),
+  };
+}
+
+export function ensureEquipmentForgeMeta(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
+  const existing = getEquipmentForgeMeta(userId, guildId, slot);
+  if (existing) return existing;
+  db.prepare(`
+    INSERT INTO equipment_forge (user_id, guild_id, slot, awakened, locked_affix)
+    VALUES (?, ?, ?, 0, 0)
+  `).run(userId, guildId, slot);
+  return getEquipmentForgeMeta(userId, guildId, slot)!;
+}
+
+export function awakenEquipmentForge(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
+  const current = ensureEquipmentForgeMeta(userId, guildId, slot);
+  const [a1, a2] = current.affix1 && current.affix2
+    ? [current.affix1, current.affix2]
+    : rollForgeAffixes();
+  db.prepare(`
+    INSERT INTO equipment_forge (user_id, guild_id, slot, awakened, affix1, affix2, locked_affix, updated_at)
+    VALUES (?, ?, ?, 1, ?, ?, COALESCE(?, 0), unixepoch())
+    ON CONFLICT(user_id, guild_id, slot) DO UPDATE SET
+      awakened=1,
+      affix1=COALESCE(equipment_forge.affix1, excluded.affix1),
+      affix2=COALESCE(equipment_forge.affix2, excluded.affix2),
+      updated_at=unixepoch()
+  `).run(userId, guildId, slot, a1, a2, current.locked_affix ?? 0);
+  return getEquipmentForgeMeta(userId, guildId, slot)!;
+}
+
+export function rerollEquipmentForgeAffixes(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
+  const current = ensureEquipmentForgeMeta(userId, guildId, slot);
+  let affix1: ForgeAffixKey;
+  let affix2: ForgeAffixKey;
+  if (current.locked_affix === 1 && current.affix1) {
+    affix1 = current.affix1;
+    affix2 = pickForgeAffix([affix1]);
+  } else if (current.locked_affix === 2 && current.affix2) {
+    affix2 = current.affix2;
+    affix1 = pickForgeAffix([affix2]);
+  } else {
+    [affix1, affix2] = rollForgeAffixes();
+  }
+  db.prepare(`
+    INSERT INTO equipment_forge (user_id, guild_id, slot, awakened, affix1, affix2, locked_affix, updated_at)
+    VALUES (?, ?, ?, 1, ?, ?, COALESCE(?, 0), unixepoch())
+    ON CONFLICT(user_id, guild_id, slot) DO UPDATE SET
+      awakened=1, affix1=excluded.affix1, affix2=excluded.affix2, updated_at=unixepoch()
+  `).run(userId, guildId, slot, affix1, affix2, current.locked_affix ?? 0);
+  return getEquipmentForgeMeta(userId, guildId, slot)!;
+}
+
+export function setEquipmentForgeLock(userId: string, guildId: string, slot: EquipSlot, lockedAffix: 0 | 1 | 2): EquipmentForgeMeta {
+  ensureEquipmentForgeMeta(userId, guildId, slot);
+  db.prepare(`
+    UPDATE equipment_forge SET locked_affix=?, updated_at=unixepoch()
+    WHERE user_id=? AND guild_id=? AND slot=?
+  `).run(lockedAffix, userId, guildId, slot);
+  return getEquipmentForgeMeta(userId, guildId, slot)!;
+}
+
+function applyForgeAffix(stats: FullEquipStats, key: ForgeAffixKey | null | undefined): void {
+  if (!key) return;
+  const affix = FORGE_AFFIXES[key];
+  if (!affix) return;
+  (stats[affix.stat] as number) = ((stats[affix.stat] as number | undefined) ?? 0) + affix.amount;
+}
+
+function applyAwakenedBonus(stats: FullEquipStats, slot: EquipSlot): void {
+  if (slot === 'weapon') {
+    stats.atk! += 5;
+    stats.critChance! += 1;
+    return;
+  }
+  if (slot === 'armor') {
+    stats.def! += 4;
+    stats.maxHp! += 20;
+    return;
+  }
+  stats.maxHp! += 10;
+  stats.maxMp! += 10;
+  stats.dropBonus! += 1;
+}
+
+function applyForgeMetaStatBonus(stats: FullEquipStats, slot: EquipSlot, meta?: EquipmentForgeMeta): void {
+  if (!meta) return;
+  if (meta.awakened) applyAwakenedBonus(stats, slot);
+  applyForgeAffix(stats, meta.affix1);
+  applyForgeAffix(stats, meta.affix2);
+}
+
+export function formatForgeState(userId: string, guildId: string, slot: EquipSlot): string {
+  const meta = getEquipmentForgeMeta(userId, guildId, slot);
+  if (!meta || !meta.awakened) return 'Legacy: *Chưa thức tỉnh*';
+  const lock1 = meta.locked_affix === 1 ? ' 🔒' : '';
+  const lock2 = meta.locked_affix === 2 ? ' 🔒' : '';
+  return `Legacy: **Đã thức tỉnh**
+  └ Dòng 1: ${formatForgeAffix(meta.affix1)}${lock1}
+  └ Dòng 2: ${formatForgeAffix(meta.affix2)}${lock2}`;
+}
+
 function applyEquipmentStatCaps(stats: FullEquipStats): FullEquipStats {
   stats.critChance = Math.min(25, stats.critChance ?? 0);
   stats.dodgeChance = Math.min(15, stats.dodgeChance ?? 0);
@@ -135,6 +321,9 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
     if (upLv > 0) {
       applyUpgradeStatBonus(stats, entry.slot, def, upLv);
     }
+
+    // Legacy forge bonuses: awakened gear + rerolled affixes.
+    applyForgeMetaStatBonus(stats, entry.slot, getEquipmentForgeMeta(userId, guildId, entry.slot));
   }
 
   // Set bonuses

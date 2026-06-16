@@ -69,3 +69,18 @@ try { db.exec(`
     PRIMARY KEY (scope, owner_id, guild_id, cd_key)
   );
 `); } catch {}
+
+
+try { db.exec(`
+  CREATE TABLE IF NOT EXISTS equipment_forge (
+    user_id TEXT NOT NULL,
+    guild_id TEXT NOT NULL,
+    slot TEXT NOT NULL,
+    awakened INTEGER DEFAULT 0,
+    affix1 TEXT,
+    affix2 TEXT,
+    locked_affix INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id, slot)
+  );
+`); } catch {}
