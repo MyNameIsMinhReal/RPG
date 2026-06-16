@@ -3,7 +3,7 @@ import db from '../database/index';
 
 function getStats() {
   const totalDeaths = (db.prepare('SELECT COUNT(*) as count FROM legacies').get() as any).count as number;
-  const totalPlayers = (db.prepare('SELECT COUNT(*) as count FROM characters').get() as any).count as number;
+  const totalPlayers = (db.prepare('SELECT COUNT(*) as count FROM players').get() as any).count as number;
   const todayDeaths = (db.prepare(
     "SELECT COUNT(*) as count FROM legacies WHERE created_at >= unixepoch('now', 'start of day')"
   ).get() as any).count as number;
