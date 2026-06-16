@@ -18,7 +18,7 @@ export const ZONES: Record<string, ZoneDef> = {
     id: 'village', name: 'Làng Ashveil', icon: '🏘️',
     description: 'Ngôi làng nhỏ yên bình, nơi mọi hành trình bắt đầu. Người ta nói rừng phía đông đang thay đổi...',
     minLevel: 0, safe: true, travelCost: 0,
-    enemyIds: [], shopItems: ['bread', 'torch', 'minor_healing_potion', 'health_potion', 'mana_potion', 'quick_salve', 'weapon_oil', 'armor_polish', 'scroll_detection', 'ancient_book'],
+    enemyIds: [], shopItems: ['bread', 'torch', 'minor_healing_potion', 'health_potion', 'mana_potion', 'quick_salve', 'weapon_oil', 'armor_polish', 'scroll_detection', 'smoke_bomb', 'ancient_book'],
     color: 0x57F287,
     ambiance: [
       'Gió thổi nhẹ qua những mái nhà tranh.',
@@ -33,7 +33,7 @@ export const ZONES: Record<string, ZoneDef> = {
     minLevel: 1, safe: false, travelCost: 0,
     enemyIds: ['forest_sprite', 'cursed_wolf', 'vine_golem', 'moss_lurker', 'thornhound', 'cursed_treant', 'will_o_wisp', 'ember_bloom', 'hollow_stag', 'spore_kin', 'briar_witch', 'alpha_thornmaw', 'moss_crowned_stag'],
     bossId: 'ancient_oak',
-    shopItems: ['forest_fruit', 'honey', 'health_potion', 'mana_potion', 'antidote', 'cooling_salve', 'forest_tonic', 'bone_broth', 'quickstep_tea', 'scroll_escape', 'ancient_book'],
+    shopItems: ['forest_fruit', 'honey', 'health_potion', 'mana_potion', 'antidote', 'cooling_salve', 'forest_tonic', 'bone_broth', 'quickstep_tea', 'scroll_escape', 'smoke_bomb', 'ancient_book'],
     color: 0x2ECC71,
     ambiance: [
       'Những cành cây xào xạc trong bóng tối.',

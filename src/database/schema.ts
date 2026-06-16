@@ -167,6 +167,18 @@ db.exec(`
   );
 `);
 
+
+
+// ── Explore node/noise state ─────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS player_explore_state (
+    user_id TEXT NOT NULL,
+    guild_id TEXT NOT NULL,
+    noise INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, guild_id)
+  );
+`);
 // ── Crafting tables ───────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS unlocked_recipes (
@@ -261,6 +273,13 @@ db.exec(`
     affix1        TEXT,
     affix2        TEXT,
     locked_affix  INTEGER DEFAULT 0,
+    instance_uuid TEXT,
+    base_id       TEXT,
+    rarity        TEXT,
+    item_level    INTEGER DEFAULT 1,
+    affixes_json  TEXT,
+    locked_affixes_json TEXT DEFAULT '[]',
+    pending_affixes_json TEXT,
     updated_at    INTEGER DEFAULT (unixepoch()),
     PRIMARY KEY (user_id, guild_id, slot)
   );

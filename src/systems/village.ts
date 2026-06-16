@@ -9,8 +9,8 @@ import { getPartyOf } from './party';
 import { onlyUser } from '../utils/collectors';
 import {
   getWornEquipment, UPGRADE_MAX, describeUpgradeBonus,
-  getEquipmentForgeMeta, awakenEquipmentForge, rerollEquipmentForgeAffixes, setEquipmentForgeLock,
-  formatForgeState, formatForgeAffix, type EquipmentForgeMeta
+  getEquipmentForgeMeta, awakenEquipmentForge, previewRerollEquipmentForgeAffixes, commitPendingForgeAffixes, discardPendingForgeAffixes,
+  toggleEquipmentForgeLock, clearEquipmentForgeLocks, formatForgeState, formatForgeAffixList, type EquipmentForgeMeta
 } from './equipment';
 import { COLORS } from '../utils/embeds';
 import { getItem } from '../data/items';
@@ -663,7 +663,7 @@ function forgeCostLine(token: number, gold: number, extra = ''): string {
 
 function getForgeActionCost(action: 'awaken' | 'reroll' | 'lock', meta?: EquipmentForgeMeta): { token: number; gold: number; crystal?: number } {
   if (action === 'awaken') return { token: 1, gold: 500, crystal: 2 };
-  if (action === 'reroll') return { token: meta?.locked_affix ? 2 : 1, gold: meta?.locked_affix ? 600 : 300 };
+  if (action === 'reroll') { const locked = meta?.locked_affixes?.length ?? 0; return { token: locked ? Math.min(4, 1 + locked) : 1, gold: locked ? 300 + locked * 300 : 300 }; }
   return { token: 1, gold: 200 };
 }
 
@@ -705,8 +705,8 @@ function buildForgeSelect(userId: string, guildId: string, mode: 'awaken' | 'rer
     const meta = getEquipmentForgeMeta(userId, guildId, entry.slot);
     const slotName = SLOT_LABELS[entry.slot] ?? entry.slot;
     const desc = mode === 'awaken'
-      ? 'Mở Legacy + 2 dòng Affix'
-      : meta?.locked_affix ? `Đang khóa dòng ${meta.locked_affix}` : 'Chưa khóa dòng nào';
+      ? 'Mở Affix theo rarity + iLvl'
+      : meta?.locked_affixes?.length ? `Đang khóa ${meta.locked_affixes.length} dòng` : 'Chưa khóa dòng nào';
     return new StringSelectMenuOptionBuilder()
       .setLabel(`${eq?.icon ?? ''} ${slotName}: ${eq?.name ?? entry.equipment_id}`.slice(0, 100))
       .setDescription(desc.slice(0, 100))
@@ -785,7 +785,7 @@ async function showBlacksmithAwakenSelect(interaction: ChatInputCommandInteracti
   const embed = new EmbedBuilder()
     .setColor(0xE67E22)
     .setTitle('✨ Thức tỉnh trang bị')
-    .setDescription(`Chọn trang bị cần thức tỉnh.\n\nChi phí: ${forgeCostLine(1, 500, '💠 Mana Crystal x2')}\n\nSau khi thức tỉnh, trang bị nhận bonus Legacy và mở **2 dòng Affix**.`);
+    .setDescription(`Chọn trang bị cần thức tỉnh.\n\nChi phí: ${forgeCostLine(1, 500, '💠 Mana Crystal x2')}\n\nSau khi thức tỉnh, trang bị nhận bonus Legacy và mở Affix theo **rarity**: Rare 1+1, Epic 2+2, Legendary 3+3.`);
   const msg = await interaction.editReply({ embeds: [embed], components: [buildForgeSelect(userId, guildId, 'awaken', worn), backRow(userId)] });
   const sel = await msg.awaitMessageComponent({ filter: (i) => i.user.id === userId, time: 45_000 }).catch(() => null);
   if (!sel) { await interaction.editReply({ components: [] }); return; }
@@ -808,7 +808,9 @@ async function showBlacksmithAwakenSelect(interaction: ChatInputCommandInteracti
     embeds: [new EmbedBuilder()
       .setColor(COLORS.success)
       .setTitle('✨ Thức tỉnh thành công!')
-      .setDescription(`**${eq?.icon ?? ''} ${eq?.name ?? entry.equipment_id}** đã được thức tỉnh.\n\nDòng 1: **${formatForgeAffix(meta.affix1)}**\nDòng 2: **${formatForgeAffix(meta.affix2)}**`)],
+      .setDescription(`**${eq?.icon ?? ''} ${eq?.name ?? entry.equipment_id}** đã được thức tỉnh.\n` +
+        `iLvl: **${meta.item_level}** · Rarity: **${eq?.rarity ?? meta.rarity ?? 'unknown'}**\n\n` +
+        formatForgeAffixList(meta))],
     components: [backRow(userId)]
   });
 }
@@ -823,7 +825,7 @@ async function showBlacksmithRerollSelect(interaction: ChatInputCommandInteracti
   const embed = new EmbedBuilder()
     .setColor(0xE67E22)
     .setTitle('🌀 Tẩy luyện Affix')
-    .setDescription(`Chọn trang bị cần tẩy luyện. Nếu có dòng bị khóa, dòng đó được giữ lại.\n\n${lines}`);
+    .setDescription(`Chọn trang bị cần tẩy luyện. Các dòng đã khóa sẽ được giữ lại.\n\nSau khi roll, bạn được chọn **Giữ kết quả mới** hoặc **Giữ đồ cũ**. Vật liệu vẫn mất khi đã xem kết quả.\n\n${lines}`);
   const msg = await interaction.editReply({ embeds: [embed], components: [buildForgeSelect(userId, guildId, 'reroll', worn), backRow(userId)] });
   const sel = await msg.awaitMessageComponent({ filter: (i) => i.user.id === userId, time: 45_000 }).catch(() => null);
   if (!sel) { await interaction.editReply({ components: [] }); return; }
@@ -841,17 +843,40 @@ async function showBlacksmithRerollSelect(interaction: ChatInputCommandInteracti
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ ${paid.reason}`)], components: [backRow(userId)] });
     return;
   }
-  const after = rerollEquipmentForgeAffixes(userId, guildId, slot);
+  const preview = previewRerollEquipmentForgeAffixes(userId, guildId, slot);
   const eq = getEquipment(entry.equipment_id);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_bs_reroll_keep_${userId}`).setLabel('Giữ kết quả mới').setEmoji('✅').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`vill_bs_reroll_old_${userId}`).setLabel('Giữ đồ cũ').setEmoji('↩️').setStyle(ButtonStyle.Secondary)
+  );
+  const msg2 = await interaction.editReply({
+    embeds: [new EmbedBuilder()
+      .setColor(0xE67E22)
+      .setTitle('🌀 Kết quả tẩy luyện')
+      .setDescription(
+        `**${eq?.icon ?? ''} ${eq?.name ?? entry.equipment_id}**\n` +
+        `Chi phí đã trừ: ${forgeCostLine(cost.token, cost.gold)}${cost.crystal ? ` · Mana Crystal x${cost.crystal}` : ''}\n\n` +
+        `**Trước**\n${formatForgeAffixList(before)}\n\n` +
+        `**Sau**\n${formatForgeAffixList(preview, preview.pending_affixes)}\n\n` +
+        `Chọn giữ kết quả mới hoặc giữ đồ cũ. Dù chọn gì, vật liệu đã dùng vẫn mất.`
+      )],
+    components: [row]
+  });
+  const btn = await msg2.awaitMessageComponent({ filter: (i) => i.user.id === userId, componentType: ComponentType.Button, time: 45_000 }).catch(() => null);
+  if (!btn) {
+    discardPendingForgeAffixes(userId, guildId, slot);
+    await interaction.editReply({ components: [] });
+    return;
+  }
+  await safeDeferUpdate(btn);
+  const finalMeta = btn.customId === `vill_bs_reroll_keep_${userId}`
+    ? commitPendingForgeAffixes(userId, guildId, slot)
+    : discardPendingForgeAffixes(userId, guildId, slot);
   await interaction.editReply({
     embeds: [new EmbedBuilder()
-      .setColor(COLORS.success)
-      .setTitle('🌀 Tẩy luyện thành công!')
-      .setDescription(
-        `**${eq?.icon ?? ''} ${eq?.name ?? entry.equipment_id}** đã đổi Affix.\n\n` +
-        `Trước: ${formatForgeAffix(before?.affix1)} / ${formatForgeAffix(before?.affix2)}\n` +
-        `Sau: **${formatForgeAffix(after.affix1)}** / **${formatForgeAffix(after.affix2)}**${after.locked_affix ? `\n🔒 Dòng ${after.locked_affix} đã được giữ lại.` : ''}`
-      )],
+      .setColor(btn.customId === `vill_bs_reroll_keep_${userId}` ? COLORS.success : COLORS.info)
+      .setTitle(btn.customId === `vill_bs_reroll_keep_${userId}` ? '✅ Đã giữ kết quả mới' : '↩️ Đã giữ đồ cũ')
+      .setDescription(`**${eq?.icon ?? ''} ${eq?.name ?? entry.equipment_id}**\n\n${formatForgeState(userId, guildId, finalMeta.slot)}`)],
     components: [backRow(userId)]
   });
 }
@@ -865,7 +890,7 @@ async function showBlacksmithLockSelect(interaction: ChatInputCommandInteraction
   const embed = new EmbedBuilder()
     .setColor(0xE67E22)
     .setTitle('🔒 Khóa dòng Affix')
-    .setDescription(`Chọn trang bị, sau đó chọn dòng cần khóa. Mỗi trang bị chỉ khóa được **1 dòng**.\n\nChi phí: ${forgeCostLine(1, 200)}`);
+    .setDescription(`Chọn trang bị, sau đó chọn dòng cần khóa/gỡ. Có thể khóa nhiều dòng, nhưng không khóa toàn bộ để tẩy luyện vẫn có dòng thay đổi.\n\nChi phí mỗi lần khóa thêm: ${forgeCostLine(1, 200)}. Gỡ khóa miễn phí.`);
   const msg = await interaction.editReply({ embeds: [embed], components: [buildForgeSelect(userId, guildId, 'lock', worn), backRow(userId)] });
   const sel = await msg.awaitMessageComponent({ filter: (i) => i.user.id === userId, time: 45_000 }).catch(() => null);
   if (!sel) { await interaction.editReply({ components: [] }); return; }
@@ -875,40 +900,65 @@ async function showBlacksmithLockSelect(interaction: ChatInputCommandInteraction
 
   const slot = sel.values[0] as EquipSlot;
   const entry = worn.find(w => w.slot === slot);
-  const meta = getEquipmentForgeMeta(userId, guildId, slot);
+  let meta = getEquipmentForgeMeta(userId, guildId, slot);
   if (!entry || !meta) return showBlacksmithForgeHome(interaction, userId, guildId);
   const eq = getEquipment(entry.equipment_id);
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`vill_bs_lock1_${userId}`).setLabel(`Khóa dòng 1: ${formatForgeAffix(meta.affix1)}`.slice(0, 80)).setEmoji('1️⃣').setStyle(ButtonStyle.Primary).setDisabled(meta.locked_affix === 1),
-    new ButtonBuilder().setCustomId(`vill_bs_lock2_${userId}`).setLabel(`Khóa dòng 2: ${formatForgeAffix(meta.affix2)}`.slice(0, 80)).setEmoji('2️⃣').setStyle(ButtonStyle.Primary).setDisabled(meta.locked_affix === 2),
-    new ButtonBuilder().setCustomId(`vill_bs_unlock_${userId}`).setLabel('Gỡ khóa').setEmoji('🔓').setStyle(ButtonStyle.Secondary).setDisabled(meta.locked_affix === 0)
-  );
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let offset = 0; offset < meta.affixes.length; offset += 5) {
+    const row = new ActionRowBuilder<ButtonBuilder>();
+    for (let idx = offset; idx < Math.min(meta.affixes.length, offset + 5); idx++) {
+      const locked = meta.locked_affixes.includes(idx);
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`vill_bs_lockidx_${userId}_${idx}`)
+          .setLabel(`${locked ? 'Gỡ' : 'Khóa'} dòng ${idx + 1}`)
+          .setEmoji(locked ? '🔓' : '🔒')
+          .setStyle(locked ? ButtonStyle.Secondary : ButtonStyle.Primary)
+      );
+    }
+    rows.push(row);
+  }
+  rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_bs_unlock_all_${userId}`).setLabel('Gỡ tất cả').setEmoji('🔓').setStyle(ButtonStyle.Secondary).setDisabled(meta.locked_affixes.length === 0),
+    new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary)
+  ));
   const msg2 = await interaction.editReply({
     embeds: [new EmbedBuilder()
       .setColor(0xE67E22)
       .setTitle(`🔒 ${eq?.name ?? entry.equipment_id}`)
-      .setDescription(`Dòng 1: **${formatForgeAffix(meta.affix1)}**${meta.locked_affix === 1 ? ' 🔒' : ''}\nDòng 2: **${formatForgeAffix(meta.affix2)}**${meta.locked_affix === 2 ? ' 🔒' : ''}\n\nChọn dòng cần khóa hoặc gỡ khóa.`)],
-    components: [row, backRow(userId)]
+      .setDescription(`${formatForgeAffixList(meta)}\n\nChọn dòng cần khóa/gỡ.`)],
+    components: rows
   });
   const btn = await msg2.awaitMessageComponent({ filter: (i) => i.user.id === userId, componentType: ComponentType.Button, time: 45_000 }).catch(() => null);
   if (!btn) { await interaction.editReply({ components: [] }); return; }
   await safeDeferUpdate(btn);
   if (btn.customId === `vill_back_${userId}`) return showBlacksmithForgeHome(interaction, userId, guildId);
 
-  const newLock: 0 | 1 | 2 = btn.customId === `vill_bs_lock1_${userId}` ? 1 : btn.customId === `vill_bs_lock2_${userId}` ? 2 : 0;
-  if (newLock !== 0) {
-    const paid = consumeForgeCost(userId, guildId, getForgeActionCost('lock', meta));
-    if (!paid.ok) {
-      await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ ${paid.reason}`)], components: [backRow(userId)] });
-      return;
+  if (btn.customId === `vill_bs_unlock_all_${userId}`) {
+    meta = clearEquipmentForgeLocks(userId, guildId, slot);
+  } else {
+    const idx = Number(btn.customId.replace(`vill_bs_lockidx_${userId}_`, ''));
+    if (!Number.isInteger(idx) || idx < 0 || idx >= meta.affixes.length) return showBlacksmithForgeHome(interaction, userId, guildId);
+    const adding = !meta.locked_affixes.includes(idx);
+    if (adding) {
+      const maxLocks = Math.min(Math.max(1, meta.affixes.length - 1), 5);
+      if (meta.locked_affixes.length >= maxLocks) {
+        await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `🔒 Không thể khóa thêm. Cần chừa ít nhất **1 dòng** để tẩy luyện.`)], components: [backRow(userId)] });
+        return;
+      }
+      const paid = consumeForgeCost(userId, guildId, getForgeActionCost('lock', meta));
+      if (!paid.ok) {
+        await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ ${paid.reason}`)], components: [backRow(userId)] });
+        return;
+      }
     }
+    meta = toggleEquipmentForgeLock(userId, guildId, slot, idx);
   }
-  const next = setEquipmentForgeLock(userId, guildId, slot, newLock);
   await interaction.editReply({
     embeds: [new EmbedBuilder()
       .setColor(COLORS.success)
-      .setTitle(newLock ? '🔒 Đã khóa dòng Affix' : '🔓 Đã gỡ khóa')
-      .setDescription(`**${eq?.icon ?? ''} ${eq?.name ?? entry.equipment_id}**\n\n${formatForgeState(userId, guildId, next.slot)}`)],
+      .setTitle('🔒 Cập nhật khóa dòng')
+      .setDescription(`**${eq?.icon ?? ''} ${eq?.name ?? entry.equipment_id}**\n\n${formatForgeState(userId, guildId, meta.slot)}`)],
     components: [backRow(userId)]
   });
 }

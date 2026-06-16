@@ -33,7 +33,7 @@ import {
 } from '../villageDistricts';
 import { doGather } from '../../commands/gather';
 import {
-  simpleEmbed, ensurePlayerAlive, buildOakSummonedRow,
+  simpleEmbed, ensurePlayerAlive, buildContinueExploreRow,
   blockIfPartyMember, attachContinueExploreHandler
 } from './shared';
 import { handleSearch } from './search';
@@ -586,6 +586,6 @@ async function handleGather(
   if (!(await ensurePlayerAlive(interaction, userId, guildId))) return;
   const player = getPlayer(userId, guildId)!;
   const { embed } = doGather(userId, guildId, player.name);
-  const reply = await interaction.editReply({ embeds: [embed], components: buildOakSummonedRow(userId) });
+  const reply = await interaction.editReply({ embeds: [embed], components: buildContinueExploreRow(userId) });
   attachContinueExploreHandler(reply, interaction, userId, guildId);
 }

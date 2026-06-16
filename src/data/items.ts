@@ -42,6 +42,14 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Đuốc dùng khi đi vào khu tối. Hiện là vật phẩm tiêu hao cho các event làng/hầm mỏ sau này.',
     sellPrice: 4, buyPrice: 12
   },
+
+  smoke_bomb: {
+    id: 'smoke_bomb', name: 'Smoke Bomb', icon: '💨',
+    type: 'consumable', stackable: true,
+    description: 'Bom mù dùng khi explore để reset Tiếng Động về 0%, tránh bị Ambush vì gây ồn.',
+    sellPrice: 18, buyPrice: 55
+  },
+
   shadow_token: {
     id: 'shadow_token', name: 'Shadow Token', icon: '🌑',
     type: 'key_item', stackable: true,

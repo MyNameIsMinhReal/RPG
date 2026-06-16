@@ -138,7 +138,10 @@ export function getActiveBuffLines(userId: string, guildId: string): string[] {
     rune_charm: '🧿 Rune Charm: chặn 1 debuff trận kế tiếp',
     luck: '🍀 May mắn: tăng chút tỉ lệ event tốt'
   };
-  return rows.map(r => `${names[r.buff_key] ?? r.buff_key}${r.charges > 1 ? ` ×${r.charges}` : ''}`);
+  return rows.map(r => {
+    if (r.buff_key === 'stone_skin' && r.value < 0) return `⚠️ Lời nguyền: DEF ${r.value}%${r.charges > 1 ? ` ×${r.charges}` : ''}`;
+    return `${names[r.buff_key] ?? r.buff_key}${r.charges > 1 ? ` ×${r.charges}` : ''}`;
+  });
 }
 
 export interface CombatBuffResult<T extends PlayerRow> {
@@ -166,9 +169,11 @@ export function applyConsumableCombatBonuses<T extends PlayerRow>(player: T): Co
   const defPct =
     (consumeBuff(userId, guildId, 'armor_polish')?.value ?? 0) +
     (consumeBuff(userId, guildId, 'stone_skin')?.value ?? 0);
-  if (defPct > 0) {
+  if (defPct !== 0) {
     next.def = Math.max(0, Math.floor(next.def * (1 + defPct / 100)));
-    logs.push(`🛡️ Consumable buff: DEF +${defPct}% trong trận này.`);
+    logs.push(defPct > 0
+      ? `🛡️ Consumable buff: DEF +${defPct}% trong trận này.`
+      : `⚠️ Lời nguyền: DEF ${defPct}% trong trận này.`);
   }
 
   if (consumeBuff(userId, guildId, 'quickstep_tea')) {
