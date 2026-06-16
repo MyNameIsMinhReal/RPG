@@ -48,14 +48,6 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Dấu hiệu của Shadow Court. Có thể mở lối vào Hẻm Tối trong làng.',
     sellPrice: 50
   },
-
-  exam_score_ten: {
-    id: 'exam_score_ten', name: 'Exam Score 10', icon: '💯',
-    type: 'key_item', stackable: true,
-    description: 'Bài kiểm tra điểm 10 hiếm đến vô lý. Vật phẩm sưu tầm may mắn, có thể bán được giá cao.',
-    sellPrice: 300
-  },
-
   legacy_spark: {
     id: 'legacy_spark', name: 'Legacy Spark', icon: '✨',
     type: 'key_item', stackable: true,
