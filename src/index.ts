@@ -9,6 +9,7 @@ import {
   Message,
   User
 } from 'discord.js';
+import { setupDynamicPresence } from './utils/dynamicPresence';
 
 import { loadCommands, buildAliasMap } from './commands/registry';
 import { PrefixCommandOptions, stripUserMentionToken, type PrefixSpec } from './commands/prefixOptions';
@@ -222,7 +223,7 @@ function validatePrefixCommand(parsed: ParsedPrefixCommand, message: Message): s
 
 client.once('ready', (c) => {
   console.log(`✅ Bot ready: ${c.user.tag}`);
-  c.user.setActivity('⚔️ Butterfly Effect RPG');
+  setupDynamicPresence(c);
   runStartupDataCheck(); // fail-fast: exits the process if game data has errors
 });
 
