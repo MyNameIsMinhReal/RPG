@@ -4,7 +4,7 @@ import {
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
   ComponentType, ModalBuilder, TextInputBuilder, TextInputStyle
 } from 'discord.js';
-import { getPlayer, addItem, getItemQty, removeItem, spendGold, applyPassiveStats, getFactionSummary } from './player';
+import { getPlayer, addItem, getItemQty, removeItem, spendGold, applyPassiveStats, getFactionSummary, updatePlayerHpMp } from './player';
 import { getPartyOf } from './party';
 import { onlyUser } from '../utils/collectors';
 import {
@@ -1212,8 +1212,14 @@ export async function showVillageTavern(
     return;
   }
 
-  db.prepare('UPDATE players SET gold=gold-?, hp=?, mp=? WHERE user_id=? AND guild_id=?')
-    .run(healCost, pNow.max_hp, pNow.max_mp, actorId, guildId);
+  if (!spendGold(actorId, guildId, healCost)) {
+    await interaction.editReply({
+      embeds: [simpleEmbed(COLORS.danger, `❌ **${pNow.name}** không đủ Gold! Cần **${healCost}**, có **${pNow.gold}**.`)],
+      components: [backRow(userId)]
+    });
+    return;
+  }
+  updatePlayerHpMp(actorId, guildId, pNow.max_hp, pNow.max_mp);
 
   await interaction.editReply({
     embeds: [new EmbedBuilder()

@@ -106,8 +106,12 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
   const derivedBase = deriveBaseStats(player);
   const normalized: PlayerRow = {
     ...player,
-    hp: Math.min(player.hp, derivedBase.maxHp),
-    mp: Math.min(player.mp, derivedBase.maxMp),
+    // Do NOT clamp current HP/MP to derivedBase here.
+    // Equipment, pets, clan buffs and forge affixes can raise the effective caps
+    // above the base max. If we clamp early, a full heal to an equipment-boosted
+    // max HP/MP is immediately cut back down on the next read.
+    hp: Math.max(player.alive ? 1 : 0, Math.floor(Number(player.hp ?? 0))),
+    mp: Math.max(0, Math.floor(Number(player.mp ?? 0))),
     max_hp: derivedBase.maxHp,
     max_mp: derivedBase.maxMp,
     atk: derivedBase.atk,
@@ -190,7 +194,7 @@ export function updatePlayerHpMp(userId: string, guildId: string, hp: number, mp
 
   const effective = applyPassiveStats(raw);
   const nextHp = Number.isFinite(hp)
-    ? Math.max(0, Math.min(Math.floor(hp), effective.max_hp))
+    ? Math.max(raw.alive ? 1 : 0, Math.min(Math.floor(hp), effective.max_hp))
     : raw.hp;
   const nextMp = Number.isFinite(mp)
     ? Math.max(0, Math.min(Math.floor(mp), effective.max_mp))
