@@ -49,10 +49,24 @@ export const ITEMS: Record<string, ItemDef> = {
     sellPrice: 50
   },
 
+  exam_score_ten: {
+    id: 'exam_score_ten', name: 'Exam Score 10', icon: '💯',
+    type: 'key_item', stackable: true,
+    description: 'Bài kiểm tra điểm 10 hiếm đến vô lý. Vật phẩm sưu tầm may mắn, có thể bán được giá cao.',
+    sellPrice: 300
+  },
+
+  legacy_spark: {
+    id: 'legacy_spark', name: 'Legacy Spark', icon: '✨',
+    type: 'key_item', stackable: true,
+    description: 'Tia lửa di sản dùng ở Lò Rèn Ashveil để thức tỉnh trang bị, khóa dòng và tẩy luyện Affix.',
+    sellPrice: 120
+  },
+
   legacy_token: {
     id: 'legacy_token', name: 'Legacy Token', icon: '🪙',
     type: 'key_item', stackable: true,
-    description: 'Đồng xu cổ dùng ở Lò Rèn Ashveil để thức tỉnh trang bị, khóa dòng và tẩy luyện Affix.',
+    description: 'Đồng xu di sản cũ. Vẫn dùng được như Legacy Spark ở Lò Rèn để tránh mất item từ bản hotfix trước.',
     sellPrice: 120
   },
 

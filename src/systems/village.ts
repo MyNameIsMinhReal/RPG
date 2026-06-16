@@ -629,10 +629,34 @@ export async function showVillageBlacksmith(
   await showBlacksmithForgeHome(interaction, userId, guildId);
 }
 
-const LEGACY_TOKEN_ID = 'legacy_token';
+const LEGACY_SPARK_ID = 'legacy_spark';
+const LEGACY_TOKEN_COMPAT_ID = 'legacy_token';
+
+function getLegacyForgeCurrencyQty(userId: string, guildId: string): number {
+  return getItemQty(userId, guildId, LEGACY_SPARK_ID) + getItemQty(userId, guildId, LEGACY_TOKEN_COMPAT_ID);
+}
+
+function spendLegacyForgeCurrency(userId: string, guildId: string, amount: number): { ok: boolean; spark: number; token: number } {
+  const sparkHave = getItemQty(userId, guildId, LEGACY_SPARK_ID);
+  const useSpark = Math.min(sparkHave, amount);
+  const remaining = amount - useSpark;
+  const tokenHave = getItemQty(userId, guildId, LEGACY_TOKEN_COMPAT_ID);
+  if (tokenHave < remaining) return { ok: false, spark: 0, token: 0 };
+  if (useSpark > 0 && !removeItem(userId, guildId, LEGACY_SPARK_ID, useSpark)) return { ok: false, spark: 0, token: 0 };
+  if (remaining > 0 && !removeItem(userId, guildId, LEGACY_TOKEN_COMPAT_ID, remaining)) {
+    if (useSpark > 0) addItem(userId, guildId, LEGACY_SPARK_ID, useSpark);
+    return { ok: false, spark: 0, token: 0 };
+  }
+  return { ok: true, spark: useSpark, token: remaining };
+}
+
+function refundLegacyForgeCurrency(userId: string, guildId: string, spent: { spark: number; token: number }): void {
+  if (spent.spark > 0) addItem(userId, guildId, LEGACY_SPARK_ID, spent.spark);
+  if (spent.token > 0) addItem(userId, guildId, LEGACY_TOKEN_COMPAT_ID, spent.token);
+}
 
 function forgeCostLine(token: number, gold: number, extra = ''): string {
-  const parts = [`🪙 Legacy Token x${token}`, `Gold ${gold}`];
+  const parts = [`✨ Legacy Spark x${token}`, `Gold ${gold}`];
   if (extra) parts.splice(1, 0, extra);
   return parts.join(' · ');
 }
@@ -647,20 +671,21 @@ function consumeForgeCost(userId: string, guildId: string, cost: { token: number
   const p = getPlayer(userId, guildId);
   if (!p) return { ok: false, reason: 'Không tìm thấy nhân vật.' };
   if (p.gold < cost.gold) return { ok: false, reason: `Không đủ Gold. Cần **${cost.gold}**, có **${p.gold}**.` };
-  const tokens = getItemQty(userId, guildId, LEGACY_TOKEN_ID);
-  if (tokens < cost.token) return { ok: false, reason: `Không đủ **Legacy Token**. Cần **${cost.token}**, có **${tokens}**.` };
+  const tokens = getLegacyForgeCurrencyQty(userId, guildId);
+  if (tokens < cost.token) return { ok: false, reason: `Không đủ **Legacy Spark**. Cần **${cost.token}**, có **${tokens}**. Legacy Token cũ vẫn được tính chung.` };
   if ((cost.crystal ?? 0) > 0) {
     const crystals = getItemQty(userId, guildId, 'mana_crystal');
     if (crystals < (cost.crystal ?? 0)) return { ok: false, reason: `Không đủ **Mana Crystal**. Cần **${cost.crystal}**, có **${crystals}**.` };
   }
   if (!spendGold(userId, guildId, cost.gold)) return { ok: false, reason: 'Gold vừa thay đổi, hãy thử lại.' };
-  if (!removeItem(userId, guildId, LEGACY_TOKEN_ID, cost.token)) {
+  const spentLegacy = spendLegacyForgeCurrency(userId, guildId, cost.token);
+  if (!spentLegacy.ok) {
     db.prepare('UPDATE players SET gold=gold+? WHERE user_id=? AND guild_id=?').run(cost.gold, userId, guildId);
-    return { ok: false, reason: 'Legacy Token vừa thay đổi, đã hoàn Gold.' };
+    return { ok: false, reason: 'Legacy Spark vừa thay đổi, đã hoàn Gold.' };
   }
   if ((cost.crystal ?? 0) > 0 && !removeItem(userId, guildId, 'mana_crystal', cost.crystal ?? 0)) {
     db.prepare('UPDATE players SET gold=gold+? WHERE user_id=? AND guild_id=?').run(cost.gold, userId, guildId);
-    addItem(userId, guildId, LEGACY_TOKEN_ID, cost.token);
+    refundLegacyForgeCurrency(userId, guildId, spentLegacy);
     return { ok: false, reason: 'Mana Crystal vừa thay đổi, đã hoàn tài nguyên.' };
   }
   return { ok: true };
@@ -701,7 +726,9 @@ async function showBlacksmithForgeHome(
 ): Promise<void> {
   const actor = getPlayer(userId, guildId)!;
   const worn = getWornEquipment(userId, guildId);
-  const tokenQty = getItemQty(userId, guildId, LEGACY_TOKEN_ID);
+  const tokenQty = getLegacyForgeCurrencyQty(userId, guildId);
+  const sparkQty = getItemQty(userId, guildId, LEGACY_SPARK_ID);
+  const oldTokenQty = getItemQty(userId, guildId, LEGACY_TOKEN_COMPAT_ID);
   const ironQty = getItemQty(userId, guildId, 'iron_ore');
   const crystalQty = getItemQty(userId, guildId, 'mana_crystal');
 
@@ -715,14 +742,14 @@ async function showBlacksmithForgeHome(
     .setDescription(
       `**${actor.name}** bước vào lò rèn. Đây là UI lò rèn mới, tách rõ nâng cấp thường và Legacy.\n\n` +
       `**Tài nguyên**\n` +
-      `> 🪙 Legacy Token: **${tokenQty}** · 🪨 Iron Ore: **${ironQty}** · 💠 Mana Crystal: **${crystalQty}** · Gold: **${actor.gold}**\n\n` +
-      `**Legacy Token dùng để làm gì?**\n` +
+      `> ✨ Legacy Spark: **${tokenQty}**${oldTokenQty > 0 ? ` (gồm ${sparkQty} Spark + ${oldTokenQty} Token cũ)` : ''} · 🪨 Iron Ore: **${ironQty}** · 💠 Mana Crystal: **${crystalQty}** · Gold: **${actor.gold}**\n\n` +
+      `**Legacy Spark dùng để làm gì?**\n` +
       `> ✨ **Thức tỉnh trang bị**: ${forgeCostLine(1, 500, '💠 Mana Crystal x2')}\n` +
       `> 🌀 **Tẩy luyện Affix**: ${forgeCostLine(1, 300)}; nếu khóa dòng thì ${forgeCostLine(2, 600)}\n` +
       `> 🔒 **Khóa/Gỡ dòng Affix**: ${forgeCostLine(1, 200)}\n\n` +
       `**Trang bị đang mặc**\n${gearLines}${partyVillageHint(userId, guildId)}`
     )
-    .setFooter({ text: 'Nâng cấp +1 vẫn dùng Iron/Mana Crystal/Gold. Legacy Token dùng cho thức tỉnh, tẩy luyện và khóa dòng.' });
+    .setFooter({ text: 'Nâng cấp +1 vẫn dùng Iron/Mana Crystal/Gold. Legacy Spark dùng cho thức tỉnh, tẩy luyện và khóa dòng. Legacy Token cũ vẫn dùng được.' });
 
   const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`vill_bs_upgrade_${userId}`).setLabel('Nâng cấp +').setEmoji('⚒️').setStyle(ButtonStyle.Primary).setDisabled(worn.length === 0),

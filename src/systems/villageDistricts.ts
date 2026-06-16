@@ -341,7 +341,8 @@ function currentBlackMarket(guildId: string): { active: boolean; itemId: string;
   const roll = hashString(`${guildId}:black:${period}`) % 100;
   const active = roll < 45 && nowSec() - periodStart <= 15 * 60;
   const stock = [
-    { itemId: 'legacy_token', price: 1500 },
+    { itemId: 'legacy_spark', price: 1500 },
+    { itemId: 'exam_score_ten', price: 3000 },
     { itemId: 'void_shard', price: 850 },
     { itemId: 'ancient_relic', price: 1200 },
     { itemId: 'demon_horn', price: 1100 },
@@ -622,7 +623,8 @@ async function openMysteryWoodenBox(interaction: ChatInputCommandInteraction, us
   }
   const roll = Math.random() * 100;
   let itemId = 'wood'; let qty = 10; let tier = 'rác';
-  if (roll >= 98) { itemId = 'legacy_token'; qty = 1; tier = 'legacy'; }
+  if (roll >= 99.5) { itemId = 'exam_score_ten'; qty = 1; tier = 'huyền thoại'; }
+  else if (roll >= 98) { itemId = 'legacy_spark'; qty = 1; tier = 'legacy'; }
   else if (roll >= 95) { itemId = 'ancient_relic'; qty = 1; tier = 'cực hiếm'; }
   else if (roll >= 86) { itemId = 'void_shard'; qty = 1; tier = 'epic'; }
   else if (roll >= 70) { itemId = 'mana_crystal'; qty = 2; tier = 'rare'; }
