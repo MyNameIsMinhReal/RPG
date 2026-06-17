@@ -34,6 +34,7 @@ import { getPetRewardMods, applyActivePetAfterVictory, grantPetDropAfterVictory 
 import { awardAchievements } from './achievements';
 import { getSecondaryStatBonuses } from './statSystem';
 import { getEquipmentStats } from './equipment';
+import { getCorruptionCombatMods, getCorruptionDropBonus, getFreshCorruptionForPlayer } from './corruption';
 import { savePartyCombat, deletePartyCombat } from './combat/partyState';
 import { getIntelRewardMods, applyIntelExtraDrop } from './villageDistricts';
 
@@ -404,9 +405,11 @@ export async function startPartyCombatFlow(
 ): Promise<void> {
   // ── Load members ────────────────────────────────────────────────────────────
   const members: PartyMember[] = [];
+  const rawMemberRows: any[] = [];
   for (const uid of memberIds) {
     const base = getPlayer(uid, guildId);
     if (!base?.alive) continue;
+    rawMemberRows.push(base);
     const p = applyPassiveStats(base);
     const mod = options.roleModifiers?.[uid];
     members.push({
@@ -449,9 +452,19 @@ export async function startPartyCombatFlow(
   const atkScale = (isBoss ? (1.10 + 0.18 * extraMembers) : (1 + 0.10 * extraMembers)) * levelScaling.atkMult;
   const defScale = levelScaling.defMult;
   const defBonus = (levelScaling as any).defBonus ?? 0;
-  const scaledHp = Math.max(1, Math.round(baseDef.hp * hpScale * (options.bossHpMult ?? 1)));
-  const scaledAtk = Math.round(baseDef.atk * atkScale);
+  let scaledHp = Math.max(1, Math.round(baseDef.hp * hpScale * (options.bossHpMult ?? 1)));
+  let scaledAtk = Math.round(baseDef.atk * atkScale);
   const scaledDef = Math.round((baseDef.def ?? 0) * defScale + defBonus);
+  const corruptionPlayer = rawMemberRows
+    .filter(p => p?.zone_id === 'shrine')
+    .sort((a, b) => getFreshCorruptionForPlayer(b) - getFreshCorruptionForPlayer(a))[0];
+  const corruptionMods = corruptionPlayer && Array.isArray((baseDef as any).zones) && (baseDef as any).zones.includes('shrine')
+    ? getCorruptionCombatMods(corruptionPlayer)
+    : { atkPct: 0, hpPct: 0, dropPct: 0, lines: [] as string[] };
+  if (corruptionMods.atkPct > 0 || corruptionMods.hpPct > 0) {
+    scaledAtk = Math.max(1, Math.floor(scaledAtk * (1 + corruptionMods.atkPct / 100)));
+    scaledHp = Math.max(1, Math.floor(scaledHp * (1 + corruptionMods.hpPct / 100)));
+  }
   const enemy: PartyCombatEnemy = {
     id: baseDef.id,
     name: baseDef.name,
@@ -471,7 +484,10 @@ export async function startPartyCombatFlow(
   };
 
   const sessionId = `${leaderId.slice(-6)}_${Date.now().toString(36)}`;
-  const log: string[] = levelScaling?.desc ? [levelScaling.desc] : [];
+  const log: string[] = [
+    ...(levelScaling?.desc ? [levelScaling.desc] : []),
+    ...(corruptionMods.lines ?? [])
+  ];
   let turn = 1;
   let combatMessageId: string | null = null;
 
@@ -735,6 +751,7 @@ export async function startPartyCombatFlow(
     const petMods = getPetRewardMods(m.user_id, guildId);
     const rawForStats = getPlayer(m.user_id, guildId);
     const statMods = rawForStats ? getSecondaryStatBonuses(rawForStats) : { critChance: 0, dodgeChance: 0, goldBonusPct: 0, dropBonusPct: 0 };
+    const corruptionDropBonus = freshForZone ? getCorruptionDropBonus(freshForZone as any) : 0;
     const eqStats = getEquipmentStats(m.user_id, guildId);
     const gearGoldBonus = eqStats.goldBonus ?? 0;
     const gearExpBonus = eqStats.expBonus ?? 0;
@@ -756,7 +773,7 @@ export async function startPartyCombatFlow(
       }
       logEvent(guildId, m.user_id, fresh.name, baseDef.boss ? 'boss_kill' : 'kill', `cùng party tiêu diệt **${baseDef.icon} ${baseDef.name}**.`, fresh.zone_id);
     }
-    const drops = rollPartyDrops(m.user_id, guildId, baseDef, factionMods.dropPct + intelMods.dropPct + statMods.dropBonusPct + gearDropBonus, fresh?.zone_id);
+    const drops = rollPartyDrops(m.user_id, guildId, baseDef, factionMods.dropPct + intelMods.dropPct + statMods.dropBonusPct + gearDropBonus + corruptionDropBonus, fresh?.zone_id);
     const petLines = fresh ? [...applyActivePetAfterVictory(m.user_id, guildId, fresh, baseDef as any), ...grantPetDropAfterVictory(m.user_id, guildId, baseDef as any)] : [];
     const achievementLines = fresh ? awardAchievements(m.user_id, guildId) : [];
     const bonusLines = [
@@ -764,6 +781,7 @@ export async function startPartyCombatFlow(
       intelMods.line ?? null,
       globalExpBonus > 0 ? `🙏 Ánh Sáng Thánh: EXP +${globalExpBonus}% toàn server` : null,
       (statMods.goldBonusPct > 0 || statMods.dropBonusPct > 0) ? `🍀 LUK: gold +${statMods.goldBonusPct}% · drop +${statMods.dropBonusPct}%` : null,
+      corruptionDropBonus > 0 ? `🌘 Ô Nhiễm Linh Hồn: drop +${corruptionDropBonus}%` : null,
       (gearGoldBonus > 0 || gearExpBonus > 0 || gearDropBonus > 0) ? `🎒 Gear: gold +${gearGoldBonus}% · exp +${gearExpBonus}% · drop +${gearDropBonus}%` : null,
       ...petMods.lines,
       ...petLines,

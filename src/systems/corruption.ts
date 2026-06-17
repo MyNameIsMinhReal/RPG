@@ -24,6 +24,16 @@ export function getCorruptionLevel(userId: string, guildId: string): number {
   return clampCorruption(row?.corruption ?? 0);
 }
 
+/**
+ * Always read the latest DB value when a player id/guild id is available.
+ * A lot of explore/combat flows keep an old PlayerRow in memory, so using
+ * player.corruption directly can make corruption look like it is not working.
+ */
+export function getFreshCorruptionForPlayer(player: Pick<PlayerRow, 'user_id' | 'guild_id'> & { corruption?: number }): number {
+  if (player?.user_id && player?.guild_id) return getCorruptionLevel(player.user_id, player.guild_id);
+  return clampCorruption(player?.corruption ?? 0);
+}
+
 export function adjustCorruption(userId: string, guildId: string, amount: number): number {
   ensureCorruptionColumn();
   const current = getCorruptionLevel(userId, guildId);
@@ -66,7 +76,7 @@ export function getCorruptionAdvice(level: number): string {
 
 export function maybeGainShrineCorruption(player: PlayerRow): string | null {
   if (player.zone_id !== 'shrine') return null;
-  const current = clampCorruption(player.corruption ?? getCorruptionLevel(player.user_id, player.guild_id));
+  const current = getFreshCorruptionForPlayer(player);
   const tier = getCorruptionTier(current);
   // Sau khi hạ Echo Demon: Ô Nhiễm ở Đền Cổ tăng chậm hơn trong 24h.
   const slowed = getFlag(player.guild_id, 'shrine_corruption_slow') !== null;
@@ -80,7 +90,7 @@ export function maybeGainShrineCorruption(player: PlayerRow): string | null {
 
 export function getCorruptionCombatMods(player: PlayerRow): { atkPct: number; hpPct: number; dropPct: number; lines: string[] } {
   if (player.zone_id !== 'shrine') return { atkPct: 0, hpPct: 0, dropPct: 0, lines: [] };
-  const corruption = clampCorruption(player.corruption ?? getCorruptionLevel(player.user_id, player.guild_id));
+  const corruption = getFreshCorruptionForPlayer(player);
   const tier = getCorruptionTier(corruption);
   if (tier <= 0) return { atkPct: 0, hpPct: 0, dropPct: 0, lines: [] };
   const atkPct = [0, 5, 10, 16][tier];
@@ -100,7 +110,8 @@ export function getCorruptionDropBonus(player: PlayerRow): number {
 
 export function shouldForceCorruptionAmbush(player: PlayerRow): boolean {
   if (player.zone_id !== 'shrine') return false;
-  const tier = getCorruptionTier(player.corruption ?? 0);
+  const corruption = getFreshCorruptionForPlayer(player);
+  const tier = getCorruptionTier(corruption);
   if (tier <= 0) return false;
   return randInt(1, 100) <= [0, 4, 8, 13][tier];
 }

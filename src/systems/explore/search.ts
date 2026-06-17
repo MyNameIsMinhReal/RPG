@@ -39,7 +39,7 @@ import { handleVictory, handleDeath, handleFlee } from './callbacks';
 import { showExploreMenu } from './menu';
 import { showMerchant, showSoulShop } from './merchant';
 import { getReadyPartyMemberIds } from './partyHelpers';
-import { maybeGainShrineCorruption, getCorruptionLevel, getCorruptionTier } from '../corruption';
+import { maybeGainShrineCorruption, getCorruptionLevel, getCorruptionTier, describeCorruption, getCorruptionAdvice } from '../corruption';
 import { setBuff } from '../consumables';
 import { doGather } from '../../commands/gather';
 import { addExploreNoise, consumeSmokeBomb, getExploreNoise, noiseBar, reduceExploreNoise, resetExploreNoise } from './noise';
@@ -74,7 +74,9 @@ async function promptExploreNode(
   userId: string,
   guildId: string,
   zoneName: string,
-  hasCombat: boolean
+  zoneId: string,
+  hasCombat: boolean,
+  corruptionTickLine?: string | null
 ): Promise<ExploreNodeType | null> {
   const noise = getExploreNoise(userId, guildId);
   const smokeQty = getItemQty(userId, guildId, 'smoke_bomb');
@@ -95,12 +97,17 @@ async function promptExploreNode(
       new ButtonBuilder().setCustomId(`ex_node_smoke_${userId}`).setLabel(`Dùng Smoke Bomb (${smokeQty})`).setEmoji('💨').setStyle(ButtonStyle.Secondary)
     ));
   }
+  const corruptionLevel = zoneId === 'shrine' ? getCorruptionLevel(userId, guildId) : 0;
+  const corruptionBlock = zoneId === 'shrine'
+    ? `\n\n🌘 **Ô Nhiễm Linh Hồn**\n${describeCorruption(corruptionLevel)}\n*${getCorruptionAdvice(corruptionLevel)}*${corruptionTickLine ? `\n${corruptionTickLine}` : ''}`
+    : '';
   const embed = new EmbedBuilder()
     .setColor(COLORS.info)
     .setTitle('🗺️ Ngã Rẽ Định Mệnh')
     .setDescription(
       `Bạn dừng lại ở rìa **${zoneName}**. Phía trước mở ra vài hướng đi — chọn theo tài nguyên và độ an toàn hiện tại.\n\n` +
       nodes.map(n => `${n.emoji} **${n.label}** — ${n.desc}`).join('\n') +
+      corruptionBlock +
       `\n\n👟 **Tiếng Động**\n${noiseBar(noise)}\n` +
       `*Rogue/Assassin/Shadowblade gây ít tiếng động hơn. Noise 100% sẽ kích hoạt Ambush và quái đánh trước.*`
     );
@@ -121,7 +128,7 @@ function nodeNoiseDelta(node: ExploreNodeType): number {
   return 0;
 }
 
-async function handleCampNode(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+async function handleCampNode(interaction: ChatInputCommandInteraction, userId: string, guildId: string, corruptionTickLine?: string | null): Promise<void> {
   const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const hpGain = Math.max(1, Math.floor(player.max_hp * 0.22));
   const mpGain = Math.max(1, Math.floor(player.max_mp * 0.18));
@@ -138,26 +145,31 @@ async function handleCampNode(interaction: ChatInputCommandInteraction, userId: 
         `Bạn tìm được một trại cũ đủ an toàn để nghỉ vài phút. Không tiêu hao Đuốc hay Lương khô.\n\n` +
         `❤️ +**${Math.min(hpGain, player.max_hp - player.hp)} HP** → ${newHp}/${player.max_hp}\n` +
         `💧 +**${Math.min(mpGain, player.max_mp - player.mp)} MP** → ${newMp}/${player.max_mp}\n` +
-        `👟 Tiếng Động: ${noise.before}% → **${noise.after}%**`
+        `👟 Tiếng Động: ${noise.before}% → **${noise.after}%**` +
+        (corruptionTickLine ? `\n${corruptionTickLine}` : '')
       )],
     components: buildContinueExploreRow(userId)
   });
   attachContinueExploreHandler(reply, interaction, userId, guildId);
 }
 
-async function handleResourceNode(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+async function handleResourceNode(interaction: ChatInputCommandInteraction, userId: string, guildId: string, corruptionTickLine?: string | null): Promise<void> {
   const player = getPlayer(userId, guildId)!;
   setExploreCooldown(userId, guildId);
   const result = doGather(userId, guildId, player.name);
+  if (corruptionTickLine) {
+    const oldDesc = result.embed.data.description ?? '';
+    result.embed.setDescription(`${oldDesc}\n\n${corruptionTickLine}`);
+  }
   const reply = await interaction.editReply({ embeds: [result.embed], components: buildContinueExploreRow(userId) });
   attachContinueExploreHandler(reply, interaction, userId, guildId);
 }
 
-async function showBrokenGoddessStatue(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+async function showBrokenGoddessStatue(interaction: ChatInputCommandInteraction, userId: string, guildId: string, corruptionTickLine?: string | null): Promise<void> {
   const embed = new EmbedBuilder()
     .setColor(0xB0C4DE)
     .setTitle('🗿 Bức Tượng Nữ Thần Vỡ')
-    .setDescription('Bạn thấy một bức tượng Nữ Thần bị đập nát. Một con quạ đậu trên vai tượng, nhìn bạn chằm chằm.');
+    .setDescription('Bạn thấy một bức tượng Nữ Thần bị đập nát. Một con quạ đậu trên vai tượng, nhìn bạn chằm chằm.' + (corruptionTickLine ? `\n\n${corruptionTickLine}` : ''));
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`goddess_pray_${userId}`).setLabel('Chắp tay cầu nguyện').setEmoji('🙏').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`goddess_search_${userId}`).setLabel('Lục soát bệ đá').setEmoji('🔎').setStyle(ButtonStyle.Primary),
@@ -386,7 +398,7 @@ export async function handleSearch(
     if (ranChapterEvent) return;
   }
 
-  const selectedNode = await promptExploreNode(interaction, userId, guildId, zone.name, enemies.length > 0);
+  const selectedNode = await promptExploreNode(interaction, userId, guildId, zone.name, player.zone_id, enemies.length > 0, corruptionTickLine);
   if (!selectedNode) return;
 
   if (selectedNode === 'smoke') {
@@ -396,13 +408,13 @@ export async function handleSearch(
       return;
     }
     resetExploreNoise(userId, guildId);
-    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '💨 Bạn ném **Smoke Bomb**. Khói phủ kín dấu chân, **Tiếng Động về 0%**.')], components: buildContinueExploreRow(userId) });
+    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '💨 Bạn ném **Smoke Bomb**. Khói phủ kín dấu chân, **Tiếng Động về 0%**.' + (corruptionTickLine ? `\n\n${corruptionTickLine}` : ''))], components: buildContinueExploreRow(userId) });
     attachContinueExploreHandler(reply, interaction, userId, guildId);
     return;
   }
 
   if (selectedNode === 'camp') {
-    await handleCampNode(interaction, userId, guildId);
+    await handleCampNode(interaction, userId, guildId, corruptionTickLine);
     return;
   }
 
@@ -421,7 +433,7 @@ Bạn gây ra thêm **${noise.delta}%** tiếng động${noise.stealth ? ' *(đ�
   }
 
   if (selectedNode === 'resource') {
-    await handleResourceNode(interaction, userId, guildId);
+    await handleResourceNode(interaction, userId, guildId, corruptionTickLine);
     return;
   }
 
@@ -434,7 +446,7 @@ Bạn gây ra thêm **${noise.delta}%** tiếng động${noise.stealth ? ' *(đ�
 
   if (selectedNode === 'mystery' && Math.random() < 0.25) {
     setExploreCooldown(userId, guildId);
-    await showBrokenGoddessStatue(interaction, userId, guildId);
+    await showBrokenGoddessStatue(interaction, userId, guildId, corruptionTickLine);
     return;
   }
 
