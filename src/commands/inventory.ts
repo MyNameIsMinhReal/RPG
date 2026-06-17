@@ -146,14 +146,13 @@ async function renderTab(
       const def    = getEquipment(equipId);
       if (def) {
         const playerBefore = getPlayer(userId, guildId)!;
-        const beforeEff = applyPassiveStats(playerBefore);
+        const maxBefore = applyPassiveStats(playerBefore).max_hp;
         wearEquipment(userId, guildId, equipId);
         const playerAfter = getPlayer(userId, guildId)!;
-        const afterEff = applyPassiveStats(playerAfter);
-        if (afterEff.max_hp !== beforeEff.max_hp || afterEff.max_mp !== beforeEff.max_mp) {
-          const newHp = Math.min(afterEff.max_hp, Math.max(1, afterEff.hp + (afterEff.max_hp - beforeEff.max_hp)));
-          const newMp = Math.min(afterEff.max_mp, Math.max(0, afterEff.mp + (afterEff.max_mp - beforeEff.max_mp)));
-          updatePlayerHpMp(userId, guildId, newHp, newMp);
+        const maxAfter = applyPassiveStats(playerAfter).max_hp;
+        if (maxAfter !== maxBefore) {
+          const newHp = Math.min(maxAfter, Math.max(1, playerAfter.hp + (maxAfter - maxBefore)));
+          updatePlayerHpMp(userId, guildId, newHp, playerAfter.mp);
         }
         await renderTab(interaction, userId, guildId, 'equip');
       }
@@ -163,12 +162,12 @@ async function renderTab(
     if (cid.startsWith(`inv_unequip_gear_${userId}_`)) {
       const slot = cid.replace(`inv_unequip_gear_${userId}_`, '') as import('../data/equipment').EquipSlot;
       const playerBefore = getPlayer(userId, guildId)!;
-      const beforeEff = applyPassiveStats(playerBefore);
+      const maxBefore = applyPassiveStats(playerBefore).max_hp;
       removeEquipment(userId, guildId, slot);
       const playerAfter = getPlayer(userId, guildId)!;
-      const afterEff = applyPassiveStats(playerAfter);
-      if (afterEff.max_hp < beforeEff.max_hp || afterEff.max_mp < beforeEff.max_mp) {
-        updatePlayerHpMp(userId, guildId, Math.min(afterEff.hp, afterEff.max_hp), Math.min(afterEff.mp, afterEff.max_mp));
+      const maxAfter = applyPassiveStats(playerAfter).max_hp;
+      if (maxAfter < maxBefore && playerAfter.hp > maxAfter) {
+        updatePlayerHpMp(userId, guildId, maxAfter, playerAfter.mp);
       }
       await renderTab(interaction, userId, guildId, 'equip');
       return;

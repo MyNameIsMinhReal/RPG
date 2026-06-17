@@ -21,6 +21,7 @@ import { EQUIPMENT, getEquipment } from '../data/equipment';
 import { ZONES } from '../data/zones';
 import { setFlag, getFlag, increaseShopMarkup, logEvent } from './world';
 import { showVillageShop, showVillageBlacksmith, showVillageBoard, showVillageHall } from './village';
+import { getAncientKnowledge, getBlindAncientBookCostLine, getBlindAncientBookMissing, openBlindAncientBook } from './skillLearning';
 
 const HOUR = 3600;
 const DAY = 24 * HOUR;
@@ -341,8 +342,7 @@ function currentBlackMarket(guildId: string): { active: boolean; itemId: string;
   const roll = hashString(`${guildId}:black:${period}`) % 100;
   const active = roll < 45 && nowSec() - periodStart <= 15 * 60;
   const stock = [
-    { itemId: 'legacy_spark', price: 1500 },
-    { itemId: 'exam_score_ten', price: 3000 },
+    { itemId: 'legacy_token', price: 1500 },
     { itemId: 'void_shard', price: 850 },
     { itemId: 'ancient_relic', price: 1200 },
     { itemId: 'demon_horn', price: 1100 },
@@ -623,8 +623,7 @@ async function openMysteryWoodenBox(interaction: ChatInputCommandInteraction, us
   }
   const roll = Math.random() * 100;
   let itemId = 'wood'; let qty = 10; let tier = 'rác';
-  if (roll >= 99.5) { itemId = 'exam_score_ten'; qty = 1; tier = 'huyền thoại'; }
-  else if (roll >= 98) { itemId = 'legacy_spark'; qty = 1; tier = 'legacy'; }
+  if (roll >= 98) { itemId = 'legacy_token'; qty = 1; tier = 'legacy'; }
   else if (roll >= 95) { itemId = 'ancient_relic'; qty = 1; tier = 'cực hiếm'; }
   else if (roll >= 86) { itemId = 'void_shard'; qty = 1; tier = 'epic'; }
   else if (roll >= 70) { itemId = 'mana_crystal'; qty = 2; tier = 'rare'; }
@@ -739,10 +738,12 @@ export async function showOldChurchDistrict(interaction: ChatInputCommandInterac
   const p = applyPassiveStats(getPlayer(userId, guildId)!);
   const rep = getFactionReputation(userId, guildId, 'old_church');
   const fund = db.prepare(`SELECT current_amount, target_amount FROM village_funds WHERE guild_id=? AND fund_id='prayer'`).get(guildId) as any;
+  const ancientBooks = getItemQty(userId, guildId, 'ancient_book');
+  const ancientKnowledge = getAncientKnowledge(userId, guildId);
   const embed = new EmbedBuilder().setColor(0xB0C4DE).setTitle('⛪ Khu C — Thánh Đường Bỏ Hoang')
     .setDescription(
       `Nến cũ cháy xanh giữa nền đá nứt.\n\n` +
-      `❤️ HP ${p.hp}/${p.max_hp} · 💧 MP ${p.mp}/${p.max_mp} · 🪙 Gold ${p.gold ?? 0} · 🌘 Corruption ${p.corruption ?? 0}\n` +
+      `❤️ HP ${p.hp}/${p.max_hp} · 💧 MP ${p.mp}/${p.max_mp} · 🌘 Corruption ${p.corruption ?? 0}\n` +
       `Old Church Rep: **${rep >= 0 ? '+' : ''}${rep}**\n\n` +
       `🙏 Quỹ Cầu Nguyện: **${fund?.current_amount ?? 0}/${fund?.target_amount ?? 10000} Gold**\n` +
       progressBar(fund?.current_amount ?? 0, fund?.target_amount ?? 10000)
@@ -751,6 +752,7 @@ export async function showOldChurchDistrict(interaction: ChatInputCommandInterac
     new ButtonBuilder().setCustomId(`vill_ch_heal_${userId}`).setLabel('Rửa Tội / Hồi Phục').setEmoji('💧').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`vill_ch_cleanse_${userId}`).setLabel('Tẩy Ô Nhiễm').setEmoji('🧂').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`vill_ch_pray_${userId}`).setLabel('Quyên góp 100 Gold').setEmoji('🙏').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`vill_ch_book_${userId}`).setLabel('Cổ Thư Thất Truyền').setEmoji('📖').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`vill_back_${userId}`).setLabel('Quay lại').setStyle(ButtonStyle.Secondary),
   );
   const msg = await interaction.editReply({ embeds: [embed], components: [row] });
@@ -760,7 +762,86 @@ export async function showOldChurchDistrict(interaction: ChatInputCommandInterac
   if (btn.customId === `vill_ch_heal_${userId}`) return churchHeal(interaction, userId, guildId);
   if (btn.customId === `vill_ch_cleanse_${userId}`) return churchCleanse(interaction, userId, guildId);
   if (btn.customId === `vill_ch_pray_${userId}`) return churchPray(interaction, userId, guildId);
+  if (btn.customId === `vill_ch_book_${userId}`) return showAncientBookArchive(interaction, userId, guildId);
   await interaction.editReply({ components: [] }).catch(() => {});
+}
+
+
+async function showAncientBookArchive(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+  const books = getItemQty(userId, guildId, 'ancient_book');
+  const knowledge = getAncientKnowledge(userId, guildId);
+  const p = getPlayer(userId, guildId)!;
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.magic)
+    .setTitle('📖 Cổ Thư Thất Truyền')
+    .setDescription(
+      `Sau bàn thờ nứt vỡ là một phòng lưu trữ phủ bụi. Những cuốn cổ thư đều bị phong ấn.
+
+` +
+      `👤 **${p.name}**
+` +
+      `📖 Ancient Book: **${books}**
+` +
+      `🧠 Ancient Knowledge: **${knowledge}**
+
+` +
+      `Bạn **không thể biết trước** kỹ năng bên trong. Mỗi lần khai mở sẽ tiêu hao:\n${getBlindAncientBookCostLine()}\n\n` +
+      `Khai mở luôn nhận **+1 Ancient Knowledge**. Nếu còn kỹ năng chưa học ở cấp hiện tại, cổ thư sẽ tự chọn ngẫu nhiên một kỹ năng mới.\n` +
+      `🔹 Broken Rune kiếm từ Shrine/event cổ đại hoặc craft trong /craft.`
+    );
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_book_open_${userId}`).setLabel('Khai mở cổ thư').setEmoji('📖').setStyle(ButtonStyle.Success).setDisabled(getBlindAncientBookMissing(userId, guildId).length > 0),
+    new ButtonBuilder().setCustomId(`vill_dist_church_${userId}`).setLabel('Quay lại Thánh Đường').setStyle(ButtonStyle.Secondary),
+  );
+  const msg = await interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await msg.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 45_000 }).catch(() => null);
+  if (!btn) return;
+  await safeDefer(btn);
+  if (btn.customId === `vill_dist_church_${userId}`) return showOldChurchDistrict(interaction, userId, guildId);
+  if (btn.customId === `vill_book_open_${userId}`) return openAncientBookAtChurch(interaction, userId, guildId);
+}
+
+async function openAncientBookAtChurch(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
+  const result = openBlindAncientBook(userId, guildId);
+  if (!result.ok) {
+    await interaction.editReply({
+      embeds: [simpleEmbed(COLORS.warning, `📖 Cổ thư không thể khai mở.
+${result.reason ?? 'Không rõ lý do.'}${result.refundLine ? `
+${result.refundLine}` : ''}`)],
+      components: [backRow(userId)]
+    });
+    return;
+  }
+  const booksLeft = getItemQty(userId, guildId, 'ancient_book');
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.magic)
+    .setTitle('✨ Cổ Thư Đã Khai Mở!')
+    .setDescription(
+      `Trang giấy mục nát bốc cháy thành ký tự cổ. Bạn học được:
+
+` +
+      `${result.skillIcon} **${result.skillName}**
+` +
+      `${result.skillDescription ?? ''}
+
+` +
+      `Chi phí: ${getBlindAncientBookCostLine()}\n` +
+      `📖 Ancient Book còn lại: **${booksLeft}**\n` +
+      `🧠 Ancient Knowledge: **${result.knowledge ?? getAncientKnowledge(userId, guildId)}**
+
+` +
+      `Kỹ năng đã vào **Skill Pool**, vào Loadout để trang bị nếu cần.`
+    );
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`vill_book_open_${userId}`).setLabel('Khai mở tiếp').setEmoji('📖').setStyle(ButtonStyle.Success).setDisabled(getBlindAncientBookMissing(userId, guildId).length > 0),
+    new ButtonBuilder().setCustomId(`vill_dist_church_${userId}`).setLabel('Quay lại Thánh Đường').setStyle(ButtonStyle.Secondary),
+  );
+  const msg = await interaction.editReply({ embeds: [embed], components: [row] });
+  const btn = await msg.awaitMessageComponent({ componentType: ComponentType.Button, filter: i => i.user.id === userId, time: 45_000 }).catch(() => null);
+  if (!btn) return;
+  await safeDefer(btn);
+  if (btn.customId === `vill_book_open_${userId}`) return openAncientBookAtChurch(interaction, userId, guildId);
+  if (btn.customId === `vill_dist_church_${userId}`) return showOldChurchDistrict(interaction, userId, guildId);
 }
 
 async function churchHeal(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
@@ -769,10 +850,7 @@ async function churchHeal(interaction: ChatInputCommandInteraction, userId: stri
   const missingHp = Math.max(0, p.max_hp - p.hp);
   const missingMp = Math.max(0, p.max_mp - p.mp);
   const base = Math.max(5, Math.ceil(missingHp * 0.18 + missingMp * 0.10));
-  // Thánh Đường là dịch vụ hồi phục rẻ, không phải miễn phí.
-  // Rep cao vẫn được giảm giá mạnh, nhưng luôn có phí tối thiểu để tránh spam hồi phục.
-  const discountRate = rep >= 50 ? 0.25 : rep >= 20 ? 0.5 : 1;
-  const cost = Math.max(3, Math.ceil(base * discountRate));
+  const cost = rep >= 50 ? 0 : rep >= 20 ? Math.floor(base * 0.5) : base;
   if (missingHp === 0 && missingMp === 0) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '✅ Bạn đang đầy HP/MP rồi.')], components: [backRow(userId)] });
     return;
@@ -781,10 +859,8 @@ async function churchHeal(interaction: ChatInputCommandInteraction, userId: stri
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ Cần **${cost} Gold** để hồi phục.`)], components: [backRow(userId)] });
     return;
   }
-  const beforeGold = p.gold ?? 0;
   updatePlayerHpMp(userId, guildId, p.max_hp, p.max_mp);
-  const afterGold = Math.max(0, beforeGold - cost);
-  await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💧 Bạn đã hồi đầy HP/MP tại Thánh Đường.\n🪙 Chi phí: **${cost} Gold** (${beforeGold} → ${afterGold})`)], components: [backRow(userId)] });
+  await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💧 Bạn đã hồi đầy HP/MP tại Thánh Đường.\n🪙 Chi phí: **${cost} Gold**`)], components: [backRow(userId)] });
 }
 
 async function churchCleanse(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {

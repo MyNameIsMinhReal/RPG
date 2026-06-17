@@ -1197,14 +1197,6 @@ const EQUIPMENT_RAW: Record<string, EquipmentDef> = {
     sellPrice: 1500, dropFrom: ['the_forgotten'], dropChance: 5, minZone: 'wastes'
   },
 
-  exam_score_ten: {
-    id: 'exam_score_ten', name: 'Exam Score 10', icon: '💯', slot: 'accessory2', rarity: 'legendary',
-    description: 'Bài kiểm tra điểm 10 được đóng khung như bùa may mắn. **EXP +10%, Gold +10%, Drop +3%**.',
-    stats: { expBonus: 10, goldBonus: 10, dropBonus: 3 },
-    sellPrice: 1000,
-    minZone: 'village'
-  },
-
   // ── Special / Promo-only ─────────────────────────────────────────────────
   ancient_blood_blade: {
     id: 'ancient_blood_blade', name: 'Ancient Blood Blade', icon: '🩸', slot: 'weapon', rarity: 'cursed',

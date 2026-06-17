@@ -32,7 +32,7 @@ export const ITEMS: Record<string, ItemDef> = {
   ancient_book: {
     id: 'ancient_book', name: 'Ancient Book', icon: '📖',
     type: 'key_item', stackable: true,
-    description: 'Cổ thư kỹ năng. Mang về Hội Quán ở làng để nghiên cứu, hoặc gặp event học trực tiếp ngoài đường.',
+    description: 'Cổ thư kỹ năng bị phong ấn. Mang tới Thánh Đường Bỏ Hoang → Cổ Thư Thất Truyền để khai mở; không biết trước skill bên trong. Cần thêm Gold, Soul Dust và Broken Rune để mở nghi thức.',
     sellPrice: 80, buyPrice: 240
   },
 
@@ -42,31 +42,17 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'Đuốc dùng khi đi vào khu tối. Hiện là vật phẩm tiêu hao cho các event làng/hầm mỏ sau này.',
     sellPrice: 4, buyPrice: 12
   },
-
-  smoke_bomb: {
-    id: 'smoke_bomb', name: 'Smoke Bomb', icon: '💨',
-    type: 'consumable', stackable: true,
-    description: 'Bom mù dùng khi explore để reset Tiếng Động về 0%, tránh bị Ambush vì gây ồn.',
-    sellPrice: 18, buyPrice: 55
-  },
-
   shadow_token: {
     id: 'shadow_token', name: 'Shadow Token', icon: '🌑',
     type: 'key_item', stackable: true,
     description: 'Dấu hiệu của Shadow Court. Có thể mở lối vào Hẻm Tối trong làng.',
     sellPrice: 50
   },
-  legacy_spark: {
-    id: 'legacy_spark', name: 'Legacy Spark', icon: '✨',
-    type: 'key_item', stackable: true,
-    description: 'Tia lửa di sản dùng ở Lò Rèn Ashveil để thức tỉnh trang bị, khóa dòng và tẩy luyện Affix.',
-    sellPrice: 120
-  },
 
   legacy_token: {
     id: 'legacy_token', name: 'Legacy Token', icon: '🪙',
     type: 'key_item', stackable: true,
-    description: 'Đồng xu di sản cũ. Vẫn dùng được như Legacy Spark ở Lò Rèn để tránh mất item từ bản hotfix trước.',
+    description: 'Đồng xu cổ dùng ở Lò Rèn Ashveil để thức tỉnh trang bị, khóa dòng và tẩy luyện Affix.',
     sellPrice: 120
   },
 
@@ -586,7 +572,7 @@ export const ITEMS: Record<string, ItemDef> = {
   broken_rune: {
     id: 'broken_rune', name: 'Broken Rune', icon: '🔹',
     type: 'material', stackable: true,
-    description: 'Mảnh rune vỡ lấy từ đền thờ và vết nứt linh hồn.',
+    description: 'Mảnh rune vỡ dùng để khai mở Ancient Book, chế rune/scroll và nghiên cứu cổ thuật. Kiếm từ Shrine, event cổ đại, miniboss phong ấn hoặc craft trong /craft.',
     sellPrice: 35
   },
   merchant_seal: {
@@ -598,7 +584,7 @@ export const ITEMS: Record<string, ItemDef> = {
   soul_dust: {
     id: 'soul_dust', name: 'Soul Dust', icon: '💨',
     type: 'material', stackable: true,
-    description: 'Bụi linh hồn còn sót lại sau chuyển sinh.',
+    description: 'Bụi linh hồn còn sót lại sau chuyển sinh. Dùng để khai mở Ancient Book, craft rune và vật phẩm tâm linh.',
     sellPrice: 55
   },
   rusty_gear: {

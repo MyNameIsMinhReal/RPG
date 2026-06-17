@@ -413,6 +413,15 @@ export const CRAFT_RECIPES: CraftRecipe[] = [
     ingredients: [{ itemId: 'merchant_seal', amount: 2 }, { itemId: 'rusty_gear', amount: 2 }],
     unlockedBy: 'default'
   },
+
+  {
+    id: 'craft_broken_rune', resultItemId: 'broken_rune', resultAmount: 1,
+    category: 'material', resultRarity: 'rare', goldCost: 55, levelRequired: 2,
+    successRate: 95, craftingExp: 12,
+    ingredients: [{ itemId: 'stone', amount: 6 }, { itemId: 'mana_crystal', amount: 1 }, { itemId: 'ectoplasm', amount: 1 }],
+    unlockedBy: 'default'
+  },
+
   {
     id: 'craft_soul_dust', resultItemId: 'soul_dust', resultAmount: 1,
     category: 'material', resultRarity: 'rare', goldCost: 40, levelRequired: 2,

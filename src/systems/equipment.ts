@@ -1,5 +1,5 @@
 import db from '../database/index';
-import { getEquipment, getSetBonuses, SLOT_ICONS, SLOT_LABELS, RARITY_LABELS, type EquipmentDef, type EquipSlot, type EquipStats, type EquipEffect, type Rarity } from '../data/equipment';
+import { getEquipment, getSetBonuses, SLOT_ICONS, SLOT_LABELS, RARITY_LABELS, type EquipmentDef, type EquipSlot, type EquipStats, type EquipEffect } from '../data/equipment';
 
 export const UPGRADE_MAX = 5;
 
@@ -91,35 +91,21 @@ function applyUpgradeStatBonus(stats: FullEquipStats, slot: EquipSlot, def: Equi
 }
 
 
+export type ForgeAffixKey =
+  | 'atk_3' | 'atk_5'
+  | 'def_3' | 'def_5'
+  | 'hp_15' | 'hp_25'
+  | 'mp_12' | 'mp_20'
+  | 'crit_1' | 'dodge_1'
+  | 'lifesteal_1'
+  | 'exp_3' | 'gold_3' | 'drop_2';
 
-export type AffixType = 'prefix' | 'suffix';
-export type ForgeAffixStat = keyof Pick<EquipStats,
-  'atk' | 'def' | 'maxHp' | 'maxMp' | 'critChance' | 'dodgeChance' | 'lifesteal' | 'expBonus' | 'goldBonus' | 'dropBonus'
->;
-export type ForgeAffixKey = string;
-
-export interface AffixTier {
-  tierLevel: number; // Tier 1 mạnh nhất
-  minILvl: number;
-  range: [number, number];
-}
-
-export interface AffixDef {
-  id: string;
+export interface ForgeAffixDef {
+  key: ForgeAffixKey;
   label: string;
-  type: AffixType;
-  stat: ForgeAffixStat;
-  isPercent: boolean;
-  tiers: AffixTier[];
-}
-
-export interface RolledForgeAffix {
-  id: string;
-  type: AffixType;
-  stat: ForgeAffixStat;
-  isPercent: boolean;
-  value: number;
-  tier: number;
+  stat: keyof EquipStats;
+  amount: number;
+  weight: number;
 }
 
 export interface EquipmentForgeMeta {
@@ -127,407 +113,134 @@ export interface EquipmentForgeMeta {
   guild_id: string;
   slot: EquipSlot;
   awakened: number;
-  affix1: RolledForgeAffix | null;
-  affix2: RolledForgeAffix | null;
+  affix1: ForgeAffixKey | null;
+  affix2: ForgeAffixKey | null;
   locked_affix: number;
-  instance_uuid: string | null;
-  base_id: string | null;
-  rarity: Rarity | null;
-  item_level: number;
-  affixes: RolledForgeAffix[];
-  locked_affixes: number[];
-  pending_affixes: RolledForgeAffix[] | null;
   updated_at?: number;
 }
 
-export const PREFIX_POOL: AffixDef[] = [
-  { id: 'flat_atk', label: 'Sát thương vật lý', type: 'prefix', stat: 'atk', isPercent: false, tiers: [
-    { tierLevel: 5, minILvl: 1, range: [2, 5] },
-    { tierLevel: 4, minILvl: 10, range: [6, 12] },
-    { tierLevel: 3, minILvl: 20, range: [13, 24] },
-    { tierLevel: 2, minILvl: 35, range: [28, 55] },
-    { tierLevel: 1, minILvl: 50, range: [70, 120] },
-  ]},
-  { id: 'flat_def', label: 'Giáp cứng', type: 'prefix', stat: 'def', isPercent: false, tiers: [
-    { tierLevel: 5, minILvl: 1, range: [1, 4] },
-    { tierLevel: 4, minILvl: 10, range: [5, 10] },
-    { tierLevel: 3, minILvl: 20, range: [11, 20] },
-    { tierLevel: 2, minILvl: 35, range: [22, 38] },
-    { tierLevel: 1, minILvl: 50, range: [45, 80] },
-  ]},
-  { id: 'flat_hp', label: 'Máu tối đa', type: 'prefix', stat: 'maxHp', isPercent: false, tiers: [
-    { tierLevel: 5, minILvl: 1, range: [12, 28] },
-    { tierLevel: 4, minILvl: 10, range: [30, 65] },
-    { tierLevel: 3, minILvl: 20, range: [70, 140] },
-    { tierLevel: 2, minILvl: 35, range: [160, 300] },
-    { tierLevel: 1, minILvl: 50, range: [350, 520] },
-  ]},
-  { id: 'flat_mp', label: 'Mana tối đa', type: 'prefix', stat: 'maxMp', isPercent: false, tiers: [
-    { tierLevel: 5, minILvl: 1, range: [8, 18] },
-    { tierLevel: 4, minILvl: 10, range: [20, 42] },
-    { tierLevel: 3, minILvl: 20, range: [45, 90] },
-    { tierLevel: 2, minILvl: 35, range: [100, 180] },
-    { tierLevel: 1, minILvl: 50, range: [220, 360] },
-  ]},
-  { id: 'drop_sense', label: 'Cảm nhận chiến lợi phẩm', type: 'prefix', stat: 'dropBonus', isPercent: true, tiers: [
-    { tierLevel: 5, minILvl: 8, range: [1, 2] },
-    { tierLevel: 4, minILvl: 18, range: [2, 4] },
-    { tierLevel: 3, minILvl: 30, range: [4, 6] },
-    { tierLevel: 2, minILvl: 42, range: [6, 8] },
-    { tierLevel: 1, minILvl: 55, range: [8, 10] },
-  ]},
-];
+export const FORGE_AFFIXES: Record<ForgeAffixKey, ForgeAffixDef> = {
+  atk_3:       { key: 'atk_3',       label: '+3 ATK',        stat: 'atk',         amount: 3,  weight: 15 },
+  atk_5:       { key: 'atk_5',       label: '+5 ATK',        stat: 'atk',         amount: 5,  weight: 6  },
+  def_3:       { key: 'def_3',       label: '+3 DEF',        stat: 'def',         amount: 3,  weight: 15 },
+  def_5:       { key: 'def_5',       label: '+5 DEF',        stat: 'def',         amount: 5,  weight: 6  },
+  hp_15:       { key: 'hp_15',       label: '+15 HP',        stat: 'maxHp',       amount: 15, weight: 14 },
+  hp_25:       { key: 'hp_25',       label: '+25 HP',        stat: 'maxHp',       amount: 25, weight: 6  },
+  mp_12:       { key: 'mp_12',       label: '+12 MP',        stat: 'maxMp',       amount: 12, weight: 12 },
+  mp_20:       { key: 'mp_20',       label: '+20 MP',        stat: 'maxMp',       amount: 20, weight: 5  },
+  crit_1:      { key: 'crit_1',      label: '+1% Crit',      stat: 'critChance',  amount: 1,  weight: 8  },
+  dodge_1:     { key: 'dodge_1',     label: '+1% Dodge',     stat: 'dodgeChance', amount: 1,  weight: 8  },
+  lifesteal_1: { key: 'lifesteal_1', label: '+1% Lifesteal', stat: 'lifesteal',   amount: 1,  weight: 5  },
+  exp_3:       { key: 'exp_3',       label: '+3% EXP',       stat: 'expBonus',    amount: 3,  weight: 8  },
+  gold_3:      { key: 'gold_3',      label: '+3% Gold',      stat: 'goldBonus',   amount: 3,  weight: 8  },
+  drop_2:      { key: 'drop_2',      label: '+2% Drop',      stat: 'dropBonus',   amount: 2,  weight: 7  },
+};
 
-export const SUFFIX_POOL: AffixDef[] = [
-  { id: 'crit_chance', label: 'Chí mạng', type: 'suffix', stat: 'critChance', isPercent: true, tiers: [
-    { tierLevel: 5, minILvl: 1, range: [1, 2] },
-    { tierLevel: 4, minILvl: 12, range: [2, 4] },
-    { tierLevel: 3, minILvl: 24, range: [4, 6] },
-    { tierLevel: 2, minILvl: 38, range: [6, 8] },
-    { tierLevel: 1, minILvl: 52, range: [9, 12] },
-  ]},
-  { id: 'dodge_chance', label: 'Né tránh', type: 'suffix', stat: 'dodgeChance', isPercent: true, tiers: [
-    { tierLevel: 5, minILvl: 1, range: [1, 2] },
-    { tierLevel: 4, minILvl: 12, range: [2, 3] },
-    { tierLevel: 3, minILvl: 24, range: [3, 5] },
-    { tierLevel: 2, minILvl: 38, range: [5, 7] },
-    { tierLevel: 1, minILvl: 52, range: [7, 10] },
-  ]},
-  { id: 'lifesteal', label: 'Hút máu', type: 'suffix', stat: 'lifesteal', isPercent: true, tiers: [
-    { tierLevel: 3, minILvl: 20, range: [1, 2] },
-    { tierLevel: 2, minILvl: 35, range: [2, 4] },
-    { tierLevel: 1, minILvl: 48, range: [4, 7] },
-  ]},
-  { id: 'gold_find', label: 'Nhặt vàng', type: 'suffix', stat: 'goldBonus', isPercent: true, tiers: [
-    { tierLevel: 5, minILvl: 1, range: [2, 4] },
-    { tierLevel: 4, minILvl: 12, range: [4, 7] },
-    { tierLevel: 3, minILvl: 24, range: [7, 10] },
-    { tierLevel: 2, minILvl: 38, range: [10, 14] },
-    { tierLevel: 1, minILvl: 52, range: [14, 20] },
-  ]},
-  { id: 'exp_focus', label: 'Kinh nghiệm chiến đấu', type: 'suffix', stat: 'expBonus', isPercent: true, tiers: [
-    { tierLevel: 5, minILvl: 1, range: [2, 4] },
-    { tierLevel: 4, minILvl: 12, range: [4, 7] },
-    { tierLevel: 3, minILvl: 24, range: [7, 10] },
-    { tierLevel: 2, minILvl: 38, range: [10, 14] },
-    { tierLevel: 1, minILvl: 52, range: [14, 20] },
-  ]},
-];
+const FORGE_AFFIX_KEYS = Object.keys(FORGE_AFFIXES) as ForgeAffixKey[];
 
-const AFFIX_POOLS: Record<AffixType, AffixDef[]> = { prefix: PREFIX_POOL, suffix: SUFFIX_POOL };
-
-function safeJson<T>(raw: unknown, fallback: T): T {
-  if (typeof raw !== 'string' || !raw.trim()) return fallback;
-  try { return JSON.parse(raw) as T; } catch { return fallback; }
+function normalizeAffixKey(value: unknown): ForgeAffixKey | null {
+  return typeof value === 'string' && value in FORGE_AFFIXES ? value as ForgeAffixKey : null;
 }
 
-function localRandInt(min: number, max: number): number {
-  const lo = Math.ceil(min); const hi = Math.floor(max);
-  return Math.floor(Math.random() * (hi - lo + 1)) + lo;
-}
-
-function weightedPick<T>(items: T[], weight: (item: T) => number): T | undefined {
-  const total = items.reduce((s, it) => s + Math.max(0, weight(it)), 0);
-  if (total <= 0) return items[0];
+function pickForgeAffix(exclude: ForgeAffixKey[] = []): ForgeAffixKey {
+  const pool = FORGE_AFFIX_KEYS.filter(k => !exclude.includes(k));
+  const total = pool.reduce((sum, key) => sum + FORGE_AFFIXES[key].weight, 0);
   let roll = Math.random() * total;
-  for (const it of items) {
-    roll -= Math.max(0, weight(it));
-    if (roll <= 0) return it;
+  for (const key of pool) {
+    roll -= FORGE_AFFIXES[key].weight;
+    if (roll <= 0) return key;
   }
-  return items[items.length - 1];
+  return pool[0] ?? 'atk_3';
 }
 
-function normalizeRolledAffix(value: any): RolledForgeAffix | null {
-  if (!value || typeof value !== 'object') return null;
-  if (value.type !== 'prefix' && value.type !== 'suffix') return null;
-  if (typeof value.stat !== 'string' || typeof value.value !== 'number') return null;
-  return {
-    id: String(value.id ?? `${value.type}_${value.stat}`),
-    type: value.type,
-    stat: value.stat as ForgeAffixStat,
-    isPercent: !!value.isPercent,
-    value: Number(value.value),
-    tier: Number(value.tier ?? 5),
-  };
+export function rollForgeAffixes(locked?: ForgeAffixKey | null): [ForgeAffixKey, ForgeAffixKey] {
+  const first = locked ?? pickForgeAffix();
+  const second = pickForgeAffix([first]);
+  return [first, second];
 }
 
-function normalizeAffixList(raw: unknown): RolledForgeAffix[] {
-  const arr = Array.isArray(raw) ? raw : safeJson<any[]>(raw, []);
-  return arr.map(normalizeRolledAffix).filter(Boolean) as RolledForgeAffix[];
-}
-
-function rarityAffixLimits(rarity: Rarity | string | null | undefined): { prefix: number; suffix: number } {
-  if (rarity === 'rare') return { prefix: 1, suffix: 1 };
-  if (rarity === 'epic') return { prefix: 2, suffix: 2 };
-  if (rarity === 'legendary' || rarity === 'mythic' || rarity === 'cursed') return { prefix: 3, suffix: 3 };
-  return { prefix: 1, suffix: 1 };
-}
-
-function rollCountForRarity(rarity: Rarity | string | null | undefined, max: number): number {
-  if (max <= 0) return 0;
-  if (rarity === 'rare') return max;
-  if (rarity === 'epic') return localRandInt(Math.max(1, max - 1), max);
-  if (rarity === 'legendary' || rarity === 'mythic' || rarity === 'cursed') return localRandInt(Math.max(1, max - 1), max);
-  return Math.min(1, max);
-}
-
-function pickTier(def: AffixDef, itemLevel: number): AffixTier | null {
-  const valid = def.tiers.filter(t => t.minILvl <= itemLevel);
-  if (!valid.length) return null;
-  // Tier yếu hơn dễ ra hơn; tier 1 vẫn có chance nhưng hiếm.
-  return weightedPick(valid, t => Math.max(1, t.tierLevel * t.tierLevel)) ?? valid[0];
-}
-
-function rollOneAffix(def: AffixDef, itemLevel: number): RolledForgeAffix | null {
-  const tier = pickTier(def, itemLevel);
-  if (!tier) return null;
-  return {
-    id: def.id,
-    type: def.type,
-    stat: def.stat,
-    isPercent: def.isPercent,
-    value: localRandInt(tier.range[0], tier.range[1]),
-    tier: tier.tierLevel,
-  };
-}
-
-export function rollEquipmentAffixes(baseId: string, rarity: Rarity | string, itemLevel: number, locked: RolledForgeAffix[] = []): RolledForgeAffix[] {
-  const limits = rarityAffixLimits(rarity);
-  const target: Record<AffixType, number> = {
-    prefix: Math.max(locked.filter(a => a.type === 'prefix').length, rollCountForRarity(rarity, limits.prefix)),
-    suffix: Math.max(locked.filter(a => a.type === 'suffix').length, rollCountForRarity(rarity, limits.suffix)),
-  };
-  const final: RolledForgeAffix[] = [...locked];
-  const usedStats = new Set(final.map(a => a.stat));
-
-  for (const type of ['prefix', 'suffix'] as AffixType[]) {
-    let guard = 0;
-    while (final.filter(a => a.type === type).length < target[type] && guard++ < 50) {
-      const pool = [...AFFIX_POOLS[type]].filter(def => !usedStats.has(def.stat) && def.tiers.some(t => t.minILvl <= itemLevel));
-      if (!pool.length) break;
-      const def = pool.sort(() => Math.random() - 0.5)[0];
-      const rolled = rollOneAffix(def, itemLevel);
-      if (!rolled) continue;
-      final.push(rolled);
-      usedStats.add(rolled.stat);
-    }
-  }
-  return final.slice(0, limits.prefix + limits.suffix);
-}
-
-function inferForgeItemLevel(userId: string, guildId: string, def?: EquipmentDef): number {
-  const row = db.prepare('SELECT level, zone_id FROM players WHERE user_id=? AND guild_id=?').get(userId, guildId) as any;
-  const level = Number(row?.level ?? 1);
-  let zoneBonus = 0;
-  try {
-    const { ZONES } = require('../data/zones');
-    zoneBonus = Number(ZONES?.[row?.zone_id]?.minLevel ?? 0) * 3;
-  } catch { zoneBonus = 0; }
-  const rarityBonus: Record<string, number> = { common: 0, rare: 4, epic: 10, legendary: 18, mythic: 26, cursed: 18 };
-  return Math.max(1, Math.floor(level * 5 + zoneBonus + (rarityBonus[def?.rarity ?? 'common'] ?? 0)));
-}
-
-function ensureForgeColumns(): void {
-  try { db.exec(`ALTER TABLE equipment_forge ADD COLUMN instance_uuid TEXT`); } catch {}
-  try { db.exec(`ALTER TABLE equipment_forge ADD COLUMN base_id TEXT`); } catch {}
-  try { db.exec(`ALTER TABLE equipment_forge ADD COLUMN rarity TEXT`); } catch {}
-  try { db.exec(`ALTER TABLE equipment_forge ADD COLUMN item_level INTEGER DEFAULT 1`); } catch {}
-  try { db.exec(`ALTER TABLE equipment_forge ADD COLUMN affixes_json TEXT`); } catch {}
-  try { db.exec(`ALTER TABLE equipment_forge ADD COLUMN locked_affixes_json TEXT DEFAULT '[]'`); } catch {}
-  try { db.exec(`ALTER TABLE equipment_forge ADD COLUMN pending_affixes_json TEXT`); } catch {}
-}
-
-function makeInstanceUuid(): string {
-  try { return crypto.randomUUID(); } catch { return `eq_${Date.now()}_${Math.random().toString(16).slice(2)}`; }
-}
-
-function rowToForgeMeta(row: any): EquipmentForgeMeta | undefined {
-  if (!row) return undefined;
-  const affixes = normalizeAffixList(row.affixes_json);
-  const legacyAffixes = affixes.length ? affixes : [legacyKeyToAffix(row.affix1), legacyKeyToAffix(row.affix2)].filter(Boolean) as RolledForgeAffix[];
-  const pending = normalizeAffixList(row.pending_affixes_json);
-  const locked = safeJson<number[]>(row.locked_affixes_json, [])
-    .map(n => Number(n)).filter(n => Number.isInteger(n) && n >= 0 && n < legacyAffixes.length);
-  return {
-    ...row,
-    slot: row.slot as EquipSlot,
-    awakened: Number(row.awakened ?? 0),
-    locked_affix: locked[0] != null ? locked[0] + 1 : Number(row.locked_affix ?? 0),
-    instance_uuid: row.instance_uuid ?? null,
-    base_id: row.base_id ?? null,
-    rarity: (row.rarity ?? null) as Rarity | null,
-    item_level: Number(row.item_level ?? 1),
-    affixes: legacyAffixes,
-    affix1: legacyAffixes[0] ?? null,
-    affix2: legacyAffixes[1] ?? null,
-    locked_affixes: locked,
-    pending_affixes: pending.length ? pending : null,
-  };
-}
-
-function legacyKeyToAffix(key: unknown): RolledForgeAffix | null {
-  if (typeof key !== 'string' || !key) return null;
-  const map: Record<string, RolledForgeAffix> = {
-    atk_3: { id: 'flat_atk', type: 'prefix', stat: 'atk', isPercent: false, value: 3, tier: 5 },
-    atk_5: { id: 'flat_atk', type: 'prefix', stat: 'atk', isPercent: false, value: 5, tier: 4 },
-    def_3: { id: 'flat_def', type: 'prefix', stat: 'def', isPercent: false, value: 3, tier: 5 },
-    def_5: { id: 'flat_def', type: 'prefix', stat: 'def', isPercent: false, value: 5, tier: 4 },
-    hp_15: { id: 'flat_hp', type: 'prefix', stat: 'maxHp', isPercent: false, value: 15, tier: 5 },
-    hp_25: { id: 'flat_hp', type: 'prefix', stat: 'maxHp', isPercent: false, value: 25, tier: 4 },
-    mp_12: { id: 'flat_mp', type: 'prefix', stat: 'maxMp', isPercent: false, value: 12, tier: 5 },
-    mp_20: { id: 'flat_mp', type: 'prefix', stat: 'maxMp', isPercent: false, value: 20, tier: 4 },
-    crit_1: { id: 'crit_chance', type: 'suffix', stat: 'critChance', isPercent: true, value: 1, tier: 5 },
-    dodge_1: { id: 'dodge_chance', type: 'suffix', stat: 'dodgeChance', isPercent: true, value: 1, tier: 5 },
-    lifesteal_1: { id: 'lifesteal', type: 'suffix', stat: 'lifesteal', isPercent: true, value: 1, tier: 3 },
-    exp_3: { id: 'exp_focus', type: 'suffix', stat: 'expBonus', isPercent: true, value: 3, tier: 5 },
-    gold_3: { id: 'gold_find', type: 'suffix', stat: 'goldBonus', isPercent: true, value: 3, tier: 5 },
-    drop_2: { id: 'drop_sense', type: 'prefix', stat: 'dropBonus', isPercent: true, value: 2, tier: 5 },
-  };
-  return map[key] ?? null;
-}
-
-export function formatForgeAffix(affix: RolledForgeAffix | ForgeAffixKey | null | undefined): string {
-  if (!affix) return '*Chưa có dòng*';
-  if (typeof affix === 'string') affix = legacyKeyToAffix(affix);
-  if (!affix) return '*Dòng lạ*';
-  const sign = affix.value >= 0 ? '+' : '';
-  const suffix = affix.isPercent ? '%' : '';
-  const kind = affix.type === 'prefix' ? 'Tiền tố' : 'Hậu tố';
-  const label = [...PREFIX_POOL, ...SUFFIX_POOL].find(a => a.id === affix!.id)?.label ?? affix.stat;
-  return `T${affix.tier} ${kind} · ${label}: ${sign}${affix.value}${suffix}`;
-}
-
-export function formatForgeAffixList(meta: EquipmentForgeMeta | undefined, list: RolledForgeAffix[] | null | undefined = meta?.affixes): string {
-  if (!meta || !list?.length) return '*Chưa có Affix*';
-  return list.map((a, idx) => {
-    const locked = meta.locked_affixes.includes(idx) ? ' 🔒' : '';
-    return `Dòng ${idx + 1}: ${formatForgeAffix(a)}${locked}`;
-  }).join('\n');
+export function formatForgeAffix(key: ForgeAffixKey | null | undefined): string {
+  if (!key) return '*Chưa có dòng*';
+  return FORGE_AFFIXES[key]?.label ?? '*Dòng lạ*';
 }
 
 export function getEquipmentForgeMeta(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta | undefined {
-  ensureForgeColumns();
   const row = db.prepare('SELECT * FROM equipment_forge WHERE user_id=? AND guild_id=? AND slot=?')
     .get(userId, guildId, slot) as any;
-  return rowToForgeMeta(row);
+  if (!row) return undefined;
+  return {
+    ...row,
+    slot: row.slot as EquipSlot,
+    affix1: normalizeAffixKey(row.affix1),
+    affix2: normalizeAffixKey(row.affix2),
+    awakened: Number(row.awakened ?? 0),
+    locked_affix: Number(row.locked_affix ?? 0),
+  };
 }
 
 export function ensureEquipmentForgeMeta(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
-  ensureForgeColumns();
-  const worn = getWornInSlot(userId, guildId, slot);
-  const def = worn ? getEquipment(worn.equipment_id) : undefined;
-  const current = getEquipmentForgeMeta(userId, guildId, slot);
-  const itemLevel = current?.item_level && current.item_level > 0 ? current.item_level : inferForgeItemLevel(userId, guildId, def);
-  const rarity = (def?.rarity ?? current?.rarity ?? 'common') as Rarity;
-
-  // Nếu đổi món đang mặc ở cùng slot, reset Forge meta để Affix không bám nhầm theo slot.
-  if (current && def && current.base_id && current.base_id !== def.id) {
-    db.prepare(`
-      UPDATE equipment_forge
-      SET awakened=0, affix1=NULL, affix2=NULL, locked_affix=0,
-          instance_uuid=?, base_id=?, rarity=?, item_level=?, affixes_json=NULL, locked_affixes_json='[]', pending_affixes_json=NULL, updated_at=unixepoch()
-      WHERE user_id=? AND guild_id=? AND slot=?
-    `).run(makeInstanceUuid(), def.id, rarity, inferForgeItemLevel(userId, guildId, def), userId, guildId, slot);
-    return getEquipmentForgeMeta(userId, guildId, slot)!;
-  }
-
-  if (current) return current;
+  const existing = getEquipmentForgeMeta(userId, guildId, slot);
+  if (existing) return existing;
   db.prepare(`
-    INSERT INTO equipment_forge (user_id, guild_id, slot, awakened, locked_affix, instance_uuid, base_id, rarity, item_level, locked_affixes_json)
-    VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, '[]')
-  `).run(userId, guildId, slot, makeInstanceUuid(), def?.id ?? null, rarity, itemLevel);
+    INSERT INTO equipment_forge (user_id, guild_id, slot, awakened, locked_affix)
+    VALUES (?, ?, ?, 0, 0)
+  `).run(userId, guildId, slot);
   return getEquipmentForgeMeta(userId, guildId, slot)!;
-}
-
-function saveForgeAffixes(userId: string, guildId: string, slot: EquipSlot, affixes: RolledForgeAffix[], locked: number[] = [], pending: RolledForgeAffix[] | null = null): void {
-  const a1 = affixes[0]?.id ?? null;
-  const a2 = affixes[1]?.id ?? null;
-  db.prepare(`
-    UPDATE equipment_forge
-    SET awakened=1,
-        affix1=?, affix2=?, locked_affix=?,
-        affixes_json=?, locked_affixes_json=?, pending_affixes_json=?, updated_at=unixepoch()
-    WHERE user_id=? AND guild_id=? AND slot=?
-  `).run(
-    a1, a2, locked[0] != null ? locked[0] + 1 : 0,
-    JSON.stringify(affixes), JSON.stringify(locked), pending ? JSON.stringify(pending) : null,
-    userId, guildId, slot
-  );
 }
 
 export function awakenEquipmentForge(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
   const current = ensureEquipmentForgeMeta(userId, guildId, slot);
-  if (current.awakened && current.affixes.length) return current;
-  const worn = getWornInSlot(userId, guildId, slot);
-  const def = worn ? getEquipment(worn.equipment_id) : undefined;
-  const rarity = (def?.rarity ?? current.rarity ?? 'common') as Rarity;
-  const itemLevel = current.item_level || inferForgeItemLevel(userId, guildId, def);
-  const affixes = rollEquipmentAffixes(def?.id ?? current.base_id ?? slot, rarity, itemLevel);
+  const [a1, a2] = current.affix1 && current.affix2
+    ? [current.affix1, current.affix2]
+    : rollForgeAffixes();
   db.prepare(`
-    UPDATE equipment_forge
-    SET awakened=1, base_id=COALESCE(?, base_id), rarity=?, item_level=?, affixes_json=?, affix1=?, affix2=?, locked_affixes_json='[]', locked_affix=0, pending_affixes_json=NULL, updated_at=unixepoch()
-    WHERE user_id=? AND guild_id=? AND slot=?
-  `).run(def?.id ?? null, rarity, itemLevel, JSON.stringify(affixes), affixes[0]?.id ?? null, affixes[1]?.id ?? null, userId, guildId, slot);
+    INSERT INTO equipment_forge (user_id, guild_id, slot, awakened, affix1, affix2, locked_affix, updated_at)
+    VALUES (?, ?, ?, 1, ?, ?, COALESCE(?, 0), unixepoch())
+    ON CONFLICT(user_id, guild_id, slot) DO UPDATE SET
+      awakened=1,
+      affix1=COALESCE(equipment_forge.affix1, excluded.affix1),
+      affix2=COALESCE(equipment_forge.affix2, excluded.affix2),
+      updated_at=unixepoch()
+  `).run(userId, guildId, slot, a1, a2, current.locked_affix ?? 0);
   return getEquipmentForgeMeta(userId, guildId, slot)!;
 }
 
-export function previewRerollEquipmentForgeAffixes(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
-  const current = ensureEquipmentForgeMeta(userId, guildId, slot);
-  const awakened = current.awakened && current.affixes.length ? current : awakenEquipmentForge(userId, guildId, slot);
-  const locked = awakened.locked_affixes.map(i => awakened.affixes[i]).filter(Boolean) as RolledForgeAffix[];
-  const pending = rollEquipmentAffixes(awakened.base_id ?? slot, awakened.rarity ?? 'common', awakened.item_level, locked);
-  saveForgeAffixes(userId, guildId, slot, awakened.affixes, awakened.locked_affixes, pending);
-  return getEquipmentForgeMeta(userId, guildId, slot)!;
-}
-
-export function commitPendingForgeAffixes(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
-  const meta = ensureEquipmentForgeMeta(userId, guildId, slot);
-  if (meta.pending_affixes?.length) saveForgeAffixes(userId, guildId, slot, meta.pending_affixes, meta.locked_affixes, null);
-  else saveForgeAffixes(userId, guildId, slot, meta.affixes, meta.locked_affixes, null);
-  return getEquipmentForgeMeta(userId, guildId, slot)!;
-}
-
-export function discardPendingForgeAffixes(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
-  const meta = ensureEquipmentForgeMeta(userId, guildId, slot);
-  saveForgeAffixes(userId, guildId, slot, meta.affixes, meta.locked_affixes, null);
-  return getEquipmentForgeMeta(userId, guildId, slot)!;
-}
-
-// Backward-compatible immediate reroll for old callers.
 export function rerollEquipmentForgeAffixes(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
-  previewRerollEquipmentForgeAffixes(userId, guildId, slot);
-  return commitPendingForgeAffixes(userId, guildId, slot);
+  const current = ensureEquipmentForgeMeta(userId, guildId, slot);
+  let affix1: ForgeAffixKey;
+  let affix2: ForgeAffixKey;
+  if (current.locked_affix === 1 && current.affix1) {
+    affix1 = current.affix1;
+    affix2 = pickForgeAffix([affix1]);
+  } else if (current.locked_affix === 2 && current.affix2) {
+    affix2 = current.affix2;
+    affix1 = pickForgeAffix([affix2]);
+  } else {
+    [affix1, affix2] = rollForgeAffixes();
+  }
+  db.prepare(`
+    INSERT INTO equipment_forge (user_id, guild_id, slot, awakened, affix1, affix2, locked_affix, updated_at)
+    VALUES (?, ?, ?, 1, ?, ?, COALESCE(?, 0), unixepoch())
+    ON CONFLICT(user_id, guild_id, slot) DO UPDATE SET
+      awakened=1, affix1=excluded.affix1, affix2=excluded.affix2, updated_at=unixepoch()
+  `).run(userId, guildId, slot, affix1, affix2, current.locked_affix ?? 0);
+  return getEquipmentForgeMeta(userId, guildId, slot)!;
 }
 
 export function setEquipmentForgeLock(userId: string, guildId: string, slot: EquipSlot, lockedAffix: 0 | 1 | 2): EquipmentForgeMeta {
-  const meta = ensureEquipmentForgeMeta(userId, guildId, slot);
-  const locked = lockedAffix > 0 ? [lockedAffix - 1] : [];
-  saveForgeAffixes(userId, guildId, slot, meta.affixes, locked, null);
+  ensureEquipmentForgeMeta(userId, guildId, slot);
+  db.prepare(`
+    UPDATE equipment_forge SET locked_affix=?, updated_at=unixepoch()
+    WHERE user_id=? AND guild_id=? AND slot=?
+  `).run(lockedAffix, userId, guildId, slot);
   return getEquipmentForgeMeta(userId, guildId, slot)!;
 }
 
-export function toggleEquipmentForgeLock(userId: string, guildId: string, slot: EquipSlot, index: number): EquipmentForgeMeta {
-  const meta = ensureEquipmentForgeMeta(userId, guildId, slot);
-  const maxLocks = Math.min(Math.max(1, Math.floor(meta.affixes.length - 1)), 5);
-  const set = new Set(meta.locked_affixes);
-  if (set.has(index)) set.delete(index);
-  else if (set.size < maxLocks) set.add(index);
-  const locked = [...set].filter(i => i >= 0 && i < meta.affixes.length).sort((a, b) => a - b);
-  saveForgeAffixes(userId, guildId, slot, meta.affixes, locked, null);
-  return getEquipmentForgeMeta(userId, guildId, slot)!;
-}
-
-export function clearEquipmentForgeLocks(userId: string, guildId: string, slot: EquipSlot): EquipmentForgeMeta {
-  const meta = ensureEquipmentForgeMeta(userId, guildId, slot);
-  saveForgeAffixes(userId, guildId, slot, meta.affixes, [], null);
-  return getEquipmentForgeMeta(userId, guildId, slot)!;
-}
-
-function applyForgeAffix(stats: FullEquipStats, affix: RolledForgeAffix | ForgeAffixKey | null | undefined): void {
+function applyForgeAffix(stats: FullEquipStats, key: ForgeAffixKey | null | undefined): void {
+  if (!key) return;
+  const affix = FORGE_AFFIXES[key];
   if (!affix) return;
-  if (typeof affix === 'string') affix = legacyKeyToAffix(affix);
-  if (!affix) return;
-  (stats[affix.stat] as number) = ((stats[affix.stat] as number | undefined) ?? 0) + affix.value;
+  (stats[affix.stat] as number) = ((stats[affix.stat] as number | undefined) ?? 0) + affix.amount;
 }
 
 function applyAwakenedBonus(stats: FullEquipStats, slot: EquipSlot): void {
@@ -549,15 +262,18 @@ function applyAwakenedBonus(stats: FullEquipStats, slot: EquipSlot): void {
 function applyForgeMetaStatBonus(stats: FullEquipStats, slot: EquipSlot, meta?: EquipmentForgeMeta): void {
   if (!meta) return;
   if (meta.awakened) applyAwakenedBonus(stats, slot);
-  for (const affix of meta.affixes) applyForgeAffix(stats, affix);
+  applyForgeAffix(stats, meta.affix1);
+  applyForgeAffix(stats, meta.affix2);
 }
 
 export function formatForgeState(userId: string, guildId: string, slot: EquipSlot): string {
   const meta = getEquipmentForgeMeta(userId, guildId, slot);
   if (!meta || !meta.awakened) return 'Legacy: *Chưa thức tỉnh*';
-  const prefixCount = meta.affixes.filter(a => a.type === 'prefix').length;
-  const suffixCount = meta.affixes.filter(a => a.type === 'suffix').length;
-  return `Legacy: **Đã thức tỉnh** · iLvl **${meta.item_level}** · Prefix/Suffix **${prefixCount}/${suffixCount}**\n${formatForgeAffixList(meta)}`;
+  const lock1 = meta.locked_affix === 1 ? ' 🔒' : '';
+  const lock2 = meta.locked_affix === 2 ? ' 🔒' : '';
+  return `Legacy: **Đã thức tỉnh**
+  └ Dòng 1: ${formatForgeAffix(meta.affix1)}${lock1}
+  └ Dòng 2: ${formatForgeAffix(meta.affix2)}${lock2}`;
 }
 
 function applyEquipmentStatCaps(stats: FullEquipStats): FullEquipStats {
@@ -607,7 +323,7 @@ export function getEquipmentStats(userId: string, guildId: string): FullEquipSta
     }
 
     // Legacy forge bonuses: awakened gear + rerolled affixes.
-    applyForgeMetaStatBonus(stats, entry.slot, ensureEquipmentForgeMeta(userId, guildId, entry.slot));
+    applyForgeMetaStatBonus(stats, entry.slot, getEquipmentForgeMeta(userId, guildId, entry.slot));
   }
 
   // Set bonuses

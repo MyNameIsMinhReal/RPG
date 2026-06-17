@@ -2,7 +2,7 @@ import {
   SlashCommandBuilder, ChatInputCommandInteraction,
   EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle,
-  ComponentType, StringSelectMenuInteraction
+  ComponentType, StringSelectMenuInteraction, MessageComponentInteraction
 } from 'discord.js';
 import { getPlayer, getItemQty, spendGold } from '../systems/player';
 import { isRecipeUnlocked, checkIngredients, attemptCraft, getCraftingStats, initDefaultRecipes, getRecipeUnlockHint } from '../systems/crafting';
@@ -34,6 +34,23 @@ function getItemName(id: string): string {
 }
 function getItemIcon(id: string): string {
   return getEquipment(id)?.icon ?? getItem(id)?.icon ?? getMaterial(id)?.icon ?? '📦';
+}
+
+async function safeDeferUpdate(i: MessageComponentInteraction): Promise<boolean> {
+  if (i.deferred || i.replied) return true;
+  try {
+    await i.deferUpdate();
+    return true;
+  } catch (err: any) {
+    // Discord 10062 = interaction expired/unknown. This commonly happens when users
+    // press an old component or the bot reacts after Discord's short ACK window.
+    if (err?.code !== 10062) console.warn('[CRAFT] deferUpdate failed:', err?.code ?? err);
+    return false;
+  }
+}
+
+async function clearCraftComponents(interaction: ChatInputCommandInteraction): Promise<void> {
+  try { await interaction.editReply({ components: [] }); } catch { /* ignore stale/deleted message */ }
 }
 
 function buildIngredientList(
@@ -113,12 +130,12 @@ async function showCategoryPicker(
 
   const sel = await reply.awaitMessageComponent({
     componentType: ComponentType.StringSelect,
-    filter: i => i.user.id === userId,
+    filter: i => i.user.id === userId && i.customId === `craft_cat_${userId}`,
     time: 60_000
   }).catch(() => null);
 
-  if (!sel) { await interaction.editReply({ components: [] }); return; }
-  await sel.deferUpdate();
+  if (!sel) { await clearCraftComponents(interaction); return; }
+  if (!(await safeDeferUpdate(sel))) { await clearCraftComponents(interaction); return; }
   await showRecipePicker(interaction, userId, guildId, sel.values[0] as Category);
 }
 
@@ -215,11 +232,11 @@ async function showRecipePicker(
   const reply = await interaction.editReply({ embeds: [embed], components: rows });
 
   const comp = await reply.awaitMessageComponent({
-    filter: i => i.user.id === userId, time: 60_000
+    filter: i => i.user.id === userId && (i.customId === `craft_recipe_${userId}` || i.customId === `craft_back_${userId}`), time: 60_000
   }).catch(() => null);
 
-  if (!comp) { await interaction.editReply({ components: [] }); return; }
-  await comp.deferUpdate();
+  if (!comp) { await clearCraftComponents(interaction); return; }
+  if (!(await safeDeferUpdate(comp))) { await clearCraftComponents(interaction); return; }
 
   if ((comp as any).customId === `craft_back_${userId}`) {
     await showCategoryPicker(interaction, userId, guildId);
@@ -287,12 +304,12 @@ async function showRecipeDetail(
 
   const btn = await reply.awaitMessageComponent({
     componentType: ComponentType.Button,
-    filter: i => i.user.id === userId,
+    filter: i => i.user.id === userId && (i.customId === `craft_confirm_${userId}` || i.customId === `craft_back2_${userId}`),
     time: 30_000
   }).catch(() => null);
 
-  if (!btn) { await interaction.editReply({ components: [] }); return; }
-  await btn.deferUpdate();
+  if (!btn) { await clearCraftComponents(interaction); return; }
+  if (!(await safeDeferUpdate(btn))) { await clearCraftComponents(interaction); return; }
 
   if (btn.customId === `craft_back2_${userId}`) {
     await showRecipePicker(interaction, userId, guildId, category);

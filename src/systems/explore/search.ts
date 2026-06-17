@@ -39,295 +39,7 @@ import { handleVictory, handleDeath, handleFlee } from './callbacks';
 import { showExploreMenu } from './menu';
 import { showMerchant, showSoulShop } from './merchant';
 import { getReadyPartyMemberIds } from './partyHelpers';
-import { maybeGainShrineCorruption, getCorruptionLevel, getCorruptionTier, describeCorruption, getCorruptionAdvice, adjustCorruption } from '../corruption';
-import { setBuff } from '../consumables';
-import { doGather } from '../../commands/gather';
-import { addExploreNoise, consumeSmokeBomb, getExploreNoise, noiseBar, reduceExploreNoise, resetExploreNoise } from './noise';
-
-
-type ExploreNodeType = 'combat' | 'resource' | 'mystery' | 'camp' | 'smoke';
-
-interface ExploreNodeDef {
-  type: ExploreNodeType;
-  label: string;
-  emoji: string;
-  desc: string;
-  style: ButtonStyle;
-}
-
-function shuffled<T>(items: T[]): T[] { return [...items].sort(() => Math.random() - 0.5); }
-
-function weightedSampleNodes(pool: ExploreNodeDef[], weights: Partial<Record<ExploreNodeType, number>>, count: number): ExploreNodeDef[] {
-  const picked: ExploreNodeDef[] = [];
-  const remaining = [...pool];
-  while (picked.length < count && remaining.length > 0) {
-    const total = remaining.reduce((sum, node) => sum + (weights[node.type] ?? 1), 0);
-    let roll = Math.random() * total;
-    let index = 0;
-    for (let i = 0; i < remaining.length; i++) {
-      roll -= weights[remaining[i].type] ?? 1;
-      if (roll <= 0) { index = i; break; }
-    }
-    picked.push(remaining.splice(index, 1)[0]);
-  }
-  return picked;
-}
-
-function makeExploreNodes(hasCombat: boolean): ExploreNodeDef[] {
-  const combatNode: ExploreNodeDef = { type: 'combat', label: 'Giao tranh', emoji: '⚔️', desc: 'Cố tình lao vào dấu vết quái vật để farm EXP/đồ.', style: ButtonStyle.Danger };
-  const otherNodes: ExploreNodeDef[] = [
-    { type: 'resource', label: 'Dấu vết tài nguyên', emoji: '⛏️', desc: 'Tìm gỗ, quặng, thảo dược hoặc nguyên liệu lạ.', style: ButtonStyle.Success },
-    { type: 'mystery', label: 'Vùng sương mù', emoji: '❓', desc: 'Sự kiện ẩn: rương, NPC, bẫy hoặc lore.', style: ButtonStyle.Primary },
-    { type: 'camp', label: 'Trại tàn tạ', emoji: '🏕️', desc: 'Điểm nghỉ rủi ro: có thể hồi phục, gặp trại đã tắt hoặc bị quái lần theo.', style: ButtonStyle.Secondary },
-  ];
-
-  // Camp từng quá mạnh vì vừa an toàn vừa hồi phục miễn phí. Giữ node này là cứu nguy,
-  // nhưng giảm tần suất xuất hiện để không thay thế Làng/Thánh Đường.
-  const weights: Partial<Record<ExploreNodeType, number>> = {
-    resource: 42,
-    mystery: 42,
-    camp: 16,
-  };
-
-  if (hasCombat) return [combatNode, ...weightedSampleNodes(otherNodes, weights, 2)];
-  return weightedSampleNodes([combatNode, ...otherNodes], { combat: 30, resource: 34, mystery: 28, camp: 8 }, 3);
-}
-
-async function promptExploreNode(
-  interaction: ChatInputCommandInteraction,
-  userId: string,
-  guildId: string,
-  zoneName: string,
-  zoneId: string,
-  hasCombat: boolean,
-  corruptionTickLine?: string | null
-): Promise<ExploreNodeType | null> {
-  const noise = getExploreNoise(userId, guildId);
-  const smokeQty = getItemQty(userId, guildId, 'smoke_bomb');
-  const nodes = makeExploreNodes(hasCombat);
-  const row = new ActionRowBuilder<ButtonBuilder>();
-  for (const node of nodes) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`ex_node_${node.type}_${userId}`)
-        .setLabel(node.label)
-        .setEmoji(node.emoji)
-        .setStyle(node.style)
-    );
-  }
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [row];
-  if (smokeQty > 0 && noise > 0) {
-    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`ex_node_smoke_${userId}`).setLabel(`Dùng Smoke Bomb (${smokeQty})`).setEmoji('💨').setStyle(ButtonStyle.Secondary)
-    ));
-  }
-  const corruptionLevel = zoneId === 'shrine' ? getCorruptionLevel(userId, guildId) : 0;
-  const corruptionBlock = zoneId === 'shrine'
-    ? `\n\n🌘 **Ô Nhiễm Linh Hồn**\n${describeCorruption(corruptionLevel)}\n*${getCorruptionAdvice(corruptionLevel)}*${corruptionTickLine ? `\n${corruptionTickLine}` : ''}`
-    : '';
-  const embed = new EmbedBuilder()
-    .setColor(COLORS.info)
-    .setTitle('🗺️ Ngã Rẽ Định Mệnh')
-    .setDescription(
-      `Bạn dừng lại ở rìa **${zoneName}**. Phía trước mở ra vài hướng đi — chọn theo tài nguyên và độ an toàn hiện tại.\n\n` +
-      nodes.map(n => `${n.emoji} **${n.label}** — ${n.desc}`).join('\n') +
-      corruptionBlock +
-      `\n\n👟 **Tiếng Động**\n${noiseBar(noise)}\n` +
-      `*Rogue/Assassin/Shadowblade gây ít tiếng động hơn. Noise 100% sẽ kích hoạt Ambush và quái đánh trước.*`
-    );
-  const msg = await interaction.editReply({ embeds: [embed], components: rows });
-  const btn = await msg.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 45_000 }).catch(() => null);
-  if (!btn) { await interaction.editReply({ components: [] }); return null; }
-  await btn.deferUpdate().catch(() => {});
-  const picked = btn.customId.replace(`ex_node_`, '').replace(`_${userId}`, '') as ExploreNodeType;
-  await msg.edit({ components: [] }).catch(() => {});
-  return picked;
-}
-
-function nodeNoiseDelta(node: ExploreNodeType): number {
-  if (node === 'combat') return 15;
-  if (node === 'resource') return 12;
-  if (node === 'mystery') return 20;
-  if (node === 'camp') return 0;
-  return 0;
-}
-
-function campZoneProfile(zoneId: string): {
-  hpPct: [number, number];
-  mpPct: [number, number];
-  noiseReduce: [number, number];
-  fakeNoise: [number, number];
-  zoneLine?: string;
-} {
-  if (zoneId === 'shrine') return {
-    hpPct: [16, 28], mpPct: [12, 20], noiseReduce: [14, 24], fakeNoise: [12, 22],
-    zoneLine: '🌘 Không khí ở Đền Cổ khiến nghỉ ngơi kém yên ổn hơn và có thể tăng Ô Nhiễm.'
-  };
-  if (zoneId === 'mines') return {
-    hpPct: [16, 28], mpPct: [12, 20], noiseReduce: [14, 24], fakeNoise: [14, 24],
-    zoneLine: '⛏️ Tiếng vọng trong Hầm Mỏ khiến mọi sai lầm dễ kéo quái tới hơn.'
-  };
-  if (zoneId === 'wastes') return {
-    hpPct: [12, 22], mpPct: [10, 16], noiseReduce: [10, 18], fakeNoise: [18, 30],
-    zoneLine: '🌫️ Vùng Hoang Tàn gần như không có nơi nghỉ thật sự an toàn.'
-  };
-  return { hpPct: [20, 35], mpPct: [15, 25], noiseReduce: [20, 35], fakeNoise: [8, 16] };
-}
-
-async function handleCampNode(interaction: ChatInputCommandInteraction, userId: string, guildId: string, corruptionTickLine?: string | null): Promise<void> {
-  const player = applyPassiveStats(getPlayer(userId, guildId)!);
-  const zoneId = player.zone_id;
-  const profile = campZoneProfile(zoneId);
-  const roll = randInt(1, 100);
-  setExploreCooldown(userId, guildId);
-
-  const zoneLines: string[] = [];
-  if (profile.zoneLine) zoneLines.push(profile.zoneLine);
-  if (corruptionTickLine) zoneLines.push(corruptionTickLine);
-
-  // 50% nghỉ thành công, 30% trại đã tắt/lừa, 20% gặp quái.
-  if (roll <= 50) {
-    const hpPct = randInt(profile.hpPct[0], profile.hpPct[1]);
-    const mpPct = randInt(profile.mpPct[0], profile.mpPct[1]);
-    const hpGain = Math.max(1, Math.floor(player.max_hp * hpPct / 100));
-    const mpGain = Math.max(1, Math.floor(player.max_mp * mpPct / 100));
-    const newHp = Math.min(player.max_hp, player.hp + hpGain);
-    const newMp = Math.min(player.max_mp, player.mp + mpGain);
-    updatePlayerHpMp(userId, guildId, newHp, newMp);
-    const noise = reduceExploreNoise(userId, guildId, randInt(profile.noiseReduce[0], profile.noiseReduce[1]));
-
-    if (zoneId === 'shrine') {
-      const gain = randInt(3, 6);
-      const next = adjustCorruption(userId, guildId, gain);
-      zoneLines.push(`🌘 Nghỉ giữa Đền Cổ khiến Ô Nhiễm +${gain} → **${next}/100**`);
-    }
-
-    const reply = await interaction.editReply({
-      embeds: [new EmbedBuilder()
-        .setColor(COLORS.info)
-        .setTitle('🏕️ Trại Tàn Tạ — Nghỉ thành công')
-        .setDescription(
-          `Bạn tìm được một góc trại còn đủ che chắn để thở lại vài phút. Không tiêu hao Đuốc hay Lương khô.\n\n` +
-          `❤️ +**${Math.min(hpGain, player.max_hp - player.hp)} HP** → ${newHp}/${player.max_hp}\n` +
-          `💧 +**${Math.min(mpGain, player.max_mp - player.mp)} MP** → ${newMp}/${player.max_mp}\n` +
-          `👟 Tiếng Động: ${noise.before}% → **${noise.after}%**` +
-          (zoneLines.length ? `\n\n${zoneLines.join('\n')}` : '')
-        )],
-      components: buildContinueExploreRow(userId)
-    });
-    attachContinueExploreHandler(reply, interaction, userId, guildId);
-    return;
-  }
-
-  if (roll <= 80) {
-    const noise = addExploreNoise(userId, guildId, randInt(profile.fakeNoise[0], profile.fakeNoise[1]));
-    if (zoneId === 'shrine') {
-      const gain = randInt(1, 3);
-      const next = adjustCorruption(userId, guildId, gain);
-      zoneLines.push(`🌘 Bạn nấn ná quá lâu. Ô Nhiễm +${gain} → **${next}/100**`);
-    }
-
-    if (noise.triggered) {
-      resetExploreNoise(userId, guildId);
-      const enemies = getEnemiesForZone(zoneId);
-      if (enemies.length > 0) {
-        await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning,
-          `🏕️ **Trại đã tắt**\nĐống lửa chỉ còn tro lạnh. Trong lúc lục soát vô ích, bạn gây thêm **${noise.delta}%** Tiếng Động.\n\n⚡ Tiếng Động chạm 100% — thứ gì đó đã nghe thấy bạn!`)], components: [] });
-        await new Promise(r => setTimeout(r, 700));
-        await showAmbush(interaction, userId, guildId, pick(enemies).id);
-        return;
-      }
-    }
-
-    const reply = await interaction.editReply({
-      embeds: [new EmbedBuilder()
-        .setColor(COLORS.warning)
-        .setTitle('🏕️ Trại Tàn Tạ — Chỉ là tro lạnh')
-        .setDescription(
-          `Bạn tưởng đây là nơi có thể nghỉ, nhưng đống lửa đã tắt từ lâu. Túi đồ quanh trại chỉ toàn vải mục và xương khô.\n\n` +
-          `Không hồi phục HP/MP.\n` +
-          `👟 Tiếng Động: ${noise.before}% → **${noise.after}%**` +
-          (zoneLines.length ? `\n\n${zoneLines.join('\n')}` : '')
-        )],
-      components: buildContinueExploreRow(userId)
-    });
-    attachContinueExploreHandler(reply, interaction, userId, guildId);
-    return;
-  }
-
-  const enemies = getEnemiesForZone(zoneId);
-  if (zoneId === 'shrine') {
-    const gain = randInt(3, 6);
-    const next = adjustCorruption(userId, guildId, gain);
-    zoneLines.push(`🌘 Cái bẫy trong trại khuấy động Ô Nhiễm +${gain} → **${next}/100**`);
-  }
-  if (enemies.length === 0) {
-    const noise = addExploreNoise(userId, guildId, randInt(profile.fakeNoise[0], profile.fakeNoise[1]));
-    const reply = await interaction.editReply({
-      embeds: [simpleEmbed(COLORS.warning,
-        `🏕️ Trại này là bẫy, nhưng may là xung quanh không có quái.\n👟 Tiếng Động: ${noise.before}% → **${noise.after}%**` +
-        (zoneLines.length ? `\n\n${zoneLines.join('\n')}` : ''))],
-      components: buildContinueExploreRow(userId)
-    });
-    attachContinueExploreHandler(reply, interaction, userId, guildId);
-    return;
-  }
-
-  await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger,
-    `🏕️ **Trại Tàn Tạ — Bẫy!**\nBạn vừa bước qua dây báo động. Bóng đen trong rừng lập tức chuyển động.` +
-    (zoneLines.length ? `\n\n${zoneLines.join('\n')}` : ''))], components: [] });
-  await new Promise(r => setTimeout(r, 700));
-  await showAmbush(interaction, userId, guildId, pick(enemies).id);
-}
-
-async function handleResourceNode(interaction: ChatInputCommandInteraction, userId: string, guildId: string, corruptionTickLine?: string | null): Promise<void> {
-  const player = getPlayer(userId, guildId)!;
-  setExploreCooldown(userId, guildId);
-  const result = doGather(userId, guildId, player.name);
-  if (corruptionTickLine) {
-    const oldDesc = result.embed.data.description ?? '';
-    result.embed.setDescription(`${oldDesc}\n\n${corruptionTickLine}`);
-  }
-  const reply = await interaction.editReply({ embeds: [result.embed], components: buildContinueExploreRow(userId) });
-  attachContinueExploreHandler(reply, interaction, userId, guildId);
-}
-
-async function showBrokenGoddessStatue(interaction: ChatInputCommandInteraction, userId: string, guildId: string, corruptionTickLine?: string | null): Promise<void> {
-  const embed = new EmbedBuilder()
-    .setColor(0xB0C4DE)
-    .setTitle('🗿 Bức Tượng Nữ Thần Vỡ')
-    .setDescription('Bạn thấy một bức tượng Nữ Thần bị đập nát. Một con quạ đậu trên vai tượng, nhìn bạn chằm chằm.' + (corruptionTickLine ? `\n\n${corruptionTickLine}` : ''));
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`goddess_pray_${userId}`).setLabel('Chắp tay cầu nguyện').setEmoji('🙏').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`goddess_search_${userId}`).setLabel('Lục soát bệ đá').setEmoji('🔎').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`goddess_leave_${userId}`).setLabel('Bỏ đi').setEmoji('🚶').setStyle(ButtonStyle.Secondary),
-  );
-  const msg = await interaction.editReply({ embeds: [embed], components: [row] });
-  const btn = await msg.awaitMessageComponent({ componentType: ComponentType.Button, filter: onlyUser(userId), time: 35_000 }).catch(() => null);
-  if (!btn) { await interaction.editReply({ components: [] }); return; }
-  await btn.deferUpdate().catch(() => {});
-  let desc = '';
-  if (btn.customId === `goddess_pray_${userId}`) {
-    if (Math.random() < 0.7) {
-      setBuff(userId, guildId, 'luck', 3, 3, 1800);
-      desc = '🙏 Bạn cầu nguyện trong im lặng. Một ánh sáng mỏng phủ lên tay bạn.\n🍀 Nhận buff **May Mắn** trong vài lượt khám phá/combat tới.';
-    } else {
-      const p = getPlayer(userId, guildId)!;
-      const dmg = Math.min(10, Math.max(1, p.hp - 1));
-      updatePlayerHpMp(userId, guildId, p.hp - dmg, p.mp);
-      desc = `🐦 Con quạ bất ngờ mổ vào tay bạn. ❤️ -${dmg} HP.`;
-    }
-  } else if (btn.customId === `goddess_search_${userId}`) {
-    grantGold(userId, guildId, 20);
-    addItem(userId, guildId, 'holy_water', 1);
-    setBuff(userId, guildId, 'stone_skin', -20, 5, 1800);
-    desc = '🔎 Bạn lục dưới bệ đá và tìm thấy **20 Gold** + **Holy Water x1**.\n⚠️ Một lời nguyền mỏng bám theo bạn: DEF giảm trong vài trận tới.';
-  } else {
-    desc = '🚶 Bạn cúi đầu rời đi. Con quạ vẫn nhìn theo cho đến khi màn sương nuốt mất nó.';
-  }
-  const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, desc)], components: buildContinueExploreRow(userId) });
-  attachContinueExploreHandler(reply, interaction, userId, guildId);
-}
+import { maybeGainShrineCorruption, getCorruptionLevel, getCorruptionTier } from '../corruption';
 
 async function startEnemyCombatMaybeParty(
   interaction: ChatInputCommandInteraction,
@@ -523,58 +235,6 @@ export async function handleSearch(
       attachContinueExploreHandler,
     });
     if (ranChapterEvent) return;
-  }
-
-  const selectedNode = await promptExploreNode(interaction, userId, guildId, zone.name, player.zone_id, enemies.length > 0, corruptionTickLine);
-  if (!selectedNode) return;
-
-  if (selectedNode === 'smoke') {
-    if (!consumeSmokeBomb(userId, guildId)) {
-      const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, '💨 Bạn không còn Smoke Bomb trong túi.')], components: buildContinueExploreRow(userId) });
-      attachContinueExploreHandler(reply, interaction, userId, guildId);
-      return;
-    }
-    resetExploreNoise(userId, guildId);
-    const reply = await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, '💨 Bạn ném **Smoke Bomb**. Khói phủ kín dấu chân, **Tiếng Động về 0%**.' + (corruptionTickLine ? `\n\n${corruptionTickLine}` : ''))], components: buildContinueExploreRow(userId) });
-    attachContinueExploreHandler(reply, interaction, userId, guildId);
-    return;
-  }
-
-  if (selectedNode === 'camp') {
-    await handleCampNode(interaction, userId, guildId, corruptionTickLine);
-    return;
-  }
-
-  const noise = addExploreNoise(userId, guildId, nodeNoiseDelta(selectedNode));
-  if (noise.triggered && enemies.length > 0) {
-    resetExploreNoise(userId, guildId);
-    setExploreCooldown(userId, guildId);
-    const warn = await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger,
-      `👟 **Tiếng Động đạt 100%**!
-Bạn gây ra thêm **${noise.delta}%** tiếng động${noise.stealth ? ' *(đã giảm nhờ class linh hoạt)*' : ''}.
-
-⚡ Quái vật đánh hơi thấy bạn và lao ra trước!`)], components: [] });
-    await new Promise(r => setTimeout(r, 650));
-    await showAmbush(interaction, userId, guildId, pick(enemies).id);
-    return;
-  }
-
-  if (selectedNode === 'resource') {
-    await handleResourceNode(interaction, userId, guildId, corruptionTickLine);
-    return;
-  }
-
-  if (selectedNode === 'combat' && enemies.length > 0) {
-    setExploreCooldown(userId, guildId);
-    if (isPartyLeader) await startPartyCombat(pick(enemies).id);
-    else await startCombatFlow(interaction, userId, guildId, pick(enemies).id, handleVictory, handleDeath, handleFlee);
-    return;
-  }
-
-  if (selectedNode === 'mystery' && Math.random() < 0.25) {
-    setExploreCooldown(userId, guildId);
-    await showBrokenGoddessStatue(interaction, userId, guildId, corruptionTickLine);
-    return;
   }
 
   const shrineCorruptionTier = player.zone_id === 'shrine' ? getCorruptionTier((player as any).corruption ?? 0) : 0;
@@ -1384,24 +1044,13 @@ async function showMysteriousFigure(
 }
 
 // ── Event: Ambush ─────────────────────────────────────────────────────────────
-function calcAmbushFirstStrikeDamage(enemyAtk: number, playerDef: number, playerMaxHp: number, multiplier = 1): number {
-  // Ambush should feel dangerous even for high-DEF players.
-  // The old formula `enemy.atk * 0.7 - player.def` often collapsed to 1 damage.
-  // Use percentage mitigation like combat, then enforce a small pressure floor.
-  const mitigated = Math.round(enemyAtk * 50 / (playerDef + 50));
-  const pressureFloor = Math.max(3, Math.floor(enemyAtk * 0.45), Math.floor(playerMaxHp * 0.035));
-  const safeCap = Math.max(8, Math.floor(enemyAtk * 1.15), Math.floor(playerMaxHp * 0.16));
-  const dmg = Math.max(mitigated, pressureFloor);
-  return Math.max(3, Math.min(safeCap, Math.round(dmg * multiplier)));
-}
-
 async function showAmbush(
   interaction: ChatInputCommandInteraction, userId: string, guildId: string, enemyId: string
 ): Promise<void> {
   const player = applyPassiveStats(getPlayer(userId, guildId)!);
   const enemy  = getEnemy(enemyId)!;
 
-  const firstStrikeDmg = calcAmbushFirstStrikeDamage(enemy.atk, player.def, player.max_hp);
+  const firstStrikeDmg = Math.max(1, Math.floor(enemy.atk * 0.7) - player.def);
 
   const embed = new EmbedBuilder().setColor(COLORS.danger)
     .setTitle('⚡ PHỤC KÍCH!')
@@ -1427,7 +1076,7 @@ async function showAmbush(
 
   if (!btn || btn.customId === `amb_fight_${userId}`) {
     // Take first hit, then combat
-    const dmg   = firstStrikeDmg;
+    const dmg   = Math.max(1, firstStrikeDmg);
     const newHp = Math.max(1, player.hp - dmg);
     updatePlayerHpMp(userId, guildId, newHp, player.mp);
     const fresh = getPlayer(userId, guildId)!;
@@ -1446,7 +1095,7 @@ async function showAmbush(
       await new Promise(r => setTimeout(r, 1000));
       await startCombatFlow(interaction, userId, guildId, enemyId, handleVictory, handleDeath, handleFlee);
     } else {
-      const dmg   = calcAmbushFirstStrikeDamage(enemy.atk, player.def, player.max_hp, 1.35); // penalty for failed dodge
+      const dmg   = Math.max(1, Math.floor(firstStrikeDmg * 1.3)); // penalty for failed dodge
       const newHp = Math.max(1, player.hp - dmg);
       updatePlayerHpMp(userId, guildId, newHp, player.mp);
       await interaction.editReply({ embeds: [simpleEmbed(COLORS.danger, `❌ Né thất bại! −**${dmg} HP** (${newHp}/${player.max_hp})\nChiến đấu bắt đầu!`)], components: [] });

@@ -29,8 +29,7 @@ import {
   setZone,
   spendGold,
   updatePlayerHpMp,
-  applyPassiveStats,
-  getEffectivePlayer
+  applyPassiveStats
 } from '../systems/player';
 import { startCombatFlowWithEnemy, type CombatDeathHandler, type CombatVictoryHandler, type CombatFleeHandler } from '../systems/combatFlow';
 import { getEquipment } from '../data/equipment';
@@ -1730,7 +1729,7 @@ async function showMagicFountain(ctx: RunExploreEventInput): Promise<void> {
     new ButtonBuilder().setCustomId(`fountain_bathe_${ctx.userId}`).setLabel('Tắm trong suối').setEmoji('✨').setStyle(ButtonStyle.Secondary)
   );
   const cid = await awaitButton(ctx, row, embed, 'spring');
-  const fresh = getEffectivePlayer(ctx.userId, ctx.guildId)!;
+  const fresh = getPlayer(ctx.userId, ctx.guildId)!;
   if (cid === `fountain_drink_${ctx.userId}`) {
     const hp = Math.min(fresh.max_hp, fresh.hp + Math.floor(fresh.max_hp * 0.32));
     const mp = Math.min(fresh.max_mp, fresh.mp + Math.floor(fresh.max_mp * 0.32));
