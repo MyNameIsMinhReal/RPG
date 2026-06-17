@@ -742,7 +742,7 @@ export async function showOldChurchDistrict(interaction: ChatInputCommandInterac
   const embed = new EmbedBuilder().setColor(0xB0C4DE).setTitle('⛪ Khu C — Thánh Đường Bỏ Hoang')
     .setDescription(
       `Nến cũ cháy xanh giữa nền đá nứt.\n\n` +
-      `❤️ HP ${p.hp}/${p.max_hp} · 💧 MP ${p.mp}/${p.max_mp} · 🌘 Corruption ${p.corruption ?? 0}\n` +
+      `❤️ HP ${p.hp}/${p.max_hp} · 💧 MP ${p.mp}/${p.max_mp} · 🪙 Gold ${p.gold ?? 0} · 🌘 Corruption ${p.corruption ?? 0}\n` +
       `Old Church Rep: **${rep >= 0 ? '+' : ''}${rep}**\n\n` +
       `🙏 Quỹ Cầu Nguyện: **${fund?.current_amount ?? 0}/${fund?.target_amount ?? 10000} Gold**\n` +
       progressBar(fund?.current_amount ?? 0, fund?.target_amount ?? 10000)
@@ -769,7 +769,10 @@ async function churchHeal(interaction: ChatInputCommandInteraction, userId: stri
   const missingHp = Math.max(0, p.max_hp - p.hp);
   const missingMp = Math.max(0, p.max_mp - p.mp);
   const base = Math.max(5, Math.ceil(missingHp * 0.18 + missingMp * 0.10));
-  const cost = rep >= 50 ? 0 : rep >= 20 ? Math.floor(base * 0.5) : base;
+  // Thánh Đường là dịch vụ hồi phục rẻ, không phải miễn phí.
+  // Rep cao vẫn được giảm giá mạnh, nhưng luôn có phí tối thiểu để tránh spam hồi phục.
+  const discountRate = rep >= 50 ? 0.25 : rep >= 20 ? 0.5 : 1;
+  const cost = Math.max(3, Math.ceil(base * discountRate));
   if (missingHp === 0 && missingMp === 0) {
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.info, '✅ Bạn đang đầy HP/MP rồi.')], components: [backRow(userId)] });
     return;
@@ -778,8 +781,10 @@ async function churchHeal(interaction: ChatInputCommandInteraction, userId: stri
     await interaction.editReply({ embeds: [simpleEmbed(COLORS.warning, `❌ Cần **${cost} Gold** để hồi phục.`)], components: [backRow(userId)] });
     return;
   }
+  const beforeGold = p.gold ?? 0;
   updatePlayerHpMp(userId, guildId, p.max_hp, p.max_mp);
-  await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💧 Bạn đã hồi đầy HP/MP tại Thánh Đường.\n🪙 Chi phí: **${cost} Gold**`)], components: [backRow(userId)] });
+  const afterGold = Math.max(0, beforeGold - cost);
+  await interaction.editReply({ embeds: [simpleEmbed(COLORS.success, `💧 Bạn đã hồi đầy HP/MP tại Thánh Đường.\n🪙 Chi phí: **${cost} Gold** (${beforeGold} → ${afterGold})`)], components: [backRow(userId)] });
 }
 
 async function churchCleanse(interaction: ChatInputCommandInteraction, userId: string, guildId: string): Promise<void> {
