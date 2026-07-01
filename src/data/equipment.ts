@@ -1215,6 +1215,14 @@ const EQUIPMENT_RAW: Record<string, EquipmentDef> = {
     sellPrice: 1,
   },
 
+  exam_score_ten: {
+    id: 'exam_score_ten', name: 'Bài điểm 10', icon: '💯', slot: 'accessory2', rarity: 'epic',
+    description: 'Phụ kiện kỷ niệm mùa thi 2k8: một bài điểm 10 được giữ như bùa may mắn. **EXP +10%, Gold +8%, Drop +2%**. Không thể mua bán thường.',
+    stats: { expBonus: 10, goldBonus: 8, dropBonus: 2 },
+    sellPrice: 1,
+    minZone: 'village'
+  },
+
 };
 
 // ── Equipment balance v2 ────────────────────────────────────────────────────

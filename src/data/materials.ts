@@ -246,6 +246,16 @@ export const MATERIALS: Record<string, MaterialDef> = {
     dropFrom: ['echo_demon'], dropChance: 60
   },
 
+  dark_essence: {
+    id: 'dark_essence', name: 'Dark Essence', icon: '🖤', rarity: 'rare',
+    description: 'Tinh chất bóng tối cô đặc, thường còn sót lại trong các vết nứt thời gian và nghi lễ hư không.',
+    sellPrice: 70, dropZones: ['shrine', 'wastes'], dropChance: 6
+  },
+  legacy_spark: {
+    id: 'legacy_spark', name: 'Legacy Spark', icon: '✨', rarity: 'epic',
+    description: 'Tia lửa di sản dùng ở Lò Rèn Ashveil để thức tỉnh hoặc khóa sức mạnh của trang bị.',
+    sellPrice: 160, dropZones: ['shrine', 'wastes'], dropChance: 3
+  },
   mysterious_shard: {
     id: 'mysterious_shard', name: 'Mysterious Shard', icon: '💎', rarity: 'rare',
     description: 'Mảnh tinh thể lạ phản chiếu ký ức và ánh trăng. Dùng cho event/craft đặc biệt.',
