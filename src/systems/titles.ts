@@ -61,6 +61,10 @@ export const TITLES: TitleDef[] = [
     description: 'Người đã bước qua tiếng vọng cuối cùng.', fromAchievement: 'chapter_4'
   },
   {
+    id: 'one_who_remembered', name: 'The One Who Remembered', icon: '🪔',
+    description: 'Người vượt qua The Forgotten Path và vẫn giữ được tên mình.', fromAchievement: 'forgotten_route_clear'
+  },
+  {
     id: 'awakened_one', name: 'Awakened One', icon: '✨',
     description: 'Đã đánh thức con đường class đầu tiên.', fromAchievement: 'first_awakening'
   },

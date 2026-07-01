@@ -525,37 +525,27 @@ export const ENEMIES: Record<string, EnemyDef> = {
       { itemId: 'forgotten_crown', chance: 100 },
       { itemId: 'ancient_book', chance: 50 },
       { itemId: 'ancient_book', chance: 50 },
-      { itemId: 'fallen_star_fragment', chance: 30 },
       { itemId: 'broken_soul', chance: 25 },
       { itemId: 'void_fragment', chance: 20 },
-      { itemId: 'lost_memory', chance: 15 },
+      { itemId: 'lost_memory', chance: 35 },
       { itemId: 'abyss_core', chance: 20 }
     ],
+    guaranteedDrops: ['fallen_star_fragment'],
     specialAttacks: ['erase', 'butterfly_curse', 'forgotten_rage'],
     phases: [
       {
-        threshold: 0.60,
+        threshold: 0.50,
         phaseIndex: 2,
-        name: 'The Forgotten (Remembered Pain)',
-        icon: '🦋',
-        atkMult: 1.40,
-        specialAttacks: ['butterfly_curse', 'skill_echo', 'mind_crush', 'forgotten_rage'],
-        transitionMsg: '🦋 **Những ký ức bị xoá quay lại thành đàn bướm đen — The Forgotten nhớ ra cách làm bạn đau.**',
-        healOnTransition: 0.04,
-      },
-      {
-        threshold: 0.35,
-        phaseIndex: 3,
-        name: 'The Forgotten (Erasure)',
-        icon: '❌',
-        atkMult: 2.05,
-        specialAttacks: ['erase', 'reality_tear', 'forgotten_rage', 'doom_call'],
-        transitionMsg: '❌ **Tên của bạn bắt đầu mờ đi trong đầu chính bạn — trận chiến bước vào pha xoá bỏ.**',
+        name: 'The Forgotten (Amnesia Overdrive)',
+        icon: '🫥',
+        atkMult: 1.80,
+        specialAttacks: ['erase', 'reality_tear', 'skill_echo', 'forgotten_rage', 'doom_call'],
+        transitionMsg: '🧠 **Ký Ức Sụp Đổ!** Không gian vỡ vụn — các nút kỹ năng bắt đầu méo mó, và lối chạy trốn bị xóa khỏi tâm trí bạn.',
       },
     ],
     zones: ['wastes'], boss: true,
     deathWorldFlag: 'the_forgotten_slain',
-    lore: 'Không ai còn nhớ hắn là ai. Mỗi khi bị giết, ký ức về cuộc chiến đó biến mất khỏi thế giới.'
+    lore: 'Không ai còn nhớ hắn là ai. Hắn tồn tại giữa những mảnh sao rơi — nơi thời gian và tên gọi đã bị xóa khỏi thế giới.'
   }
 };
 

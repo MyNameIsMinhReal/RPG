@@ -173,10 +173,19 @@ export function applyPassiveStats(player: PlayerRow): PlayerRow {
 
   const virtualMaxHp = Math.max(10, normalized.max_hp + bonusMaxHp);
   const virtualMaxMp = Math.max(5,  normalized.max_mp + bonusMaxMp);
+
+  // Preserve current HP/MP that already comes from virtual bonuses.
+  // The previous implementation clamped HP/MP to the derived base max before
+  // equipment/passive/pet/clan bonuses were added, so event heals could turn
+  // 353/353 into 270/270 and look like damage. Clamp only after the final
+  // virtual caps are known.
+  const currentHp = Number.isFinite(Number(player.hp)) ? Math.floor(Number(player.hp)) : normalized.hp;
+  const currentMp = Number.isFinite(Number(player.mp)) ? Math.floor(Number(player.mp)) : normalized.mp;
+
   return {
     ...normalized,
-    hp:     Math.min(normalized.hp, virtualMaxHp),
-    mp:     Math.min(normalized.mp, virtualMaxMp),
+    hp:     Math.max(player.alive ? 1 : 0, Math.min(currentHp, virtualMaxHp)),
+    mp:     Math.max(0, Math.min(currentMp, virtualMaxMp)),
     atk:    normalized.atk + bonusAtk,
     def:    Math.max(0, normalized.def + bonusDef),
     max_hp: virtualMaxHp,

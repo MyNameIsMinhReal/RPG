@@ -1,0 +1,703 @@
+[
+  {
+    "id": "dd_wastes_void_wraith_trace",
+    "title": "👁️ Dấu Vết Oán Linh Hư Không",
+    "description": "Trên nền tro đen xuất hiện một đường kéo dài như móng tay cào vào thực tại. Không có dấu chân, không có hơi thở, chỉ có cảm giác ai đó vừa đi ngang qua ký ức của bạn.",
+    "color": 3289855,
+    "image": "mysterious",
+    "weight": 4,
+    "zones": ["wastes"],
+    "requiresCombat": true,
+    "timeoutText": "👁️ Dấu cào khép lại. Thứ vừa đi ngang qua không muốn bị gọi tên.",
+    "choices": [
+      {
+        "id": "hunt",
+        "label": "Lần theo dấu cào",
+        "emoji": "👁️",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn đặt tay lên vết cào. Một tiếng rít lạnh chạy dọc sống lưng — Oán Linh Hư Không đã phát hiện ra bạn.",
+            "actions": [
+              { "type": "combat_enemy", "enemyId": "void_wraith" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "study",
+        "label": "Quan sát từ xa",
+        "emoji": "🔎",
+        "style": "secondary",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Bạn không đuổi theo, nhưng kịp nhận ra dấu vết này luôn xoắn về cùng một tâm điểm: một tọa độ không thuộc bản đồ.",
+            "actions": [
+              { "type": "exp", "min": 24, "max": 42 }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Dấu cào nhìn lại bạn. Một phần ký ức nóng lên như bị ai đó bóp nát.",
+            "actions": [
+              { "type": "damage_percent", "min": 8, "max": 14 },
+              { "type": "corruption", "amount": 3 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_broken_beacon",
+    "title": "🜂 Cột Mốc Vỡ",
+    "description": "Một cột đá đen gãy ngang cắm giữa Hoang Nguyên. Trên thân cột là ba hốc rỗng có hình giống Lõi Vực Thẳm. Mỗi lần gió thổi qua, nó phát ra tiếng như la bàn chết.",
+    "color": 3026478,
+    "image": "altar",
+    "weight": 3,
+    "zones": ["wastes"],
+    "timeoutText": "🜂 Cột mốc chìm xuống lớp tro như chưa từng tồn tại.",
+    "choices": [
+      {
+        "id": "feed_essence",
+        "label": "Đổ Void Essence vào hốc đá",
+        "emoji": "🧪",
+        "style": "primary",
+        "requires": { "itemId": "void_essence" },
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Tinh chất hư không bốc cháy không lửa. Cột mốc trả lại một mảnh tọa độ đã đông cứng.",
+            "actions": [
+              { "type": "consume_item", "itemId": "void_essence", "amount": 1 },
+              { "type": "item", "itemId": "abyss_core", "min": 1, "max": 1 },
+              { "type": "exp", "min": 18, "max": 30 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "read_marks",
+        "label": "Đọc ký hiệu trên cột",
+        "emoji": "📜",
+        "style": "secondary",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Bạn hiểu được một phần ký hiệu: 'Ba lõi dựng thành đường. Một ngọn đèn giữ đường quay về.'",
+            "actions": [
+              { "type": "exp", "min": 15, "max": 26 }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Ký hiệu tự đảo chiều. Bạn đọc sai tên của một thứ không nên có tên.",
+            "actions": [
+              { "type": "damage_percent", "min": 6, "max": 11 },
+              { "type": "corruption", "amount": 2 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_lantern_keeper",
+    "title": "🪔 Người Giữ Đèn Cuối Cùng",
+    "description": "Một ông lão ngồi bên chiếc đèn tắt, khuôn mặt lúc già lúc trẻ như ký ức bị lật trang liên tục. Ông nhìn bạn và hỏi: 'Ngươi đã có thứ để nhớ đường về chưa?'",
+    "color": 11513775,
+    "image": "merchant",
+    "weight": 3,
+    "zones": ["wastes"],
+    "timeoutText": "🪔 Ông lão cúi đầu. Khi bạn chớp mắt, cả người lẫn chiếc đèn đều biến mất.",
+    "choices": [
+      {
+        "id": "ask_recipe",
+        "label": "Hỏi về Đèn Lồng Ký Ức",
+        "emoji": "🪔",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Ông lão thì thầm công thức: Lõi đèn cần Ash Crystal, khung đèn cần Black Iron, còn nhiên liệu... phải là những Broken Soul chưa tan hết.",
+            "actions": [
+              { "type": "exp", "min": 20, "max": 35 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "offer_gold",
+        "label": "Mua mảnh linh hồn",
+        "emoji": "🪙",
+        "style": "success",
+        "requires": { "gold": 80 },
+        "outcomes": [
+          {
+            "chance": 75,
+            "text": "Ông lão nhận vàng nhưng không đếm. Ông đặt vào tay bạn một mảnh linh hồn vỡ còn hơi ấm.",
+            "actions": [
+              { "type": "gold", "min": -80, "max": -80 },
+              { "type": "item", "itemId": "broken_soul", "min": 1, "max": 2 }
+            ]
+          },
+          {
+            "chance": 25,
+            "text": "Ông lão lắc đầu: 'Vàng nhớ quá nhiều chủ cũ.' Dù vậy ông vẫn chỉ bạn cách giữ hơi thở trong tro đỏ.",
+            "actions": [
+              { "type": "gold", "min": -40, "max": -40 },
+              { "type": "heal_percent", "min": 8, "max": 14 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_black_sundial_riddle",
+    "title": "🕳️ Đồng Hồ Mặt Trời Đen",
+    "description": "Một đồng hồ mặt trời nằm giữa vùng không có mặt trời. Bóng của nó không chỉ hướng thời gian, mà chỉ vào những lựa chọn chưa xảy ra.",
+    "color": 2105376,
+    "image": "altar",
+    "weight": 2,
+    "zones": ["wastes"],
+    "miniGame": {
+      "title": "🕳️ Câu Đố Của Bóng Đen",
+      "introText": "Chọn đúng dấu hiệu ở ít nhất 2/3 lượt để hiểu lời nhắc của Astral Maze.",
+      "startLabel": "Đọc bóng đen",
+      "startEmoji": "🕳️",
+      "startStyle": "primary",
+      "options": [
+        { "id": "star", "label": "Ánh sao", "emoji": "🌟", "style": "success" },
+        { "id": "crown", "label": "Vương miện", "emoji": "👑", "style": "secondary" },
+        { "id": "breath", "label": "Hơi thở", "emoji": "💨", "style": "danger" }
+      ],
+      "rounds": [
+        {
+          "prompt": "Bóng thứ nhất không đổ xuống đất. Nó rơi ngược lên trời như một mảnh sáng mất chủ.",
+          "correctOptionId": "star",
+          "successLine": "Bạn nhận ra dấu của sao rơi.",
+          "failureLine": "Bạn nhìn nhầm bóng của ký ức cũ."
+        },
+        {
+          "prompt": "Bóng thứ hai không nói bằng tiếng người, chỉ nhấp nháy theo nhịp của những vì sao xa.",
+          "correctOptionId": "star",
+          "successLine": "Bạn giữ được nhịp sáng trong đầu.",
+          "failureLine": "Nhịp sáng bị đứt thành tiếng thở dài."
+        },
+        {
+          "prompt": "Bóng cuối cùng chỉ về nơi không có đường, nhưng trên mép đường lóe lên một điểm tím rất nhỏ.",
+          "correctOptionId": "star",
+          "successLine": "Bạn hiểu: trong mê cung, hãy đi theo dấu tinh tú.",
+          "failureLine": "Bạn ghi nhớ nhầm một biểu tượng chết."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Bạn khắc vào trí nhớ một quy tắc: trong Mê Cung Tinh Tú, ánh sao là đường về.",
+      "failureText": "Bóng đồng hồ bẻ cong trí nhớ của bạn. Lời nhắc còn đó, nhưng không rõ nét.",
+      "onSuccess": [
+        { "type": "exp", "min": 35, "max": 55 },
+        { "type": "mp_percent", "min": 10, "max": 18 }
+      ],
+      "onFailure": [
+        { "type": "damage_percent", "min": 7, "max": 13 },
+        { "type": "corruption", "amount": 3 }
+      ],
+      "timeoutText": "⏳ Bóng đồng hồ xoay hết một vòng. Bạn quên mất câu hỏi ban đầu."
+    }
+  },
+  {
+    "id": "dd_wastes_fallen_star_omen",
+    "title": "🌠 Điềm Báo Sao Rơi",
+    "description": "Một mảnh sao rơi đứng yên giữa không trung. Nó không cháy, không rơi, chỉ chờ ai đó đủ gan chạm vào điều đáng lẽ đã kết thúc từ lâu.",
+    "color": 7078123,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": ["wastes"],
+    "timeoutText": "🌠 Mảnh sao chớp tắt rồi tan thành bụi sáng.",
+    "choices": [
+      {
+        "id": "touch",
+        "label": "Chạm vào mảnh sao",
+        "emoji": "🌠",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 18,
+            "text": "Mảnh sao không làm bạn bỏng. Nó nhận ra Đèn Lồng hoặc ý chí của bạn và để lại một mẩu vật chất tinh tú.",
+            "actions": [
+              { "type": "item", "itemId": "fallen_star_fragment", "min": 1, "max": 1 },
+              { "type": "exp", "min": 25, "max": 40 }
+            ]
+          },
+          {
+            "chance": 52,
+            "text": "Mảnh sao rót vào đầu bạn một hình ảnh: một thực thể đứng giữa khoảng trống, bị cả thế giới quên tên.",
+            "actions": [
+              { "type": "exp", "min": 28, "max": 48 },
+              { "type": "soul_shard", "amount": 1 }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Ánh sao lạnh đến mức cắt da. Bạn giật tay lại nhưng vẫn nhớ được một câu: 'Nó từng rơi từ trên cao.'",
+            "actions": [
+              { "type": "damage_percent", "min": 6, "max": 10 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "watch",
+        "label": "Đứng quan sát",
+        "emoji": "👁️",
+        "style": "secondary",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn không chạm vào nó. Đổi lại, bạn thấy đường ánh sáng tím lặp lại đúng ba lần trước khi biến mất.",
+            "actions": [
+              { "type": "exp", "min": 18, "max": 32 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_memory_leak",
+    "title": "🧠 Ký Ức Rò Rỉ",
+    "description": "Từng giọt sáng rơi khỏi thái dương bạn, rơi xuống tro rồi biến thành những cảnh tượng không chắc có thật: một cánh cửa, một chiếc đèn, và một cái tên bị cào xóa.",
+    "color": 7368816,
+    "image": "legacy",
+    "weight": 3,
+    "zones": ["wastes"],
+    "timeoutText": "🧠 Những giọt sáng ngừng rơi. Bạn vẫn còn nhớ mình đang đứng ở đâu — có lẽ vậy.",
+    "choices": [
+      {
+        "id": "collect",
+        "label": "Hứng lại ký ức",
+        "emoji": "🧠",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 60,
+            "text": "Bạn gom được vài mảnh ký ức trước khi chúng tan. Chúng không hoàn chỉnh, nhưng đủ để củng cố linh hồn.",
+            "actions": [
+              { "type": "soul_shard", "amount": 1 },
+              { "type": "exp", "min": 20, "max": 36 }
+            ]
+          },
+          {
+            "chance": 40,
+            "text": "Một mảnh ký ức cắn ngược vào bạn. Nó không muốn bị nhớ lại.",
+            "actions": [
+              { "type": "damage_percent", "min": 9, "max": 15 },
+              { "type": "corruption", "amount": 4 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "anchor",
+        "label": "Dùng Đèn Lồng để neo lại",
+        "emoji": "🪔",
+        "style": "success",
+        "requires": { "itemId": "memory_lantern" },
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Đèn Lồng Ký Ức sáng lên. Các mảnh ký ức quay về đúng chỗ, để lại chút ánh sáng trong ngực bạn.",
+            "actions": [
+              { "type": "heal_percent", "min": 14, "max": 22 },
+              { "type": "mp_percent", "min": 12, "max": 20 },
+              { "type": "exp", "min": 18, "max": 30 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_name_echo",
+    "title": "📣 Tiếng Vọng Của Tên Thật",
+    "description": "Từ một khe nứt nhỏ, một giọng nói gọi tên bạn. Lần đầu nghe giống tên thật. Lần thứ hai nghe giống tiếng ai đó đang giả giọng bạn.",
+    "color": 4079686,
+    "image": "mysterious",
+    "weight": 3,
+    "zones": ["wastes"],
+    "timeoutText": "📣 Tiếng gọi lùi xa, để lại cảm giác có ai đó vừa học cách phát âm tên bạn.",
+    "choices": [
+      {
+        "id": "answer",
+        "label": "Đáp lại tiếng gọi",
+        "emoji": "📣",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 45,
+            "text": "Bạn đáp lại. Tiếng vọng cười bằng chính giọng của bạn rồi kéo một bóng đen ra khỏi khe nứt.",
+            "actions": [
+              { "type": "combat_random" }
+            ]
+          },
+          {
+            "chance": 55,
+            "text": "Bạn đáp lại đúng nhịp. Khe nứt khép lại, nhưng để lại một mảnh linh hồn vỡ.",
+            "actions": [
+              { "type": "item", "itemId": "broken_soul", "min": 1, "max": 1 },
+              { "type": "exp", "min": 18, "max": 32 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "cover_lantern",
+        "label": "Che tên bằng Đèn Lồng",
+        "emoji": "🪔",
+        "style": "success",
+        "requires": { "itemId": "memory_lantern" },
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Ngọn đèn nuốt tiếng gọi giả. Bạn nghe được một câu thật nằm dưới lớp tiếng vọng: 'Khi mọi chữ biến dạng, hãy nhớ vị trí.'",
+            "actions": [
+              { "type": "mp_percent", "min": 10, "max": 16 },
+              { "type": "exp", "min": 24, "max": 38 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_glass_graveyard",
+    "title": "🪞 Nghĩa Địa Kính Vỡ",
+    "description": "Hàng trăm tấm kính cắm trên mặt đất như bia mộ. Mỗi tấm phản chiếu một phiên bản bạn đã chết ở một nơi khác.",
+    "color": 6321273,
+    "image": "legacy",
+    "weight": 3,
+    "zones": ["wastes"],
+    "timeoutText": "🪞 Những tấm kính quay mặt đi, như thể không muốn chứng kiến lựa chọn tiếp theo của bạn.",
+    "choices": [
+      {
+        "id": "break",
+        "label": "Đập tấm kính đen nhất",
+        "emoji": "🔨",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 55,
+            "text": "Tấm kính vỡ ra thành kim loại đen. Không rõ nó là quặng hay xương của một thứ từng phản chiếu bầu trời.",
+            "actions": [
+              { "type": "item", "itemId": "black_iron", "min": 1, "max": 2 },
+              { "type": "damage_percent", "min": 4, "max": 8 }
+            ]
+          },
+          {
+            "chance": 45,
+            "text": "Bản sao trong kính thoát ra trước khi bạn kịp lùi lại.",
+            "actions": [
+              { "type": "combat_random" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bow",
+        "label": "Cúi đầu trước các bản thể đã chết",
+        "emoji": "🕯️",
+        "style": "secondary",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn cúi đầu. Những phản chiếu im lặng đáp lễ, để lại một chút kinh nghiệm sống sót từ các cái chết không xảy ra.",
+            "actions": [
+              { "type": "exp", "min": 28, "max": 46 },
+              { "type": "reputation", "amount": 1 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_red_ash_squall",
+    "title": "🌪️ Bão Tro Đỏ",
+    "description": "Một cơn bão tro đỏ trườn qua mặt đất thay vì thổi trên trời. Mỗi hạt tro chạm vào da đều mang theo cảm giác như bị ai đó xóa một chữ trong đầu.",
+    "color": 10496016,
+    "image": "mysterious",
+    "weight": 4,
+    "zones": ["wastes"],
+    "timeoutText": "🌪️ Cơn bão đi qua. Trên nền tro còn lại những ký tự bạn không nhớ mình từng biết.",
+    "choices": [
+      {
+        "id": "brace",
+        "label": "Dùng áo choàng che mặt",
+        "emoji": "🧥",
+        "style": "secondary",
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Bạn co người đi qua vùng tro. Cơn bão cào rát phổi, nhưng để lại vài tinh thể tro trong kẽ áo.",
+            "actions": [
+              { "type": "damage_percent", "min": 5, "max": 9 },
+              { "type": "item", "itemId": "ash_crystal", "min": 1, "max": 1 }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Tro đỏ lọt qua lớp vải và đốt cháy ký ức gần nhất của bạn.",
+            "actions": [
+              { "type": "damage_percent", "min": 10, "max": 17 },
+              { "type": "corruption", "amount": 5 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "lantern",
+        "label": "Giơ Đèn Lồng Ký Ức",
+        "emoji": "🪔",
+        "style": "success",
+        "requires": { "itemId": "memory_lantern" },
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Ánh đèn tách cơn bão ra làm hai. Tro đỏ không dám chạm vào ngọn lửa ký ức.",
+            "actions": [
+              { "type": "heal_percent", "min": 10, "max": 18 },
+              { "type": "item", "itemId": "ash_crystal", "min": 1, "max": 1 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_rift_splinter",
+    "title": "🌌 Mảnh Rạn Nứt Nhỏ",
+    "description": "Một vết nứt nhỏ mở ra giữa không khí. Bên trong không có cảnh vật, chỉ có ba chấm đen xoay quanh nhau như đang chờ đủ tọa độ.",
+    "color": 2894892,
+    "image": "mysterious",
+    "weight": 3,
+    "zones": ["wastes"],
+    "timeoutText": "🌌 Mảnh rạn nứt khép lại, để lại một vệt lạnh trên đầu ngón tay bạn.",
+    "choices": [
+      {
+        "id": "probe",
+        "label": "Chạm thử bằng vũ khí",
+        "emoji": "⚔️",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 55,
+            "text": "Vũ khí không bị nuốt mất. Bạn nghe rõ ba tiếng gõ từ bên kia: một lời nhắc về ba Abyss Core.",
+            "actions": [
+              { "type": "exp", "min": 22, "max": 36 }
+            ]
+          },
+          {
+            "chance": 45,
+            "text": "Vết nứt cắn vào lưỡi vũ khí rồi truyền chấn động ngược vào tay bạn.",
+            "actions": [
+              { "type": "damage_percent", "min": 7, "max": 12 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "feed_core",
+        "label": "Đưa Abyss Core lại gần",
+        "emoji": "🧿",
+        "style": "danger",
+        "requires": { "itemId": "abyss_core" },
+        "outcomes": [
+          {
+            "chance": 70,
+            "text": "Abyss Core rung lên như nhận ra đường về. Vết nứt mở rộng trong một nhịp rồi tự khép lại, để lại bản đồ không lời trong đầu bạn.",
+            "actions": [
+              { "type": "exp", "min": 35, "max": 55 },
+              { "type": "mp_percent", "min": 8, "max": 14 }
+            ]
+          },
+          {
+            "chance": 30,
+            "text": "Abyss Core nóng lên. Vết nứt gần như gọi bạn bước qua dù bạn chưa có đủ mỏ neo.",
+            "actions": [
+              { "type": "damage_percent", "min": 8, "max": 14 },
+              { "type": "corruption", "amount": 4 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_faceless_cartographer",
+    "title": "🗺️ Người Vẽ Bản Đồ Không Mặt",
+    "description": "Một người không có khuôn mặt đang vẽ bản đồ lên da của chính mình. Mỗi đường mực vừa khô đã biến mất, nhưng bàn tay hắn vẫn vẽ đúng một điểm đen lặp đi lặp lại.",
+    "color": 5921370,
+    "image": "merchant",
+    "weight": 2,
+    "zones": ["wastes"],
+    "timeoutText": "🗺️ Người vẽ bản đồ xé tấm da giấy cuối cùng rồi thả nó bay vào gió tro.",
+    "choices": [
+      {
+        "id": "buy_hint",
+        "label": "Mua một tọa độ giả",
+        "emoji": "🪙",
+        "style": "primary",
+        "requires": { "gold": 120 },
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Tọa độ là giả, nhưng phần sai của nó lại chỉ ra điều thật: The Forgotten không ở một nơi, mà ở khoảng trống giữa ba mảnh lõi.",
+            "actions": [
+              { "type": "gold", "min": -120, "max": -120 },
+              { "type": "exp", "min": 45, "max": 70 }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Bạn trả tiền cho một bản đồ trắng. Khi nhìn kỹ, bản đồ trắng đang nhìn lại bạn.",
+            "actions": [
+              { "type": "gold", "min": -80, "max": -80 },
+              { "type": "corruption", "amount": 4 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "steal_ink",
+        "label": "Lấy trộm mực đen",
+        "emoji": "🖋️",
+        "style": "danger",
+        "outcomes": [
+          {
+            "chance": 45,
+            "text": "Bạn lấy được lọ mực đen. Nó đặc như kim loại nóng chảy, có thể dùng để tôi khung đèn.",
+            "actions": [
+              { "type": "item", "itemId": "black_iron", "min": 1, "max": 1 },
+              { "type": "wanted", "amount": 1 }
+            ]
+          },
+          {
+            "chance": 55,
+            "text": "Người vẽ bản đồ không cần mặt để nhìn thấy bạn. Hắn chỉ vào ngực bạn, và một dấu truy nã tự cháy lên.",
+            "actions": [
+              { "type": "wanted", "amount": 2 },
+              { "type": "damage_percent", "min": 6, "max": 11 }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dd_wastes_orphaned_constellation",
+    "title": "✨ Chòm Sao Mồ Côi",
+    "description": "Một chòm sao nhỏ treo thấp đến mức gần chạm đất. Không có bầu trời nào giữ nó lại. Các ngôi sao con cứ xoay quanh một khoảng trống ở giữa.",
+    "color": 7644927,
+    "image": "mysterious",
+    "weight": 2,
+    "zones": ["wastes"],
+    "miniGame": {
+      "title": "✨ Sắp Lại Chòm Sao",
+      "introText": "Chọn đúng hình ảnh còn thiếu ở ít nhất 2/3 lượt.",
+      "startLabel": "Sắp sao",
+      "startEmoji": "✨",
+      "startStyle": "success",
+      "options": [
+        { "id": "core", "label": "Lõi đen", "emoji": "🧿", "style": "primary" },
+        { "id": "lantern", "label": "Ngọn đèn", "emoji": "🪔", "style": "success" },
+        { "id": "name", "label": "Cái tên", "emoji": "📣", "style": "secondary" }
+      ],
+      "rounds": [
+        {
+          "prompt": "Ba ngôi sao xoay quanh một điểm tối, nhưng điểm tối không phải lỗ hổng — nó giống vật dẫn đường hơn.",
+          "correctOptionId": "core",
+          "successLine": "Bạn nhận ra hình của Abyss Core.",
+          "failureLine": "Bạn đặt sai trung tâm của chòm sao."
+        },
+        {
+          "prompt": "Đường sao thứ hai không dẫn tới boss. Nó dẫn ngược về người đang cầm ánh sáng.",
+          "correctOptionId": "lantern",
+          "successLine": "Bạn hiểu vì sao cần một mỏ neo.",
+          "failureLine": "Bạn quên đường quay về trong một nhịp."
+        },
+        {
+          "prompt": "Ngôi sao cuối cùng không sáng hơn các sao khác, nhưng mọi sao còn lại đều tránh gọi tên nó.",
+          "correctOptionId": "name",
+          "successLine": "Bạn nghe thấy khoảng trống nơi cái tên bị xóa.",
+          "failureLine": "Bạn gọi nhầm một cái tên không thuộc về nó."
+        }
+      ],
+      "successNeeded": 2,
+      "successText": "Chòm sao khép lại thành một dấu hiệu hoàn chỉnh: lõi, đèn, và cái tên bị quên.",
+      "failureText": "Chòm sao vỡ thành bụi sáng. Bạn chỉ nhớ được vài điểm rời rạc.",
+      "onSuccess": [
+        { "type": "soul_shard", "amount": 1 },
+        { "type": "exp", "min": 40, "max": 64 }
+      ],
+      "onFailure": [
+        { "type": "damage_percent", "min": 6, "max": 12 }
+      ],
+      "timeoutText": "⏳ Chòm sao mồ côi rời khỏi mặt đất và biến mất vào một bầu trời không tồn tại."
+    }
+  },
+  {
+    "id": "dd_wastes_ash_crystal_geode",
+    "title": "💎 Hốc Tro Kết Tinh",
+    "description": "Dưới lớp đất nứt là một hốc tinh thể màu xám đỏ. Bên trong, Ash Crystal mọc quanh một đốm sáng nhỏ như tim đèn.",
+    "color": 11750707,
+    "image": "spring",
+    "weight": 3,
+    "zones": ["wastes"],
+    "timeoutText": "💎 Hốc tinh thể khép lại dưới lớp tro nóng.",
+    "choices": [
+      {
+        "id": "mine",
+        "label": "Tách tinh thể ra",
+        "emoji": "⛏️",
+        "style": "primary",
+        "outcomes": [
+          {
+            "chance": 65,
+            "text": "Bạn tách được một Ash Crystal còn nguyên. Nó phát sáng yếu như một ngọn đèn chưa được thắp.",
+            "actions": [
+              { "type": "item", "itemId": "ash_crystal", "min": 1, "max": 1 },
+              { "type": "exp", "min": 14, "max": 24 }
+            ]
+          },
+          {
+            "chance": 35,
+            "text": "Tinh thể vỡ. Tro nóng phụt lên, nhưng bạn vẫn nhặt được một mảnh Black Iron nằm dưới hốc đá.",
+            "actions": [
+              { "type": "damage_percent", "min": 5, "max": 9 },
+              { "type": "item", "itemId": "black_iron", "min": 1, "max": 1 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "warm_hands",
+        "label": "Sưởi tay bên ánh tinh thể",
+        "emoji": "🔥",
+        "style": "success",
+        "outcomes": [
+          {
+            "chance": 100,
+            "text": "Bạn không lấy gì cả. Hơi ấm của tinh thể giúp bạn nhớ lại nhịp thở của mình.",
+            "actions": [
+              { "type": "heal_percent", "min": 8, "max": 15 },
+              { "type": "mp_percent", "min": 8, "max": 15 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

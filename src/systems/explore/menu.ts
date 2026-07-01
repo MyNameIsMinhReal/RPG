@@ -130,7 +130,7 @@ export async function showExploreMenu(
     }
   }
 
-  const rows = buildExploreRows(userId, zone.safe, oakInfo, !!bossId && !bossSlain && player.zone_id !== 'forest' && player.zone_id !== 'shrine', player.zone_id === 'shrine' && !bossSlain);
+  const rows = buildExploreRows(userId, zone.safe, oakInfo, !!bossId && !bossSlain && player.zone_id !== 'forest' && player.zone_id !== 'shrine' && player.zone_id !== 'wastes', player.zone_id === 'shrine' && !bossSlain);
   const { embed: zoneEmbed, files: zoneFiles } = withImage(embed, `zone_${player.zone_id}`);
   const reply = await interaction.editReply({ embeds: [zoneEmbed], files: zoneFiles, components: rows });
 

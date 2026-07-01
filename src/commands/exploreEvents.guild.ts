@@ -5,8 +5,10 @@ import {
   EmbedBuilder,
   Message
 } from 'discord.js';
-import type { RunExploreEventInput } from './exploreEvents';
+import type { RunExploreEventInput, GuildExploreEventId } from '../systems/explore/events/types';
 import { finishExploreEvent as finish, awaitExploreBtn as awaitBtn } from './exploreEventShared';
+
+export type { GuildExploreEventId };
 import db from '../database/index';
 import {
   adjustFaction,
@@ -1230,28 +1232,6 @@ export async function showGuildTreasuryAudit(ctx: RunExploreEventInput): Promise
 // ══════════════════════════════════════════════════════════════════════
 //  EVENT REGISTRY
 // ══════════════════════════════════════════════════════════════════════
-
-export type GuildExploreEventId =
-  | 'guild_caravan_ambush'
-  | 'guild_recruiter'
-  | 'guild_vault_cipher'
-  | 'guild_bulletin_board'
-  | 'guild_watchtower_drill'
-  | 'guild_rival_scout'
-  | 'guild_smuggler_chase'
-  | 'guild_stock_whisper'
-  | 'guild_sparring_ring'
-  | 'guild_festival_donation'
-  | 'guild_festival_ring_toss'
-  | 'guild_lost_courier'
-  | 'guild_cipher_scroll'
-  | 'guild_war_messenger'
-  | 'guild_mock_duel'
-  | 'guild_anniversary'
-  | 'guild_alarm_bell'
-  | 'guild_bounty_board'
-  | 'guild_relic_puzzle'
-  | 'guild_treasury_audit';
 
 export const GUILD_EVENT_HANDLERS: Record<GuildExploreEventId, (ctx: RunExploreEventInput) => Promise<void>> = {
   guild_caravan_ambush: showGuildCaravanAmbush,

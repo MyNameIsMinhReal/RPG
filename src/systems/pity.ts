@@ -1,6 +1,6 @@
 import db from '../database/index';
 import { withTransaction } from '../database/transaction';
-import type { ExploreEventType } from '../commands/exploreEvents';
+import type { ExploreEventType } from '../systems/explore/events/types';
 
 // Events eligible for pity: always have weight > 0, regardless of player state.
 // Conditional events (combat, ambush, bounty_hunter, etc.) are excluded.

@@ -1,3 +1,6 @@
+import forestEventsJson from './events/forestEvents.json';
+import wastesForgottenEventsJson from './events/wastesForgottenEvents.json';
+
 export type DataDrivenExploreEventId = string;
 
 export type DataButtonStyle = 'primary' | 'secondary' | 'success' | 'danger';
@@ -17,7 +20,8 @@ export type DataEventAction =
   | { type: 'soul_shard'; amount: number }
   | { type: 'learn_random_skill'; tier: 't1' | 't2' | 't3' }
   | { type: 'world_danger'; amount: number }
-  | { type: 'combat_random' };
+  | { type: 'combat_random' }
+  | { type: 'combat_enemy'; enemyId: string };
 
 export interface DataEventOutcome {
   chance: number;
@@ -90,7 +94,7 @@ export interface DataDrivenExploreEventDef {
   miniGame?: DataEventMiniGame;
 }
 
-export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = [
+const CODE_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = [
 
   {
     id: 'dd_ancient_book_sage',
@@ -213,49 +217,6 @@ export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = 
           { chance: 55, text: 'Chiếc hộp móp méo vỡ ra. Phần lớn đồ bên trong hỏng, nhưng còn chút vàng.', actions: [{ type: 'gold', min: 10, max: 22 }] },
         ],
       },
-    ],
-  },
-  {
-    id: 'dd_forest_wolf_tracks',
-    title: '🐺 Dấu Chân Sói Tươi',
-    description: 'Dấu chân sói còn in sâu trên nền đất ẩm. Chúng mới đi qua đây không lâu, và có vẻ không chỉ có một con.',
-    color: 0x355e3b,
-    image: 'combat',
-    weight: 3,
-    zones: ['forest'],
-    requiresCombat: true,
-    timeoutText: '🐺 Bạn lùi lại trước khi tiếng tru vang lên gần hơn.',
-    choices: [
-      { id: 'hunt', label: 'Lần theo', emoji: '🐾', style: 'danger', outcomes: [{ chance: 75, text: 'Bạn lần theo dấu chân và đụng độ bầy sói.', actions: [{ type: 'combat_random' }] }, { chance: 25, text: 'Bạn tìm được ổ cũ của bầy sói. Chúng đã đi, nhưng còn vài thứ sót lại.', actions: [{ type: 'item', itemId: 'bone_glue', min: 1, max: 1 }, { type: 'exp', min: 6, max: 12 }] }] },
-      { id: 'avoid', label: 'Đi vòng', emoji: '🌲', style: 'secondary', outcomes: [{ chance: 100, text: 'Bạn chọn đường vòng. Mất thời gian, nhưng tránh được một trận không cần thiết.', actions: [{ type: 'exp', min: 3, max: 7 }] }] },
-    ],
-  },
-  {
-    id: 'dd_forest_old_hunter',
-    title: '🏹 Thợ Săn Già',
-    description: 'Một thợ săn già ngồi mài mũi tên bên gốc cây. Ông ta nhìn vết thương của bạn rồi chỉ vào rừng sâu.',
-    color: 0x4f7942,
-    image: 'villager',
-    weight: 2,
-    zones: ['forest'],
-    timeoutText: '🏹 Thợ săn già im lặng quay lại việc mài tên.',
-    choices: [
-      { id: 'advice', label: 'Xin lời khuyên', emoji: '🗣️', style: 'primary', outcomes: [{ chance: 100, text: 'Ông ta chỉ bạn cách nghe tiếng lá để đoán hướng thú dữ.', actions: [{ type: 'exp', min: 8, max: 18 }] }] },
-      { id: 'buy', label: 'Mua thuốc rừng - 25G', emoji: '🌿', style: 'success', requires: { gold: 25 }, outcomes: [{ chance: 100, text: 'Bạn mua một ít thuốc rừng được gói trong lá khô.', actions: [{ type: 'gold', min: -25, max: -25 }, { type: 'item', itemId: 'forest_tonic', min: 1, max: 1 }] }] },
-    ],
-  },
-  {
-    id: 'dd_forest_thorn_bush',
-    title: '🌿 Bụi Gai Đen',
-    description: 'Một bụi gai đen chắn ngang lối đi. Sau lớp gai, bạn thấy có thứ gì đó lấp lánh.',
-    color: 0x2f4f2f,
-    image: 'trap',
-    weight: 3,
-    zones: ['forest'],
-    timeoutText: '🌿 Bạn không cố chui qua bụi gai.',
-    choices: [
-      { id: 'reach', label: 'Thò tay lấy', emoji: '✋', style: 'danger', outcomes: [{ chance: 100, text: 'Gai cứa vào tay bạn, nhưng bạn lấy được thứ mắc bên trong.', actions: [{ type: 'damage_percent', min: 5, max: 10 }, { type: 'item', itemId: 'herb', min: 2, max: 4 }] }] },
-      { id: 'cut', label: 'Cắt đường', emoji: '🪓', style: 'primary', outcomes: [{ chance: 70, text: 'Bạn mở được một lối nhỏ và gom vài cây thuốc.', actions: [{ type: 'item', itemId: 'herb', min: 1, max: 3 }, { type: 'exp', min: 4, max: 10 }] }, { chance: 30, text: 'Bụi gai bật ngược lại, làm bạn bị thương nhẹ.', actions: [{ type: 'damage_percent', min: 4, max: 8 }] }] },
     ],
   },
   {
@@ -468,238 +429,6 @@ export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = 
     ],
   },
   // EXTRA_FOREST_50_EVENTS_START
-  {
-    id: 'dd_forest_fallen_scout',
-    title: '🧭 Trinh Sát Gục Bên Gốc Cây',
-    description: 'Một trinh sát bị thương nằm tựa vào rễ cây. Túi bản đồ của anh ta vẫn còn, nhưng tiếng lá động quanh đây không bình thường.',
-    color: 0x355e3b,
-    image: 'villager',
-    weight: 3,
-    zones: ['forest'],
-    timeoutText: 'Bạn bỏ qua dấu hiệu lạ trong rừng và tiếp tục đi.',
-    choices: [
-      {
-        id: 'careful',
-        label: 'Tiếp cận cẩn thận',
-        emoji: '🔎',
-        style: 'primary',
-        outcomes: [
-          { chance: 75, text: 'Bạn xử lý tình huống cẩn thận và lấy được chút lợi ích mà không gây quá nhiều tiếng động.', actions: [{ type: 'reputation', amount: 1 }, { type: 'item', itemId: 'leather', min: 1, max: 1 }, { type: 'exp', min: 5, max: 12 }] },
-          { chance: 25, text: 'Bạn đánh giá sai một chi tiết nhỏ và bị thương nhẹ.', actions: [{ type: 'damage_percent', min: 4, max: 9 }, { type: 'exp', min: 3, max: 7 }] },
-        ],
-      },
-      {
-        id: 'risk',
-        label: 'Mạo hiểm hơn',
-        emoji: '⚠️',
-        style: 'danger',
-        outcomes: [
-          { chance: 40, text: 'Bạn chấp nhận rủi ro và tìm được phần thưởng tốt hơn trong rừng sâu.', actions: [{ type: 'gold', min: 8, max: 26 }, { type: 'item', itemId: 'leather', min: 1, max: 2 }] },
-          { chance: 35, text: 'Tiếng động của bạn thu hút kẻ săn mồi gần đó.', actions: [{ type: 'world_danger', amount: 1 }, { type: 'combat_random' }] },
-          { chance: 25, text: 'Cái giá của sự hấp tấp là vài vết thương và một bài học đau.', actions: [{ type: 'damage_percent', min: 7, max: 14 }, { type: 'exp', min: 4, max: 10 }] },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'dd_forest_blood_moss',
-    title: '🩸 Rêu Máu',
-    description: 'Một mảng rêu đỏ bám quanh thân cây, phập phồng như có mạch đập. Nó có thể là thuốc, cũng có thể là bẫy.',
-    color: 0x2f4f2f,
-    image: 'herb',
-    weight: 2,
-    zones: ['forest'],
-    timeoutText: 'Bạn bỏ qua dấu hiệu lạ trong rừng và tiếp tục đi.',
-    choices: [
-      {
-        id: 'careful',
-        label: 'Tiếp cận cẩn thận',
-        emoji: '🔎',
-        style: 'primary',
-        outcomes: [
-          { chance: 75, text: 'Bạn xử lý tình huống cẩn thận và lấy được chút lợi ích mà không gây quá nhiều tiếng động.', actions: [{ type: 'item', itemId: 'blood_vial', min: 1, max: 1 }, { type: 'exp', min: 5, max: 12 }] },
-          { chance: 25, text: 'Bạn đánh giá sai một chi tiết nhỏ và bị thương nhẹ.', actions: [{ type: 'damage_percent', min: 4, max: 9 }, { type: 'exp', min: 3, max: 7 }] },
-        ],
-      },
-      {
-        id: 'risk',
-        label: 'Mạo hiểm hơn',
-        emoji: '⚠️',
-        style: 'danger',
-        outcomes: [
-          { chance: 40, text: 'Bạn chấp nhận rủi ro và tìm được phần thưởng tốt hơn trong rừng sâu.', actions: [{ type: 'gold', min: 8, max: 26 }, { type: 'item', itemId: 'blood_vial', min: 1, max: 2 }] },
-          { chance: 35, text: 'Tiếng động của bạn thu hút kẻ săn mồi gần đó.', actions: [{ type: 'combat_random' }] },
-          { chance: 25, text: 'Cái giá của sự hấp tấp là vài vết thương và một bài học đau.', actions: [{ type: 'damage_percent', min: 7, max: 14 }, { type: 'exp', min: 4, max: 10 }] },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'dd_forest_rope_bridge',
-    title: '🌉 Cầu Dây Mục',
-    description: 'Một cây cầu dây cũ bắc qua khe sâu. Bên kia có lối đi ngắn hơn, nhưng vài sợi dây đã sắp đứt.',
-    color: 0x4f7942,
-    image: 'trap',
-    weight: 2,
-    zones: ['forest'],
-    timeoutText: 'Bạn bỏ qua dấu hiệu lạ trong rừng và tiếp tục đi.',
-    choices: [
-      {
-        id: 'careful',
-        label: 'Tiếp cận cẩn thận',
-        emoji: '🔎',
-        style: 'primary',
-        outcomes: [
-          { chance: 75, text: 'Bạn xử lý tình huống cẩn thận và lấy được chút lợi ích mà không gây quá nhiều tiếng động.', actions: [{ type: 'item', itemId: 'wood', min: 1, max: 1 }, { type: 'exp', min: 5, max: 12 }] },
-          { chance: 25, text: 'Bạn đánh giá sai một chi tiết nhỏ và bị thương nhẹ.', actions: [{ type: 'damage_percent', min: 4, max: 9 }, { type: 'exp', min: 3, max: 7 }] },
-        ],
-      },
-      {
-        id: 'risk',
-        label: 'Mạo hiểm hơn',
-        emoji: '⚠️',
-        style: 'danger',
-        outcomes: [
-          { chance: 40, text: 'Bạn chấp nhận rủi ro và tìm được phần thưởng tốt hơn trong rừng sâu.', actions: [{ type: 'gold', min: 8, max: 26 }, { type: 'item', itemId: 'wood', min: 1, max: 2 }] },
-          { chance: 35, text: 'Tiếng động của bạn thu hút kẻ săn mồi gần đó.', actions: [{ type: 'combat_random' }] },
-          { chance: 25, text: 'Cái giá của sự hấp tấp là vài vết thương và một bài học đau.', actions: [{ type: 'damage_percent', min: 7, max: 14 }, { type: 'exp', min: 4, max: 10 }] },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'dd_forest_hungry_crows',
-    title: '🐦\u200d⬛ Đàn Quạ Đói',
-    description: 'Một đàn quạ đen đậu kín trên cành cây. Chúng nhìn túi đồ của bạn bằng ánh mắt quá thông minh.',
-    color: 0x3b5f2a,
-    image: 'mysterious',
-    weight: 3,
-    zones: ['forest'],
-    timeoutText: 'Bạn bỏ qua dấu hiệu lạ trong rừng và tiếp tục đi.',
-    choices: [
-      {
-        id: 'careful',
-        label: 'Tiếp cận cẩn thận',
-        emoji: '🔎',
-        style: 'primary',
-        outcomes: [
-          { chance: 75, text: 'Bạn xử lý tình huống cẩn thận và lấy được chút lợi ích mà không gây quá nhiều tiếng động.', actions: [{ type: 'item', itemId: 'eagle_feather', min: 1, max: 1 }, { type: 'exp', min: 5, max: 12 }] },
-          { chance: 25, text: 'Bạn đánh giá sai một chi tiết nhỏ và bị thương nhẹ.', actions: [{ type: 'damage_percent', min: 4, max: 9 }, { type: 'exp', min: 3, max: 7 }] },
-        ],
-      },
-      {
-        id: 'risk',
-        label: 'Mạo hiểm hơn',
-        emoji: '⚠️',
-        style: 'danger',
-        outcomes: [
-          { chance: 40, text: 'Bạn chấp nhận rủi ro và tìm được phần thưởng tốt hơn trong rừng sâu.', actions: [{ type: 'gold', min: 8, max: 26 }, { type: 'item', itemId: 'eagle_feather', min: 1, max: 2 }] },
-          { chance: 35, text: 'Tiếng động của bạn thu hút kẻ săn mồi gần đó.', actions: [{ type: 'combat_random' }] },
-          { chance: 25, text: 'Cái giá của sự hấp tấp là vài vết thương và một bài học đau.', actions: [{ type: 'damage_percent', min: 7, max: 14 }, { type: 'exp', min: 4, max: 10 }] },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'dd_forest_glowing_fern',
-    title: '🌱 Dương Xỉ Phát Sáng',
-    description: 'Bụi dương xỉ phát ra ánh xanh nhạt dưới bóng cây. Mỗi chiếc lá như đang chỉ về một hướng khác nhau.',
-    color: 0x5a6b3a,
-    image: 'legacy',
-    weight: 2,
-    zones: ['forest'],
-    timeoutText: 'Bạn bỏ qua dấu hiệu lạ trong rừng và tiếp tục đi.',
-    choices: [
-      {
-        id: 'careful',
-        label: 'Tiếp cận cẩn thận',
-        emoji: '🔎',
-        style: 'primary',
-        outcomes: [
-          { chance: 75, text: 'Bạn xử lý tình huống cẩn thận và lấy được chút lợi ích mà không gây quá nhiều tiếng động.', actions: [{ type: 'item', itemId: 'healing_herb', min: 1, max: 1 }, { type: 'exp', min: 5, max: 12 }] },
-          { chance: 25, text: 'Bạn đánh giá sai một chi tiết nhỏ và bị thương nhẹ.', actions: [{ type: 'damage_percent', min: 4, max: 9 }, { type: 'exp', min: 3, max: 7 }] },
-        ],
-      },
-      {
-        id: 'risk',
-        label: 'Mạo hiểm hơn',
-        emoji: '⚠️',
-        style: 'danger',
-        outcomes: [
-          { chance: 40, text: 'Bạn chấp nhận rủi ro và tìm được phần thưởng tốt hơn trong rừng sâu.', actions: [{ type: 'gold', min: 8, max: 26 }, { type: 'item', itemId: 'healing_herb', min: 1, max: 2 }] },
-          { chance: 35, text: 'Tiếng động của bạn thu hút kẻ săn mồi gần đó.', actions: [{ type: 'combat_random' }] },
-          { chance: 25, text: 'Cái giá của sự hấp tấp là vài vết thương và một bài học đau.', actions: [{ type: 'damage_percent', min: 7, max: 14 }, { type: 'exp', min: 4, max: 10 }] },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'dd_forest_trapwire',
-    title: '🪤 Dây Bẫy Căng Ngang',
-    description: 'Một sợi dây mảnh gần như vô hình căng ngang lối mòn. Có người đã đặt bẫy ở đây rất gần đây.',
-    color: 0x355e3b,
-    image: 'trap',
-    weight: 2,
-    zones: ['forest'],
-    timeoutText: 'Bạn bỏ qua dấu hiệu lạ trong rừng và tiếp tục đi.',
-    choices: [
-      {
-        id: 'careful',
-        label: 'Tiếp cận cẩn thận',
-        emoji: '🔎',
-        style: 'primary',
-        outcomes: [
-          { chance: 75, text: 'Bạn xử lý tình huống cẩn thận và lấy được chút lợi ích mà không gây quá nhiều tiếng động.', actions: [{ type: 'item', itemId: 'leather', min: 1, max: 1 }, { type: 'exp', min: 5, max: 12 }] },
-          { chance: 25, text: 'Bạn đánh giá sai một chi tiết nhỏ và bị thương nhẹ.', actions: [{ type: 'damage_percent', min: 4, max: 9 }, { type: 'exp', min: 3, max: 7 }] },
-        ],
-      },
-      {
-        id: 'risk',
-        label: 'Mạo hiểm hơn',
-        emoji: '⚠️',
-        style: 'danger',
-        outcomes: [
-          { chance: 40, text: 'Bạn chấp nhận rủi ro và tìm được phần thưởng tốt hơn trong rừng sâu.', actions: [{ type: 'gold', min: 8, max: 26 }, { type: 'item', itemId: 'leather', min: 1, max: 2 }] },
-          { chance: 35, text: 'Tiếng động của bạn thu hút kẻ săn mồi gần đó.', actions: [{ type: 'combat_random' }] },
-          { chance: 25, text: 'Cái giá của sự hấp tấp là vài vết thương và một bài học đau.', actions: [{ type: 'damage_percent', min: 7, max: 14 }, { type: 'exp', min: 4, max: 10 }] },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'dd_forest_lost_boot',
-    title: '🥾 Chiếc Ủng Lạc',
-    description: 'Một chiếc ủng mắc trong bùn. Dấu kéo dài phía sau cho thấy chủ nhân của nó không tự bước đi.',
-    color: 0x2f4f2f,
-    image: 'loot',
-    weight: 3,
-    zones: ['forest'],
-    requiresCombat: true,
-    timeoutText: 'Bạn bỏ qua dấu hiệu lạ trong rừng và tiếp tục đi.',
-    choices: [
-      {
-        id: 'careful',
-        label: 'Tiếp cận cẩn thận',
-        emoji: '🔎',
-        style: 'primary',
-        outcomes: [
-          { chance: 75, text: 'Bạn xử lý tình huống cẩn thận và lấy được chút lợi ích mà không gây quá nhiều tiếng động.', actions: [{ type: 'item', itemId: 'bone_shard', min: 1, max: 1 }, { type: 'exp', min: 5, max: 12 }] },
-          { chance: 25, text: 'Bạn đánh giá sai một chi tiết nhỏ và bị thương nhẹ.', actions: [{ type: 'damage_percent', min: 4, max: 9 }, { type: 'exp', min: 3, max: 7 }] },
-        ],
-      },
-      {
-        id: 'risk',
-        label: 'Mạo hiểm hơn',
-        emoji: '⚠️',
-        style: 'danger',
-        outcomes: [
-          { chance: 40, text: 'Bạn chấp nhận rủi ro và tìm được phần thưởng tốt hơn trong rừng sâu.', actions: [{ type: 'gold', min: 8, max: 26 }, { type: 'item', itemId: 'bone_shard', min: 1, max: 2 }] },
-          { chance: 35, text: 'Tiếng động của bạn thu hút kẻ săn mồi gần đó.', actions: [{ type: 'combat_random' }] },
-          { chance: 25, text: 'Cái giá của sự hấp tấp là vài vết thương và một bài học đau.', actions: [{ type: 'damage_percent', min: 7, max: 14 }, { type: 'exp', min: 4, max: 10 }] },
-        ],
-      },
-    ],
-  },
   {
     id: 'dd_forest_moon_pool',
     title: '🌙 Vũng Nước Ánh Trăng',
@@ -6152,4 +5881,10 @@ export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = 
   },
   // EXTRA_50_MIXED_EVENTS_END
 
+] as const;
+
+export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = [
+  ...(forestEventsJson as readonly DataDrivenExploreEventDef[]),
+  ...(wastesForgottenEventsJson as readonly DataDrivenExploreEventDef[]),
+  ...CODE_DRIVEN_EXPLORE_EVENTS,
 ] as const;

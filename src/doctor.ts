@@ -138,6 +138,9 @@ export function checkEvents(): Issue[] {
       if ((a.type === 'item' || a.type === 'consume_item') && !itemExists(a.itemId)) {
         err(ctx, `action "${a.type}" itemId "${a.itemId}" không tồn tại trong ITEMS/MATERIALS/EQUIPMENT`);
       }
+      if (a.type === 'combat_enemy' && !ENEMIES[a.enemyId]) {
+        err(ctx, `action combat_enemy enemyId "${a.enemyId}" không tồn tại trong ENEMIES`);
+      }
     }
   };
 

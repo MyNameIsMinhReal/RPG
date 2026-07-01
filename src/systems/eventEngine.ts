@@ -39,7 +39,7 @@ import {
   type DataEventMiniGameOption,
   type DataEventMiniGameRound,
 } from '../data/exploreEventDefs';
-import type { PickExploreEventInput, RunExploreEventInput } from '../commands/exploreEvents';
+import type { PickExploreEventInput, RunExploreEventInput } from '../systems/explore/events/types';
 
 const DATA_EVENT_IDS = new Set<string>(DATA_DRIVEN_EXPLORE_EVENTS.map(e => e.id));
 
@@ -268,7 +268,7 @@ async function finish(ctx: RunExploreEventInput, embed: EmbedBuilder, image?: st
   await ctx.callbacks.attachContinueExploreHandler(msg as Message<boolean>, ctx.interaction, ctx.userId, ctx.guildId);
 }
 
-function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line?: string; startsCombat?: boolean } {
+function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line?: string; startsCombat?: boolean; combatEnemyId?: string } {
   const player = getEffectivePlayer(ctx.userId, ctx.guildId) ?? ctx.player;
   // Party explore events are voted on by the whole party, so shared rewards/penalties
   // must hit every member — not just the leader who clicked. Solo falls back to [userId].
@@ -334,9 +334,14 @@ function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line
         const p = getEffectivePlayer(uid, ctx.guildId) ?? (uid === ctx.userId ? player : null);
         if (!p) continue;
         const heal = Math.max(1, Math.floor(p.max_hp * randInt(action.min, action.max) / 100));
-        const hp = Math.min(p.max_hp, p.hp + heal);
+        const hp = Math.max(p.hp, Math.min(p.max_hp, p.hp + heal));
+        const healed = Math.max(0, hp - p.hp);
         updatePlayerHpMp(uid, ctx.guildId, hp, p.mp);
-        if (uid === ctx.userId) callerLine = `❤️ Hồi **${heal} HP** (${hp}/${p.max_hp})`;
+        if (uid === ctx.userId) {
+          callerLine = healed > 0
+            ? `❤️ Hồi **${healed} HP** (${hp}/${p.max_hp})`
+            : `❤️ HP đã đầy (${hp}/${p.max_hp})`;
+        }
       }
       return { line: `${callerLine || '❤️ Cả tổ đội được hồi máu'}${partyTag}` };
     }
@@ -383,6 +388,8 @@ function applyAction(ctx: RunExploreEventInput, action: DataEventAction): { line
     }
     case 'combat_random':
       return { startsCombat: true };
+    case 'combat_enemy':
+      return { startsCombat: true, combatEnemyId: action.enemyId };
   }
 }
 
@@ -396,11 +403,13 @@ async function resolveResultActions(
 ): Promise<void> {
   const rewardLines: string[] = [];
   let shouldStartCombat = false;
+  let combatEnemyId: string | undefined;
 
   for (const action of actions ?? []) {
     const result = applyAction(ctx, action);
     if (result.line) rewardLines.push(result.line);
     if (result.startsCombat) shouldStartCombat = true;
+    if (result.combatEnemyId) combatEnemyId = result.combatEnemyId;
   }
 
   const resultDescription = eventResult(bodyLines, rewardLines);
@@ -411,7 +420,7 @@ async function resolveResultActions(
     .setDescription(resultDescription);
 
   if (shouldStartCombat) {
-    if (!ctx.enemies.length) {
+    if (!combatEnemyId && !ctx.enemies.length) {
       return finish(ctx, simpleEmbed(COLORS.info, `${resultDescription}
 
 🕊️ Khu vực này hiện không có kẻ địch phù hợp.`), event.image);
@@ -420,7 +429,8 @@ async function resolveResultActions(
 
 ${combatStartLine()}`)], components: [] });
     await new Promise(r => setTimeout(r, 600));
-    return ctx.callbacks.startCombat(pick(ctx.enemies).id);
+    const enemyId = combatEnemyId ?? pick(ctx.enemies).id;
+    return ctx.callbacks.startCombat(enemyId);
   }
 
   return finish(ctx, resultEmbed, event.image);

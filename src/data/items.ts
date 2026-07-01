@@ -56,6 +56,13 @@ export const ITEMS: Record<string, ItemDef> = {
     sellPrice: 120
   },
 
+  memory_lantern: {
+    id: 'memory_lantern', name: 'Memory Lantern', icon: '🪔',
+    type: 'key_item', stackable: false,
+    description: 'Đèn Lồng Ký Ức — mỏ neo thực tại dùng để bước vào Rạn Nứt Không Gian ở Hoang Nguyên Tiếng Vọng. Khi đối mặt The Forgotten, nó giữ cho bạn không bị xóa ký ức hoàn toàn.',
+    sellPrice: 1
+  },
+
   // Echo Demon ritual key items — thu thập từ event "Tiếng Vọng" ở Đền Cổ (shrine).
   // Dùng để mở Cổng Phong Ấn / Nghi Lễ triệu hồi Echo Demon.
   echo_trace: {

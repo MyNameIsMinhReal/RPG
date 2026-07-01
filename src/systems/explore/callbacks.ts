@@ -5,7 +5,7 @@ import {
   updatePlayerHpMp, grantGold, addItem
 } from '../player';
 import { processVictoryRewards, processDeathPenalty } from '../rewards';
-import { setFlag, markPlayerClearedBoss } from '../world';
+import { getFlag, setFlag, markPlayerClearedBoss } from '../world';
 import { markOakPrereq } from '../oakEvent';
 import { awardAchievements } from '../achievements';
 import { incrementChapterObjective } from '../chapter';
@@ -16,6 +16,8 @@ import { getItem } from '../../data/items';
 import { getMaterial } from '../../data/materials';
 import { withImage } from '../../utils/eventImages';
 import { simpleEmbed, buildContinueExploreRow, attachContinueExploreHandler } from './shared';
+import { awardForgottenRouteRewards, FORGOTTEN_ROUTE } from '../forgottenRoute';
+import { unlockTitle } from '../titles';
 
 export async function handleVictory(
   interaction: ChatInputCommandInteraction, btnInt: ButtonInteraction,
@@ -49,6 +51,18 @@ export async function handleVictory(
       addItem(userId, guildId, itemId, 1);
       const it = getItem(itemId) ?? getMaterial(itemId);
       if (it) rewards.drops.push(`${it.icon} **${it.name}** *(guaranteed)*`);
+    }
+  }
+
+  if (enemy.id === FORGOTTEN_ROUTE.bossId) {
+    const routeRewardLines = awardForgottenRouteRewards(userId, guildId);
+    if (routeRewardLines.length) rewards.drops.push(...routeRewardLines);
+
+    const firstClearKey = FORGOTTEN_ROUTE.firstClearFlag(userId);
+    if (!getFlag(guildId, firstClearKey)) {
+      setFlag(guildId, firstClearKey, '1');
+      const unlocked = unlockTitle(userId, guildId, 'one_who_remembered');
+      rewards.bonusDescription += `\n\n🪔 **First clear Route:** The Forgotten Path đã được ghi nhớ.${unlocked ? '\n🏷️ Mở khóa danh hiệu: **The One Who Remembered**' : ''}`;
     }
   }
 

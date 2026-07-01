@@ -8,56 +8,75 @@ import type { CombatState, CombatEnemy } from '../../utils/embeds';
 import { type Effect, parseEffects, hasEffect, tickEffects, addEffect } from './effects';
 import { getGroupEnemies } from './state';
 import { AOE_SKILL_PENALTY, SKILL_BASE_RETAIN, SKILL_ATK_DIVISOR, HEAL_MAXHP_DIVISOR } from '../../utils/constants';
+import { calcDamage, calcSkillDamage as calcSkillDamageCore } from './damage';
+import { getCombatPassives as getPassives, type CombatPassives as Passives } from './passives';
 
-// ── Passive snapshot ──────────────────────────────────────────────────────
-interface Passives {
-  hasBerserker: boolean;
-  hasVampiric: boolean;
-  hasCounter: boolean;
-  hasLastStand: boolean;
-  hpRegenPerTurn: number;
-  mpRegenPerTurn: number;
-  lifestealBonus: number;
-}
-
-function getPassives(userId: string, guildId: string): Passives {
-  const loadout = getLoadout(userId, guildId);
-  const p: Passives = {
-    hasBerserker: false, hasVampiric: false,
-    hasCounter: false, hasLastStand: false,
-    hpRegenPerTurn: 0, mpRegenPerTurn: 0, lifestealBonus: 0
-  };
-  for (const entry of loadout) {
-    const sk = getSkill(entry.skill_id);
-    if (!sk) continue;
-    switch (sk.id) {
-      case 'berserker':  p.hasBerserker  = true; break;
-      case 'vampiric':   p.hasVampiric   = true; break;
-      case 'counter':    p.hasCounter    = true; break;
-      case 'last_stand': p.hasLastStand  = true; break;
-    }
-    if (sk.type === 'passive' && sk.passiveBonus) {
-      p.hpRegenPerTurn += sk.passiveBonus.hpRegen ?? 0;
-      p.mpRegenPerTurn += sk.passiveBonus.mpRegen ?? 0;
-      p.lifestealBonus += sk.passiveBonus.lifesteal ?? 0;
-      p.hasVampiric = p.hasVampiric || ((sk.passiveBonus.lifesteal ?? 0) > 0);
-    }
-  }
-  return p;
-}
+export { calcDamage } from './damage';
 
 // ── Damage calc ───────────────────────────────────────────────────────────
-function calcDamage(atk: number, def: number, variance = 0.15): number {
-  // Percentage mitigation: DEF reduces damage by def/(def+50).
-  // Prevents high-DEF players from making all enemies deal 1 damage.
-  const base = Math.max(1, Math.round(atk * 50 / (def + 50)));
-  const v = base * variance;
-  return Math.max(1, Math.round(base + randInt(-v, v)));
-}
-
 function targetIsBoss(enemyId: string): boolean {
   const enemy = getEnemy(enemyId);
   return !!(enemy?.boss || enemy?.miniboss);
+}
+
+function isTheForgotten(enemyId: string): boolean {
+  return enemyId === 'the_forgotten';
+}
+
+function isForgottenPhaseOne(enemyId: string, effects: Effect[]): boolean {
+  return isTheForgotten(enemyId) && getBossPhase(effects) < 2;
+}
+
+function hasForgottenAnchor(effects: Effect[]): boolean {
+  return hasEffect(effects, 'memory_lantern');
+}
+
+function isForgottenDebuff(effectName?: string): boolean {
+  return effectName === 'burn' || effectName === 'poison' || effectName === 'stun' || effectName === 'slow';
+}
+
+function applyForgottenVoidShell(
+  enemyId: string,
+  effects: Effect[],
+  logs: string[],
+  dmg: number,
+  opts: { soulSkill?: boolean; basicAttack?: boolean } = {}
+): number {
+  if (!isForgottenPhaseOne(enemyId, effects)) return dmg;
+  if (opts.soulSkill) {
+    logs.push('💀 **Soul Skill** xuyên qua Lớp Vỏ Hư Không của The Forgotten.');
+    return dmg;
+  }
+  const mult = opts.basicAttack ? 0.50 : 0.65;
+  logs.push(`🌀 **Void Shell** bẻ cong sát thương ${opts.basicAttack ? 'đòn thường' : 'kỹ năng thường'} (−${Math.round((1 - mult) * 100)}%).`);
+  return Math.max(1, Math.floor(dmg * mult));
+}
+
+function applyForgottenLostMemoryCurse(
+  current: CombatState,
+  effects: Effect[],
+  logs: string[],
+  playerHp: number
+): { hp: number; died: boolean } {
+  if (!isTheForgotten(current.enemy_id) || !hasEffect(effects, 'lost_memory_curse')) {
+    return { hp: playerHp, died: playerHp <= 0 };
+  }
+  const dmg = Math.max(1, Math.floor(current.player_max_hp * 0.30));
+  const hp = Math.max(0, playerHp - dmg);
+  logs.push(`🫥 **Lost Memory**: Bạn quên mất cách hít thở — mất **${dmg} HP**.`);
+  return { hp, died: hp <= 0 };
+}
+
+function applyForgottenAnchorReduction(
+  current: CombatState,
+  effects: Effect[],
+  logs: string[],
+  dmg: number
+): number {
+  if (!isTheForgotten(current.enemy_id) || !hasForgottenAnchor(effects) || dmg <= 0) return dmg;
+  const next = Math.max(1, Math.floor(dmg * 0.85));
+  if (next < dmg) logs.push('🪔 **Memory Lantern** giữ bạn bám vào thực tại: sát thương từ The Forgotten −15%.');
+  return next;
 }
 
 function applyOutgoingDamageModifiers(
@@ -164,6 +183,11 @@ function checkBossPhaseTransition(
   const pidx = effects.findIndex(e => e.name === 'boss_phase');
   if (pidx >= 0) effects[pidx].value = nextPhase.phaseIndex;
   else effects.push({ name: 'boss_phase', value: nextPhase.phaseIndex, duration: 999 });
+
+  if (enemy.id === 'the_forgotten' && nextPhase.phaseIndex >= 2) {
+    addEffect(effects, 'amnesia_overdrive', 999, 1, 'enemy');
+    logs.push('🫥 **Amnesia Overdrive**: nút Rút lui biến mất, còn kỹ năng thì chỉ hiện những ký tự méo mó. Hãy nhớ vị trí loadout của bạn.');
+  }
 
   // New ATK from this phase
   const newAtk = Math.floor(enemy.atk * nextPhase.atkMult);
@@ -288,6 +312,12 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
   let dmg = calcDamage(effectiveAtk, targetDef);
   if (isCrit) { dmg = Math.floor(dmg * 1.75); }
   const targetId = groupEnemies ? groupEnemies[actualTargetIdx].id : state.enemy_id;
+  if (!groupEnemies && isForgottenPhaseOne(targetId, effects) && randInt(1, 100) <= 40) {
+    logs.push('🌀 **Void Dodge** — The Forgotten trượt khỏi vị trí như một ký ức bị xóa. Đòn thường đánh vào hư không!');
+    const dodgedState = { ...state, player_stamina };
+    return enemyTurn(state, dodgedState, player_hp, player_mp, effects, logs, defendBonus, passives);
+  }
+  dmg = applyForgottenVoidShell(targetId, effects, logs, dmg, { basicAttack: true });
   dmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, dmg, targetIsBoss(targetId), logs, effects);
 
   // Apply damage
@@ -310,12 +340,18 @@ export function processAttack(state: CombatState, playerAtk: number, targetIdx =
 
   // Equipment effects on hit
   if (eqStats.effects.includes('burn_on_hit') && randInt(1, 100) <= 20) {
-    addEffect(effects, 'burn', 2, Math.max(5, Math.floor(effectiveAtk * 0.12)), 'enemy');
-    logs.push(`🔥 Flameblade — Đốt cháy 2 lượt!`);
+    if (isTheForgotten(targetId)) {
+      logs.push('🌀 Flameblade bị The Forgotten xóa khỏi thực tại — miễn nhiễm Đốt.');
+    } else {
+      addEffect(effects, 'burn', 2, Math.max(5, Math.floor(effectiveAtk * 0.12)), 'enemy');
+      logs.push(`🔥 Flameblade — Đốt cháy 2 lượt!`);
+    }
   }
   if (eqStats.effects.includes('stun_on_hit') && randInt(1, 100) <= 15) {
     const hitEnemy = getEnemy(state.enemy_id);
-    if (!((hitEnemy?.boss || hitEnemy?.miniboss) && hasEffect(effects, 'stun_immune'))) {
+    if (isTheForgotten(targetId)) {
+      logs.push('🌀 Hammer va vào ký ức rỗng — The Forgotten miễn nhiễm Choáng.');
+    } else if (!((hitEnemy?.boss || hitEnemy?.miniboss) && hasEffect(effects, 'stun_immune'))) {
       addEffect(effects, 'stun', 1);
       logs.push(`💫 Hammer — Choáng 1 lượt!`);
     }
@@ -387,6 +423,11 @@ export function processSkill(
   let { player_hp, player_mp, enemy_hp } = state;
   let player_stamina = Math.max(0, (state.player_stamina ?? 100) - 10);
 
+  if (isTheForgotten(state.enemy_id) && hasEffect(effects, 'lost_memory_curse')) {
+    logs.push('🫥 Bạn quên mất cách dùng kỹ năng. Các ký tự trong đầu tan thành tro.');
+    return enemyTurn(state, { ...state, player_stamina }, player_hp, player_mp, effects, logs, 0, passives);
+  }
+
   // Chỉ active skill được dùng trong combat. Passive/reaction/world không được bấm để tránh mất lượt/exploit.
   if (skill.type !== 'active') {
     logs.push(`❌ **${skill.name}** không phải kỹ năng active, không dùng được trong combat!`);
@@ -428,7 +469,8 @@ export function processSkill(
       skillMult *= 1.15;
       logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
     }
-    let out = Math.max(1, Math.round(rawDamage * 50 / (targetDef * defPierce + 50) * skillMult));
+    let out = calcSkillDamageCore(rawDamage, targetDef, { defPierce, multiplier: skillMult });
+    out = applyForgottenVoidShell(targetId, effects, logs, out, { soulSkill: !!(skill as any).soulCost });
     return applyOutgoingDamageModifiers(state.user_id, state.guild_id, out, targetIsBoss(targetId), logs, effects);
   };
 
@@ -538,7 +580,8 @@ export function processSkill(
       skillMult *= 1.15;
       logs.push('🔥 Low HP ATK: HP thấp, sát thương skill +15%.');
     }
-    let finalDmg  = Math.max(1, Math.round(scaledSkillRaw(skill, playerAtk) * 50 / (skillTargetDef * defPierce + 50) * skillMult));
+    let finalDmg  = calcSkillDamageCore(scaledSkillRaw(skill, playerAtk), skillTargetDef, { defPierce, multiplier: skillMult });
+    finalDmg = applyForgottenVoidShell(targetId, effects, logs, finalDmg, { soulSkill: !!(skill as any).soulCost });
     finalDmg = applyOutgoingDamageModifiers(state.user_id, state.guild_id, finalDmg, targetIsBoss(targetId), logs, effects);
     if (skillGroupEnemies) {
       skillGroupEnemies[actualTargetIdx] = {
@@ -583,7 +626,8 @@ export function processSkill(
       const eData = getEnemy(state.enemy_id);
       return (eData?.boss || eData?.miniboss) && hasEffect(effects, 'stun_immune');
     })();
-    if (!stunBlocked) {
+    const forgottenBlocked = effectTarget === 'enemy' && isTheForgotten(state.enemy_id) && isForgottenDebuff(skill.effect);
+    if (!stunBlocked && !forgottenBlocked) {
       addEffect(effects, skill.effect, skill.effectDuration, val, effectTarget);
     }
     const dotVal = val !== undefined && (skill.effect === 'burn' || skill.effect === 'poison') ? `(${val}/lượt)` : '';
@@ -592,11 +636,13 @@ export function processSkill(
       dodge: '🌑 Shadow Step — sẽ né đòn tấn công tiếp theo',
       battle_cry: '📣 ATK tăng +15%', stone_skin: '🛡️ Giảm sát thương −20%', shield: '🛡️ Chắn đòn'
     };
-    const effectLabel = stunBlocked
-      ? `💫 **${state.enemy_name}** kháng choáng!`
-      : (effectLabels[skill.effect] ?? skill.effect) + (stunBlocked ? '' : ` ×${skill.effectDuration} lượt`);
+    const effectLabel = forgottenBlocked
+      ? `🌀 **${state.enemy_name}** miễn nhiễm mọi hiệu ứng xấu.`
+      : stunBlocked
+        ? `💫 **${state.enemy_name}** kháng choáng!`
+        : (effectLabels[skill.effect] ?? skill.effect) + ` ×${skill.effectDuration} lượt`;
     if (!skill.damage && !skill.heal) {
-      logs.push(`${skill.icon} **${skill.name}**! ${stunBlocked ? `💫 **${state.enemy_name}** kháng choáng!` : `${effectLabels[skill.effect] ?? skill.effect} ×${skill.effectDuration} lượt.`}`);
+      logs.push(`${skill.icon} **${skill.name}**! ${effectLabel}`);
     } else {
       logs.push(`  └ ${effectLabel}.`);
     }
@@ -604,8 +650,12 @@ export function processSkill(
 
   const eqStatsAfterSkill = getEquipmentStats(state.user_id, state.guild_id);
   if (eqStatsAfterSkill.effects.includes('slow_on_skill') && randInt(1, 100) <= 15) {
-    addEffect(effects, 'slow', 1, undefined, 'enemy');
-    logs.push('🧊 Slow on Skill: địch bị làm chậm 1 lượt.');
+    if (isTheForgotten(state.enemy_id)) {
+      logs.push('🌀 Slow on Skill bị The Forgotten xoá khỏi thực tại.');
+    } else {
+      addEffect(effects, 'slow', 1, undefined, 'enemy');
+      logs.push('🧊 Slow on Skill: địch bị làm chậm 1 lượt.');
+    }
   }
 
   const skillGroupEnemies2 = getGroupEnemies(state);
@@ -675,6 +725,14 @@ export function processFlee(state: CombatState): ActionResult {
   const logs: string[] = JSON.parse(state.combat_log || '[]');
   const effects = parseEffects(state.active_effects);
 
+  // Amnesia Overdrive: The Forgotten deletes the concept of fleeing.
+  if (isTheForgotten(state.enemy_id) && hasEffect(effects, 'amnesia_overdrive')) {
+    logs.push('🫥 **Bỏ chạy** đã bị The Forgotten xóa khỏi ký ức. Bạn không thể rút lui trong Phase 2.');
+    const fleeGroupEnemies = getGroupEnemies(state);
+    if (fleeGroupEnemies) return groupEnemyTurn(state, state, state.player_hp, state.player_mp, effects, logs, 0, passives, fleeGroupEnemies);
+    return enemyTurn(state, state, state.player_hp, state.player_mp, effects, logs, 0, passives);
+  }
+
   // Rooted: cannot flee while this effect is active
   if (hasEffect(effects, 'rooted')) {
     logs.push('🌿 Bạn đang bị **Trói Buộc**! Không thể bỏ chạy.');
@@ -726,6 +784,12 @@ function enemyTurn(
 ): ActionResult {
   const enemy = getEnemy(current.enemy_id);
   if (!enemy) return makeResult(original, current, playerHp, playerMp, effects, logs, false, false, false);
+
+  const lostMemory = applyForgottenLostMemoryCurse(current, effects, logs, playerHp);
+  playerHp = lostMemory.hp;
+  if (lostMemory.died) {
+    return makeResult(original, current, playerHp, playerMp, effects, logs, true, false, false);
+  }
 
   // ── Stun: enemy skips turn ─────────────────────────────────────────────
   if (hasEffect(effects, 'stun')) {
@@ -835,9 +899,10 @@ function enemyTurn(
     const chargePhase  = enemy.phases?.find(p => p.phaseIndex === bossPhaseNow);
     const telegraphName = chargePhase?.specialAttacks[0] ?? 'Ancient Rage';
     logs.push(`⚠️ **${current.enemy_name}** đang tích tụ năng lượng hủy diệt... ― **${telegraphName}** sẽ bùng phát lượt sau!`);
-    const lightDmg = applyIncomingDamageModifiers(current, effects, logs,
+    let lightDmg = applyIncomingDamageModifiers(current, effects, logs,
       Math.max(1, calcDamage(enemyAtk * 0.4, ((current as any).player_def ?? 0) + defenseBonus)),
       { isBossAttacker: true });
+    lightDmg = applyForgottenAnchorReduction(current, effects, logs, lightDmg);
     playerHp = Math.max(0, playerHp - lightDmg);
     logs.push(`${enemy.icon} **${current.enemy_name}** vung cành cây nhẹ trong lúc tích tụ! **${lightDmg}** sát thương!`);
     // Tick and return early — rest of enemy turn skipped
@@ -877,7 +942,8 @@ function enemyTurn(
     playerMp = res.playerMp;
     dealDmg  = res.dmg;
     if (dealDmg > 0) {
-      const adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(enemy.boss || enemy.miniboss), isSpecial: true });
+      let adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(enemy.boss || enemy.miniboss), isSpecial: true });
+      adjusted = applyForgottenAnchorReduction(current, effects, logs, adjusted);
       playerHp = Math.min(current.player_max_hp, playerHp + (dealDmg - adjusted));
       dealDmg = adjusted;
     }
@@ -896,6 +962,7 @@ function enemyTurn(
   } else {
     dealDmg  = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
     dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(enemy.boss || enemy.miniboss) });
+    dealDmg = applyForgottenAnchorReduction(current, effects, logs, dealDmg);
     playerHp = Math.max(0, playerHp - dealDmg);
     logs.push(`${enemy.icon} **${enemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP còn lại)`);
   }
@@ -1202,7 +1269,8 @@ function groupEnemyTurn(
       const res = applySpecialAttack(special, enemyAtk, fakeDef, playerHp, playerMp, logs, (current as any).player_def ?? 0);
       playerHp = res.playerHp; playerMp = res.playerMp; dealDmg = res.dmg;
       if (dealDmg > 0) {
-        const adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(fakeDef.boss || fakeDef.miniboss), isSpecial: true });
+        let adjusted = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(fakeDef.boss || fakeDef.miniboss), isSpecial: true });
+        adjusted = applyForgottenAnchorReduction(current, effects, logs, adjusted);
         playerHp = Math.min(current.player_max_hp, playerHp + (dealDmg - adjusted));
         dealDmg = adjusted;
       }
@@ -1217,6 +1285,7 @@ function groupEnemyTurn(
     } else {
       dealDmg = Math.max(1, calcDamage(enemyAtk, ((current as any).player_def ?? 0) + defenseBonus));
       dealDmg = applyIncomingDamageModifiers(current, effects, logs, dealDmg, { isBossAttacker: !!(getEnemy(combatEnemy.id)?.boss || getEnemy(combatEnemy.id)?.miniboss) });
+      dealDmg = applyForgottenAnchorReduction(current, effects, logs, dealDmg);
       playerHp = Math.max(0, playerHp - dealDmg);
       logs.push(`${combatEnemy.icon} **${combatEnemy.name}** tấn công gây **${dealDmg}** sát thương. (${playerHp}/${current.player_max_hp} HP)`);
     }

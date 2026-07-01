@@ -56,6 +56,19 @@ export function getLevelSuccessBonus(craftingLevel: number): number {
 // ── Recipes ───────────────────────────────────────────────────────────────
 export const CRAFT_RECIPES: CraftRecipe[] = [
 
+  // ════════════ KEY ITEMS / ROUTE CRAFTS ═══════════════════════════════════
+  {
+    id: 'craft_memory_lantern', resultItemId: 'memory_lantern', resultAmount: 1,
+    category: 'material', resultRarity: 'epic', goldCost: 450, levelRequired: 8,
+    successRate: 100, craftingExp: 90,
+    ingredients: [
+      { itemId: 'ash_crystal', amount: 1 },
+      { itemId: 'black_iron', amount: 3 },
+      { itemId: 'broken_soul', amount: 5 },
+    ],
+    unlockedBy: 'default'
+  },
+
   // ════════════ WEAPONS ════════════════════════════════════════════════════
 
   // Common

@@ -177,6 +177,7 @@ export function buildCombatEmbed(
     focus_tonic: '🎯', rooted: '🌿', stun_immune: '🛡️',
     battle_cry: '📣', stone_skin: '🪨', weapon_oil: '🔩', rage_elixir: '🔥',
     blood_vial: '🩸', armor_polish: '🧼', silence: '📜', ward: '🧿',
+    memory_lantern: '🪔', void_shell: '🌀', amnesia_overdrive: '🫥', lost_memory_curse: '🫥',
   };
 
   // Parse group enemies
@@ -253,6 +254,7 @@ export function buildCombatEmbed(
       battle_cry: 'ATK↑', stone_skin: 'Giáp↑', silence: 'Silence', ward: 'Bùa',
       weapon_oil: 'ATK↑', rage_elixir: 'Bạo loạn', blood_vial: 'ATK↑', armor_polish: 'DEF↑',
       focus_tonic: 'Focus', bark_armor: 'Vỏ cây', oak_vulnerable: 'Yếu điểm', boss_charging: 'Đang tích',
+      memory_lantern: 'Mỏ neo', void_shell: 'Void Shell', amnesia_overdrive: 'Amnesia', lost_memory_curse: 'Lost Memory',
     };
     const targetTag = (e: any) => e.target === 'enemy' ? ' 👹' : e.target === 'player' ? ' 🧑' : '';
     const valTag = (e: any) => (e.value && (e.name === 'burn' || e.name === 'poison')) ? `(${e.value}/t)` : '';
@@ -279,7 +281,7 @@ function getFleeChanceFromActiveEffects(activeEffectsRaw?: string | null): numbe
   try {
     const effects = JSON.parse(activeEffectsRaw || '[]');
     if (!Array.isArray(effects)) return 45;
-    if (effects.some((e: any) => e?.name === 'rooted')) return 0;
+    if (effects.some((e: any) => e?.name === 'rooted' || e?.name === 'amnesia_overdrive' || e?.name === 'lost_memory_curse')) return 0;
     const attempts = Number(effects.find((e: any) => e?.name === 'flee_attempts')?.value ?? 0) || 0;
     const fleePenalty = Number(effects.find((e: any) => e?.name === 'flee_penalty')?.value ?? 0) || 0;
     return Math.max(5, Math.min(90, 45 + attempts * 15 - fleePenalty));
@@ -297,6 +299,11 @@ export function buildCombatButtons(
   const exhausted = stamina <= 10;
   const fleeChance = getFleeChanceFromActiveEffects(activeEffectsRaw);
   const rooted = fleeChance <= 0;
+  let amnesiaLocked = false;
+  try {
+    const fx = JSON.parse(activeEffectsRaw || '[]');
+    amnesiaLocked = Array.isArray(fx) && fx.some((e: any) => e?.name === 'amnesia_overdrive' || e?.name === 'lost_memory_curse');
+  } catch {}
 
   let hasBarkArmor = false;
   if (activeEffectsRaw) {
@@ -332,7 +339,7 @@ export function buildCombatButtons(
       .setDisabled(!hasItems),
     new ButtonBuilder()
       .setCustomId(`rpg_flee_${userId}`)
-      .setLabel(rooted ? 'Bị trói' : `Rút lui (${fleeChance}%)`)
+      .setLabel(amnesiaLocked ? 'Rút lui bị xoá' : rooted ? 'Bị trói' : `Rút lui (${fleeChance}%)`)
       .setEmoji('🏃')
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(rooted)
@@ -357,22 +364,32 @@ export function buildCombatButtons(
 export function buildSkillSelectMenu(
   userId: string,
   loadout: Array<{ slot: number; skill_id: string }>,
-  playerMp: number
+  playerMp: number,
+  activeEffectsRaw?: string | null
 ): ActionRowBuilder<StringSelectMenuBuilder> {
   const activeLoadout = loadout
     .map(entry => ({ entry, skill: getSkill(entry.skill_id) }))
     .filter(x => x.skill?.type === 'active');
 
-  const options = activeLoadout.map(({ entry, skill }) => {
+  let amnesia = false;
+  try {
+    const fx = JSON.parse(activeEffectsRaw || '[]');
+    amnesia = Array.isArray(fx) && fx.some((e: any) => e?.name === 'amnesia_overdrive');
+  } catch {}
+  const corruptedLabels = ['✦ ▒▒▒', '☌ ???', '∅ MEMORY', '𖤐 ASH', '...'];
+
+  const options = activeLoadout.map(({ entry, skill }, idx) => {
     const sk = skill!;
     const canAfford = !sk.mpCost || playerMp >= sk.mpCost;
-    const label = `[${entry.slot}] ${sk.name}`;
-    const desc = sk.mpCost ? `${sk.mpCost} MP${canAfford ? '' : ' (không đủ MP)'}` : 'Không tốn MP';
+    const label = amnesia ? `[${entry.slot}] ${corruptedLabels[idx % corruptedLabels.length]}` : `[${entry.slot}] ${sk.name}`;
+    const desc = amnesia
+      ? 'Ký ức méo mó — hãy nhớ vị trí skill của bạn'
+      : (sk.mpCost ? `${sk.mpCost} MP${canAfford ? '' : ' (không đủ MP)'}` : 'Không tốn MP');
     return new StringSelectMenuOptionBuilder()
       .setLabel(label)
       .setDescription(desc)
       .setValue(`rpg_useskill_${userId}_${sk.id}`)
-      .setEmoji(sk.icon);
+      .setEmoji(amnesia ? '🫥' : sk.icon);
   });
 
   // Fallback bảo vệ nếu UI gọi nhầm khi người chơi không có active skill.
@@ -387,7 +404,7 @@ export function buildSkillSelectMenu(
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId(`rpg_skillmenu_${userId}`)
-      .setPlaceholder('Chọn kỹ năng để tung đòn...')
+      .setPlaceholder(amnesia ? 'Ký ức bị méo — chọn theo vị trí loadout...' : 'Chọn kỹ năng để tung đòn...')
       .addOptions(options.slice(0, 25))
   );
 }

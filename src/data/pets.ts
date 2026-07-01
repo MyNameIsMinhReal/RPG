@@ -105,6 +105,16 @@ export const PETS: Record<string, PetDef> = {
     releaseItem: 'stardust',
     obtainHint: 'Phần thưởng Prestige lần 3 trở lên',
   },
+
+  void_beast: {
+    id: 'void_beast', name: 'Void Beast', icon: '🐈‍⬛',
+    rarity: 'legendary',
+    description: 'Thú Hư Không sinh ra từ một ký ức chưa bị xóa. Tăng ATK nhờ bản năng săn mồi ngoài thực tại.',
+    passiveType: 'atk_pct', passiveBase: 18, passivePerLv: 2.2,
+    maxLevel: 25, feedGold: 1400,
+    releaseItem: 'void_fragment',
+    obtainHint: '5% rơi khi hoàn thành route The Forgotten Path',
+  },
 };
 
 export function getPet(id: string): PetDef | undefined {

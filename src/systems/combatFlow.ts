@@ -8,8 +8,8 @@ import { registerCombat, unregisterCombat, getCombatEntry, getCombatFallbackHand
 import { getPlayer, getLoadout, applyPassiveStats, getItemQty, removeItem } from './player';
 import {
   getCombatByUser, saveCombat, deleteCombat,
-  processAttack, processSkill, processDefend, processFlee, processItemUse, processIgnite,
-  buildGroupCombatState
+  buildGroupCombatState,
+  resolveCombatMove
 } from './combat';
 import { getEnemy } from '../data/enemies';
 import { getInventory } from './player';
@@ -364,16 +364,16 @@ export async function dispatchCombatInteraction(
         ]});
         return true;
       }
-      result = processAttack(current, freshPassive.atk);
+      result = resolveCombatMove({ type: 'attack' }, { state: current, playerAtk: freshPassive.atk });
     }
     else if (cid === `rpg_atktarget_${userId}` && compInt.isStringSelectMenu()) {
       const val = (compInt as StringSelectMenuInteraction).values[0];
       const idx = parseInt(val.replace(`rpg_attackidx_${userId}_`, ''));
-      result = processAttack(current, freshPassive.atk, isNaN(idx) ? 0 : idx);
+      result = resolveCombatMove({ type: 'attack', targetIdx: isNaN(idx) ? 0 : idx }, { state: current, playerAtk: freshPassive.atk });
     }
-    else if (cid === `rpg_defend_${userId}`)  result = processDefend(current, freshPassive.atk, 0, 0);
-    else if (cid === `rpg_flee_${userId}`)    result = processFlee(current);
-    else if (cid === `rpg_ignite_${userId}`)  result = processIgnite(current);
+    else if (cid === `rpg_defend_${userId}`)  result = resolveCombatMove({ type: 'defend' }, { state: current, playerAtk: freshPassive.atk });
+    else if (cid === `rpg_flee_${userId}`)    result = resolveCombatMove({ type: 'flee' }, { state: current, playerAtk: freshPassive.atk });
+    else if (cid === `rpg_ignite_${userId}`)  result = resolveCombatMove({ type: 'ignite' }, { state: current, playerAtk: freshPassive.atk });
     else if (cid === `rpg_item_${userId}`) {
       const inv  = getInventory(userId, guildId);
       const cons = inv.filter((e: any) => { const it = getItem(e.item_id); return it?.type === 'consumable' && e.quantity > 0 && isCombatUsableItem(e.item_id); });
@@ -395,13 +395,13 @@ export async function dispatchCombatInteraction(
     else if (cid === `rpg_itemsel_${userId}`) {
       const itemId = (compInt as any).values?.[0]?.replace('useitem_', '');
       if (!itemId) return true;
-      result = processItemUse(current, itemId);
+      result = resolveCombatMove({ type: 'item', itemId }, { state: current, playerAtk: freshPassive.atk });
       if (result.itemConsumed && countsAsPotion(itemId)) incrementDaily(userId, guildId, 'potion_used');
     }
     else if (cid === `rpg_skill_${userId}`) {
       const updatedLoadout = getLoadout(userId, guildId);
       if (!updatedLoadout.length) return true;
-      await compInt.editReply({ components: [buildSkillSelectMenu(userId, updatedLoadout, current.player_mp), makeBackRow(userId)] }).catch(() => {});
+      await compInt.editReply({ components: [buildSkillSelectMenu(userId, updatedLoadout, current.player_mp, current.active_effects), makeBackRow(userId)] }).catch(() => {});
       return true;
     }
     else if (cid === `rpg_skillmenu_${userId}` && compInt.isStringSelectMenu()) {
@@ -410,12 +410,12 @@ export async function dispatchCombatInteraction(
         await compInt.editReply({ components: buildSkillTargetRows(userId, current, skillId) }).catch(() => {});
         return true;
       }
-      result = processSkill(current, skillId, freshPassive.atk, 0, 0);
+      result = resolveCombatMove({ type: 'skill', skillId }, { state: current, playerAtk: freshPassive.atk });
     }
     else if (cid.startsWith(`rpg_skilltarget_${userId}_`) && compInt.isStringSelectMenu()) {
       const skillId = cid.replace(`rpg_skilltarget_${userId}_`, '');
       const targetIdx = parseTargetIndexFromSelect(compInt as StringSelectMenuInteraction);
-      result = processSkill(current, skillId, freshPassive.atk, 0, 0, targetIdx);
+      result = resolveCombatMove({ type: 'skill', skillId, targetIdx }, { state: current, playerAtk: freshPassive.atk });
     }
     else if (cid === `rpg_back_${userId}`) {
       await compInt.editReply({
@@ -503,7 +503,7 @@ export async function startCombatFlow(
   onDeath: CombatDeathHandler,
   onFlee?: CombatFleeHandler,
   hpOverride?: { startHp: number; maxHp: number },
-  startingEffects?: { name: string; duration: number; value?: number }[]
+  startingEffects?: { name: string; duration: number; value?: number; target?: 'player' | 'enemy' }[]
 ): Promise<void> {
   const player      = getPlayer(userId, guildId)!;
   let enemy: any    = getEnemy(enemyId);
@@ -533,6 +533,23 @@ export async function startCombatFlow(
   const monsterScaleDesc = !enemy.boss ? enemy._monsterLevelScaling?.desc : null;
   const openingLogs = [log0, ...(bossScaleDesc ? [bossScaleDesc] : []), ...(monsterScaleDesc ? [monsterScaleDesc] : []), ...corruptionAdjusted.lines, ...buffedStart.logs, ...(defenseRedux > 0 ? [`🧱 Tường thành Ashveil: quái bị giảm ${defenseRedux}% ATK.`] : []), ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : [])];
 
+  const initialRouteEffects: { name: string; duration: number; value?: number; target?: 'player' | 'enemy' }[] = [...(startingEffects ?? [])];
+  if (enemy.id === 'the_forgotten') {
+    const hasMemoryLanternEffect = initialRouteEffects.some(e => e.name === 'memory_lantern');
+    const hasLostMemoryEffect = initialRouteEffects.some(e => e.name === 'lost_memory_curse');
+    const hasVoidShellEffect = initialRouteEffects.some(e => e.name === 'void_shell');
+    if (!hasVoidShellEffect) initialRouteEffects.push({ name: 'void_shell', duration: 999, value: 1, target: 'enemy' });
+    if (!hasMemoryLanternEffect && !hasLostMemoryEffect) {
+      if (getItemQty(userId, guildId, 'memory_lantern') > 0) {
+        initialRouteEffects.push({ name: 'memory_lantern', duration: 999, value: 15, target: 'player' });
+        openingLogs.push('🪔 **Memory Lantern** sáng lên — bạn có mỏ neo chống lại Lost Memory.');
+      } else {
+        initialRouteEffects.push({ name: 'lost_memory_curse', duration: 999, value: 30, target: 'player' });
+        openingLogs.push('🫥 Không có Memory Lantern: The Forgotten bắt đầu xóa khái niệm sống khỏi bạn.');
+      }
+    }
+  }
+
   const initState = {
     message_id: 'temp', channel_id: interaction.channelId,
     user_id: userId, guild_id: guildId,
@@ -544,7 +561,7 @@ export async function startCombatFlow(
     player_def: withPassive.def,
     turn: 1, is_defending: 0,
     active_effects: JSON.stringify([
-      ...(startingEffects ?? []),
+      ...initialRouteEffects,
       ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
       ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
       ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),
@@ -618,6 +635,17 @@ export async function startCombatFlowWithEnemy(
     ...(greedBuff ? ['📜 Scroll of Greed: enemy ATK +15%, gold thưởng sẽ tăng nếu thắng.'] : []),
     ...(smokeBuff ? ['🗡️ Assassin’s Smoke: shopkeeper DEF -20% khi mở combat.'] : [])
   ];
+  const inlineRouteEffects: { name: string; duration: number; value?: number; target?: 'player' | 'enemy' }[] = [];
+  if (enemy.id === 'the_forgotten') {
+    inlineRouteEffects.push({ name: 'void_shell', duration: 999, value: 1, target: 'enemy' });
+    if (getItemQty(userId, guildId, 'memory_lantern') > 0) {
+      inlineRouteEffects.push({ name: 'memory_lantern', duration: 999, value: 15, target: 'player' });
+      openingLogs.push('🪔 **Memory Lantern** sáng lên — bạn có mỏ neo chống lại Lost Memory.');
+    } else {
+      inlineRouteEffects.push({ name: 'lost_memory_curse', duration: 999, value: 30, target: 'player' });
+      openingLogs.push('🫥 Không có Memory Lantern: The Forgotten bắt đầu xóa khái niệm sống khỏi bạn.');
+    }
+  }
   const initState = {
     message_id: 'temp', channel_id: interaction.channelId,
     user_id: userId, guild_id: guildId,
@@ -629,6 +657,7 @@ export async function startCombatFlowWithEnemy(
     player_def: withPassive.def,
     turn: 1, is_defending: 0,
     active_effects: JSON.stringify([
+      ...inlineRouteEffects,
       ...(buffedStart.logs.some(l => l.includes('Quickstep')) ? [{ name: 'dodge', duration: 1 }] : []),
       ...(consumeBuff(userId, guildId, 'rune_charm') ? [{ name: 'ward', duration: 1 }] : []),
       ...(buffedStart.logs.some(l => l.includes('Focus Tonic')) ? [{ name: 'focus_tonic', duration: 999, value: 20 }, { name: 'incoming_damage_up', duration: 999, value: 10 }] : []),

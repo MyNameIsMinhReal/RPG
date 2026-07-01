@@ -40,6 +40,7 @@ import { showExploreMenu } from './menu';
 import { showMerchant, showSoulShop } from './merchant';
 import { getReadyPartyMemberIds } from './partyHelpers';
 import { maybeGainShrineCorruption, getCorruptionLevel, getCorruptionTier } from '../corruption';
+import { canShowForgottenRift, FORGOTTEN_STARTING_EFFECTS, showForgottenRiftNode } from '../forgottenRoute';
 
 async function startEnemyCombatMaybeParty(
   interaction: ChatInputCommandInteraction,
@@ -235,6 +236,28 @@ export async function handleSearch(
       attachContinueExploreHandler,
     });
     if (ranChapterEvent) return;
+  }
+
+  // The Forgotten Path: when the player has enough Abyss Cores in Zone 4,
+  // the next search is hijacked by the fixed red/black rift node instead of
+  // rolling normal events. This makes the boss route deterministic once the
+  // beacons are collected.
+  if (canShowForgottenRift(userId, guildId, player.zone_id)) {
+    setExploreCooldown(userId, guildId);
+    await showForgottenRiftNode(interaction, userId, guildId, async () => {
+      await startCombatFlow(
+        interaction,
+        userId,
+        guildId,
+        'the_forgotten',
+        handleVictory,
+        handleDeath,
+        handleFlee,
+        undefined,
+        FORGOTTEN_STARTING_EFFECTS
+      );
+    });
+    return;
   }
 
   const shrineCorruptionTier = player.zone_id === 'shrine' ? getCorruptionTier((player as any).corruption ?? 0) : 0;
