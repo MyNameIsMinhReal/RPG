@@ -1,5 +1,6 @@
 import forestEventsJson from './events/forestEvents.json';
 import wastesForgottenEventsJson from './events/wastesForgottenEvents.json';
+import random50EventsJson from './events/random50Events.json';
 
 export type DataDrivenExploreEventId = string;
 
@@ -5886,5 +5887,6 @@ const CODE_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = [
 export const DATA_DRIVEN_EXPLORE_EVENTS: readonly DataDrivenExploreEventDef[] = [
   ...(forestEventsJson as readonly DataDrivenExploreEventDef[]),
   ...(wastesForgottenEventsJson as readonly DataDrivenExploreEventDef[]),
+  ...(random50EventsJson as readonly DataDrivenExploreEventDef[]),
   ...CODE_DRIVEN_EXPLORE_EVENTS,
 ] as const;

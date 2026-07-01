@@ -29,6 +29,70 @@ type Tab = 'items' | 'skills' | 'loadout' | 'equip' | 'titles';
 
 const INVENTORY_COLLECTOR_MS = 120_000;
 
+function getInteractionErrorCode(err: any): unknown {
+  return err?.code ?? err?.rawError?.code ?? err?.status ?? err?.name ?? err?.cause?.code;
+}
+
+function isIgnorableInteractionAckError(err: any): boolean {
+  const code = getInteractionErrorCode(err);
+  const msg = String(err?.message ?? err ?? '').toLowerCase();
+
+  // Discord interaction ACK errors that are expected for stale inventory menus:
+  // - 10062: Unknown interaction (expired token / old message / bot restart)
+  // - 40060: Interaction has already been acknowledged
+  if (code === 10062 || code === 40060) return true;
+
+  // Network/proxy timeouts from undici can happen while acknowledging the click.
+  // These do not indicate an inventory logic bug and should not spam logs.
+  if (typeof code === 'string') {
+    const networkCodes = new Set([
+      'UND_ERR_CONNECT_TIMEOUT',
+      'UND_ERR_HEADERS_TIMEOUT',
+      'UND_ERR_BODY_TIMEOUT',
+      'UND_ERR_SOCKET',
+      'UND_ERR_DESTROYED',
+      'ECONNRESET',
+      'ECONNREFUSED',
+      'ETIMEDOUT',
+      'EAI_AGAIN',
+      'ENETUNREACH',
+    ]);
+    if (networkCodes.has(code)) return true;
+  }
+
+  return (
+    msg.includes('unknown interaction') ||
+    msg.includes('already been acknowledged') ||
+    msg.includes('connect timeout') ||
+    msg.includes('connection timeout') ||
+    msg.includes('headers timeout') ||
+    msg.includes('socket') ||
+    msg.includes('und_err_')
+  );
+}
+
+async function safeInventoryDeferUpdate(component: any, context: string): Promise<boolean> {
+  // If another collector already acknowledged this interaction, do not run the action twice.
+  if (component?.deferred || component?.replied) return false;
+
+  try {
+    await component.deferUpdate();
+    return true;
+  } catch (err: any) {
+    // Most deferUpdate failures here are stale Discord interactions or temporary network
+    // ACK failures. They are not inventory state errors, so keep production logs clean.
+    if (!isIgnorableInteractionAckError(err)) {
+      console.warn(`[INVENTORY] ${context} failed:`, getInteractionErrorCode(err) ?? err);
+    }
+    return false;
+  }
+}
+
+function isInventoryComponentForUser(i: any, userId: string): boolean {
+  const cid = String(i?.customId ?? '');
+  return i?.user?.id === userId && cid.startsWith('inv_') && cid.includes(`_${userId}`);
+}
+
 function buildInventoryTabSelect(userId: string, currentTab?: Tab): ActionRowBuilder<StringSelectMenuBuilder> {
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
     new StringSelectMenuBuilder()
@@ -86,15 +150,12 @@ async function renderTab(
 
   // ── Collector ────────────────────────────────────────────────────
   const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
+    filter: i => isInventoryComponentForUser(i, userId),
     time: INVENTORY_COLLECTOR_MS
   });
 
   collector.on('collect', async (compInt) => {
-    const deferred = await compInt.deferUpdate().then(() => true).catch(err => {
-      console.warn('[INVENTORY] deferUpdate failed:', err?.code ?? err);
-      return false;
-    });
+    const deferred = await safeInventoryDeferUpdate(compInt, 'deferUpdate');
     if (!deferred) return;
     collector.stop('action');
     const cid = (compInt as any).customId as string;
@@ -504,15 +565,12 @@ async function handleUseItem(
   const reply = await interaction.editReply({ embeds: [embed], components: [tabSelect, backRow] });
 
   const collector = reply.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
+    filter: i => isInventoryComponentForUser(i, userId),
     time: INVENTORY_COLLECTOR_MS
   });
 
   collector.on('collect', async (compInt) => {
-    const deferred = await compInt.deferUpdate().then(() => true).catch(err => {
-      console.warn('[INVENTORY] result deferUpdate failed:', err?.code ?? err);
-      return false;
-    });
+    const deferred = await safeInventoryDeferUpdate(compInt, 'result deferUpdate');
     if (!deferred) return;
     collector.stop('action');
 
@@ -579,12 +637,12 @@ async function pickSlotForSkill(
 
   const sel = await reply.awaitMessageComponent({
     componentType: ComponentType.StringSelect,
-    filter: i => i.user.id === userId,
+    filter: i => isInventoryComponentForUser(i, userId),
     time: 20_000
   }).catch(() => null);
 
   if (!sel) { await renderTab(interaction, userId, guildId, 'loadout'); return; }
-  const ok = await sel.deferUpdate().then(() => true).catch(() => false);
+  const ok = await safeInventoryDeferUpdate(sel, 'slot picker deferUpdate');
   if (!ok) return;
 
   const slot = Number(sel.values[0].replace('slot_', ''));
